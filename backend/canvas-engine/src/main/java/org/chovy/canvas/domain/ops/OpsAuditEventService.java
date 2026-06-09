@@ -9,6 +9,9 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
+/**
+ * OpsAuditEventService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class OpsAuditEventService {
 
     private static final int MAX_EVENTS = 500;
@@ -38,10 +41,19 @@ public class OpsAuditEventService {
         return event;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<OpsAuditEvent> recent(Long tenantId, int limit) {
         int normalizedLimit = Math.max(1, Math.min(limit, 100));
         List<OpsAuditEvent> result = new ArrayList<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (OpsAuditEvent event : events) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (tenantId == null || tenantId.equals(event.tenantId())) {
                 result.add(event);
             }
@@ -49,9 +61,13 @@ public class OpsAuditEventService {
                 break;
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return result;
     }
 
+    /**
+     * OpsAuditEvent 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record OpsAuditEvent(
             String id,
             Long tenantId,

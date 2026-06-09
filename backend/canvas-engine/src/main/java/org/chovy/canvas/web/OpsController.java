@@ -65,6 +65,20 @@ public class OpsController {
     /** 统一审批工作流服务；存在时 pending-reviews 改读统一审批任务。 */
     private ApprovalWorkflowService approvalWorkflowService;
 
+    /**
+     * 创建 OpsController 实例并注入 web 场景依赖。
+     * @param templateMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasVersionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param approvalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param configCache 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param routeRecoveryService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param canvasService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasOpsService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param opsAuditEventService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param notificationEventService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public OpsController(CanvasTemplateMapper templateMapper,
                          CanvasMapper canvasMapper,
@@ -90,11 +104,30 @@ public class OpsController {
         this.notificationEventService = notificationEventService;
     }
 
+    /**
+     * 创建 OpsController 实例并注入 web 场景依赖。
+     * @param templateMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasVersionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param approvalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param configCache 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param routeRecoveryService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setApprovalWorkflowService(ApprovalWorkflowService approvalWorkflowService) {
         this.approvalWorkflowService = approvalWorkflowService;
     }
 
+    /**
+     * 执行 OpsController 流程，围绕 ops controller 完成校验、计算或结果组装。
+     *
+     * @param templateMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasVersionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param approvalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param configCache 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param routeRecoveryService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public OpsController(CanvasTemplateMapper templateMapper,
                          CanvasMapper canvasMapper,
                          CanvasVersionMapper canvasVersionMapper,
@@ -124,7 +157,9 @@ public class OpsController {
     @PostMapping("/ops/cache/invalidate/{id}")
     public Mono<R<String>> invalidateCache(@PathVariable Long id) {
         return Mono.fromCallable(() -> {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             CanvasDO canvas = canvasMapper.selectById(id);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (canvas == null) return R.<String>fail("画布不存在: " + id);
             if (canvas.getPublishedVersionId() != null) {
                 configCache.invalidate(id, canvas.getPublishedVersionId());
@@ -132,6 +167,7 @@ public class OpsController {
             if (canvas.getCanaryVersionId() != null) {
                 configCache.invalidate(id, canvas.getCanaryVersionId());
             }
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return R.ok("已失效画布 " + id + " 的缓存");
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -142,7 +178,14 @@ public class OpsController {
         return Mono.fromCallable(() -> R.ok(routeRecoveryService.rebuildRuntimeState()))
                 .subscribeOn(Schedulers.boundedElastic());
     }
-
+    /**
+     * 触发运维运行接口，对应 GET /ops/runtime/status。
+     * 接口先解析当前租户上下文，并把操作人和角色传入服务层执行权限校验。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @return 异步返回统一响应，包含触发运维运行后的业务数据。
+     */
     @GetMapping("/ops/runtime/status")
     public Mono<R<RuntimeStatus>> runtimeStatus() {
         return requiredTenantContext().map(context -> R.ok(new RuntimeStatus(
@@ -151,14 +194,31 @@ public class OpsController {
                 context.tenantId(),
                 context.username())));
     }
-
+    /**
+     * 查询运维审计接口，对应 GET /ops/audit-events。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param limit 返回数量上限，默认值为 50。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/ops/audit-events")
     public Mono<R<List<OpsAuditEventService.OpsAuditEvent>>> auditEvents(
             @RequestParam(defaultValue = "50") int limit) {
         return requiredTenantContext().map(context -> R.ok(
                 requiredAuditService().recent(context.isSuperAdmin() ? null : context.tenantId(), limit)));
     }
-
+    /**
+     * 暂停 运维接口，对应 POST /ops/canvas/{id}/pause。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 副作用：会暂停资源。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含键值结果。
+     */
     @PostMapping("/ops/canvas/{id}/pause")
     public Mono<R<Map<String, Object>>> pauseCanvas(
             @PathVariable Long id,
@@ -166,7 +226,16 @@ public class OpsController {
         return emergencyAction(id, "PAUSE", req,
                 (context, canvas) -> requiredCanvasService().offline(id, operator(context)));
     }
-
+    /**
+     * 处理 运维 请求接口，对应 POST /ops/canvas/{id}/offline。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 副作用由下游服务封装，通常会写入状态、审计或任务记录。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含键值结果。
+     */
     @PostMapping("/ops/canvas/{id}/offline")
     public Mono<R<Map<String, Object>>> offlineCanvas(
             @PathVariable Long id,
@@ -174,7 +243,16 @@ public class OpsController {
         return emergencyAction(id, "OFFLINE", req,
                 (context, canvas) -> requiredCanvasService().offline(id, operator(context)));
     }
-
+    /**
+     * 恢复 运维接口，对应 POST /ops/canvas/{id}/resume。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 副作用：会恢复资源。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含键值结果。
+     */
     @PostMapping("/ops/canvas/{id}/resume")
     public Mono<R<Map<String, Object>>> resumeCanvas(
             @PathVariable Long id,
@@ -182,7 +260,16 @@ public class OpsController {
         return emergencyAction(id, "RESUME", req,
                 (context, canvas) -> requiredCanvasService().publish(id, operator(context)));
     }
-
+    /**
+     * 处理 运维 请求接口，对应 POST /ops/canvas/{id}/kill。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 副作用由下游服务封装，通常会写入状态、审计或任务记录。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含键值结果。
+     */
     @PostMapping("/ops/canvas/{id}/kill")
     public Mono<R<Map<String, Object>>> killCanvas(
             @PathVariable Long id,
@@ -190,7 +277,16 @@ public class OpsController {
         return emergencyAction(id, "KILL", req,
                 (context, canvas) -> requiredCanvasOpsService().kill(id, defaultIfBlank(req.getMode(), "GRACEFUL")));
     }
-
+    /**
+     * 回滚运维操作接口，对应 POST /ops/canvas/{id}/rollback。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 副作用：会执行回滚动作。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含键值结果。
+     */
     @PostMapping("/ops/canvas/{id}/rollback")
     public Mono<R<Map<String, Object>>> rollbackCanvas(
             @PathVariable Long id,
@@ -303,7 +399,9 @@ public class OpsController {
      */
     @GetMapping("/canvas/pending-reviews")
     public Mono<R<List<ApprovalTaskView>>> pendingReviews() {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (approvalWorkflowService != null) {
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             return requiredTenantContext().flatMap(context ->
                     Mono.fromCallable(() -> R.ok(approvalWorkflowService.listTasks(
                                     context.tenantId() == null ? 0L : context.tenantId(),
@@ -313,6 +411,7 @@ public class OpsController {
                             .subscribeOn(Schedulers.boundedElastic()));
         }
         return Mono.fromCallable(() ->
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 approvalMapper.selectList(
                                 new LambdaQueryWrapper<CanvasManualApprovalDO>()
                                         .eq(CanvasManualApprovalDO::getStatus, ApprovalStatus.PENDING)
@@ -323,6 +422,12 @@ public class OpsController {
         ).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 执行 legacyApprovalTask 流程，围绕 legacy approval task 完成校验、计算或结果组装。
+     *
+     * @param approval approval 参数，用于 legacyApprovalTask 流程中的校验、计算或对象转换。
+     * @return 返回 legacyApprovalTask 流程生成的业务结果。
+     */
     private ApprovalTaskView legacyApprovalTask(CanvasManualApprovalDO approval) {
         return new ApprovalTaskView(
                 null,
@@ -367,11 +472,24 @@ public class OpsController {
     }
 
     @Data
+    /**
+     * EmergencyActionReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public static class EmergencyActionReq {
+        /** 发起变更、控制或回滚的原因，用于审批和审计追溯。 */
         private String reason;
+        /** 执行模式，用于区分自动判定、人工触发或混合巡检流程。 */
         private String mode;
     }
 
+    /**
+     * RuntimeStatus 创建或触发 web 场景的业务处理。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @return 返回 RuntimeStatus 流程生成的业务结果。
+     */
     public record RuntimeStatus(
             String status,
             String role,
@@ -379,17 +497,36 @@ public class OpsController {
             String username) {
     }
 
+    /**
+     * EmergencyOperation 接口契约。
+     */
     @FunctionalInterface
     private interface EmergencyOperation {
+        /**
+         * 执行核心业务处理流程。
+         *
+         * @param context 上下文对象，承载租户、身份或运行时信息。
+         * @param canvas canvas 参数，用于 execute 流程中的校验、计算或对象转换。
+         */
         void execute(TenantContext context, CanvasDO canvas);
     }
 
+    /**
+     * 执行 emergencyAction 流程，围绕 emergency action 完成校验、计算或结果组装。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param action action 参数，用于 emergencyAction 流程中的校验、计算或对象转换。
+     * @param req 请求对象，承载本次操作的输入参数。
+     * @param operation 待调度任务或操作名称，用于封装阻塞工作。
+     * @return 返回 emergencyAction 流程生成的业务结果。
+     */
     private Mono<R<Map<String, Object>>> emergencyAction(
             Long canvasId,
             String action,
             EmergencyActionReq req,
             EmergencyOperation operation) {
         return requiredTenantContext()
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .flatMap(context -> Mono.fromCallable(() -> {
                     requireEmergencyPermission(context);
                     String reason = requireReason(req);
@@ -397,6 +534,7 @@ public class OpsController {
                             canvasId,
                             context.isSuperAdmin() ? null : context.tenantId(),
                             context.isSuperAdmin());
+                    // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                     operation.execute(context, canvas);
                     OpsAuditEventService.OpsAuditEvent audit = requiredAuditService().record(
                             canvas.getTenantId(),
@@ -412,10 +550,16 @@ public class OpsController {
                             "action", action,
                             "canvasId", canvasId,
                             "auditId", audit.id());
+                    // 汇总前面计算出的状态和明细，返回给调用方。
                     return R.ok(result);
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @return 返回 requiredTenantContext 流程生成的业务结果。
+     */
     private Mono<TenantContext> requiredTenantContext() {
         if (tenantContextResolver == null) {
             return Mono.error(new SecurityException("AUTH_003: missing tenant context"));
@@ -423,12 +567,23 @@ public class OpsController {
         return tenantContextResolver.currentOrError();
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void requireEmergencyPermission(TenantContext context) {
         if (context == null || (!context.isSuperAdmin() && !context.isTenantAdmin())) {
             throw new AccessDeniedException("无权限执行运维应急动作");
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param req 请求对象，承载本次操作的输入参数。
+     * @return 返回 require reason 生成的文本或业务键。
+     */
     private String requireReason(EmergencyActionReq req) {
         String reason = req == null ? null : req.getReason();
         if (reason == null || reason.isBlank()) {
@@ -437,16 +592,34 @@ public class OpsController {
         return reason.trim();
     }
 
+    /**
+     * 解析操作人标识。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 operator 生成的文本或业务键。
+     */
     private String operator(TenantContext context) {
         return context != null && context.username() != null && !context.username().isBlank()
                 ? context.username()
                 : "operator";
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultIfBlank 流程中的校验、计算或对象转换。
+     * @return 返回 default if blank 生成的文本或业务键。
+     */
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @return 返回 requiredCanvasService 流程生成的业务结果。
+     */
     private CanvasService requiredCanvasService() {
         if (canvasService == null) {
             throw new IllegalStateException("canvasService is not configured");
@@ -454,6 +627,11 @@ public class OpsController {
         return canvasService;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @return 返回 requiredCanvasOpsService 流程生成的业务结果。
+     */
     private CanvasOpsService requiredCanvasOpsService() {
         if (canvasOpsService == null) {
             throw new IllegalStateException("canvasOpsService is not configured");
@@ -461,6 +639,11 @@ public class OpsController {
         return canvasOpsService;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @return 返回 requiredAuditService 流程生成的业务结果。
+     */
     private OpsAuditEventService requiredAuditService() {
         if (opsAuditEventService == null) {
             throw new IllegalStateException("opsAuditEventService is not configured");

@@ -1,8 +1,13 @@
 # P2-082AD - Search Marketing Production Closed Loop Spec
 
+Priority: P2
+Sequence: 082AD
 Parent spec: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082ad-search-marketing-production-closed-loop-plan.md`
-Status: In progress - backend closed-loop foundation
+
+## Implementation Status
+
+In progress - backend closed-loop foundation.
 
 ## Problem
 

@@ -3,6 +3,7 @@ package org.chovy.canvas.domain.canvas;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.UserInputFormDO;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class UserInputServiceTest {
@@ -85,7 +87,7 @@ class UserInputServiceTest {
     }
 
     @Test
-    void submitCompletesPendingResponseAuditsAndTriggersResume() {
+    void submitCompletesPendingResponseAuditsAndTriggersResume() throws Exception {
         UserInputResponseMapper responseMapper = mock(UserInputResponseMapper.class);
         UserInputResumeAuditMapper auditMapper = mock(UserInputResumeAuditMapper.class);
         CanvasExecutionService executionService = mock(CanvasExecutionService.class);
@@ -100,23 +102,37 @@ class UserInputServiceTest {
 
         assertThat(resp.duplicate()).isFalse();
         assertThat(resp.status()).isEqualTo(UserInputService.STATUS_COMPLETED);
-        verify(auditMapper).insert(any(UserInputResumeAuditDO.class));
+        ArgumentCaptor<UserInputResumeAuditDO> auditCaptor = ArgumentCaptor.forClass(UserInputResumeAuditDO.class);
+        verify(auditMapper).insert(auditCaptor.capture());
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
         verify(executionService).trigger(eq(10L), eq("user-1"), eq(TriggerType.WAIT_RESUME),
-                eq(NodeType.USER_INPUT), eq("input-1"), any(), any(), eq(false));
+                eq(NodeType.USER_INPUT), eq("input-1"), payloadCaptor.capture(), any(), eq(false));
+        assertThat(payloadCaptor.getValue())
+                .containsEntry(MapFieldKeys.SOURCE_NODE_ID, "input-1")
+                .containsEntry(MapFieldKeys.WAIT_RESUME_STATUS, UserInputService.STATUS_COMPLETED);
+
+        Map<String, Object> auditPayload = new ObjectMapper()
+                .readValue(auditCaptor.getValue().getResumePayload(), Map.class);
+        assertThat(auditPayload)
+                .containsEntry(MapFieldKeys.SOURCE_NODE_ID, "input-1")
+                .containsEntry(MapFieldKeys.WAIT_RESUME_STATUS, UserInputService.STATUS_COMPLETED);
     }
 
     @Test
     void submitIsDuplicateWhenAlreadyCompleted() {
         UserInputResponseMapper responseMapper = mock(UserInputResponseMapper.class);
+        UserInputResumeAuditMapper auditMapper = mock(UserInputResumeAuditMapper.class);
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
         UserInputResponseDO completed = response(12L, UserInputService.STATUS_COMPLETED);
         when(responseMapper.selectById(12L)).thenReturn(completed);
-        UserInputService service = service(mock(UserInputFormMapper.class), responseMapper,
-                mock(UserInputResumeAuditMapper.class), mock(CanvasExecutionService.class));
+        UserInputService service = service(mock(UserInputFormMapper.class), responseMapper, auditMapper, executionService);
 
         UserInputSubmitResp resp = service.submit(12L, new UserInputSubmitReq(Map.of("email", "a@example.com"), "alice"));
 
         assertThat(resp.duplicate()).isTrue();
         assertThat(resp.status()).isEqualTo(UserInputService.STATUS_COMPLETED);
+        verifyNoInteractions(auditMapper, executionService);
     }
 
     private UserInputService service(UserInputFormMapper formMapper,

@@ -43,6 +43,7 @@ public class LlmBiInterpretationPlanner implements BiInterpretationPlanner {
                 request.modelKey(),
                 null,
                 variables(context),
+                null,
                 request.params(),
                 request.timeoutMs(),
                 null,

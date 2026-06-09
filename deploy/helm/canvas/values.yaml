@@ -1,11 +1,15 @@
 nameOverride: ""
 fullnameOverride: ""
+# Namespace is explicit so rendered manifests can be reviewed without relying on helm CLI flags.
 namespace: canvas
 
 global:
+  # Shared Kubernetes labels used by templates for ownership and app grouping.
   partOf: marketing-canvas
+  # Optional imagePullSecrets for private registries.
   imagePullSecrets: []
 
+# Spring Boot engine deployment and runtime wiring.
 backend:
   enabled: true
   name: canvas-engine
@@ -22,12 +26,14 @@ backend:
   strategy:
     maxSurge: 1
     maxUnavailable: 0
+  # JVM options favor low-pause production behavior and container-aware memory sizing.
   javaOpts: >-
     -XX:+UseZGC
     -XX:+ZGenerational
     -XX:MaxRAMPercentage=70
     -Djava.security.egd=file:/dev/./urandom
   profile: prod
+  # Health probes point at Actuator and use a longer startup gate for Flyway and cache warmup.
   probes:
     readinessPath: /actuator/health
     livenessPath: /actuator/health
@@ -43,6 +49,7 @@ backend:
       cpu: "2"
       memory: 3Gi
   config:
+    # Non-secret runtime dependencies are mounted through ConfigMap environment variables.
     springDataRedisHost: redis.example.internal
     springDataRedisPort: "6379"
     rocketmqNameServer: rocketmq.example.internal:9876
@@ -51,6 +58,7 @@ backend:
     springDatasourceHikariMaximumPoolSize: "33"
     springDatasourceHikariMinimumIdle: "8"
   secretName: canvas-engine-runtime
+  # Secret keys map external Secret data keys to Spring/Canvas environment variables.
   secretKeys:
     springDatasourceUrl: spring-datasource-url
     springDatasourceUsername: spring-datasource-username
@@ -62,12 +70,14 @@ backend:
     canvasJwtSecret: canvas-jwt-secret
     canvasSecretCipherKey: canvas-secret-cipher-key
   autoscaling:
+    # Backend autoscaling keeps at least two replicas for rolling updates and request continuity.
     enabled: true
     minReplicas: 2
     maxReplicas: 6
     targetCPUUtilizationPercentage: 65
     targetMemoryUtilizationPercentage: 75
 
+# Static frontend deployment served by nginx; API traffic is routed by nginx configuration.
 frontend:
   enabled: true
   name: canvas-frontend
@@ -95,11 +105,13 @@ frontend:
       cpu: 500m
       memory: 512Mi
   autoscaling:
+    # Frontend replicas are lightweight but kept redundant for ingress availability.
     enabled: true
     minReplicas: 2
     maxReplicas: 4
     targetCPUUtilizationPercentage: 70
 
+# Optional Flink realtime warehouse stack. Disabled by default for app-only deployments.
 flink:
   enabled: false
   image:
@@ -108,12 +120,14 @@ flink:
     pullPolicy: IfNotPresent
   serviceAccountName: canvas-flink
   jobJarPath: /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar
+  # Pipelines are rendered into submitter Jobs; order mirrors the realtime warehouse DAG.
   pipelines:
     - mysql_cdp_event_log_to_doris_ods
     - mysql_canvas_trace_to_doris_ods
     - doris_ods_cdp_event_to_dwd_fact
     - doris_dwd_user_fact_to_dws_metric_daily
   config:
+    # Runtime tuning is passed into Flink configuration and checkpoint reporter payloads.
     tenantId: "0"
     reportedBy: canvas-flink-jobs-prod
     dorisLabelSuffix: ""
@@ -127,6 +141,7 @@ flink:
     checkpointDir: file:///opt/flink/checkpoints
     savepointDir: file:///opt/flink/savepoints
   secretName: canvas-flink-runtime
+  # Secret keys are shared by JobManager, TaskManager, and submitter jobs.
   secretKeys:
     canvasFlinkMysqlUrl: canvas-flink-mysql-url
     canvasFlinkMysqlUsername: canvas-flink-mysql-username
@@ -139,6 +154,7 @@ flink:
     canvasFlinkCheckpointEndpoint: canvas-flink-checkpoint-endpoint
     canvasFlinkInternalApiToken: canvas-flink-internal-api-token
   jobManager:
+    # JobManager coordinates SQL job submission and checkpoint metadata.
     replicas: 1
     restPort: 8081
     rpcPort: 6123
@@ -150,6 +166,7 @@ flink:
         cpu: "2"
         memory: 2Gi
   taskManager:
+    # TaskManagers run the streaming operators; scale replicas/slots with pipeline parallelism.
     replicas: 2
     resources:
       requests:
@@ -159,10 +176,12 @@ flink:
         cpu: "4"
         memory: 6Gi
   storage:
+    # Persistent volumes keep checkpoints/savepoints across pod rescheduling.
     checkpointStorageSize: 20Gi
     savepointStorageSize: 20Gi
     storageClassName: ""
 
+# Public ingress for the frontend host; backend API routing is handled by frontend nginx.
 ingress:
   enabled: true
   className: nginx
@@ -175,4 +194,5 @@ ingress:
     secretName: canvas-staging-tls
 
 secrets:
+  # Stub secrets are for local template smoke tests only and must stay disabled for real releases.
   createStub: false

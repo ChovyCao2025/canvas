@@ -5,6 +5,8 @@ Sequence: 028
 Source: `docs/product-evolution/specs/p2-024-cdp-warehouse-operations-api-and-scheduler.md`, `docs/product-evolution/specs/p2-025-cdp-warehouse-realtime-retry-buffer.md`, `docs/product-evolution/specs/p2-026-cdp-warehouse-quality-and-reconciliation.md`
 Implementation plan: `../plans/p2-028-cdp-warehouse-scheduler-lease-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a tenant-scoped warehouse scheduler lease so multi-instance deployments do not run backfill, aggregation, realtime retry, or quality checks concurrently for the same warehouse job.

@@ -1,5 +1,9 @@
 # CDP Warehouse Data Path Proof Certification Gate Implementation Plan
 
+Spec: `../specs/p2-072-cdp-warehouse-data-path-proof-certification-gate.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Require P2-071 synthetic ODS data-path proof in warehouse physical E2E certification and production promotion gates.

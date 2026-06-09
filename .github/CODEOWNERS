@@ -1,0 +1,23 @@
+# Open Source Growth and execution-core ownership.
+#
+# Replace @photonpay with GitHub teams before publishing if the repository
+# moves under an organization. Until then, route sensitive areas to the
+# project owner for explicit review.
+
+* @photonpay
+
+/docs/open-source-growth/ @photonpay
+/tools/open-source-growth/ @photonpay
+/.github/workflows/ @photonpay
+
+/backend/canvas-engine/src/main/java/org/chovy/canvas/engine/ @photonpay
+/backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/ @photonpay
+/backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/ @photonpay
+/backend/canvas-engine/src/main/java/org/chovy/canvas/engine/template/ @photonpay
+/backend/canvas-engine/src/main/resources/db/migration/ @photonpay
+
+/frontend/src/pages/canvas-editor/ @photonpay
+/frontend/src/pages/canvas-list/ @photonpay
+/frontend/src/components/config-panel/ @photonpay
+/frontend/src/components/node-panel/ @photonpay
+

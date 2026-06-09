@@ -10,8 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CoreTenantNotNullMigrationTest {
 
     @Test
-    void v273BackfillsAndEnforcesCoreTenantColumns() throws Exception {
-        String sql = Files.readString(migrationDir().resolve("V273__enforce_core_tenant_not_null.sql"));
+    void v356BackfillsAndEnforcesCoreTenantColumns() throws Exception {
+        String sql = Files.readString(migrationDir().resolve("V356__enforce_core_tenant_not_null.sql"));
 
         assertThat(sql).contains("UPDATE canvas");
         assertThat(sql).contains("UPDATE canvas_version");

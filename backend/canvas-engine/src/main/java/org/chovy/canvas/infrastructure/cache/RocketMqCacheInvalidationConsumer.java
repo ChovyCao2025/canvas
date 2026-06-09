@@ -30,6 +30,9 @@ import java.nio.charset.StandardCharsets;
         messageModel = MessageModel.BROADCASTING,
         consumeThreadNumber = 2
 )
+/**
+ * RocketMqCacheInvalidationConsumer 封装本模块的核心职责、输入输出结构和协作边界。
+ */
 public class RocketMqCacheInvalidationConsumer implements RocketMQListener<MessageExt> {
     /** 失效消息反序列化用 Jackson 组件。 */
     private final ObjectMapper objectMapper;

@@ -1,5 +1,9 @@
 # Marketing Platform Control Plane Implementation Plan
 
+Spec: `../specs/p2-086-marketing-platform-control-plane.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add a first production control-plane slice for the marketing middle platform so implemented P2-082 domains are exposed as one operator-visible readiness and integration map.
 
 **Architecture:** Keep the slice additive. Add a platform service that aggregates tenant runtime evidence from existing marketing domains, converts it into capability readiness, glue-lane status, integration asset catalog entries, and a machine-readable readiness gate, exposes an authenticated controller, and renders the result in a compact operator page. Existing domain modules remain unchanged.

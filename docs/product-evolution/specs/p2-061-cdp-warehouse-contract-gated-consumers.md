@@ -5,6 +5,8 @@ Sequence: 061
 Source: `docs/product-evolution/specs/p2-060-cdp-warehouse-consumer-availability-contracts.md`, `docs/product-evolution/specs/p2-057-cdp-warehouse-bi-query-availability-gate.md`, `docs/product-evolution/specs/p2-056-cdp-warehouse-audience-materialization-availability-gate.md`
 Implementation plan: `../plans/p2-061-cdp-warehouse-contract-gated-consumers-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Wire P2-060 consumer availability contracts into BI query execution and manual audience materialization so downstream consumers can block execution on table, dataset, or metric availability evidence instead of only the coarse warehouse window-level gate.

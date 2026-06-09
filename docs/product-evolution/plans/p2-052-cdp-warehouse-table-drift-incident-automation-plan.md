@@ -1,10 +1,14 @@
 # CDP Warehouse Table Drift Incident Automation Implementation Plan
 
+Spec: `../specs/p2-052-cdp-warehouse-table-drift-incident-automation.md`
+
 **Goal:** Convert table contract inspection drift into stable warehouse incidents so live/asset DDL drift enters the same operational queue as quality and realtime failures.
 
 **Architecture:** Reuse `cdp_warehouse_incident` and `cdp_warehouse_table_inspection`. `CdpWarehouseTableDriftIncidentService` runs table inspections through `CdpWarehouseTableGovernanceService`, delegates non-PASS reports to `CdpWarehouseIncidentService`, and `CdpWarehouseTableDriftIncidentScheduler` runs the same scan behind the warehouse lease.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

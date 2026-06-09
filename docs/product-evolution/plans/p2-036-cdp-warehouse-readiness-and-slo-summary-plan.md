@@ -1,10 +1,14 @@
 # CDP Warehouse Readiness And SLO Summary Implementation Plan
 
+Spec: `../specs/p2-036-cdp-warehouse-readiness-and-slo-summary.md`
+
 **Goal:** Add a read-only warehouse readiness summary that aggregates existing offline, realtime, BI, incident, and audience materialization facts.
 
 **Architecture:** Keep all existing warehouse services as sources of truth. `CdpWarehouseReadinessService` only calls them, converts to section summaries, and derives PASS/WARN/FAIL.
 
 **Tech Stack:** Java 21, Spring Boot, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

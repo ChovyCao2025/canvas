@@ -76,7 +76,7 @@ Add an operator-facing marketing preference center that lets authenticated opera
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05.
 
 - `MarketingPreferenceCenterService` composes tenant-scoped user preference reports and writes consent, channel, suppression, and suppression deactivation records on top of the existing policy tables.
 - `MarketingPreferenceCenterController` exposes `/canvas/marketing-preferences` endpoints with tenant fallback and `R.ok` response wrapping.

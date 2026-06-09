@@ -124,11 +124,13 @@ interface ReleaseFormValues {
   rollbackReason?: string
 }
 
+/** 将可选表单文本规整为 undefined，避免空字符串进入内容 API。 */
 function trimText(value?: string | null) {
   const text = value?.trim()
   return text || undefined
 }
 
+/** 解析逗号分隔的资产标签，并按首次出现顺序去重。 */
 function parseTags(value?: string) {
   return (value ?? '')
     .split(',')
@@ -136,6 +138,7 @@ function parseTags(value?: string) {
     .filter((item, index, all) => item.length > 0 && all.indexOf(item) === index)
 }
 
+/** 解析编辑器 JSON 文本，确保内容正文、SEO 和元数据均为对象。 */
 function parseJsonObject(value?: string): Record<string, unknown> {
   const text = value?.trim()
   if (!text) return {}
@@ -146,6 +149,7 @@ function parseJsonObject(value?: string): Record<string, unknown> {
   return parsed as Record<string, unknown>
 }
 
+/** 校验 JSON 文本并在为空时填入默认结构，供模板/内容草稿保存使用。 */
 function normalizeJsonText(value: string | undefined, fallback: string) {
   const text = value?.trim()
   if (!text) return fallback
@@ -153,11 +157,13 @@ function normalizeJsonText(value: string | undefined, fallback: string) {
   return text
 }
 
+/** 按内容状态生成统一状态标签。 */
 function statusTag(status: string) {
   const view = contentStatusView(status)
   return <Tag color={view.color}>{view.text}</Tag>
 }
 
+/** 内容中心页面，串联 DAM 资产、CMS 条目、模板预览和生产发布闭环。 */
 export default function ContentHubPage() {
   const [assetSearchForm] = Form.useForm<AssetSearchValues>()
   const [templateSearchForm] = Form.useForm<TemplateSearchValues>()
@@ -196,11 +202,14 @@ export default function ContentHubPage() {
   const watchedBody = Form.useWatch('body', templateForm) ?? ''
   const watchedReleaseSourceType = Form.useWatch('sourceType', releaseForm) ?? 'TEMPLATE'
   const watchedReleaseSourceKey = Form.useWatch('sourceKey', releaseForm)
+  // 从当前模板草稿实时派生变量列表，辅助运营补齐预览上下文。
   const draftVariables = useMemo(() => extractTemplateVariables(watchedSubject, watchedBody), [watchedSubject, watchedBody])
+  // 将资产目录转换为 Select 展示模型。
   const folderOptions = useMemo(() => assetFolders.map(folder => ({
     value: folder.id,
     label: folder.name,
   })), [assetFolders])
+  // 根据发布来源类型切换模板或内容条目候选。
   const releaseSourceOptions = useMemo(() => {
     if (watchedReleaseSourceType === 'ENTRY') {
       return entries.map(entry => ({
@@ -213,6 +222,7 @@ export default function ContentHubPage() {
       label: `${template.displayName} (${template.templateKey})`,
     }))
   }, [entries, templates, watchedReleaseSourceType])
+  // 找到当前来源最新的 ACTIVE 发布快照，作为解析和回滚默认目标。
   const activeRelease = useMemo(() => releases
     .filter(release => release.sourceType === watchedReleaseSourceType
       && release.sourceKey === watchedReleaseSourceKey
@@ -222,16 +232,19 @@ export default function ContentHubPage() {
   const currentReleaseKey = watchedReleaseSourceKey
     ? activeRelease?.releaseKey ?? releaseKeyFor(watchedReleaseSourceType, watchedReleaseSourceKey)
     : undefined
+  // 审计事件按当前 releaseKey 过滤，只展示最近 5 条。
   const currentAuditEvents = useMemo(() => auditEvents
     .filter(event => !currentReleaseKey || event.targetKey === currentReleaseKey)
     .slice(0, 5),
   [auditEvents, currentReleaseKey])
+  // 将发布阻断项按 scope 分组，便于门禁面板按对象类型展示。
   const releaseBlockerGroups = useMemo(
     () => groupReleaseBlockers(releaseValidation?.blockers ?? []),
     [releaseValidation],
   )
   const folderName = (folderId?: number | null) => assetFolders.find(folder => folder.id === folderId)?.name ?? '-'
 
+  /** 选择资产并把后端展示模型回填到资产编辑表单。 */
   const selectAsset = (asset: MarketingAsset) => {
     setSelectedAsset(asset)
     assetForm.setFieldsValue({
@@ -250,6 +263,7 @@ export default function ContentHubPage() {
     })
   }
 
+  /** 选择模板并同步发布来源、预览状态和模板编辑表单。 */
   const selectTemplate = (template: ContentTemplate) => {
     setSelectedTemplate(template)
     setPreview(null)
@@ -269,6 +283,7 @@ export default function ContentHubPage() {
     })
   }
 
+  /** 选择 CMS 内容条目并同步发布来源和编辑表单。 */
   const selectEntry = (entry: ContentEntry) => {
     setSelectedEntry(entry)
     setReleaseValidation(null)
@@ -287,12 +302,15 @@ export default function ContentHubPage() {
     })
   }
 
+  /** 加载 DAM 资产目录。 */
   const loadAssetFolders = async () => {
     const response = await marketingContentApi.listAssetFolders()
     setAssetFolders(response.data)
   }
 
+  /** 按搜索表单筛选资产，并在未选择资产时默认选中第一项。 */
   const loadAssets = async (values: AssetSearchValues = assetSearchForm.getFieldsValue()) => {
+    // 组装资产查询参数，空文本不传给后端。
     const response = await marketingContentApi.listAssets({
       keyword: trimText(values.keyword),
       assetType: trimText(values.assetType),
@@ -302,7 +320,9 @@ export default function ContentHubPage() {
     if (!selectedAsset && response.data.length > 0) selectAsset(response.data[0])
   }
 
+  /** 按渠道、状态和关键词筛选内容模板。 */
   const loadTemplates = async (values: TemplateSearchValues = templateSearchForm.getFieldsValue()) => {
+    // 组装模板查询参数，保持和后端过滤字段一致。
     const response = await marketingContentApi.listTemplates({
       keyword: trimText(values.keyword),
       channel: trimText(values.channel),
@@ -312,7 +332,9 @@ export default function ContentHubPage() {
     if (!selectedTemplate && response.data.length > 0) selectTemplate(response.data[0])
   }
 
+  /** 按类型、状态和关键词筛选 CMS 内容条目。 */
   const loadEntries = async (values: EntrySearchValues = entrySearchForm.getFieldsValue()) => {
+    // 组装内容条目查询参数，空筛选项省略。
     const response = await marketingContentApi.listEntries({
       keyword: trimText(values.keyword),
       contentType: trimText(values.contentType),
@@ -322,16 +344,19 @@ export default function ContentHubPage() {
     if (!selectedEntry && response.data.length > 0) selectEntry(response.data[0])
   }
 
+  /** 加载内容发布快照列表。 */
   const loadReleases = async () => {
     const response = await marketingContentApi.listReleases()
     setReleases(response.data)
   }
 
+  /** 加载发布相关审计事件。 */
   const loadAuditEvents = async () => {
     const response = await marketingContentApi.listAuditEvents({ targetType: 'RELEASE', limit: 20 })
     setAuditEvents(response.data)
   }
 
+  /** 并行加载内容中心首屏所需资产、模板、条目、发布和审计数据。 */
   const loadAll = async () => {
     setLoading(true)
     setError(null)
@@ -355,6 +380,7 @@ export default function ContentHubPage() {
     loadAll()
   }, [])
 
+  /** 重置资产编辑器为新建状态。 */
   const newAsset = () => {
     setSelectedAsset(null)
     setSelectedUploadFile(null)
@@ -374,6 +400,7 @@ export default function ContentHubPage() {
     })
   }
 
+  /** 选择本地文件后，按文件名、MIME 和大小派生资产草稿字段。 */
   const handleUploadFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null
     setSelectedUploadFile(file)
@@ -391,11 +418,13 @@ export default function ContentHubPage() {
     })
   }
 
+  /** 创建上传意图、直传文件，并把供应商返回的 storageUrl 回填到资产表单。 */
   const handleUploadAssetFile = async () => {
     if (!selectedUploadFile) return
     setUploadingAsset(true)
     setError(null)
     try {
+      // 只校验上传必需字段，避免未保存资产的其他字段阻断直传。
       const values = await assetForm.validateFields(['assetKey', 'assetType', 'mimeType'])
       const response = await marketingContentApi.createUploadIntent({
         assetKey: values.assetKey.trim(),
@@ -420,6 +449,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 重置模板编辑器为新建状态，并提供带变量的示例草稿。 */
   const newTemplate = () => {
     setSelectedTemplate(null)
     setPreview(null)
@@ -436,6 +466,7 @@ export default function ContentHubPage() {
     })
   }
 
+  /** 重置内容条目编辑器为新建状态。 */
   const newEntry = () => {
     setSelectedEntry(null)
     entryForm.setFieldsValue({
@@ -451,6 +482,7 @@ export default function ContentHubPage() {
     })
   }
 
+  /** 保存资产目录。 */
   const handleSaveFolder = async (values: MarketingAssetFolderDraft) => {
     setSavingFolder(true)
     setError(null)
@@ -470,10 +502,12 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 保存资产草稿，组装标签、元数据和可选媒体字段。 */
   const handleSaveAsset = async (values: AssetEditorValues) => {
     setSavingAsset(true)
     setError(null)
     try {
+      // 将编辑器字段转换为后端资产草稿载荷。
       const payload: MarketingAssetDraft = {
         assetKey: values.assetKey.trim(),
         name: values.name.trim(),
@@ -505,6 +539,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 更新当前资产审核状态。 */
   const handleAssetStatus = async (status: string) => {
     const assetKey = selectedAsset?.assetKey
     if (!assetKey) return
@@ -521,10 +556,12 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 保存内容模板，校验设计 JSON 和资产引用 JSON。 */
   const handleSaveTemplate = async (values: TemplateEditorValues) => {
     setSavingTemplate(true)
     setError(null)
     try {
+      // 组装模板草稿，JSON 字段保持字符串快照供发布固化。
       const payload: ContentTemplateDraft = {
         templateKey: values.templateKey.trim(),
         displayName: values.displayName.trim(),
@@ -547,6 +584,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 更新当前模板审核状态。 */
   const handleTemplateStatus = async (status: string) => {
     const templateKey = selectedTemplate?.templateKey
     if (!templateKey) return
@@ -563,6 +601,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 预览模板：已保存模板走后端，未保存草稿走本地变量替换。 */
   const handlePreviewTemplate = async () => {
     const values = templateForm.getFieldsValue()
     setPreviewing(true)
@@ -580,10 +619,12 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 保存 CMS 内容条目草稿。 */
   const handleSaveEntry = async (values: EntryEditorValues) => {
     setSavingEntry(true)
     setError(null)
     try {
+      // 组装内容条目载荷，正文、SEO、资产引用先做 JSON 文本校验。
       const payload: ContentEntryDraft = {
         entryKey: values.entryKey.trim(),
         contentType: values.contentType,
@@ -606,6 +647,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 发布或归档当前 CMS 内容条目。 */
   const handleEntryTransition = async (transition: 'publish' | 'archive') => {
     const entryKey = selectedEntry?.entryKey
     if (!entryKey) return
@@ -624,6 +666,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 从发布表单中读取当前发布来源，并校验 sourceKey 已选择。 */
   const currentReleaseSource = () => {
     const values = releaseForm.getFieldsValue()
     const sourceType = values.sourceType ?? watchedReleaseSourceType
@@ -634,6 +677,7 @@ export default function ContentHubPage() {
     return { sourceType, sourceKey }
   }
 
+  /** 调用发布门禁校验，刷新阻断项并清空旧解析结果。 */
   const handleValidateRelease = async () => {
     setReleaseAction('validate')
     setError(null)
@@ -649,6 +693,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 发布当前来源快照，并刷新发布列表和审计事件。 */
   const handlePublishRelease = async () => {
     setReleaseAction('publish')
     setError(null)
@@ -668,6 +713,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 解析当前 active release 或默认 releaseKey，生成最终内容预览。 */
   const handleResolveRelease = async () => {
     setReleaseAction('resolve')
     setError(null)
@@ -686,6 +732,7 @@ export default function ContentHubPage() {
     }
   }
 
+  /** 回滚当前 active release，并刷新发布列表和审计事件。 */
   const handleRollbackRelease = async () => {
     setReleaseAction('rollback')
     setError(null)
@@ -785,6 +832,7 @@ export default function ContentHubPage() {
     },
   ]
 
+  /** 渲染生产发布闭环面板，包括门禁、发布、解析和回滚。 */
   const renderReadinessPanel = () => (
     <Card size="small" title="生产发布闭环">
       <Row gutter={[16, 16]}>
@@ -950,6 +998,7 @@ export default function ContentHubPage() {
     </Card>
   )
 
+  /** 渲染 CMS 内容条目工作区。 */
   const renderEntryTab = () => (
     <Row gutter={[16, 16]}>
       <Col xs={24} xl={14}>
@@ -1017,6 +1066,7 @@ export default function ContentHubPage() {
     </Row>
   )
 
+  /** 渲染 DAM 资产工作区。 */
   const renderAssetTab = () => (
     <Row gutter={[16, 16]}>
       <Col xs={24} xl={14}>
@@ -1128,6 +1178,7 @@ export default function ContentHubPage() {
     </Row>
   )
 
+  /** 渲染设计模板工作区。 */
   const renderTemplateTab = () => (
     <Row gutter={[16, 16]}>
       <Col xs={24} xl={14}>

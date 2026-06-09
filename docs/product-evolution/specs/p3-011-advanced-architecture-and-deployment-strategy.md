@@ -5,6 +5,8 @@ Sequence: 011
 Source: `todo/p3/strategic-opportunities-from-filtered-scope.md#advanced-architecture-and-deployment-strategy`
 Implementation plan: `../plans/p3-011-advanced-architecture-and-deployment-strategy-plan.md`
 
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Create an executable evidence gate for advanced architecture and deployment strategy so service split, event-driven communication, serverless, edge, multi-cloud, and data residency work is evaluated with current-code proof before implementation.

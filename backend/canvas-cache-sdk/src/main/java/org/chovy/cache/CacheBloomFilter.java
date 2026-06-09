@@ -8,21 +8,21 @@ package org.chovy.cache;
  */
 public interface CacheBloomFilter<K> {
     /**
-     * 执行 might Contain 对应的业务逻辑。
+     * 判断 key 是否可能存在。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>返回 false 时缓存实现可以直接按穿透保护策略处理，不再访问 Redis 或 L3；返回 true 只表示可能存在。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param key 业务缓存 key
+     * @return true 表示 key 可能存在，false 表示 key 一定不存在或应被拦截
      */
     boolean mightContain(K key);
 
     /**
-     * 写入或记录 put 相关的业务数据。
+     * 登记一个已确认存在的 key。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>通常在数据创建或成功加载后调用，用于降低后续读取被误判为不存在的概率。
      *
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param key 业务缓存 key
      */
     void put(K key);
 }

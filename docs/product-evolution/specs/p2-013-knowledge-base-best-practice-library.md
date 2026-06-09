@@ -5,6 +5,8 @@ Sequence: 013
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#knowledge-base-and-best-practice-library`
 Implementation plan: `../plans/p2-013-knowledge-base-best-practice-library-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Turn template seed data into a browsable best-practice library with contextual help, playbooks, FAQ, benchmarks, and case studies.

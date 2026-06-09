@@ -10,6 +10,8 @@
 
 **Implementation status (2026-06-05):** Completed. Existing controller/page/API/helper files were retained and verified; this pass added the missing app route, navigation entry, route announcement, and updated stale presentation test expectations. Broader Maven focused backend testing is still blocked by unrelated `RedisBiQueryResultCacheTest` testCompile failures, so final backend coverage used an isolated `/tmp` runner with 44/44 passing tests. Commit was intentionally skipped because the user did not request one.
 
+Status: Completed on 2026-06-05; broader Maven focused backend testing is still blocked by unrelated testCompile failures.
+
 ---
 
 ## Spec Reference

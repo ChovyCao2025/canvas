@@ -5,6 +5,27 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * ProgrammaticDspSnapshotView 承载 domain.programmatic 场景中的不可变数据快照。
+ * @param id id 字段。
+ * @param tenantId tenantId 字段。
+ * @param seatId seatId 字段。
+ * @param campaignId campaignId 字段。
+ * @param lineItemId lineItemId 字段。
+ * @param snapshotDate snapshotDate 字段。
+ * @param bidCount bidCount 字段。
+ * @param winCount winCount 字段。
+ * @param impressionCount impressionCount 字段。
+ * @param clickCount clickCount 字段。
+ * @param conversionCount conversionCount 字段。
+ * @param viewableImpressionCount viewableImpressionCount 字段。
+ * @param spendAmount spendAmount 字段。
+ * @param revenueAmount revenueAmount 字段。
+ * @param metadata metadata 字段。
+ * @param createdBy createdBy 字段。
+ * @param createdAt createdAt 字段。
+ * @param updatedAt updatedAt 字段。
+ */
 public record ProgrammaticDspSnapshotView(
         Long id,
         Long tenantId,

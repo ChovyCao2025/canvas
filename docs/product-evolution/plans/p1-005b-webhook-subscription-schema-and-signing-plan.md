@@ -8,7 +8,9 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, HMAC-SHA256, JUnit 5, Mockito, AssertJ.
 
-**Implementation Status:** Implemented and merged into `main` on 2026-06-05. The actual migration is `backend/canvas-engine/src/main/resources/db/migration/V103__webhook_subscription_schema.sql`, and the domain services live under `org.chovy.canvas.domain.cdp` rather than the originally planned `org.chovy.canvas.domain.webhook` package. Added focused acceptance tests under `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/`.
+**Implementation Status:** Implemented in the current workspace record on 2026-06-05. The actual migration is `backend/canvas-engine/src/main/resources/db/migration/V103__webhook_subscription_schema.sql`, and the domain services live under `org.chovy.canvas.domain.cdp` rather than the originally planned `org.chovy.canvas.domain.webhook` package. Added focused acceptance tests under `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/`. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
+
+Status: Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 
 **Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused Maven tests for `WebhookSubscriptionSchemaTest`, `WebhookSignatureServiceTest`, and `WebhookSubscriptionValidatorTest` are currently blocked by unrelated global `testCompile` failures, including duplicate `KillSwitchSubscriberTest`, missing P2-079 automation-run classes, stale constructor/API expectations in existing tests, and `ExecutionContextNamespaceTest` expecting `ExecutionContext#getNodeOutput(...)`.
 
@@ -22,27 +24,27 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V98__webhook_subscription_schema.sql`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionSchemaTest.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookSubscriptionDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookDeliveryLogDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/WebhookSubscriptionMapper.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/WebhookDeliveryLogMapper.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSignatureService.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionValidator.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSignatureServiceTest.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionValidatorTest.java`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V103__webhook_subscription_schema.sql`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionSchemaTest.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookSubscriptionDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookDeliveryLogDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/WebhookSubscriptionMapper.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/WebhookDeliveryLogMapper.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSignatureService.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidator.java`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSignatureServiceTest.java`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidatorTest.java`
 
 ### Task 1: Schema And Data Objects
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionSchemaTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V98__webhook_subscription_schema.sql`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookSubscriptionDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookDeliveryLogDO.java`
-- Create: mapper files under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionSchemaTest.java`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V103__webhook_subscription_schema.sql`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookSubscriptionDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookDeliveryLogDO.java`
+- Existing: mapper files under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 Create `WebhookSubscriptionSchemaTest.java`:
 
@@ -52,7 +54,7 @@ class WebhookSubscriptionSchemaTest {
     @Test
     void migrationCreatesSubscriptionsAndDeliveryLogs() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V98__webhook_subscription_schema.sql"));
+                "src/main/resources/db/migration/V103__webhook_subscription_schema.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS webhook_subscription")
@@ -68,7 +70,7 @@ class WebhookSubscriptionSchemaTest {
 }
 ```
 
-- [ ] **Step 2: Run schema test and confirm red state**
+**Historical red-state check: Schema test was not rerun in this audit**
 
 Run:
 
@@ -76,11 +78,11 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=WebhookSubscriptionSchemaTest
 ```
 
-Expected: FAIL because migration does not exist.
+Expected before implementation: FAIL because migration does not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `V98__webhook_subscription_schema.sql`:
+Actual implementation uses `V103__webhook_subscription_schema.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS webhook_subscription (
@@ -122,7 +124,7 @@ CREATE TABLE IF NOT EXISTS webhook_delivery_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Outbound webhook delivery attempts';
 ```
 
-- [ ] **Step 4: Add data objects and mappers**
+- [x] **Step 4: Add data objects and mappers**
 
 Create `WebhookSubscriptionDO.java`:
 
@@ -200,7 +202,7 @@ public interface WebhookDeliveryLogMapper extends BaseMapper<WebhookDeliveryLogD
 }
 ```
 
-- [ ] **Step 5: Run schema test**
+**Residual verification gap: Schema test remains blocked in Maven testCompile**
 
 Run:
 
@@ -208,15 +210,15 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=WebhookSubscriptionSchemaTest
 ```
 
-Expected: PASS.
+Expected before production signoff: PASS.
 
 ### Task 2: Signature Service
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSignatureServiceTest.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSignatureService.java`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSignatureServiceTest.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSignatureService.java`
 
-- [ ] **Step 1: Write signature tests**
+- [x] **Step 1: Write signature tests**
 
 Create `WebhookSignatureServiceTest.java`:
 
@@ -236,7 +238,7 @@ class WebhookSignatureServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run signature test and confirm red state**
+**Historical red-state check: Signature test was not rerun in this audit**
 
 Run:
 
@@ -244,9 +246,9 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=WebhookSignatureServiceTest
 ```
 
-Expected: FAIL because service does not exist.
+Expected before implementation: FAIL because service does not exist.
 
-- [ ] **Step 3: Add signature service**
+- [x] **Step 3: Add signature service**
 
 Create `WebhookSignatureService.java`:
 
@@ -275,7 +277,7 @@ public class WebhookSignatureService {
 }
 ```
 
-- [ ] **Step 4: Run signature test**
+**Residual verification gap: Signature test remains blocked in Maven testCompile**
 
 Run:
 
@@ -283,15 +285,15 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=WebhookSignatureServiceTest
 ```
 
-Expected: PASS.
+Expected before production signoff: PASS.
 
 ### Task 3: Subscription Validator
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionValidatorTest.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionValidator.java`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidatorTest.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidator.java`
 
-- [ ] **Step 1: Write validator tests**
+- [x] **Step 1: Write validator tests**
 
 Create `WebhookSubscriptionValidatorTest.java`:
 
@@ -323,7 +325,7 @@ class WebhookSubscriptionValidatorTest {
 }
 ```
 
-- [ ] **Step 2: Run validator tests and confirm red state**
+**Historical red-state check: Validator tests were not rerun in this audit**
 
 Run:
 
@@ -331,9 +333,9 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=WebhookSubscriptionValidatorTest
 ```
 
-Expected: FAIL because validator does not exist.
+Expected before implementation: FAIL because validator does not exist.
 
-- [ ] **Step 3: Add validator**
+- [x] **Step 3: Add validator**
 
 Create `WebhookSubscriptionValidator.java`:
 
@@ -359,7 +361,7 @@ public class WebhookSubscriptionValidator {
 }
 ```
 
-- [ ] **Step 4: Run focused backend tests**
+**Residual verification gap: Focused backend tests remain blocked in Maven testCompile**
 
 Run:
 
@@ -367,7 +369,9 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=WebhookSubscriptionSchemaTest,WebhookSignatureServiceTest,WebhookSubscriptionValidatorTest
 ```
 
-Expected: PASS.
+Expected before production signoff: PASS.
+
+Observed: production compile passed, but the focused Maven test goal is still blocked during global `testCompile` by unrelated existing test-source errors listed in the implementation status above. The test files and production artifacts exist at their actual `org.chovy.canvas.domain.cdp` paths.
 
 ### Task 4: Commit This Slice
 
@@ -375,21 +379,22 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-005b-webhook-subscription-schema-and-signing.md`
 - Read: `docs/product-evolution/plans/p1-005b-webhook-subscription-schema-and-signing-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V98__webhook_subscription_schema.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V103__webhook_subscription_schema.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookSubscriptionDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookDeliveryLogDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/WebhookSubscriptionMapper.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/WebhookDeliveryLogMapper.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSignatureService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionValidator.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionSchemaTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSignatureServiceTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionValidatorTest.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSignatureService.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidator.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionSchemaTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSignatureServiceTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidatorTest.java \
   docs/product-evolution/specs/p1-005b-webhook-subscription-schema-and-signing.md \
   docs/product-evolution/plans/p1-005b-webhook-subscription-schema-and-signing-plan.md
 git commit -m "feat: add webhook subscription schema and signing"

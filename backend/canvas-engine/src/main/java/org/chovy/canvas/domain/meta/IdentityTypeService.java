@@ -61,7 +61,9 @@ public class IdentityTypeService {
 
     /** 删除身份类型，若已被 CDP 用户身份引用则阻止删除。 */
     public void delete(Long id) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         IdentityTypeDO existing = identityTypeMapper.selectById(id);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (existing == null) {
             throw new IllegalArgumentException("identity type not found: " + id);
         }
@@ -87,6 +89,7 @@ public class IdentityTypeService {
 
     /** 校验身份类型必填字段并规范化编码、名称。 */
     private static void validateAndNormalize(IdentityTypeDO body) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (body == null) {
             throw new IllegalArgumentException("identity type body is required");
         }
@@ -106,6 +109,7 @@ public class IdentityTypeService {
 
     /** 为身份类型写入默认启用、可导入、优先级等配置。 */
     private static void applyDefaults(IdentityTypeDO body) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (body.getEnabled() == null) {
             body.setEnabled(1);
         }

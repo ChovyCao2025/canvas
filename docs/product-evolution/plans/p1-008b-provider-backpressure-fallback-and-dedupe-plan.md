@@ -10,6 +10,8 @@
 
 **Implementation status (2026-06-05):** Completed. The actual Flyway migration is `V121__channel_provider_policies.sql` because earlier numbers were already allocated. Existing schema/service/repository code was retained; this pass added runtime handler integration, provider-aware delivery requests, coupon dedupe/backpressure checks, focused tests, and isolated verification. Final post-clean backend focused runner coverage was 44/44 across P1-008B/P1-008C and handler regression tests. Commit was intentionally skipped because the user did not request one.
 
+Status: Completed on 2026-06-05; full Maven test execution is still blocked by unrelated legacy test compilation issues.
+
 ---
 
 ## Spec Reference

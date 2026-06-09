@@ -2,7 +2,7 @@
 
 Priority: P0
 Sequence: 004
-Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/todo/plan-review-findings.md`
+Source: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`, `docs/optimization/todo/plan-review-findings.md`
 Implementation plan: `../plans/p0-004-dag-side-effect-idempotency-and-context-bounds-plan.md`
 
 ## Implementation Status

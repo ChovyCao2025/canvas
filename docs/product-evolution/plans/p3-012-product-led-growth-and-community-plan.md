@@ -1,5 +1,7 @@
 # Product Led Growth And Community Evidence Plan
 
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a product-led growth and community evidence gate so trial journeys, activation milestones, proficiency levels, referrals, public examples, case studies, community templates, and customer story loops cannot proceed without metric, consent, risk, proof, and rollback evidence.
@@ -36,7 +38,7 @@
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
 
-- [ ] **Step 1: Write migration and service tests**
+- [x] **Step 1: Write migration and service tests**
 
 Create `ProductLedGrowthEvidenceServiceTest`:
 
@@ -112,7 +114,7 @@ class ProductLedGrowthEvidenceServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -129,7 +131,7 @@ Expected: FAIL because the migration and service do not exist.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceService.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add the additive migration**
+- [x] **Step 1: Add the additive migration**
 
 Create `V184__product_led_growth_evidence.sql`:
 
@@ -156,7 +158,7 @@ CREATE TABLE IF NOT EXISTS product_led_growth_evidence (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 2: Implement the evidence gate**
+- [x] **Step 2: Implement the evidence gate**
 
 Create `ProductLedGrowthEvidenceService`:
 
@@ -237,7 +239,7 @@ public class ProductLedGrowthEvidenceService {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -253,7 +255,7 @@ Expected: PASS for migration shape and service gate behavior.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceService.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add approval test**
+- [x] **Step 1: Add approval test**
 
 Add this test:
 
@@ -277,7 +279,7 @@ void approvalRequiresReviewerAndChildSpec() {
 }
 ```
 
-- [ ] **Step 2: Implement approval method**
+- [x] **Step 2: Implement approval method**
 
 Add this method to `ProductLedGrowthEvidenceService` and add the matching method to `EvidenceRepository`:
 
@@ -295,7 +297,7 @@ public interface EvidenceRepository {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -311,7 +313,7 @@ Expected: PASS with registration and approval gate coverage.
 - Modify: `docs/product-evolution/specs/p3-012-product-led-growth-and-community.md`
 - Modify: `docs/product-evolution/plans/p3-012-product-led-growth-and-community-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -321,7 +323,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=ProductLedGrowthEvidenceServiceT
 
 Expected: PASS.
 
-- [ ] **Step 2: Run migration naming check**
+- [x] **Step 2: Run migration naming check**
 
 Run:
 
@@ -331,11 +333,11 @@ test -f backend/canvas-engine/src/main/resources/db/migration/V184__product_led_
 
 Expected: command exits 0.
 
-- [ ] **Step 3: Rollout notes**
+- [x] **Step 3: Rollout notes**
 
 Rollout: run `V184__product_led_growth_evidence.sql`, then allow growth owners to register opportunity evidence. Keep public, referral, case-study, and community workflows unavailable until reviewed child specs exist. Rollback: disable evidence registration or hide the admin entry point; no runtime growth workflow depends on this additive table.
 
-- [ ] **Step 4: Commit the scoped slice**
+Commit boundary: no commit was created in this docs-only audit; commit and merge status remains unverified.
 
 Run:
 

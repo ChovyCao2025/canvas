@@ -132,6 +132,7 @@ Specs are ordered by priority and sequence. Each spec links to its matching impl
 | P2-080 | [Conversational Session Foundation](p2-080-conversational-session-foundation.md) |
 | P2-081 | [CDP Warehouse Enterprise OLAP Readiness](p2-081-cdp-warehouse-enterprise-olap-readiness.md) |
 | P2-082 | [Marketing Platform Gap Closure](p2-082-marketing-platform-gap-closure.md) |
+| P2-082A/B/C | Tracked inside the P2-082 umbrella spec; standalone child spec files start at P2-082D. |
 | P2-082D | [SCRM Operator Workspace](p2-082d-scrm-operator-workspace.md) |
 | P2-082D2 | [Private-Domain Contact And Group Sync](p2-082d2-private-domain-contact-group-sync.md) |
 | P2-082E | [Paid-Media Audience Sync](p2-082e-paid-media-audience-sync.md) |

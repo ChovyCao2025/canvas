@@ -15,6 +15,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * SandboxSearchMarketingProviderReadClient 编排 domain.search 场景的领域业务规则。
+ */
 @Component
 public class SandboxSearchMarketingProviderReadClient implements SearchMarketingProviderReadClient {
 
@@ -24,15 +27,28 @@ public class SandboxSearchMarketingProviderReadClient implements SearchMarketing
             "PROVIDER_STATE",
             "CHANGE_RECONCILIATION");
 
+    /**
+     * supports 处理 domain.search 场景的业务逻辑。
+     * @param provider provider 参数，用于 supports 流程中的校验、计算或对象转换。
+     * @param runType 类型标识，用于选择对应处理分支。
+     * @return 返回 supports 的布尔判断结果。
+     */
     @Override
     public boolean supports(String provider, String runType) {
         return ProviderWriteSandboxSupport.supportsSandboxProvider(provider)
                 && RUN_TYPES.contains(normalize(runType));
     }
 
+    /**
+     * sync 创建或触发 domain.search 场景的业务处理。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param credential credential 参数，用于 sync 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     @Override
     public SearchMarketingProviderSyncResult sync(SearchMarketingSyncCommand command,
                                                   SearchMarketingCredentialRef credential) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             return SearchMarketingProviderSyncResult.failure(
                     "INVALID_SEARCH_SYNC_REQUEST",
@@ -84,6 +100,7 @@ public class SandboxSearchMarketingProviderReadClient implements SearchMarketing
                 "runType", command.runType(),
                 "metadata", command.metadata(),
                 "credential", credential.safeEvidence()));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return SearchMarketingProviderSyncResult.success(
                 "sandbox-search-read-" + seed.substring(0, 16),
                 seoOnly ? List.of() : List.of(performance),
@@ -91,14 +108,27 @@ public class SandboxSearchMarketingProviderReadClient implements SearchMarketing
                 evidence);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 执行 sha256 流程，围绕 sha256 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 sha256 生成的文本或业务键。
+     */
     private static String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ex) {
             throw new IllegalStateException("Could not hash sandbox search marketing evidence", ex);
         }

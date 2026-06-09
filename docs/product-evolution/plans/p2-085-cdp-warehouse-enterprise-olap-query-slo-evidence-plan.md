@@ -1,5 +1,9 @@
 # CDP Warehouse Enterprise OLAP Query SLO Evidence Implementation Plan
 
+Spec: `../specs/p2-085-cdp-warehouse-enterprise-olap-query-slo-evidence.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add enterprise OLAP query SLO evidence so production readiness validates representative query-path latency, error, queueing, memory, and freshness policy.

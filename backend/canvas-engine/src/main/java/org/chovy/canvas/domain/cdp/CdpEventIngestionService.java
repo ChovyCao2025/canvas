@@ -31,6 +31,9 @@ import java.util.Map;
 
 @Slf4j
 @Service
+/**
+ * CdpEventIngestionService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpEventIngestionService {
     private final CdpEventLogMapper eventLogMapper;
     private final EventDefinitionCacheService eventDefinitionCacheService;
@@ -46,6 +49,19 @@ public class CdpEventIngestionService {
     @Value("${canvas.cdp.ingestion.max-batch-size:100}")
     private int maxBatchSize = 100;
 
+    /**
+     * 初始化 CdpEventIngestionService 实例。
+     *
+     * @param eventLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param eventDefinitionCacheService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param userService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param discoveryService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param publisher publisher 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     * @param warehouseEventSink warehouse event sink 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     * @param warehouseRetryService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param warehouseCheckpointService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpEventIngestionService(CdpEventLogMapper eventLogMapper,
                                     EventDefinitionCacheService eventDefinitionCacheService,
                                     CdpUserService userService,
@@ -60,6 +76,20 @@ public class CdpEventIngestionService {
     }
 
     @Autowired
+    /**
+     * 初始化 CdpEventIngestionService 实例。
+     *
+     * @param eventLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param eventDefinitionCacheService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param userService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param discoveryService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param publisher publisher 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     * @param warehouseEventSink warehouse event sink 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     * @param warehouseRetryService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param warehouseCheckpointService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param privacyTombstoneService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpEventIngestionService(CdpEventLogMapper eventLogMapper,
                                     EventDefinitionCacheService eventDefinitionCacheService,
                                     CdpUserService userService,
@@ -82,6 +112,17 @@ public class CdpEventIngestionService {
         this.privacyTombstoneService = privacyTombstoneService;
     }
 
+    /**
+     * 初始化 CdpEventIngestionService 实例。
+     *
+     * @param eventLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param eventDefinitionCacheService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param userService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param discoveryService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param publisher publisher 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     * @param warehouseEventSink warehouse event sink 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     */
     public CdpEventIngestionService(CdpEventLogMapper eventLogMapper,
                                     EventDefinitionCacheService eventDefinitionCacheService,
                                     CdpUserService userService,
@@ -93,6 +134,18 @@ public class CdpEventIngestionService {
                 discoveryService, publisher, warehouseEventSink, null, null);
     }
 
+    /**
+     * 初始化 CdpEventIngestionService 实例。
+     *
+     * @param eventLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param eventDefinitionCacheService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param userService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param discoveryService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param publisher publisher 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     * @param warehouseEventSink warehouse event sink 参数，用于 CdpEventIngestionService 流程中的校验、计算或对象转换。
+     * @param warehouseRetryService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpEventIngestionService(CdpEventLogMapper eventLogMapper,
                                     EventDefinitionCacheService eventDefinitionCacheService,
                                     CdpUserService userService,
@@ -105,8 +158,16 @@ public class CdpEventIngestionService {
                 discoveryService, publisher, warehouseEventSink, warehouseRetryService, null);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param req 请求对象，承载本次操作的输入参数。
+     * @return 返回 ingestBatch 流程生成的业务结果。
+     */
     public IngestionResult ingestBatch(CdpWriteKeyAuthService.AuthenticatedWriteKey key, BatchTrackReq req) {
         List<TrackEventReq> batch = req == null || req.batch() == null ? List.of() : req.batch();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (batch.size() > maxBatchSize) {
             return new IngestionResult(0, batch.size(),
                     List.of(new IngestionError(null, "BATCH_TOO_LARGE", "batch size exceeds " + maxBatchSize)));
@@ -115,6 +176,7 @@ public class CdpEventIngestionService {
         int accepted = 0;
         List<IngestionError> errors = new ArrayList<>();
         OffsetDateTime batchSentAt = req == null ? null : req.sentAt();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (TrackEventReq event : batch) {
             try {
                 if (ingestOne(key, event, batchSentAt)) {
@@ -124,10 +186,20 @@ public class CdpEventIngestionService {
                 errors.add(new IngestionError(event == null ? null : event.messageId(), "INVALID_EVENT", ex.getMessage()));
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new IngestionResult(accepted, errors.size(), errors);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param event event 参数，用于 ingestOne 流程中的校验、计算或对象转换。
+     * @param batchSentAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 ingest one 的布尔判断结果。
+     */
     protected boolean ingestOne(CdpWriteKeyAuthService.AuthenticatedWriteKey key, TrackEventReq event, OffsetDateTime batchSentAt) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (event == null) {
             throw new IllegalArgumentException("event is required");
         }
@@ -142,6 +214,7 @@ public class CdpEventIngestionService {
             return false;
         }
 
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         EventDefinitionDO def = eventDefinitionCacheService.getPublishedByCode(eventCode);
         if (def == null) {
             throw new IllegalArgumentException("unknown event code: " + eventCode);
@@ -167,9 +240,15 @@ public class CdpEventIngestionService {
             log.warn("[CDP] internal event publish failed messageId={}: {}", event.messageId(), ex.getMessage());
         }
         mirrorToWarehouse(row);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return true;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     */
     private void mirrorToWarehouse(CdpEventLogDO row) {
         CdpWarehouseEventSink sink = warehouseEventSink == null ? null : warehouseEventSink.getIfAvailable();
         if (sink == null) {
@@ -186,6 +265,13 @@ public class CdpEventIngestionService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param source source 参数，用于 enforcePrivacyTombstone 流程中的校验、计算或对象转换。
+     */
     private void enforcePrivacyTombstone(Long tenantId, String userId, String source) {
         if (userId == null || userId.isBlank()) {
             return;
@@ -198,6 +284,12 @@ public class CdpEventIngestionService {
         service.enforceNotBlocked(tenantId, "USER_ID", userId, source);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param failure failure 参数，用于 enqueueWarehouseRetry 流程中的校验、计算或对象转换。
+     */
     private void enqueueWarehouseRetry(CdpEventLogDO row, RuntimeException failure) {
         CdpWarehouseRealtimeRetryService retryService =
                 warehouseRetryService == null ? null : warehouseRetryService.getIfAvailable();
@@ -212,6 +304,12 @@ public class CdpEventIngestionService {
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param deliverySource delivery source 参数，用于 recordWarehouseCheckpointDelivered 流程中的校验、计算或对象转换。
+     */
     private void recordWarehouseCheckpointDelivered(CdpEventLogDO row, String deliverySource) {
         CdpWarehouseRealtimeCheckpointService checkpointService =
                 warehouseCheckpointService == null ? null : warehouseCheckpointService.getIfAvailable();
@@ -226,6 +324,12 @@ public class CdpEventIngestionService {
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param errorMessage error message 参数，用于 recordWarehouseCheckpointFailure 流程中的校验、计算或对象转换。
+     */
     private void recordWarehouseCheckpointFailure(CdpEventLogDO row, String errorMessage) {
         CdpWarehouseRealtimeCheckpointService checkpointService =
                 warehouseCheckpointService == null ? null : warehouseCheckpointService.getIfAvailable();
@@ -240,8 +344,18 @@ public class CdpEventIngestionService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param event event 参数，用于 toRow 流程中的校验、计算或对象转换。
+     * @param eventCode 业务编码，用于匹配对应类型或状态。
+     * @param batchSentAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CdpEventLogDO toRow(CdpWriteKeyAuthService.AuthenticatedWriteKey key, TrackEventReq event,
                                 String eventCode, OffsetDateTime batchSentAt) {
+        // 准备本次处理所需的上下文和中间变量。
         CdpEventLogDO row = new CdpEventLogDO();
         row.setTenantId(key.tenantId());
         row.setWriteKeyId(key.writeKeyId());
@@ -261,9 +375,17 @@ public class CdpEventIngestionService {
         row.setSentAt(sentAt == null ? null : toLocal(sentAt));
         row.setReceivedAt(LocalDateTime.now());
         row.setStatus(CdpEventLogDO.ACCEPTED);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return row;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param messageId 业务对象 ID，用于定位具体记录。
+     * @return 返回布尔判断结果。
+     */
     private boolean isDuplicateMessage(Long tenantId, String messageId) {
         Long count = eventLogMapper.selectCount(new LambdaQueryWrapper<CdpEventLogDO>()
                 .eq(CdpEventLogDO::getTenantId, tenantId)
@@ -271,6 +393,13 @@ public class CdpEventIngestionService {
         return count != null && count > 0;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param idempotencyKey 业务键，用于在同一租户下定位资源。
+     * @return 返回布尔判断结果。
+     */
     private boolean isDuplicateIdempotency(Long tenantId, String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return false;
@@ -282,7 +411,18 @@ public class CdpEventIngestionService {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param MapString map string 参数，用于 readContextString 流程中的校验、计算或对象转换。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param directKey 业务键，用于在同一租户下定位资源。
+     * @param snakeKey 业务键，用于在同一租户下定位资源。
+     * @param nestedKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 read context string 生成的文本或业务键。
+     */
     private String readContextString(Map<String, Object> context, String directKey, String snakeKey, String nestedKey) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (context == null) {
             return null;
         }
@@ -296,14 +436,30 @@ public class CdpEventIngestionService {
                 value = ((Map<String, Object>) nested).get("id");
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return value == null || String.valueOf(value).isBlank() ? null : String.valueOf(value);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param MapString map string 参数，用于 readPlatform 流程中的校验、计算或对象转换。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 read platform 生成的文本或业务键。
+     */
     private String readPlatform(CdpWriteKeyAuthService.AuthenticatedWriteKey key, Map<String, Object> context) {
         Object platform = context == null ? null : context.get("platform");
         return platform == null || String.valueOf(platform).isBlank() ? key.platform() : String.valueOf(platform);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param MapString map string 参数，用于 writeJson 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 write json 生成的文本或业务键。
+     */
     private String writeJson(Map<String, Object> value) {
         if (value == null) {
             return null;
@@ -315,14 +471,33 @@ public class CdpEventIngestionService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private LocalDateTime toLocal(OffsetDateTime value) {
         return LocalDateTime.ofInstant(value.toInstant(), ZoneOffset.UTC);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 require text 生成的文本或业务键。
+     */
     private String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " is required");

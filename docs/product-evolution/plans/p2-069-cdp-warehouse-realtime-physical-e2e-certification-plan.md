@@ -1,5 +1,9 @@
 # CDP Warehouse Realtime Physical E2E Certification Implementation Plan
 
+Spec: `../specs/p2-069-cdp-warehouse-realtime-physical-e2e-certification.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add realtime pipeline and realtime job proof to warehouse physical E2E certification and production gates.

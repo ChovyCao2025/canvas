@@ -27,16 +27,16 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 @AutoConfiguration(after = {RedisAutoConfiguration.class, RedisReactiveAutoConfiguration.class})
 public class TieredCacheAutoConfiguration {
     /**
-     * 创建并注册 tiered Cache Manager 相关的 Spring Bean。
+     * 创建分层缓存管理器 Bean。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>只在存在 {@link StringRedisTemplate} 且业务未自定义 manager 时生效；响应式 Redis、指标和外部失效发布器均为可选依赖。
      *
-     * @param redis redis 方法执行所需的业务参数
-     * @param reactiveRedis reactiveRedis 方法执行所需的业务参数
-     * @param reactiveFactory reactiveFactory 方法执行所需的业务参数
-     * @param meterRegistry meterRegistry 方法执行所需的业务参数
-     * @param invalidationPublishers invalidationPublishers 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param redis 同步 Redis 模板，用于 L2 缓存读写
+     * @param reactiveRedis 响应式 Redis 模板提供器
+     * @param reactiveFactory 响应式 Redis 连接工厂提供器
+     * @param meterRegistry 指标注册表提供器
+     * @param invalidationPublishers 外部失效发布器提供器
+     * @return 自动装配的缓存管理器
      */
     @Bean
     @ConditionalOnMissingBean
@@ -53,11 +53,11 @@ public class TieredCacheAutoConfiguration {
     }
 
     /**
-     * 创建并注册 spel Key Evaluator 相关的 Spring Bean。
+     * 创建 SpEL key 计算器 Bean。
      *
-     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     * <p>业务未自定义时提供默认实现，供缓存切面解析 key、condition 和 unless 表达式。
      *
-     * @return 方法执行后的业务结果
+     * @return SpEL key 计算器
      */
     @Bean
     @ConditionalOnMissingBean
@@ -66,13 +66,13 @@ public class TieredCacheAutoConfiguration {
     }
 
     /**
-     * 创建并注册 annotation Cache Resolver 相关的 Spring Bean。
+     * 创建注解缓存解析器 Bean。
      *
-     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     * <p>解析器依赖缓存管理器，并优先复用应用已有 ObjectMapper 处理 L2 JSON 序列化。
      *
-     * @param manager manager 方法执行所需的业务参数
-     * @param objectMapper objectMapper 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param manager 缓存管理器
+     * @param objectMapper ObjectMapper 提供器
+     * @return 注解缓存解析器
      */
     @Bean
     @ConditionalOnMissingBean
@@ -84,13 +84,13 @@ public class TieredCacheAutoConfiguration {
     }
 
     /**
-     * 创建并注册 tiered Cache Aspect 相关的 Spring Bean。
+     * 创建分层缓存 AOP 切面 Bean。
      *
-     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     * <p>切面负责拦截 {@code @TieredCached}、{@code @TieredCachePut} 和 {@code @TieredCacheEvict} 并执行缓存读写。
      *
-     * @param resolver resolver 方法执行所需的业务参数
-     * @param keyEvaluator keyEvaluator 对应的缓存键、配置键或业务键
-     * @return 方法执行后的业务结果
+     * @param resolver 注解缓存解析器
+     * @param keyEvaluator SpEL key 计算器
+     * @return 分层缓存切面
      */
     @Bean
     @ConditionalOnMissingBean

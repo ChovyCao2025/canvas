@@ -5,6 +5,8 @@ Sequence: 070
 Source: `docs/product-evolution/specs/p2-047-cdp-warehouse-realtime-job-control-plane.md`, `docs/product-evolution/specs/p2-048-cdp-warehouse-realtime-job-incident-automation.md`, `docs/product-evolution/specs/p2-069-cdp-warehouse-realtime-physical-e2e-certification.md`
 Implementation plan: `../plans/p2-070-cdp-warehouse-external-realtime-job-probe-evidence-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add external realtime job probes so Flink REST, Kafka Connect REST, and Doris routine-load style health evidence can automatically feed the existing P2-047 realtime job heartbeat control plane. This lets P2-069 physical E2E certification consume real external runtime state instead of relying only on manually reported job heartbeats.

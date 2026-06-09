@@ -10,6 +10,9 @@ import org.chovy.canvas.dal.dataobject.CdpWarehouseStreamJobInstanceDO;
 
 import java.util.List;
 
+/**
+ * CdpWarehouseStreamJobInstanceMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface CdpWarehouseStreamJobInstanceMapper extends BaseMapper<CdpWarehouseStreamJobInstanceDO> {
 
@@ -34,6 +37,12 @@ public interface CdpWarehouseStreamJobInstanceMapper extends BaseMapper<CdpWareh
                 owner_name = VALUES(owner_name),
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsertHeartbeat(@Param("row") CdpWarehouseStreamJobInstanceDO row);
 
     @Select("""
@@ -46,6 +55,14 @@ public interface CdpWarehouseStreamJobInstanceMapper extends BaseMapper<CdpWareh
               AND job_key = #{jobKey}
             LIMIT 1
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param jobKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     CdpWarehouseStreamJobInstanceDO findByKey(@Param("tenantId") Long tenantId,
                                               @Param("pipelineKey") String pipelineKey,
                                               @Param("jobKey") String jobKey);
@@ -60,6 +77,14 @@ public interface CdpWarehouseStreamJobInstanceMapper extends BaseMapper<CdpWareh
             ORDER BY last_heartbeat_at DESC, id DESC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<CdpWarehouseStreamJobInstanceDO> listInstances(@Param("tenantId") Long tenantId,
                                                         @Param("pipelineKey") String pipelineKey,
                                                         @Param("limit") int limit);
@@ -72,6 +97,15 @@ public interface CdpWarehouseStreamJobInstanceMapper extends BaseMapper<CdpWareh
               AND pipeline_key = #{pipelineKey}
               AND job_key = #{jobKey}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param jobKey 业务键，用于在同一租户下定位资源。
+     * @param desiredStatus 业务状态，用于筛选或推进状态流转。
+     * @return 返回流程执行后的业务结果。
+     */
     int updateDesiredStatus(@Param("tenantId") Long tenantId,
                             @Param("pipelineKey") String pipelineKey,
                             @Param("jobKey") String jobKey,

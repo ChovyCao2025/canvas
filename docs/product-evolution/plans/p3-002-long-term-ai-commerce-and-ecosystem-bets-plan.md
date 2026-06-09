@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, JSON, Node.js 18 `node:test`, existing Git workflow.
 
+**Implementation Status:** Discovery package and validator are complete in the current workspace record. Reverified on 2026-06-08 with `node --test tools/strategy/ai-commerce-bets-evidence.test.mjs` (4 tests passing) and `node tools/strategy/ai-commerce-bets-evidence.mjs`. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -34,7 +36,7 @@ No migration is created. This slice does not store model output, customer action
 **Files:**
 - Create: `tools/strategy/ai-commerce-bets-evidence.test.mjs`
 
-- [ ] **Step 1: Write failing validator tests**
+- [x] **Step 1: Write failing validator tests**
 
 Create `tools/strategy/ai-commerce-bets-evidence.test.mjs`:
 
@@ -91,7 +93,7 @@ test('rejects accepted AI bets without approval boundary', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -107,7 +109,7 @@ Expected: FAIL because the validator script and evidence package do not exist.
 - Create: `tools/strategy/ai-commerce-bets-evidence.mjs`
 - Test: `tools/strategy/ai-commerce-bets-evidence.test.mjs`
 
-- [ ] **Step 1: Create the validator script**
+- [x] **Step 1: Create the validator script**
 
 Create `tools/strategy/ai-commerce-bets-evidence.mjs`:
 
@@ -146,7 +148,7 @@ if (errors.length > 0) {
 console.log(JSON.stringify({ ok: true, package: payload.package, betKeys: payload.bets.map((bet) => bet.key) }, null, 2))
 ```
 
-- [ ] **Step 2: Run tests and confirm evidence still missing**
+- [x] **Step 2: Run tests and confirm evidence still missing**
 
 Run:
 
@@ -164,7 +166,7 @@ Expected: FAIL because `docs/product-evolution/discovery/p3-002-ai-commerce-bets
 - Create: `docs/product-evolution/discovery/p3-002-ai-commerce-bets/governance-policy.md`
 - Create: `docs/product-evolution/discovery/p3-002-ai-commerce-bets/decision-log.md`
 
-- [ ] **Step 1: Create evidence JSON**
+- [x] **Step 1: Create evidence JSON**
 
 Create `docs/product-evolution/discovery/p3-002-ai-commerce-bets/evidence.json`:
 
@@ -258,7 +260,7 @@ Create `docs/product-evolution/discovery/p3-002-ai-commerce-bets/evidence.json`:
 }
 ```
 
-- [ ] **Step 2: Create README and governance docs**
+- [x] **Step 2: Create README and governance docs**
 
 Create `docs/product-evolution/discovery/p3-002-ai-commerce-bets/README.md`:
 
@@ -289,7 +291,7 @@ Create `docs/product-evolution/discovery/p3-002-ai-commerce-bets/governance-poli
 - This slice has no Flyway migration and no runtime behavior; rollback is reverting or amending the discovery package.
 ```
 
-- [ ] **Step 3: Create decision log**
+- [x] **Step 3: Create decision log**
 
 Create `docs/product-evolution/discovery/p3-002-ai-commerce-bets/decision-log.md`:
 
@@ -307,7 +309,7 @@ Create `docs/product-evolution/discovery/p3-002-ai-commerce-bets/decision-log.md
 | Ecosystem program | Deferred | Marketplace governance must come first. |
 ```
 
-- [ ] **Step 4: Run validator tests**
+- [x] **Step 4: Run validator tests**
 
 Run:
 
@@ -324,7 +326,7 @@ Expected: PASS, and the validator prints all seven bet keys.
 - Modify: `docs/product-evolution/specs/p3-002-long-term-ai-commerce-and-ecosystem-bets.md`
 - Modify: `docs/product-evolution/plans/p3-002-long-term-ai-commerce-and-ecosystem-bets-plan.md`
 
-- [ ] **Step 1: Confirm no migration references remain**
+- [x] **Step 1: Confirm no migration references remain**
 
 Run:
 
@@ -335,7 +337,7 @@ rg -n "$pattern" docs/product-evolution/specs/p3-002-long-term-ai-commerce-and-e
 
 Expected: no output.
 
-- [ ] **Step 2: Scan for implementation-deferral wording**
+- [x] **Step 2: Scan for implementation-deferral wording**
 
 Run:
 
@@ -371,7 +373,8 @@ EOF
 
 Expected: no output.
 
-- [ ] **Step 3: Commit the discovery slice**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

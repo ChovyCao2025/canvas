@@ -10,6 +10,8 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, JUnit 5, AssertJ, React 18, TypeScript, Ant Design, Vitest.
 
+**Implementation Status:** Implemented and focused-verified on 2026-06-05. Actual migration: `backend/canvas-engine/src/main/resources/db/migration/V259__canvas_project_folder_metadata.sql`, because earlier migration versions are already occupied in the current sequence. Verification evidence is recorded in `../plans/p1-003f-canvas-project-folder-metadata-plan.md`.
+
 ---
 
 ## Spec Reference
@@ -408,7 +410,8 @@ cd frontend && npm run build
 
 Result: TypeScript and Vite build passed.
 
-- [ ] **Step 2: Commit this slice**
+- [x] **Step 2: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

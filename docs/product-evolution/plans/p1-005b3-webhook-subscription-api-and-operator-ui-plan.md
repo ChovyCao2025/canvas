@@ -8,7 +8,9 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, Jackson, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Ant Design, Vitest.
 
-**Implementation Status:** Implemented and merged into `main` on 2026-06-05. Backend management endpoints live at `/cdp/webhooks`, and the operator UI is available at `/webhook-subscriptions`.
+**Implementation Status:** Implemented in the current workspace record on 2026-06-05. Backend management endpoints live at `/cdp/webhooks`, and the operator UI is available at `/webhook-subscriptions`. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
+
+Status: Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 
 **Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused webhook backend tests for P1-005B/P1-005B2/P1-005B3 pass in an isolated runner because Maven `testCompile` is still blocked by unrelated existing test-source errors. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- cdpEventApi.test.ts webhookSubscriptions.test.ts` passed, and `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
 
@@ -41,7 +43,7 @@
 - Create: DTOs under `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/WebhookSubscriptionControllerTest.java`
 
-- [ ] **Step 1: Add DTO records**
+- [x] **Step 1: Add DTO records**
 
 Create:
 
@@ -89,7 +91,7 @@ public record WebhookRotateSecretResp(
 }
 ```
 
-- [ ] **Step 2: Write controller tests**
+- [x] **Step 2: Write controller tests**
 
 Create `WebhookSubscriptionControllerTest.java` with tests:
 
@@ -149,7 +151,7 @@ void testDeliveryUsesDispatcher() {
 }
 ```
 
-- [ ] **Step 3: Run controller tests and confirm red state**
+- [x] **Step 3: Run controller tests and confirm red state**
 
 Run:
 
@@ -164,7 +166,7 @@ Expected: FAIL because controller does not exist.
 **Files:**
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/WebhookSubscriptionController.java`
 
-- [ ] **Step 1: Add controller**
+- [x] **Step 1: Add controller**
 
 Create `WebhookSubscriptionController.java`:
 
@@ -227,7 +229,7 @@ public class WebhookSubscriptionController {
 
 Add methods `rotateSecret`, `testDelivery`, `deliveries`, `updateStatus`, `requireTenantRow`, `toDto`, `toDeliveryDto`, `applyNewSecret`, `writeJson`, and `readEventTypes`. `applyNewSecret` creates `whsec_` plus a UUID without dashes, stores prefix/hash/ciphertext, and `rotateSecret` returns the raw secret in `WebhookRotateSecretResp`.
 
-- [ ] **Step 2: Run controller tests**
+- [x] **Step 2: Run controller tests**
 
 Run:
 
@@ -244,7 +246,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/webhook-subscriptions/webhookSubscriptionPresentation.ts`
 - Create: `frontend/src/pages/webhook-subscriptions/webhookSubscriptions.test.ts`
 
-- [ ] **Step 1: Write frontend helper tests**
+- [x] **Step 1: Write frontend helper tests**
 
 Create `webhookSubscriptions.test.ts`:
 
@@ -275,7 +277,7 @@ describe('webhook subscription presentation', () => {
 })
 ```
 
-- [ ] **Step 2: Add presentation helper**
+- [x] **Step 2: Add presentation helper**
 
 Create `webhookSubscriptionPresentation.ts`:
 
@@ -307,7 +309,7 @@ export function maskWebhookSecret(secretPrefix: string) {
 }
 ```
 
-- [ ] **Step 3: Extend API helper**
+- [x] **Step 3: Extend API helper**
 
 Add to `cdpEventApi.ts`:
 
@@ -352,7 +354,7 @@ export const webhookApi = {
 }
 ```
 
-- [ ] **Step 4: Run helper tests**
+- [x] **Step 4: Run helper tests**
 
 Run:
 
@@ -369,7 +371,7 @@ Expected: PASS.
 - Modify: `frontend/src/App.tsx`
 - Modify: `frontend/src/components/layout/AppLayout.tsx`
 
-- [ ] **Step 1: Add page**
+- [x] **Step 1: Add page**
 
 Create `frontend/src/pages/webhook-subscriptions/index.tsx` with:
 
@@ -411,7 +413,7 @@ export default function WebhookSubscriptionsPage() {
 
 Add action buttons for pause, resume, disable, rotate secret, test delivery, and delivery logs using `webhookApi`.
 
-- [ ] **Step 2: Add route and navigation**
+- [x] **Step 2: Add route and navigation**
 
 Modify `App.tsx`:
 
@@ -442,7 +444,7 @@ Add menu item:
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -459,7 +461,8 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-005b3-webhook-subscription-api-and-operator-ui.md`
 - Read: `docs/product-evolution/plans/p1-005b3-webhook-subscription-api-and-operator-ui-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

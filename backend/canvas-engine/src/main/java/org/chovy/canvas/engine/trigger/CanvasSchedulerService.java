@@ -60,6 +60,13 @@ public class CanvasSchedulerService {
     private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
     private static final String SCHEDULED_BATCH_USER_PREFIX = "__scheduled_batch__:";
 
+    /**
+     * 初始化 CanvasSchedulerService 实例。
+     *
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param scheduleRegistrar schedule registrar 参数，用于 CanvasSchedulerService 流程中的校验、计算或对象转换。
+     * @param webClientBuilder 依赖组件，用于完成数据访问或外部能力调用。
+     */
     CanvasSchedulerService(CanvasExecutionService executionService,
                            ScheduleRegistrar scheduleRegistrar,
                            WebClient.Builder webClientBuilder) {
@@ -210,6 +217,7 @@ public class CanvasSchedulerService {
         List<PendingJitterGroup> groups;
         List<ScheduleKey> scheduleKeys;
         synchronized (lifecycleLock) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (closed.get()) {
                 throw new IllegalStateException("Scheduler is closed");
             }
@@ -224,11 +232,13 @@ public class CanvasSchedulerService {
         groups.forEach(PendingJitterGroup::dispose);
 
         int registrations = 0;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map.Entry<Long, DagGraph> entry : publishedGraphs.entrySet()) {
             registrations += countScheduledTriggerNodes(entry.getValue());
             registerScheduledTriggers(entry.getKey(), entry.getValue());
         }
         log.info("[SCHEDULER] 运行态调度重建完成 registrations={}", registrations);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return registrations;
     }
 
@@ -290,6 +300,11 @@ public class CanvasSchedulerService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @return 返回布尔判断结果。
+     */
     boolean isClosed() {
         return closed.get();
     }
@@ -350,8 +365,10 @@ public class CanvasSchedulerService {
                                                    String cronExpr,
                                                    String triggerTimeStr,
                                                    PendingJitterGroup group) {
+        // 准备本次处理所需的上下文和中间变量。
         Runnable callback;
         LocalDateTime triggerTime = null;
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (cronExpr != null && !cronExpr.isBlank()) {
             callback = () -> triggerForAllUsers(canvasId, nodeId, cfg, group);
         } else {
@@ -374,6 +391,7 @@ public class CanvasSchedulerService {
         if (triggerTimeStr != null && !triggerTimeStr.isBlank()) {
             metadata.put("triggerTime", triggerTimeStr);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ScheduleRegistration(
                 scheduleKey,
                 cronExpr,
@@ -384,6 +402,13 @@ public class CanvasSchedulerService {
         );
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param triggerTimeStr 时间参数，用于计算窗口、过期或审计时间。
+     * @param timezone 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private LocalDateTime parseTriggerTime(String triggerTimeStr, String timezone) {
         try {
             return LocalDateTime.parse(triggerTimeStr);
@@ -452,14 +477,33 @@ public class CanvasSchedulerService {
                 e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage()));
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @return 返回布尔判断结果。
+     */
     public static boolean isScheduledBatchUser(String userId) {
         return userId != null && userId.startsWith(SCHEDULED_BATCH_USER_PREFIX);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @return 返回 scheduled batch user id 生成的文本或业务键。
+     */
     private static String scheduledBatchUserId(Long canvasId, String nodeId) {
         return SCHEDULED_BATCH_USER_PREFIX + canvasId + ":" + nodeId;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param taskKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 node id from task key 生成的文本或业务键。
+     */
     static String nodeIdFromTaskKey(String taskKey) {
         if (taskKey == null || taskKey.isBlank()) {
             return "";

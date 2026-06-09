@@ -9,6 +9,9 @@ import org.chovy.canvas.dal.dataobject.CdpWarehouseStreamSchemaDO;
 
 import java.util.List;
 
+/**
+ * CdpWarehouseStreamSchemaMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface CdpWarehouseStreamSchemaMapper extends BaseMapper<CdpWarehouseStreamSchemaDO> {
 
@@ -30,6 +33,12 @@ public interface CdpWarehouseStreamSchemaMapper extends BaseMapper<CdpWarehouseS
                 registered_by = VALUES(registered_by),
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsert(@Param("row") CdpWarehouseStreamSchemaDO row);
 
     @Select("""
@@ -44,6 +53,15 @@ public interface CdpWarehouseStreamSchemaMapper extends BaseMapper<CdpWarehouseS
               AND active = 1
             LIMIT 1
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param schemaRole schema role 参数，用于 findActiveVersion 流程中的校验、计算或对象转换。
+     * @param schemaVersion schema version 参数，用于 findActiveVersion 流程中的校验、计算或对象转换。
+     * @return 返回符合条件的数据列表或视图。
+     */
     CdpWarehouseStreamSchemaDO findActiveVersion(@Param("tenantId") Long tenantId,
                                                  @Param("pipelineKey") String pipelineKey,
                                                  @Param("schemaRole") String schemaRole,
@@ -61,6 +79,14 @@ public interface CdpWarehouseStreamSchemaMapper extends BaseMapper<CdpWarehouseS
             ORDER BY created_at DESC, id DESC
             LIMIT 1
             """)
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param schemaRole schema role 参数，用于 latestActive 流程中的校验、计算或对象转换。
+     * @return 返回 latestActive 流程生成的业务结果。
+     */
     CdpWarehouseStreamSchemaDO latestActive(@Param("tenantId") Long tenantId,
                                             @Param("pipelineKey") String pipelineKey,
                                             @Param("schemaRole") String schemaRole);
@@ -78,6 +104,15 @@ public interface CdpWarehouseStreamSchemaMapper extends BaseMapper<CdpWarehouseS
             ORDER BY created_at DESC, id DESC
             LIMIT 1
             """)
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param schemaRole schema role 参数，用于 latestActiveExcluding 流程中的校验、计算或对象转换。
+     * @param excludeId 业务对象 ID，用于定位具体记录。
+     * @return 返回 latestActiveExcluding 流程生成的业务结果。
+     */
     CdpWarehouseStreamSchemaDO latestActiveExcluding(@Param("tenantId") Long tenantId,
                                                      @Param("pipelineKey") String pipelineKey,
                                                      @Param("schemaRole") String schemaRole,
@@ -94,6 +129,15 @@ public interface CdpWarehouseStreamSchemaMapper extends BaseMapper<CdpWarehouseS
             ORDER BY schema_role ASC, created_at DESC, id DESC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param schemaRole schema role 参数，用于 listVersions 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<CdpWarehouseStreamSchemaDO> listVersions(@Param("tenantId") Long tenantId,
                                                   @Param("pipelineKey") String pipelineKey,
                                                   @Param("schemaRole") String schemaRole,

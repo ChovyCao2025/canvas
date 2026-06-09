@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { OUTLET_TARGET_FIELDS } from '../components/canvas/outletSchema'
 
 const recordSchema = z.record(z.string(), z.unknown())
+const stringMappingSchema = z.record(z.string(), z.string())
 const outletTargetFieldSchema = z.enum(OUTLET_TARGET_FIELDS)
 
 const outletSchemaItemSchema = z.object({
@@ -42,6 +43,31 @@ export const canvasNodeSchema = z.object({
 export const canvasGraphSchema = z.object({
   nodes: z.array(canvasNodeSchema),
   edges: z.array(canvasGraphEdgeSchema).default([]),
+})
+
+export const riskDecisionActionRouteSchema = z.enum(['ALLOW', 'REVIEW', 'VERIFY', 'BLOCK', 'LIMIT', 'DELAY'])
+export const riskDecisionFailPolicySchema = z.enum(['FAIL_OPEN', 'FAIL_REVIEW', 'FAIL_CLOSED'])
+
+export const riskDecisionConfigSchema = z.object({
+  sceneKey: z.string().trim().min(1),
+  subjectMapping: stringMappingSchema.refine(value => Object.keys(value).length > 0, {
+    message: 'At least one subject mapping is required',
+  }),
+  eventMapping: stringMappingSchema.refine(value => Object.keys(value).length > 0, {
+    message: 'At least one event mapping is required',
+  }),
+  contextMapping: stringMappingSchema.default({}),
+  actionRoutes: z.object({
+    ALLOW: z.string().trim().min(1),
+    REVIEW: z.string().trim().min(1).optional(),
+    VERIFY: z.string().trim().min(1).optional(),
+    BLOCK: z.string().trim().min(1).optional(),
+    LIMIT: z.string().trim().min(1).optional(),
+    DELAY: z.string().trim().min(1).optional(),
+  }),
+  failPolicy: riskDecisionFailPolicySchema.default('FAIL_REVIEW'),
+  timeoutMs: z.number().int().min(10).max(500).default(50),
+  includeTrace: z.boolean().default(false),
 })
 
 export const nodeTypeRegistrySchema = z.object({

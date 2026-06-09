@@ -8,12 +8,14 @@
 
 **Tech Stack:** Markdown, Node.js perf tooling references, Maven command references.
 
+**Implementation Status:** Implemented and focused-verified on 2026-06-05. The 3000 concurrency hardening runbook now exists under `docs/product-evolution/runbooks/`, and `tools/perf/README.md` links to it from the 3000 hardening profile section.
+
 ---
 
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-004d-3000-concurrency-runbook-and-baseline-gate.md`
-- Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+- Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 
 ## File Structure
 
@@ -135,7 +137,8 @@ Expected: output includes the runbook link in the 3000 hardening profile section
 
 Observed: PASS on 2026-06-05; output included the runbook link at `tools/perf/README.md:193`.
 
-- [ ] **Step 3: Commit implementation slice**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

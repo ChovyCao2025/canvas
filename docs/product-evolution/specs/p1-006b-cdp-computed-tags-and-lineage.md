@@ -11,7 +11,7 @@ Add computed tags with dependency validation and lineage so operators can create
 
 ## Current Baseline
 
-- Implemented on 2026-06-05 and merged into `main`.
+- Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - `CdpTagService` writes manual/API/import/computed tags and tag history.
 - `TagDefinitionDO` stores tag metadata and value type.
 - Computed tag definition, dependency graph, cycle validation, preview, run-now, run history, and lineage impact checks are available.
@@ -61,9 +61,9 @@ Add computed tags with dependency validation and lineage so operators can create
 
 ## Implementation Status
 
-- Status: implemented on 2026-06-05 and merged into `main`.
+- Status: implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - Backend: added `ComputedTagService`, `CdpLineageService`, and `CdpComputedTagController` under `/cdp/computed-tags`; actual migration is `V105__cdp_computed_tags_lineage.sql` using `cdp_computed_tag_*` tables.
 - Computed tag execution supports RULE/EXPR against active user profile JSON, rejects dependency cycles with an exact path, and writes matched tags through `CdpTagService.setTag(tenantId, userId, req)` with deterministic `computed-tag:{runId}:{userId}:{tagCode}` idempotency keys.
 - Lineage impact checks scan computed tag dependencies, audience rule JSON, and published canvas graph JSON.
 - Frontend: added typed `cdpApi.computedTags`, presentation helpers, `/cdp/computed-tags` admin page, route, and side-nav entry.
-- Verification: backend production compile passed with `mvn -pl canvas-engine -DskipTests compile`; focused P1-006B backend tests pass in an isolated runner because Maven `testCompile` remains blocked by unrelated existing test-source errors. Frontend `npm run test -- computedTagPresentation.test.ts cdpApi.test.ts` and `npm run build` passed.
+- Verification: focused Java 21 backend verification passed on 2026-06-08 with `ComputedTagSchemaTest`, `ComputedTagServiceTest`, `CdpLineageServiceTest`, and `CdpComputedTagControllerTest` covering 8 tests. Focused frontend verification passed on 2026-06-08 with `computedTagPresentation.test.ts` and `cdpApi.test.ts` covering 7 tests.

@@ -1,5 +1,9 @@
 # CDP Warehouse Privacy Erasure Propagation Proof Implementation Plan
 
+Spec: `../specs/p2-073-cdp-warehouse-privacy-erasure-propagation-proof.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a tenant-scoped, auditable privacy erasure propagation ledger and readiness evidence for CDP warehouse assets.

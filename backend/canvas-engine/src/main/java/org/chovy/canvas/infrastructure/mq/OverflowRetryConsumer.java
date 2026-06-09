@@ -37,6 +37,9 @@ import java.util.Map;
         messageModel = MessageModel.CLUSTERING,
         consumeThreadNumber = 5
 )
+/**
+ * OverflowRetryConsumer 封装本模块的核心职责、输入输出结构和协作边界。
+ */
 public class OverflowRetryConsumer implements RocketMQListener<MessageExt> {
 
     /** 溢出重试写入 DLQ 时使用的失败节点标识。 */

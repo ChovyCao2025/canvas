@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082l-scrm-ai-reply-assistance-plan.md`
 
 Make the SCRM operator workspace faster and safer by adding AI-generated reply suggestions that are grounded in the work-item timeline, risk-scored, tenant-scoped, and always reviewed by a human before use.
 
-## Delivery Status
+## Implementation Status
 
 Delivered backend and workspace frontend slice:
 

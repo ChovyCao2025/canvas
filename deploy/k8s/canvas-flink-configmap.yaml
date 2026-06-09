@@ -1,3 +1,4 @@
+# Flink 集群运行配置，集中定义 JobManager 地址、并行度和状态后端。
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,16 +9,23 @@ metadata:
     app.kubernetes.io/part-of: marketing-canvas
 data:
   flink-conf.yaml: |
+    # JobManager RPC 地址使用集群内 Service，TaskManager 与 submitter 都依赖该名称。
     jobmanager.rpc.address: canvas-flink-jobmanager
     jobmanager.rpc.port: 6123
+    # REST 端口对集群内开放，用于提交任务、探针和监控抓取。
     rest.address: 0.0.0.0
     rest.port: 8081
+    # 每个 TaskManager 暴露 4 个 slot，默认并行度控制单作业基础吞吐。
     taskmanager.numberOfTaskSlots: 4
     parallelism.default: 2
+    # RocksDB 状态后端适合 CDC/聚合类有状态流任务。
     state.backend: rocksdb
+    # checkpoint/savepoint 写入挂载 PVC，支持 Pod 重建后的状态恢复。
     state.checkpoints.dir: file:///opt/flink/checkpoints
     state.savepoints.dir: file:///opt/flink/savepoints
+    # checkpoint 周期与超时平衡恢复点新鲜度和 Doris/MySQL 写入压力。
     execution.checkpointing.interval: 60s
     execution.checkpointing.timeout: 10min
     execution.checkpointing.min-pause: 30s
+    # 容忍短暂失败，避免存储抖动时立即让流任务失败。
     execution.checkpointing.tolerable-failed-checkpoints: 3

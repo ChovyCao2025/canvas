@@ -1,5 +1,9 @@
 # Marketing Integration Contract Registry Implementation Plan
 
+Spec: `../specs/p2-088-marketing-integration-contract-registry.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add a tenant-scoped integration contract registry and runtime probe evidence so the marketing middle platform has a governed API glue layer instead of only provider-specific write and credential modules.
 
 **Architecture:** Add additive Flyway migrations, MyBatis DO/mappers, focused domain services, tenant-context controllers, control-plane evidence fields, contract audit events, a generic HTTP probe client, append-only probe observations, SLO burn-rate evaluation, a lease-guarded scheduler, and a compact operator table on `/marketing-platform`. The registry declares contracts, records revision history, records runtime readiness evidence, and turns degraded production probes into deduped monitoring alerts; provider-specific signed probes stay independent follow-up slices.

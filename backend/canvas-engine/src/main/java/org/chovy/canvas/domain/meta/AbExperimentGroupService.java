@@ -77,7 +77,9 @@ public class AbExperimentGroupService {
 
     /** 更新已有记录，仅修改允许变更的字段。 */
     public void update(Long experimentId, Long groupId, AbExperimentGroupDO body) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         AbExperimentGroupDO existing = mapper.selectById(groupId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (existing == null) {
             throw new IllegalArgumentException("AB 分组不存在: " + groupId);
         }

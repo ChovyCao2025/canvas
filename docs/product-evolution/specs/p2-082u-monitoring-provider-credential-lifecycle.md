@@ -4,7 +4,10 @@ Priority: P2
 Sequence: 082U
 Parent: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082u-monitoring-provider-credential-lifecycle-plan.md`
-Status: Delivered backend first slice
+
+## Implementation Status
+
+Delivered backend first slice. Verification results are recorded in `../plans/p2-082u-monitoring-provider-credential-lifecycle-plan.md`.
 
 ## Goal
 

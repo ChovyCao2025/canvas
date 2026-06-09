@@ -32,10 +32,21 @@ public class CanvasExecutionRequestService {
     /** 画布 Mapper，用于按目标画布解析租户归属。 */
     private final CanvasMapper canvasMapper;
 
+    /**
+     * 创建 CanvasExecutionRequestService 实例并注入 engine.request 场景依赖。
+     * @param mapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CanvasExecutionRequestService(CanvasExecutionRequestMapper mapper, ObjectMapper objectMapper) {
         this(mapper, objectMapper, null);
     }
 
+    /**
+     * 创建 CanvasExecutionRequestService 实例并注入 engine.request 场景依赖。
+     * @param mapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public CanvasExecutionRequestService(CanvasExecutionRequestMapper mapper,
                                          ObjectMapper objectMapper,
@@ -74,6 +85,12 @@ public class CanvasExecutionRequestService {
         return requestId;
     }
 
+    /**
+     * 根据画布 ID 解析租户 ID。
+     *
+     * @param canvasId 画布 ID
+     * @return 画布所属租户 ID，缺少 CanvasMapper 时返回 null
+     */
     private Long resolveTenantId(Long canvasId) {
         if (canvasMapper == null) {
             return null;
@@ -104,6 +121,7 @@ public class CanvasExecutionRequestService {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(raw.getBytes(StandardCharsets.UTF_8)));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
         }
@@ -113,6 +131,7 @@ public class CanvasExecutionRequestService {
     private String toJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Execution request payload serialize failed", e);
         }

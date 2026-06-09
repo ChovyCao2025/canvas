@@ -5,6 +5,8 @@ Sequence: 085
 Source: production OLAP completion audit after P2-084 evidence automation
 Implementation plan: `../plans/p2-085-cdp-warehouse-enterprise-olap-query-slo-evidence-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add first-class enterprise OLAP query SLO and capacity evidence so production readiness proves representative BI, audience, and ad-hoc analytical query paths are fresh, successful, and within latency, error, queueing, and memory policy.

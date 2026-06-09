@@ -5,6 +5,8 @@ Sequence: 062
 Source: `docs/product-evolution/specs/p2-060-cdp-warehouse-consumer-availability-contracts.md`, `docs/product-evolution/specs/p2-022-cdp-warehouse-ingestion-and-aggregation.md`, `docs/product-evolution/specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`
 Implementation plan: `../plans/p2-062-cdp-warehouse-asset-availability-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Automatically publish asset availability observations from successful offline warehouse aggregation and realtime pipeline checkpoint evidence so P2-060 consumer contracts can depend on production job evidence rather than only operator-entered observations.

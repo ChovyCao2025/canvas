@@ -1,10 +1,14 @@
 # CDP Warehouse Data Availability Gates Implementation Plan
 
+Spec: `../specs/p2-055-cdp-warehouse-data-availability-gates.md`
+
 **Goal:** Add a concrete time-window availability decision for offline and realtime warehouse consumers.
 
 **Architecture:** Build a read-only `CdpWarehouseAvailabilityService` over existing warehouse status, realtime pipeline status, and SLO policy thresholds. Expose a tenant-scoped controller endpoint that returns per-gate evidence and an overall PASS/WARN/FAIL verdict.
 
 **Tech Stack:** Java 21, Spring Boot, existing warehouse services, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

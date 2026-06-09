@@ -1,5 +1,6 @@
 -- pipeline: doris_ods_cdp_event_to_dwd_fact
 -- sink: canvas_dwd.cdp_user_event_fact
+-- Purpose: normalize ODS event rows into user-event facts with canvas/node dimensions.
 CREATE TABLE doris_cdp_event_log_ods_source (
     tenant_id BIGINT,
     event_log_id BIGINT,
@@ -23,6 +24,7 @@ CREATE TABLE doris_cdp_event_log_ods_source (
     'password' = '${DORIS_PASSWORD}'
 );
 
+-- DWD fact table is the canonical stream for user-level event analytics and downstream aggregates.
 CREATE TABLE doris_cdp_user_event_fact_dwd_sink (
     tenant_id BIGINT,
     user_id STRING,
@@ -48,6 +50,7 @@ CREATE TABLE doris_cdp_user_event_fact_dwd_sink (
 INSERT INTO doris_cdp_user_event_fact_dwd_sink
 SELECT
     tenant_id,
+    -- Anonymous ID is used as fallback so pre-login behavior remains attributable.
     COALESCE(NULLIF(user_id, ''), anonymous_id) AS user_id,
     event_code,
     event_time,
@@ -57,5 +60,6 @@ SELECT
     properties AS properties_json,
     CAST(event_time AS DATE) AS event_date
 FROM doris_cdp_event_log_ods_source
+-- Drop malformed rows that cannot be attributed to an event code or user identity.
 WHERE event_code IS NOT NULL
   AND COALESCE(NULLIF(user_id, ''), anonymous_id) IS NOT NULL;

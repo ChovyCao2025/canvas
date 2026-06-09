@@ -16,20 +16,40 @@ import reactor.core.scheduler.Schedulers;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * PluginRegistryController 暴露 web 场景的 HTTP 接口。
+ */
 @RestController
 @RequestMapping("/canvas/plugins")
 @RequiredArgsConstructor
 public class PluginRegistryController {
 
     private final PluginRegistryService service;
-
+    /**
+     * 查询插件注册表目录接口，对应 GET 请求。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping
     public Mono<R<Map<String, List<PluginRegistryService.Plugin>>>> catalog() {
         return Mono.fromCallable(service::groupedCatalog)
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(R::ok);
     }
-
+    /**
+     * 处理 插件注册表 请求接口，对应 PUT /{pluginKey}/enabled。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 副作用由下游服务封装，通常会写入状态、审计或任务记录。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param pluginKey plugin 唯一键。
+     * @param canvasVersion 请求头参数，默认值为 1.0.0。
+     * @param request 请求体。
+     * @return 异步返回统一响应，表示操作完成。
+     */
     @PutMapping("/{pluginKey}/enabled")
     public Mono<R<Void>> setEnabled(
             @PathVariable String pluginKey,
@@ -40,5 +60,8 @@ public class PluginRegistryController {
                 .thenReturn(R.ok());
     }
 
+    /**
+     * EnableRequest 数据记录。
+     */
     public record EnableRequest(boolean enabled) {}
 }

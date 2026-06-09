@@ -1,5 +1,7 @@
 # Test Users And Single User Rerun Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add seed/test user management and single-user rerun modes with explicit side-effect controls.
@@ -13,6 +15,15 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p2-017d-test-users-and-single-user-rerun.md`
+
+## Current Status Note
+
+The implementation files are present in the current worktree and fresh focused verification passed on 2026-06-09:
+
+- `JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-engine test -Dtest=TemplateRenderServiceTest,UserInputHandlerTest,WaitEventFilterTest,WaitHandlerTest,ConnectedContentHandlerTest,ExecutionRerunControllerTest,CanvasBatchOperationControllerTest,RuntimeMigrationEvidenceTest` (covered `ExecutionRerunControllerTest`; 48 total selected backend tests passed).
+- `npm run build` (frontend TypeScript and Vite production build passed).
+
+Historical RED-state checks were not reproduced because the current worktree already contains the implementation. No commit or merge was created in this audit, so commit and merge status remain unverified.
 
 ## File Structure
 
@@ -31,11 +42,11 @@
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/TestUserController.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ExecutionRerunController.java`
 
-- [ ] **Step 1: Write tests**
+- [x] **Step 1: Write tests**
 
 Create tests for seed-user creation, preview context, rerun reason required, default dry-run mode, side-effect skip mode, admin replay mode, original execution reference, and audit row creation.
 
-- [ ] **Step 2: Run tests and confirm red state**
+Historical RED-state boundary: not reproduced in this audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -45,15 +56,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=ExecutionRerunControllerTest
 
 Expected: FAIL because migration and controllers do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
 Create `test_user_set`, `test_user`, and `execution_rerun_audit` tables with tenant id, user id, profile JSON, input params JSON, original execution id, mode, reason, operator, status, and timestamps.
 
-- [ ] **Step 4: Implement controllers**
+- [x] **Step 4: Implement controllers**
 
 Expose seed-user list/create/detail/preview and rerun request/status. Rerun mode defaults to `DRY_RUN`; `ADMIN_REPLAY` requires admin role and reason length at least 10 characters.
 
-- [ ] **Step 5: Run backend tests**
+- [x] **Step 5: Run backend tests**
 
 Run:
 
@@ -69,15 +80,15 @@ Expected: PASS.
 - Create: `frontend/src/services/executionRerunApi.ts`
 - Create: `frontend/src/pages/test-users/index.tsx`
 
-- [ ] **Step 1: Add typed API wrapper**
+- [x] **Step 1: Add typed API wrapper**
 
 Add calls for test user sets, test user detail, preview context, rerun request, rerun status, and rerun audit list.
 
-- [ ] **Step 2: Add test user page**
+- [x] **Step 2: Add test user page**
 
 Add test user list, create/edit drawer, selected user preview, and rerun action entry that requires mode and reason.
 
-- [ ] **Step 3: Run frontend build**
+- [x] **Step 3: Run frontend build**
 
 Run:
 
@@ -93,7 +104,7 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p2-017d-test-users-and-single-user-rerun.md`
 - Modify: `docs/product-evolution/plans/p2-017d-test-users-and-single-user-rerun-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -104,7 +115,7 @@ cd frontend && npm run build
 
 Expected: PASS.
 
-- [ ] **Step 2: Commit**
+Commit boundary: no commit was created in this audit; commit and merge status remain unverified.
 
 Run:
 

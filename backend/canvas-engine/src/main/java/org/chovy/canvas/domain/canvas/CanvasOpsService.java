@@ -50,11 +50,29 @@ public class CanvasOpsService {
     /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
 
+    /**
+     * 执行 setStateTransitionPolicy 流程，围绕 set state transition policy 完成校验、计算或结果组装。
+     *
+     * @param stateTransitionPolicy state transition policy 参数，用于 setStateTransitionPolicy 流程中的校验、计算或对象转换。
+     */
     @Autowired(required = false)
     void setStateTransitionPolicy(CanvasStateTransitionPolicy stateTransitionPolicy) {
         this.stateTransitionPolicy = stateTransitionPolicy;
     }
 
+    /**
+     * 创建 CanvasOpsService 实例并注入 domain.canvas 场景依赖。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasVersionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param executionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param executionRequestMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param triggerRouteService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param preCheckService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasTransactionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param stateTransitionPolicy state transition policy 参数，用于 CanvasOpsService 流程中的校验、计算或对象转换。
+     * @param canvasService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param redis redis 参数，用于 CanvasOpsService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public CanvasOpsService(CanvasMapper canvasMapper,
                             CanvasVersionMapper canvasVersionMapper,
@@ -76,6 +94,11 @@ public class CanvasOpsService {
         this.canvasService = canvasService;
         this.redis = redis;
         this.stateTransitionPolicy = stateTransitionPolicy == null
+                /**
+                 * 判断业务条件是否成立。
+                 *
+                 * @return 返回 CanvasStateTransitionPolicy 流程生成的业务结果。
+                 */
                 ? new CanvasStateTransitionPolicy()
                 : stateTransitionPolicy;
     }
@@ -153,6 +176,7 @@ public class CanvasOpsService {
 
     /** FORCE Kill 时将该画布仍处于 RUNNING 的执行记录统一标记为失败。 */
     private void markRunningExecutionsFailed(Long canvasId, Long tenantId) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CanvasExecutionDO update = new CanvasExecutionDO();
         update.setStatus(ExecutionStatus.FAILED.getCode());
         update.setResult("{\"error\":\"FORCE_CANCELLED\"}");
@@ -203,7 +227,9 @@ public class CanvasOpsService {
     @Transactional(rollbackFor = Exception.class)
     public void promoteCanary(Long id) {
         CanvasDO canvas = require(id);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         stateTransitionPolicy.assertPublishedRuntimeMutationAllowed(canvas);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (canvas.getCanaryVersionId() == null) throw new IllegalStateException("无灰度版本");
 
         canvas.setPreviousVersionId(canvas.getPublishedVersionId());
@@ -228,13 +254,6 @@ public class CanvasOpsService {
         invalidateRuntimeCanvasAfterCommit(id);
     }
 
-    /**
-     * 执行 rollback 对应的业务逻辑。
-     *
-     * <p>该方法在事务边界内执行，确保相关数据库写入保持一致。
-     *
-     * @param id id 对应的业务主键或标识
-     */
 // ── 版本回滚 ────────────────────────────────────────────────
 
     /**
@@ -244,7 +263,9 @@ public class CanvasOpsService {
     @Transactional(rollbackFor = Exception.class)
     public void rollback(Long id) {
         CanvasDO canvas = require(id);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         stateTransitionPolicy.assertPublishedRuntimeMutationAllowed(canvas);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (canvas.getPreviousVersionId() == null) throw new IllegalStateException("无上一版本可回滚");
 
         Long tmp = canvas.getPublishedVersionId();
@@ -376,18 +397,11 @@ public class CanvasOpsService {
             if (nodes instanceof java.util.List<?> l) {
                 return (java.util.List<java.util.Map<String, Object>>) l;
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ignored) {}
         return java.util.List.of();
     }
 
-    /**
-     * 执行 require 对应的业务逻辑。
-     *
-     * <p>实现会通过持久化层读取或写入数据库记录。
-     *
-     * @param id id 对应的业务主键或标识
-     * @return 方法执行后的业务结果
-     */
 // ── helpers ──────────────────────────────────────────────────
 
     /** 按 ID 查询画布，不存在时抛出业务异常。 */
@@ -432,6 +446,9 @@ public class CanvasOpsService {
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
+            /**
+             * 在外层事务提交后执行缓存驱逐，确保只有已提交的发布或灰度变更会影响运行态读取。
+             */
             public void afterCommit() {
                 invalidate.run();
             }

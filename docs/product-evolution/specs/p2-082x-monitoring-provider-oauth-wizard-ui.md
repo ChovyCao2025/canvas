@@ -1,8 +1,13 @@
 # P2-082X - Monitoring Provider OAuth Wizard UI Spec
 
+Priority: P2
+Sequence: 082X
 Parent spec: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082x-monitoring-provider-oauth-wizard-ui-plan.md`
-Status: Delivered frontend first slice
+
+## Implementation Status
+
+Delivered frontend first slice. Verification results are recorded in `../plans/p2-082x-monitoring-provider-oauth-wizard-ui-plan.md`.
 
 ## Problem
 

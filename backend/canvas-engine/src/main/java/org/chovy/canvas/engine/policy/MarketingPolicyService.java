@@ -49,8 +49,17 @@ public class MarketingPolicyService {
 
     /** 判断用户在指定渠道是否满足营销授权要求。 */
     public PolicyDecision consentAllowed(String userId, String channel, boolean requireExplicitConsent) {
+        return consentAllowed(null, userId, channel, requireExplicitConsent);
+    }
+
+    /** 判断租户内用户在指定渠道是否满足营销授权要求。 */
+    public PolicyDecision consentAllowed(Long tenantId, String userId, String channel, boolean requireExplicitConsent) {
         String normalized = normalize(channel);
-        MarketingConsentDO consent = consentMapper.selectOne(new LambdaQueryWrapper<MarketingConsentDO>()
+        LambdaQueryWrapper<MarketingConsentDO> query = new LambdaQueryWrapper<MarketingConsentDO>();
+        if (tenantId != null) {
+            query.eq(MarketingConsentDO::getTenantId, tenantId);
+        }
+        MarketingConsentDO consent = consentMapper.selectOne(query
                 .eq(MarketingConsentDO::getUserId, userId)
                 .eq(MarketingConsentDO::getChannel, normalized)
                 .last("LIMIT 1"));
@@ -71,9 +80,18 @@ public class MarketingPolicyService {
 
     /** 判断用户是否被营销抑制名单拦截。 */
     public PolicyDecision suppressionAllowed(String userId, String channel) {
+        return suppressionAllowed(null, userId, channel);
+    }
+
+    /** 判断租户内用户是否被营销抑制名单拦截。 */
+    public PolicyDecision suppressionAllowed(Long tenantId, String userId, String channel) {
         String normalized = normalize(channel);
         LocalDateTime now = LocalDateTime.now(clock);
-        Long count = suppressionMapper.selectCount(new LambdaQueryWrapper<MarketingSuppressionDO>()
+        LambdaQueryWrapper<MarketingSuppressionDO> query = new LambdaQueryWrapper<MarketingSuppressionDO>();
+        if (tenantId != null) {
+            query.eq(MarketingSuppressionDO::getTenantId, tenantId);
+        }
+        Long count = suppressionMapper.selectCount(query
                 .eq(MarketingSuppressionDO::getUserId, userId)
                 .eq(MarketingSuppressionDO::getActive, 1)
                 // 未设置过期时间表示长期抑制，设置过期时间则只在未来仍生效。
@@ -93,8 +111,17 @@ public class MarketingPolicyService {
 
     /** 判断用户指定触达渠道是否可用。 */
     public PolicyDecision channelAvailable(String userId, String channel) {
+        return channelAvailable(null, userId, channel);
+    }
+
+    /** 判断租户内用户指定触达渠道是否可用。 */
+    public PolicyDecision channelAvailable(Long tenantId, String userId, String channel) {
         String normalized = normalize(channel);
-        CustomerChannelDO customerChannel = channelMapper.selectOne(new LambdaQueryWrapper<CustomerChannelDO>()
+        LambdaQueryWrapper<CustomerChannelDO> query = new LambdaQueryWrapper<CustomerChannelDO>();
+        if (tenantId != null) {
+            query.eq(CustomerChannelDO::getTenantId, tenantId);
+        }
+        CustomerChannelDO customerChannel = channelMapper.selectOne(query
                 .eq(CustomerChannelDO::getUserId, userId)
                 .eq(CustomerChannelDO::getChannel, normalized)
                 .eq(CustomerChannelDO::getEnabled, 1)
@@ -116,6 +143,7 @@ public class MarketingPolicyService {
         }
         try {
             return ZoneId.of(timezone);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ignored) {
             return ZoneId.of(DEFAULT_TIMEZONE);
         }
@@ -128,11 +156,18 @@ public class MarketingPolicyService {
         try {
             quietStart = LocalTime.parse(start == null || start.isBlank() ? "22:00" : start);
             quietEnd = LocalTime.parse(end == null || end.isBlank() ? "08:00" : end);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DateTimeParseException e) {
             return PolicyDecision.blocked("INVALID_QUIET_HOURS", "静默时段格式不正确");
         }
 
         ZoneId zone = (timezone == null || timezone.isBlank() || "USER_LOCAL".equalsIgnoreCase(timezone))
+                /**
+                 * 执行 timezoneFor 流程，围绕 timezone for 完成校验、计算或结果组装。
+                 *
+                 * @param timezone 时间参数，用于计算窗口、过期或审计时间。
+                 * @return 返回 timezoneFor 流程生成的业务结果。
+                 */
                 ? timezoneFor(userId)
                 : ZoneId.of(timezone);
         LocalTime now = LocalTime.now(clock.withZone(zone));
@@ -221,6 +256,7 @@ public class MarketingPolicyService {
         }
         try {
             return Long.parseLong(rawCount);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (NumberFormatException ignored) {
             return 0L;
         }

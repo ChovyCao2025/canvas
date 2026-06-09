@@ -1,8 +1,9 @@
 # P2-082AA - Programmatic DSP Provider Write Gateway Spec
 
+Priority: P2
+Sequence: 082AA
 Parent spec: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082aa-programmatic-dsp-provider-write-gateway-plan.md`
-Status: Delivered backend first slice
 
 ## Problem
 
@@ -59,9 +60,9 @@ Backend first slice:
 - Controller tests prove tenant/operator propagation for propose, approve, execute, and list endpoints.
 - Focused backend tests pass with Java 21.
 
-## Delivery Status
+## Implementation Status
 
-Delivered:
+Status: Delivered.
 
 - Added `programmatic_dsp_mutation` as an additive mutation ledger.
 - Added tenant-owned seat, campaign, line item, and supply-path relationship validation before proposals execute.

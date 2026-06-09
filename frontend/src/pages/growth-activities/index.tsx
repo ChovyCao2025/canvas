@@ -36,18 +36,37 @@ const ACTIVITY_PRESETS: Record<string, Pick<GrowthActivityCommand, 'activityType
   BENEFIT_PROMOTION: { activityType: 'BENEFIT_PROMOTION', objective: 'PROMOTION', channelScope: 'ALL' },
 }
 
+/** 活动向导的本地表单态，字符串字段便于直接绑定原生 input/select。 */
 interface ActivityWizardState {
+  /** 活动业务 key。 */
   activityKey: string
+
+  /** 活动名称。 */
   activityName: string
+
+  /** 活动类型。 */
   activityType: string
+
+  /** 活动状态。 */
   status: string
+
+  /** Campaign ID 的输入态，保存时再转 number。 */
   campaignId: string
+
+  /** 活动目标。 */
   objective: string
+
+  /** 负责人团队。 */
   ownerTeam: string
+
+  /** 渠道范围。 */
   channelScope: string
+
+  /** 报表看板引用。 */
   dashboardRef: string
 }
 
+/** 增长活动中心页面，聚合活动列表、上线闸口、奖励池、推荐关系和任务进度。 */
 export default function GrowthActivitiesPage() {
   const [activities, setActivities] = useState<GrowthActivity[]>([])
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null)
@@ -82,6 +101,7 @@ export default function GrowthActivitiesPage() {
   const campaignOptions = useMemo(() => {
     const seen = new Set<number>()
     return activities
+      // 从当前活动列表派生 Campaign 下拉项，同一 campaign 只保留首个活动名称作为标签。
       .filter(activity => typeof activity.campaignId === 'number' && !seen.has(activity.campaignId))
       .map(activity => {
         seen.add(activity.campaignId as number)
@@ -89,6 +109,7 @@ export default function GrowthActivitiesPage() {
       })
   }, [activities])
 
+  /** 加载活动列表，并在筛选后保持当前选中项或自动选择第一条。 */
   const loadActivities = useCallback(async (query: GrowthActivityQuery = { limit: 50 }) => {
     setLoading(true)
     setLoadError(null)
@@ -97,18 +118,22 @@ export default function GrowthActivitiesPage() {
       const rows = response.data ?? []
       setActivities(rows)
       setSelectedActivityId(current => {
+        // 当前活动仍在筛选结果中时保留选择，否则切到第一条，避免详情面板悬空。
         if (current && rows.some(row => row.id === current)) return current
         return rows[0]?.id ?? null
       })
     } catch (error) {
+      // 列表加载失败只展示错误提示，不清空已有活动，便于用户保留上下文后重试。
       setLoadError(error instanceof Error ? error.message : '请稍后重试')
     } finally {
       setLoading(false)
     }
   }, [])
 
+  /** 并发加载选中活动详情，空选中时清理所有详情态。 */
   const loadSelectedDetails = useCallback(async (activityId: number | null) => {
     if (!activityId) {
+      // 筛选无结果或列表为空时主动清空详情，避免展示旧活动信息。
       setReadiness(null)
       setReport(null)
       setRewardPools([])
@@ -122,6 +147,7 @@ export default function GrowthActivitiesPage() {
     setDetailLoading(true)
     setRewardPoolLoading(true)
     try {
+      // 详情页多个区域互不依赖，使用并发请求降低切换活动时的等待时间。
       const [
         readinessResponse,
         reportResponse,
@@ -150,6 +176,7 @@ export default function GrowthActivitiesPage() {
       setTaskDefinitions(taskDefinitionResponse.data ?? [])
       setTaskProgress(taskProgressResponse.data ?? [])
     } finally {
+      // 即使某个详情请求失败，也必须释放 loading；错误由请求层或上层边界处理。
       setDetailLoading(false)
       setRewardPoolLoading(false)
     }
@@ -163,6 +190,7 @@ export default function GrowthActivitiesPage() {
     void loadSelectedDetails(selectedActivity?.id ?? null)
   }, [loadSelectedDetails, selectedActivity?.id])
 
+  /** 将筛选控件状态组装成 API 查询参数，空值不传，campaignId 只在合法数字时传入。 */
   const applyFilters = () => {
     const normalizedCampaignId = Number(campaignId)
     void loadActivities({
@@ -177,12 +205,14 @@ export default function GrowthActivitiesPage() {
     })
   }
 
+  /** 打开新建向导，按推荐裂变预设初始化活动目标和渠道范围。 */
   const openCreateWizard = () => {
     setWizardMode('create')
     setWizard(emptyWizard('REFERRAL_INVITE'))
     setWizardOpen(true)
   }
 
+  /** 打开编辑向导，把当前活动记录投影成本地表单态。 */
   const openEditWizard = () => {
     if (!selectedActivity) return
     setWizardMode('edit')
@@ -200,6 +230,7 @@ export default function GrowthActivitiesPage() {
     setWizardOpen(true)
   }
 
+  /** 应用活动预设，只覆盖类型、目标和渠道范围，保留用户已输入的其他字段。 */
   const applyActivityPreset = (presetKey: string) => {
     const preset = ACTIVITY_PRESETS[presetKey] ?? ACTIVITY_PRESETS.REFERRAL_INVITE
     setWizard(current => ({
@@ -210,6 +241,7 @@ export default function GrowthActivitiesPage() {
     }))
   }
 
+  /** 保存活动配置，完成数字转换、空字符串归 null，并通过 activityKey upsert。 */
   const saveActivity = async () => {
     const normalizedCampaignId = Number(wizard.campaignId)
     await growthActivityApi.upsertActivity({
@@ -223,6 +255,7 @@ export default function GrowthActivitiesPage() {
       channelScope: wizard.channelScope.trim() || null,
       dashboardRef: wizard.dashboardRef.trim() || null,
       audienceRefs: {},
+      // metadata 标记来源模式，便于后端审计新建和编辑路径。
       metadata: { source: wizardMode },
     })
     setWizardOpen(false)
@@ -232,8 +265,10 @@ export default function GrowthActivitiesPage() {
   const participationTotal = report?.participation.totalParticipants ?? 0
   const grantTotal = report?.grants.totalGrants ?? 0
   const roi = formatNumber(report?.conversion.roi)
+  // 闸口展示优先突出阻断项；没有阻断时展示全量检查结果，便于快速定位上线风险。
   const readinessItems = readiness?.blockers.length ? readiness.blockers : readiness?.checks ?? []
   const rewardPoolCostCurrency = rewardPools[0]?.costCurrency ?? 'CNY'
+  // 奖励池金额和库存在前端做轻量聚合，用于概览展示，明细仍以单池记录为准。
   const rewardPoolBudgetTotal = rewardPools.reduce((total, pool) => total + numberValue(pool.budgetAmount), 0)
   const rewardPoolReservedAmount = rewardPools.reduce((total, pool) => total + numberValue(pool.reservedAmount), 0)
   const rewardPoolGrantedAmount = rewardPools.reduce((total, pool) => total + numberValue(pool.grantedAmount), 0)
@@ -241,6 +276,7 @@ export default function GrowthActivitiesPage() {
   const rewardPoolInventoryTotal = rewardPools.reduce((total, pool) => total + (pool.totalInventory ?? 0), 0)
   const rewardPoolReservedInventory = rewardPools.reduce((total, pool) => total + (pool.reservedInventory ?? 0), 0)
   const rewardPoolGrantedInventory = rewardPools.reduce((total, pool) => total + (pool.grantedInventory ?? 0), 0)
+  // 详情 tabs 统一在数组内声明，按钮式 tablist 和隐藏 Antd Tabs 共用同一份内容。
   const detailTabs = [
     {
       key: 'overview',
@@ -393,6 +429,7 @@ export default function GrowthActivitiesPage() {
                     <Button
                       size="small"
                       onClick={() => void growthActivityApi.reconcileGrant(grant.activityId, grant.id, {
+                        // 对账时把当前供应商证据回传，后端据此修正状态或重新入队。
                         providerStatus: grant.status,
                         providerResponse: grant.providerResponse ?? {},
                       })}
@@ -783,6 +820,7 @@ export default function GrowthActivitiesPage() {
   )
 }
 
+/** 活动、奖励池、任务等通用状态颜色。 */
 function statusColor(status?: string | null) {
   if (status === 'ACTIVE') return 'green'
   if (status === 'DRAFT') return 'default'
@@ -791,6 +829,7 @@ function statusColor(status?: string | null) {
   return 'blue'
 }
 
+/** 数字展示兜底：无法转换的字符串保留原值，避免金额/比例被错误置零。 */
 function formatNumber(value: number | string | undefined) {
   if (value === undefined || value === null) return 0
   const numberValue = typeof value === 'number' ? value : Number(value)
@@ -798,43 +837,51 @@ function formatNumber(value: number | string | undefined) {
   return Number.isInteger(numberValue) ? numberValue : numberValue.toFixed(2)
 }
 
+/** 将 number/string/null 统一转换为可聚合数字，非法值按 0 处理。 */
 function numberValue(value: number | string | null | undefined) {
   if (value === undefined || value === null) return 0
   const number = typeof value === 'number' ? value : Number(value)
   return Number.isNaN(number) ? 0 : number
 }
 
+/** 金额展示保留两位小数。 */
 function formatMoney(value: number | string | null | undefined) {
   const number = numberValue(value)
   return number.toFixed(2)
 }
 
+/** 比例展示转换为百分比。 */
 function formatPercent(value: number | string | null | undefined) {
   return `${(numberValue(value) * 100).toFixed(2)}%`
 }
 
+/** 提取推荐关系风控证据摘要。 */
 function riskEvidenceText(riskEvidence: Record<string, unknown> | undefined) {
   const riskDecision = typeof riskEvidence?.riskDecision === 'string' ? riskEvidence.riskDecision : '-'
   const ipRisk = typeof riskEvidence?.ipRisk === 'string' ? riskEvidence.ipRisk : '-'
   return `${riskDecision} · IP ${ipRisk}`
 }
 
+/** 提取任务进度证据摘要。 */
 function taskEvidenceText(evidence: Record<string, unknown> | undefined) {
   const eventName = typeof evidence?.eventName === 'string' ? evidence.eventName : '-'
   const source = typeof evidence?.source === 'string' ? evidence.source : '-'
   return `${eventName} · 来源 ${source}`
 }
 
+/** 提取奖励供应商响应摘要。 */
 function providerEvidenceText(providerResponse: Record<string, unknown> | undefined) {
   const provider = typeof providerResponse?.provider === 'string' ? providerResponse.provider : '-'
   const referenceId = typeof providerResponse?.referenceId === 'string' ? providerResponse.referenceId : '-'
   return `${provider} · 单号 ${referenceId}`
 }
 
+/** 提取奖励供应商错误码，缺失时用占位符兜底。 */
 function providerErrorText(providerResponse: Record<string, unknown> | undefined) {
   return typeof providerResponse?.errorCode === 'string' ? providerResponse.errorCode : '-'
 }
 
+/** 根据活动预设生成空向导状态。 */
 function emptyWizard(presetKey: string): ActivityWizardState {
   const preset = ACTIVITY_PRESETS[presetKey] ?? ACTIVITY_PRESETS.REFERRAL_INVITE
   return {

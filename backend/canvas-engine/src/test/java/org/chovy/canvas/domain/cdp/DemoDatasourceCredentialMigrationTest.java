@@ -11,7 +11,7 @@ class DemoDatasourceCredentialMigrationTest {
 
     @Test
     void migrationReplacesRootRootDemoDatasourceCredentials() throws Exception {
-        String sql = new ClassPathResource("db/migration/V272__sanitize_demo_datasource_credentials.sql")
+        String sql = new ClassPathResource("db/migration/V354__sanitize_demo_datasource_credentials.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(sql).contains("UPDATE data_source_config");

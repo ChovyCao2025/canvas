@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * CdpEventPublisher 编排 domain.cdp 场景的领域业务规则。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -19,6 +22,15 @@ public class CdpEventPublisher {
     @Value("${canvas.cdp.event-topic:CDP_EVENT_INGESTED}")
     private String topic;
 
+    /**
+     * 发布已接收的 CDP 事件到 RocketMQ。
+     *
+     * <p>方法把事件日志中的租户、事件 ID、消息 ID、用户标识、事件时间和属性组装为消息体；
+     * 如果 eventCode 非空，会使用 {@code topic:eventCode} 作为目的地以便消费者按事件过滤。发送为同步调用，
+     * RocketMQ 失败会向调用方抛出异常。</p>
+     *
+     * @param event 已持久化且通过接收校验的 CDP 事件日志
+     */
     public void publishAccepted(CdpEventLogDO event) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("tenantId", event.getTenantId());

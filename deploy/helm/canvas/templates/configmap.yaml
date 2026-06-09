@@ -1,4 +1,5 @@
 {{- if .Values.backend.enabled }}
+# Backend ConfigMap carries non-secret runtime wiring; credentials stay in Secret refs.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,6 +9,7 @@ metadata:
     {{- include "canvas.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 data:
+  # Dependency endpoints and operational knobs consumed as environment variables by deployment.yaml.
   spring-data-redis-host: {{ .Values.backend.config.springDataRedisHost | quote }}
   spring-data-redis-port: {{ .Values.backend.config.springDataRedisPort | quote }}
   rocketmq-name-server: {{ .Values.backend.config.rocketmqNameServer | quote }}
@@ -18,6 +20,7 @@ data:
 {{- end }}
 ---
 {{- if .Values.frontend.enabled }}
+# Frontend ConfigMap tells nginx where API requests should be proxied.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -27,5 +30,6 @@ metadata:
     {{- include "canvas.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 data:
+  # Defaults to the in-chart backend service when no external upstream is supplied.
   canvas-api-upstream: {{ default (printf "http://%s:%v" (include "canvas.backendName" .) .Values.backend.service.port) .Values.frontend.apiUpstream | quote }}
 {{- end }}

@@ -5,6 +5,8 @@ Sequence: 009
 Source: `todo/p3/strategic-opportunities-from-filtered-scope.md#globalization-and-regional-expansion`
 Implementation plan: `../plans/p3-009-globalization-and-regional-expansion-plan.md`
 
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Create an executable discovery and governance slice for globalization and regional expansion so market-entry work is backed by evidence before localization, regional channel, compliance, currency, timezone, or deployment implementation begins.

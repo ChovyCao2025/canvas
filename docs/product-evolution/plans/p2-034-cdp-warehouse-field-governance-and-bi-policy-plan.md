@@ -1,10 +1,14 @@
 # CDP Warehouse Field Governance And BI Policy Implementation Plan
 
+Spec: `../specs/p2-034-cdp-warehouse-field-governance-and-bi-policy.md`
+
 **Goal:** Add field-level PII governance and enforce it before BI query SQL is returned or executed.
 
 **Architecture:** Store warehouse field policies in MySQL with tenant-default merging. BI compile and execute paths call the governance service before returning SQL or hitting Doris/MySQL. Denied access is audited. Existing V191 BI field/permission foundations remain intact; this slice adds the runtime enforcement layer for the current registry-backed BI query path.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

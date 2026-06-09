@@ -1,5 +1,9 @@
 # CDP Warehouse Privacy Audience Bitmap Rebuild Automation Implementation Plan
 
+Spec: `../specs/p2-077-cdp-warehouse-privacy-audience-bitmap-rebuild-automation.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Automatically run P2-076 audience bitmap rebuild proof for privacy erasure requests whose upstream assets are already proven erased.

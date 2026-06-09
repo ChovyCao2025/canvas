@@ -1,10 +1,14 @@
 # CDP Warehouse Realtime Job Incident Automation Implementation Plan
 
+Spec: `../specs/p2-048-cdp-warehouse-realtime-job-incident-automation.md`
+
 **Goal:** Route realtime warehouse job health into incidents and readiness so failed or stale external streaming jobs are visible without manual polling.
 
 **Architecture:** Reuse the existing incident table and scheduler lease pattern. `CdpWarehouseRealtimeJobIncidentService` scans P2-047 job status, `CdpWarehouseIncidentService` owns incident row creation, and `CdpWarehouseReadinessService` combines pipeline and job health for realtime readiness.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

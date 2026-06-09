@@ -102,6 +102,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/marketing-platform')) return 'marketing-platform'
     if (location.pathname.startsWith('/growth-activities')) return 'growth-activities'
     if (location.pathname.startsWith('/search-marketing')) return 'search-marketing'
+    if (location.pathname.startsWith('/risk')) return 'risk'
     if (location.pathname.startsWith('/marketing-preferences')) return 'marketing-preferences'
     if (location.pathname.startsWith('/marketing-forms')) return 'marketing-forms'
     if (location.pathname.startsWith('/content-hub')) return 'content-hub'
@@ -111,6 +112,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/ops')) return 'ops'
     if (location.pathname.startsWith('/conversations')) return 'conversations'
     if (location.pathname.startsWith('/marketing-monitoring')) return 'marketing-monitoring'
+    if (location.pathname.startsWith('/analytics')) return 'analytics-events'
     if (location.pathname.startsWith('/bi')) return 'bi'
     if (location.pathname.startsWith('/ai-predictions')) return 'ai-predictions'
     if (location.pathname.startsWith('/cdp/users'))      return 'cdp-users'
@@ -121,9 +123,9 @@ export default function AppLayout() {
   const getDesiredOpenKeys = () => {
     if (selectedKey === 'home') return []
     if (['ops', 'approvals', 'conversations', 'marketing-monitoring'].includes(selectedKey)) return ['operations']
-    if (selectedKey === 'bi') return ['analytics']
+    if (['bi', 'analytics-events'].includes(selectedKey)) return ['analytics']
     if (['cdp-users', 'ai-predictions'].includes(selectedKey)) return ['insight']
-    if (['test-users', 'message-deliveries', 'mautic-insights', 'marketing-platform', 'growth-activities', 'search-marketing', 'marketing-preferences', 'marketing-forms', 'content-hub', 'message-templates', 'demo-sandbox'].includes(selectedKey)) return ['marketing']
+    if (['test-users', 'message-deliveries', 'mautic-insights', 'marketing-platform', 'growth-activities', 'search-marketing', 'risk', 'marketing-preferences', 'marketing-forms', 'content-hub', 'message-templates', 'demo-sandbox'].includes(selectedKey)) return ['marketing']
     if (selectedKey === 'api-docs') return ['developer']
     if (['audiences', 'tag-config', 'cdp-computed-profile', 'cdp-computed-tags', 'cdp-realtime-audiences', 'identity-types', 'tag-import', 'ab-experiments'].includes(selectedKey)) return ['data']
     if (['api-config', 'data-source-config', 'mq-config', 'event-config', 'webhook-subscriptions', 'channel-connectors'].includes(selectedKey)) return ['integration']
@@ -171,6 +173,12 @@ export default function AppLayout() {
           icon: <SearchOutlined />,
           label: 'SEO / SEM 管理',
           onClick: () => go('/search-marketing'),
+        },
+        {
+          key: 'risk',
+          icon: <SafetyCertificateOutlined />,
+          label: '风控策略',
+          onClick: () => go('/risk'),
         },
         {
           key: 'growth-activities',
@@ -237,6 +245,12 @@ export default function AppLayout() {
           icon: <BarChartOutlined />,
           label: 'BI 工作台',
           onClick: () => navigate('/bi'),
+        },
+        {
+          key: 'analytics-events',
+          icon: <BarChartOutlined />,
+          label: '事件分析',
+          onClick: () => go('/analytics'),
         },
       ],
     },

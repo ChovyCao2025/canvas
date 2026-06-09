@@ -1,8 +1,9 @@
 # P2-082Z - Creator Provider Write Gateway Spec
 
+Priority: P2
+Sequence: 082Z
 Parent spec: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082z-creator-provider-write-gateway-plan.md`
-Status: Delivered backend first slice
 
 ## Problem
 
@@ -57,9 +58,9 @@ Backend first slice:
 - Controller tests prove tenant/operator propagation for propose, approve, execute, and list endpoints.
 - Focused backend tests pass with Java 21.
 
-## Delivery Status
+## Implementation Status
 
-Delivered:
+Status: Delivered.
 
 - Added `creator_provider_mutation` as an additive mutation ledger.
 - Added tenant-owned campaign, collaboration, deliverable, and creator relationship validation before proposals execute.

@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, Flyway, Jackson, JUnit 5, Mockito, AssertJ, Reactor Test.
 
+**Implementation Status:** Current workspace record: delivered backend and workspace frontend slice. Verification results are recorded below.
+
 ---
 
 ## Scope

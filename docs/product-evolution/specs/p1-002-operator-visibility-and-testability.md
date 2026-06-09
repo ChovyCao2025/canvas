@@ -7,7 +7,9 @@ Implementation plan: `../plans/p1-002-operator-visibility-and-testability-plan.m
 
 ## Implementation Status
 
-Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-002-operator-visibility-and-testability-plan.md`.
+Status: Implemented and focused-verified on 2026-06-05; full module regressions are not recorded as run/passing.
+
+Verification evidence is recorded in `../plans/p1-002-operator-visibility-and-testability-plan.md`.
 
 ## Goal
 

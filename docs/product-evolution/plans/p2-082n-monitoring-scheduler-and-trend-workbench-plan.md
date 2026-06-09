@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot scheduling, MyBatis-Plus, JUnit 5, Mockito, AssertJ, React, TypeScript, Ant Design, Vitest, Testing Library.
 
+**Implementation Status:** Current workspace record: delivered backend and frontend slice. Verification results are recorded below.
+
 ---
 
 ## Scope

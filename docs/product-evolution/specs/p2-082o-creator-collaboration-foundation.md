@@ -9,9 +9,9 @@ Implementation plan: `../plans/p2-082o-creator-collaboration-foundation-plan.md`
 
 Add the first production-grade KOL/KOC collaboration foundation: creator profiles, campaign briefs, collaboration offers, deliverable tracking, attributed performance snapshots, and tenant-scoped reporting APIs.
 
-## Delivery Status
+## Implementation Status
 
-Delivered backend first slice on 2026-06-06:
+Status: Delivered backend first slice on 2026-06-06.
 
 - Creator registry with provider/channel identity, audience metrics, engagement rate, tags, profile status, risk status, and metadata.
 - Campaign brief registry with objective, budget, currency, date window, status, and metadata.

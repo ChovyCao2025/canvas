@@ -1,5 +1,9 @@
 # CDP Warehouse Catalog And Lineage Implementation Plan
 
+Spec: `../specs/p2-027-cdp-warehouse-catalog-and-lineage.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add tenant-scoped warehouse catalog and direct lineage metadata for CDP, audience, and BI datasets.
 
 **Architecture:** Add metadata-only MySQL tables and a service/controller layer. Runtime data movement remains in P2-022 through P2-026; this slice makes those assets discoverable and traceable.

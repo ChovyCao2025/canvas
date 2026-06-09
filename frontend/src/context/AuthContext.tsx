@@ -3,7 +3,7 @@
  *
  * 维护说明：Provider 负责 localStorage 与 React 状态的同步，调用方通过 useAuth 读取和更新。
  */
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { LoginResp } from '../services/api'
 import {
   canManageSystemOptions,
@@ -84,11 +84,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   /** 退出登录时清理本地会话并重置认证态。 */
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('canvas_token')
     localStorage.removeItem('canvas_user')
     setUser(null)
-  }
+  }, [])
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      logout()
+    }
+    globalThis.addEventListener?.('canvas:unauthorized', onUnauthorized)
+    return () => globalThis.removeEventListener?.('canvas:unauthorized', onUnauthorized)
+  }, [logout])
 
   return (
     <AuthContext.Provider value={{

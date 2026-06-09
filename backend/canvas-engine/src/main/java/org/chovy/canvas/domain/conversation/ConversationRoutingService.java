@@ -28,6 +28,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * ConversationRoutingService 编排 domain.conversation 场景的领域业务规则。
+ */
 @Service
 public class ConversationRoutingService {
 
@@ -46,6 +49,15 @@ public class ConversationRoutingService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    /**
+     * 创建 ConversationRoutingService 实例并注入 domain.conversation 场景依赖。
+     * @param workItemMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param agentMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ruleMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param breachMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public ConversationRoutingService(ConversationWorkItemMapper workItemMapper,
                                       ConversationWorkItemAuditMapper auditMapper,
@@ -57,6 +69,17 @@ public class ConversationRoutingService {
                 objectMapper, Clock.systemDefaultZone());
     }
 
+    /**
+     * 执行 ConversationRoutingService 流程，围绕 conversation routing service 完成校验、计算或结果组装。
+     *
+     * @param workItemMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param agentMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ruleMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param breachMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     ConversationRoutingService(ConversationWorkItemMapper workItemMapper,
                                ConversationWorkItemAuditMapper auditMapper,
                                ConversationRoutingAgentMapper agentMapper,
@@ -74,14 +97,20 @@ public class ConversationRoutingService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 新增或更新租户内客服路由坐席。
+     * 会规范化坐席状态、团队、技能和容量，写入当前负载，并返回可路由视图。
+     */
     public ConversationRoutingAgentView upsertAgent(Long tenantId,
                                                     ConversationRoutingAgentCommand command,
                                                     String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("conversation routing agent command is required");
         }
         Long scopedTenantId = tenantId(tenantId);
         String agentKey = key(command.agentKey(), "agentKey");
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         ConversationRoutingAgentDO row = agentMapper.selectOne(new LambdaQueryWrapper<ConversationRoutingAgentDO>()
                 .eq(ConversationRoutingAgentDO::getTenantId, scopedTenantId)
                 .eq(ConversationRoutingAgentDO::getAgentKey, agentKey)
@@ -108,18 +137,25 @@ public class ConversationRoutingService {
         } else {
             agentMapper.updateById(row);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toAgentView(row);
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 新增或更新租户内会话路由规则。
+     * 规则包含渠道、最低优先级、所需技能、目标团队和 SLA 分钟数，后续工单路由会按排序优先匹配启用规则。
+     */
     public ConversationRoutingRuleView upsertRule(Long tenantId,
                                                   ConversationRoutingRuleCommand command,
                                                   String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("conversation routing rule command is required");
         }
         Long scopedTenantId = tenantId(tenantId);
         String ruleKey = key(command.ruleKey(), "ruleKey");
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         ConversationRoutingRuleDO row = ruleMapper.selectOne(new LambdaQueryWrapper<ConversationRoutingRuleDO>()
                 .eq(ConversationRoutingRuleDO::getTenantId, scopedTenantId)
                 .eq(ConversationRoutingRuleDO::getRuleKey, ruleKey)
@@ -145,10 +181,15 @@ public class ConversationRoutingService {
         } else {
             ruleMapper.updateById(row);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toRuleView(row);
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 为会话工单匹配路由规则并分配可用坐席。
+     * 成功时会更新工单分配人、团队、SLA 到期时间和坐席负载，并写入审计；无可用坐席时只标记 UNROUTED。
+     */
     public ConversationRouteResultView routeWorkItem(Long tenantId,
                                                      Long workItemId,
                                                      ConversationRouteCommand command,
@@ -160,13 +201,28 @@ public class ConversationRoutingService {
         }
         ConversationRoutingRuleDO rule = matchingRule(scopedTenantId, workItem);
         List<String> requiredSkills = command != null && !command.requiredSkills().isEmpty()
+                /**
+                 * 规范化输入值。
+                 *
+                 * @return 返回解析、归一化或安全处理后的值。
+                 */
                 ? normalizedKeys(command.requiredSkills())
                 : rule == null ? List.of() : stringList(rule.getRequiredSkillsJson());
         String targetTeam = command == null || isBlank(command.targetTeam())
                 ? rule == null ? null : rule.getTargetTeam()
+                /**
+                 * 执行 optionalKey 流程，围绕 optional key 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 optionalKey 流程生成的业务结果。
+                 */
                 : optionalKey(command.targetTeam());
         int slaMinutes = command == null || command.slaMinutes() == null
                 ? rule == null ? 60 : positive(rule.getSlaMinutes(), 60)
+                /**
+                 * 执行 positive 流程，围绕 positive 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 positive 流程生成的业务结果。
+                 */
                 : positive(command.slaMinutes(), rule == null ? 60 : positive(rule.getSlaMinutes(), 60));
         ConversationRoutingAgentDO agent = bestAgent(scopedTenantId, targetTeam, requiredSkills);
         if (agent == null) {
@@ -212,6 +268,10 @@ public class ConversationRoutingService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 扫描租户内已超过 SLA 的未解决工单并生成违约记录。
+     * 已存在 OPEN 违约会被跳过，新违约会提升低优先级工单到 HIGH 并写入工单审计。
+     */
     public ConversationSlaEvaluationView evaluateSlaBreaches(Long tenantId,
                                                              LocalDateTime evaluatedAt,
                                                              String actor,
@@ -219,6 +279,7 @@ public class ConversationRoutingService {
         Long scopedTenantId = tenantId(tenantId);
         LocalDateTime effectiveNow = evaluatedAt == null ? now() : evaluatedAt;
         int boundedLimit = boundedLimit(limit);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<ConversationWorkItemDO> rows = safeList(workItemMapper.selectList(new LambdaQueryWrapper<ConversationWorkItemDO>()
                 .eq(ConversationWorkItemDO::getTenantId, scopedTenantId)
                 .le(ConversationWorkItemDO::getSlaDueAt, effectiveNow)
@@ -226,7 +287,9 @@ public class ConversationRoutingService {
         int scanned = 0;
         int skippedExisting = 0;
         List<ConversationSlaBreachDO> created = new ArrayList<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (ConversationWorkItemDO row : rows) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (!scopedTenantId.equals(row.getTenantId())
                     || row.getSlaDueAt() == null
                     || row.getSlaDueAt().isAfter(effectiveNow)
@@ -284,14 +347,20 @@ public class ConversationRoutingService {
                 created.stream().map(this::toBreachView).toList());
     }
 
+    /**
+     * 查询租户内 SLA 违约记录。
+     * 可按状态过滤，按违约时间倒序返回，用于客服主管查看待处理升级项。
+     */
     public List<ConversationSlaBreachView> slaBreaches(Long tenantId, String status, int limit) {
         Long scopedTenantId = tenantId(tenantId);
         String normalizedStatus = normalizeOptionalUpper(status);
         int boundedLimit = boundedLimit(limit);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return safeList(breachMapper.selectList(new LambdaQueryWrapper<ConversationSlaBreachDO>()
                         .eq(ConversationSlaBreachDO::getTenantId, scopedTenantId)
                         .eq(normalizedStatus != null, ConversationSlaBreachDO::getStatus, normalizedStatus)
                         .orderByDesc(ConversationSlaBreachDO::getBreachedAt)
+                        // 遍历候选数据并按业务规则筛选、转换或聚合。
                         .last("LIMIT " + boundedLimit))).stream()
                 .filter(row -> scopedTenantId.equals(row.getTenantId()))
                 .filter(row -> normalizedStatus == null || normalizedStatus.equals(row.getStatus()))
@@ -300,11 +369,22 @@ public class ConversationRoutingService {
                 .toList();
     }
 
+    /**
+     * 执行 routeMiss 流程，围绕 route miss 完成校验、计算或结果组装。
+     *
+     * @param workItem work item 参数，用于 routeMiss 流程中的校验、计算或对象转换。
+     * @param requiredSkills required skills 参数，用于 routeMiss 流程中的校验、计算或对象转换。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 routeMiss 流程生成的业务结果。
+     */
     private ConversationRouteResultView routeMiss(ConversationWorkItemDO workItem,
                                                   List<String> requiredSkills,
                                                   String reason,
                                                   String actor) {
+        // 准备本次处理所需的上下文和中间变量。
         LocalDateTime changedAt = now();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         ConversationWorkItemDO update = new ConversationWorkItemDO();
         update.setId(workItem.getId());
         update.setRoutingStatus("UNROUTED");
@@ -317,6 +397,7 @@ public class ConversationRoutingService {
                 Map.of(),
                 values("routingStatus", "UNROUTED", "requiredSkills", requiredSkills, "reason", reason),
                 reason);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ConversationRouteResultView(
                 workItem.getTenantId(),
                 workItem.getId(),
@@ -329,11 +410,20 @@ public class ConversationRoutingService {
                 workItem.getSlaDueAt());
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workItem work item 参数，用于 matchingRule 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private ConversationRoutingRuleDO matchingRule(Long tenantId, ConversationWorkItemDO workItem) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return safeList(ruleMapper.selectList(new LambdaQueryWrapper<ConversationRoutingRuleDO>()
                         .eq(ConversationRoutingRuleDO::getTenantId, tenantId)
                         .eq(ConversationRoutingRuleDO::getEnabled, 1)
                         .orderByAsc(ConversationRoutingRuleDO::getSortOrder)
+                        // 遍历候选数据并按业务规则筛选、转换或聚合。
                         .orderByAsc(ConversationRoutingRuleDO::getId))).stream()
                 .filter(rule -> tenantId.equals(rule.getTenantId()))
                 .filter(rule -> enabled(rule.getEnabled()))
@@ -343,12 +433,22 @@ public class ConversationRoutingService {
                 .orElse(null);
     }
 
+    /**
+     * 执行 bestAgent 流程，围绕 best agent 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param targetTeam target team 参数，用于 bestAgent 流程中的校验、计算或对象转换。
+     * @param requiredSkills required skills 参数，用于 bestAgent 流程中的校验、计算或对象转换。
+     * @return 返回 bestAgent 流程生成的业务结果。
+     */
     private ConversationRoutingAgentDO bestAgent(Long tenantId, String targetTeam, List<String> requiredSkills) {
         Set<String> required = new LinkedHashSet<>(requiredSkills == null ? List.of() : requiredSkills);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return safeList(agentMapper.selectList(new LambdaQueryWrapper<ConversationRoutingAgentDO>()
                         .eq(ConversationRoutingAgentDO::getTenantId, tenantId)
                         .eq(ConversationRoutingAgentDO::getStatus, "AVAILABLE")
                         .orderByAsc(ConversationRoutingAgentDO::getCurrentLoad)
+                        // 遍历候选数据并按业务规则筛选、转换或聚合。
                         .orderByAsc(ConversationRoutingAgentDO::getAgentKey))).stream()
                 .filter(agent -> tenantId.equals(agent.getTenantId()))
                 .filter(agent -> "AVAILABLE".equals(normalizeOptionalUpper(agent.getStatus())))
@@ -361,6 +461,13 @@ public class ConversationRoutingService {
                 .orElse(null);
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workItemId 业务对象 ID，用于定位具体记录。
+     * @return 返回 requireWorkItem 流程生成的业务结果。
+     */
     private ConversationWorkItemDO requireWorkItem(Long tenantId, Long workItemId) {
         if (workItemId == null) {
             throw new IllegalArgumentException("workItemId is required");
@@ -372,6 +479,17 @@ public class ConversationRoutingService {
         return row;
     }
 
+    /**
+     * 记录审计、指标或状态变更信息。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workItemId 业务对象 ID，用于定位具体记录。
+     * @param eventType 类型标识，用于选择对应处理分支。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param oldValue 待处理值，用于规则计算或转换。
+     * @param newValue 待处理值，用于规则计算或转换。
+     * @param note note 参数，用于 audit 流程中的校验、计算或对象转换。
+     */
     private void audit(Long tenantId,
                        Long workItemId,
                        String eventType,
@@ -391,6 +509,12 @@ public class ConversationRoutingService {
         auditMapper.insert(row);
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private ConversationRoutingAgentView toAgentView(ConversationRoutingAgentDO row) {
         return new ConversationRoutingAgentView(
                 row.getId(),
@@ -408,6 +532,12 @@ public class ConversationRoutingService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private ConversationRoutingRuleView toRuleView(ConversationRoutingRuleDO row) {
         return new ConversationRoutingRuleView(
                 row.getId(),
@@ -426,6 +556,12 @@ public class ConversationRoutingService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private ConversationSlaBreachView toBreachView(ConversationSlaBreachDO row) {
         return new ConversationSlaBreachView(
                 row.getId(),
@@ -445,14 +581,28 @@ public class ConversationRoutingService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 执行 slaSeverity 流程，围绕 sla severity 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 sla severity 生成的文本或业务键。
+     */
     private String slaSeverity(ConversationWorkItemDO row) {
         return "URGENT".equals(normalizeOptionalUpper(row.getPriority())) ? "CRITICAL" : "HIGH";
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param values values 参数，用于 normalizedKeys 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private List<String> normalizedKeys(List<String> values) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (values == null) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return values.stream()
                 .filter(value -> value != null && !value.isBlank())
                 .map(value -> value.trim().toLowerCase(Locale.ROOT))
@@ -460,6 +610,12 @@ public class ConversationRoutingService {
                 .toList();
     }
 
+    /**
+     * 执行 values 流程，围绕 values 完成校验、计算或结果组装。
+     *
+     * @param keysAndValues keys and values 参数，用于 values 流程中的校验、计算或对象转换。
+     * @return 返回 values 流程生成的业务结果。
+     */
     private Map<String, Object> values(Object... keysAndValues) {
         Map<String, Object> result = new LinkedHashMap<>();
         for (int i = 0; i + 1 < keysAndValues.length; i += 2) {
@@ -472,12 +628,20 @@ public class ConversationRoutingService {
         return result;
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 jsonValue 流程生成的业务结果。
+     */
     private Object jsonValue(Object value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value instanceof LocalDateTime time) {
             return time.toString();
         }
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> result = new LinkedHashMap<>();
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 if (entry.getKey() != null) {
                     result.put(String.valueOf(entry.getKey()), jsonValue(entry.getValue()));
@@ -488,46 +652,80 @@ public class ConversationRoutingService {
         if (value instanceof List<?> list) {
             return list.stream().map(this::jsonValue).toList();
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return value;
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 write json 生成的文本或业务键。
+     */
     private String writeJson(Object value) {
         try {
             if (value instanceof List<?> list) {
                 return objectMapper.writeValueAsString(new ArrayList<>(list));
             }
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ex) {
             throw new IllegalArgumentException("conversation routing JSON serialization failed", ex);
         }
     }
 
+    /**
+     * 执行 stringList 流程，围绕 string list 完成校验、计算或结果组装。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 string list 汇总后的集合、分页或映射视图。
+     */
     private List<String> stringList(String json) {
         if (isBlank(json)) {
             return List.of();
         }
         try {
             return objectMapper.readValue(json, STRING_LIST_TYPE);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ignored) {
             return List.of();
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (isBlank(json)) {
             return Map.of();
         }
         try {
             return objectMapper.readValue(json, MAP_TYPE);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ignored) {
             return Map.of();
         }
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 执行 priorityRank 流程，围绕 priority rank 完成校验、计算或结果组装。
+     *
+     * @param priority priority 参数，用于 priorityRank 流程中的校验、计算或对象转换。
+     * @return 返回 priority rank 计算得到的数量、金额或指标值。
+     */
     private int priorityRank(String priority) {
         return switch (normalizePriority(defaultString(priority, "NORMAL"))) {
             case "URGENT" -> 4;
@@ -537,6 +735,12 @@ public class ConversationRoutingService {
         };
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param priority priority 参数，用于 normalizePriority 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizePriority(String priority) {
         String normalized = required(priority, "priority is required").toUpperCase(Locale.ROOT);
         if (!PRIORITIES.contains(normalized)) {
@@ -545,6 +749,12 @@ public class ConversationRoutingService {
         return normalized;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeAgentStatus(String status) {
         String normalized = defaultString(status, "AVAILABLE").toUpperCase(Locale.ROOT);
         if (!AGENT_STATUSES.contains(normalized)) {
@@ -553,22 +763,54 @@ public class ConversationRoutingService {
         return normalized;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOptionalUpper(String value) {
         return isBlank(value) ? null : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 执行 optionalUpper 流程，围绕 optional upper 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 optional upper 生成的文本或业务键。
+     */
     private String optionalUpper(String value) {
         return isBlank(value) ? null : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 执行 optionalKey 流程，围绕 optional key 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 optional key 生成的文本或业务键。
+     */
     private String optionalKey(String value) {
         return isBlank(value) ? null : value.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 执行 key 流程，围绕 key 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 key 生成的文本或业务键。
+     */
     private String key(String value, String field) {
         return required(value, field + " is required").toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String message) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(message);
@@ -576,26 +818,64 @@ public class ConversationRoutingService {
         return value.trim();
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private String defaultString(String value, String fallback) {
         return isBlank(value) ? fallback : value.trim();
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String blankToNull(String value) {
         return isBlank(value) ? null : value.trim();
     }
 
+    /**
+     * 执行 positive 流程，围绕 positive 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 positive 流程中的校验、计算或对象转换。
+     * @return 返回 positive 计算得到的数量、金额或指标值。
+     */
     private int positive(Integer value, int fallback) {
         return value == null || value <= 0 ? fallback : value;
     }
 
+    /**
+     * 执行 value 流程，围绕 value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 value 计算得到的数量、金额或指标值。
+     */
     private int value(Integer value) {
         return value == null ? 0 : value;
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 enabled 的布尔判断结果。
+     */
     private boolean enabled(Integer value) {
         return value != null && value == 1;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundedLimit(int limit) {
         if (limit < 1) {
             return 1;
@@ -603,18 +883,41 @@ public class ConversationRoutingService {
         return Math.min(limit, 100);
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 tenant id 计算得到的数量、金额或指标值。
+     */
     private Long tenantId(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 解析操作人标识。
+     *
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 actor 生成的文本或业务键。
+     */
     private String actor(String actor) {
         return isBlank(actor) ? "system" : actor.trim();
     }
 
+    /**
+     * 执行 now 流程，围绕 now 完成校验、计算或结果组装。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

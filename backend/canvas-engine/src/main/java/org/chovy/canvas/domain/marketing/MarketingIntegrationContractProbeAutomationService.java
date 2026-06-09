@@ -50,6 +50,9 @@ import java.util.Locale;
 import java.util.Map;
 
 @Service
+/**
+ * MarketingIntegrationContractProbeAutomationService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class MarketingIntegrationContractProbeAutomationService {
 
     static final String PROBE_KEY = "prod-readiness-probe";
@@ -66,6 +69,14 @@ public class MarketingIntegrationContractProbeAutomationService {
     private final Clock clock;
 
     @Autowired
+    /**
+     * 初始化 MarketingIntegrationContractProbeAutomationService 实例。
+     *
+     * @param contractMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeClient 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public MarketingIntegrationContractProbeAutomationService(
             MarketingIntegrationContractMapper contractMapper,
             MarketingIntegrationContractProbeService probeService,
@@ -74,6 +85,14 @@ public class MarketingIntegrationContractProbeAutomationService {
         this(contractMapper, probeService, probeClient, objectMapper, Clock.systemDefaultZone());
     }
 
+    /**
+     * 初始化 MarketingIntegrationContractProbeAutomationService 实例。
+     *
+     * @param contractMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeClient 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingIntegrationContractProbeAutomationService(
             MarketingIntegrationContractMapper contractMapper,
             MarketingIntegrationContractProbeService probeService,
@@ -82,6 +101,15 @@ public class MarketingIntegrationContractProbeAutomationService {
         this(contractMapper, probeService, probeClient, new ObjectMapper(), clock);
     }
 
+    /**
+     * 初始化 MarketingIntegrationContractProbeAutomationService 实例。
+     *
+     * @param contractMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeClient 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingIntegrationContractProbeAutomationService(
             MarketingIntegrationContractMapper contractMapper,
             MarketingIntegrationContractProbeService probeService,
@@ -107,6 +135,7 @@ public class MarketingIntegrationContractProbeAutomationService {
         Long scopedTenantId = safeTenantId(tenantId);
         LocalDateTime evaluatedAt = LocalDateTime.now(clock).withNano(0);
         int boundedLimit = boundedLimit(limit);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<MarketingIntegrationContractDO> candidates = safeList(contractMapper.selectList(
                 new LambdaQueryWrapper<MarketingIntegrationContractDO>()
                         .eq(MarketingIntegrationContractDO::getTenantId, scopedTenantId)
@@ -114,6 +143,7 @@ public class MarketingIntegrationContractProbeAutomationService {
                         .eq(MarketingIntegrationContractDO::getStatus, "ACTIVE")
                         .orderByDesc(MarketingIntegrationContractDO::getUpdatedAt)
                         .last("LIMIT " + boundedLimit)));
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         List<MarketingIntegrationContractDO> contracts = candidates.stream()
                 .filter(row -> scopedTenantId.equals(row.getTenantId()))
                 .filter(row -> "PRODUCTION".equalsIgnoreCase(defaultString(row.getEnvironment(), "")))
@@ -125,6 +155,7 @@ public class MarketingIntegrationContractProbeAutomationService {
                 .toList();
         long passed = results.stream().filter(result -> "PASS".equals(result.status())).count();
         long failed = results.stream().filter(result -> !"PASS".equals(result.status())).count();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ProbeAutomationSummary(
                 scopedTenantId,
                 candidates.size(),
@@ -136,10 +167,20 @@ public class MarketingIntegrationContractProbeAutomationService {
                 results);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contract contract 参数，用于 probeContract 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param evaluatedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 probeContract 流程生成的业务结果。
+     */
     private ProbeAutomationResult probeContract(Long tenantId,
                                                 MarketingIntegrationContractDO contract,
                                                 String actor,
                                                 LocalDateTime evaluatedAt) {
+        // 准备本次处理所需的上下文和中间变量。
         try {
             MarketingIntegrationContractProbeClient.ProbeResult probe = probeClient.probe(toTarget(contract));
             MarketingIntegrationContractProbeRunView view = probeService.recordProbeRun(
@@ -170,10 +211,17 @@ public class MarketingIntegrationContractProbeAutomationService {
                             "Automatic probe failed",
                             failureEvidence(contract, ex, evaluatedAt)),
                     actor(actor));
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return toResult(view);
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param contract contract 参数，用于 toTarget 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private MarketingIntegrationContractProbeClient.ProbeTarget toTarget(MarketingIntegrationContractDO contract) {
         return new MarketingIntegrationContractProbeClient.ProbeTarget(
                 contract.getId(),
@@ -188,6 +236,12 @@ public class MarketingIntegrationContractProbeAutomationService {
                 fromJson(contract.getMetadataJson()));
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param view view 参数，用于 toResult 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private ProbeAutomationResult toResult(MarketingIntegrationContractProbeRunView view) {
         return new ProbeAutomationResult(
                 view.contractId(),
@@ -202,6 +256,14 @@ public class MarketingIntegrationContractProbeAutomationService {
                 view.observedAt());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param contract contract 参数，用于 evidence 流程中的校验、计算或对象转换。
+     * @param clientEvidence 依赖组件，用于完成数据访问或外部能力调用。
+     * @param evaluatedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 evidence 流程生成的业务结果。
+     */
     private Map<String, Object> evidence(MarketingIntegrationContractDO contract,
                                          Map<String, Object> clientEvidence,
                                          LocalDateTime evaluatedAt) {
@@ -216,6 +278,14 @@ public class MarketingIntegrationContractProbeAutomationService {
         return evidence;
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param contract contract 参数，用于 failureEvidence 流程中的校验、计算或对象转换。
+     * @param exception exception 参数，用于 failureEvidence 流程中的校验、计算或对象转换。
+     * @param evaluatedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 failureEvidence 流程生成的业务结果。
+     */
     private Map<String, Object> failureEvidence(MarketingIntegrationContractDO contract,
                                                 RuntimeException exception,
                                                 LocalDateTime evaluatedAt) {
@@ -224,6 +294,12 @@ public class MarketingIntegrationContractProbeAutomationService {
         return evidence;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> fromJson(String value) {
         if (value == null || value.isBlank()) {
             return Map.of();
@@ -235,6 +311,12 @@ public class MarketingIntegrationContractProbeAutomationService {
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeStatus(String value) {
         String status = defaultString(value, "PASS").toUpperCase(Locale.ROOT);
         return switch (status) {
@@ -243,14 +325,32 @@ public class MarketingIntegrationContractProbeAutomationService {
         };
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private static List<MarketingIntegrationContractDO> safeList(List<MarketingIntegrationContractDO> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 safe tenant id 计算得到的数量、金额或指标值。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static int boundedLimit(Integer limit) {
         if (limit == null || limit < 1) {
             return DEFAULT_LIMIT;
@@ -258,20 +358,42 @@ public class MarketingIntegrationContractProbeAutomationService {
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 actor 生成的文本或业务键。
+     */
     private static String actor(String actor) {
         return actor == null || actor.isBlank() ? "marketing-integration-probe-scheduler" : actor.trim();
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private static String defaultString(String value, String fallback) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? fallback : trimmed;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param exception exception 参数，用于 message 流程中的校验、计算或对象转换。
+     * @return 返回 message 生成的文本或业务键。
+     */
     private static String message(RuntimeException exception) {
         String message = exception.getMessage();
         return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 
+    /**
+     * ProbeAutomationSummary 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ProbeAutomationSummary(
             Long tenantId,
             int candidateCount,
@@ -283,6 +405,9 @@ public class MarketingIntegrationContractProbeAutomationService {
             List<ProbeAutomationResult> results) {
     }
 
+    /**
+     * ProbeAutomationResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ProbeAutomationResult(
             Long contractId,
             String contractKey,

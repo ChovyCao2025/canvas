@@ -1,10 +1,14 @@
 # CDP Warehouse BI Query Availability Gate Implementation Plan
 
+Spec: `../specs/p2-057-cdp-warehouse-bi-query-availability-gate.md`
+
 **Goal:** Add an availability-gated BI query execution path without changing the existing BI execute endpoint.
 
 **Architecture:** Reuse `CdpWarehouseAvailabilityService` inside `BiQueryExecutionService`. Return a combined response that carries the availability decision and, only when allowed, the existing BI query result. Blocked gated queries write BI history with status `BLOCKED` and never call the datasource.
 
 **Tech Stack:** Java 21, Spring Boot, existing BI query execution service, existing warehouse availability service, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

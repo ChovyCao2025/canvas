@@ -48,7 +48,16 @@ public class CdpUserController {
     private final CdpTagService tagService;
     /** 租户上下文解析器，用于隔离 CDP 用户和标签数据。 */
     private final TenantContextResolver tenantContextResolver;
-
+    /**
+     * 查询 CDP 用户列表接口，对应 GET 请求。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 主要委托 tenantContextResolver.currentOrError, directoryService.listUsers 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param keyword 搜索关键字，可选。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping
     public Mono<R<List<CanvasUserRowDTO>>> list(@org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
         return tenantContextResolver.currentOrError().flatMap(context ->
@@ -135,13 +144,10 @@ public class CdpUserController {
     }
 
     /**
-     * 处理 remove Tag 对应的 HTTP 接口请求。
-     *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @param userId userId 对应的业务主键或标识
-     * @param tagCode tagCode 方法执行所需的业务参数
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * removeTag 删除或清理 web 场景的业务数据。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param tagCode 业务编码，用于匹配对应类型或状态。
+     * @return 返回 removeTag 流程生成的业务结果。
      */
     @DeleteMapping("/{userId}/tags/{tagCode}")
     public Mono<R<Void>> removeTag(@PathVariable String userId, @PathVariable String tagCode) {
@@ -152,6 +158,12 @@ public class CdpUserController {
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 tenant id 计算得到的数量、金额或指标值。
+     */
     private Long tenantId(TenantContext context) {
         if (context.tenantId() == null && RoleNames.ADMIN.equals(context.role())) {
             return null;

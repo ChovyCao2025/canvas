@@ -2,6 +2,7 @@
 
 Priority: P2
 Sequence: 020
+Status: Closed
 Source: `docs/optimization/todo/2026-05-31-ai-capability-roadmap.md`, `docs/optimization/todo/competitor-analysis-report.md`, `docs/optimization/todo/market-research-report.md`
 Implementation plan: `../plans/p2-020-churn-prediction-and-smart-timing-foundation-plan.md`
 
@@ -17,7 +18,7 @@ Operators gain the smallest useful predictive capability without waiting for a f
 
 - AI roadmap identifies churn probability as the minimum viable AI capability that changes product positioning.
 - Competitor analysis shows Klaviyo-style churn, next purchase, CLV, and channel affinity predictions as a major gap.
-- Current code has CDP profiles, tags, event logs, message send records, and canvas examples, but no prediction service or profile prediction fields.
+- Original gap: CDP profiles, tags, event logs, message send records, and canvas examples existed without a prediction service or profile prediction fields.
 
 ## In Scope
 
@@ -44,6 +45,31 @@ Operators gain the smallest useful predictive capability without waiting for a f
 4. The run must be idempotent by tenant, model version, and run date.
 5. The service must cap batch size and expose status so it can be scheduled safely.
 6. Audience and canvas condition consumers must be able to read the new profile fields without a new node type.
+7. Manual recompute must be gated by `canvas.ai.prediction.enabled`; P2-020 does not register an automatic scheduler.
+
+## Scheduler And Sample Metadata Note
+
+P2-020 intentionally ships the foundation with operator-triggered recompute only. `canvas.ai.prediction.enabled=false` keeps recompute closed by default; a future scheduler should call the same recompute path only after the flag is enabled and should preserve the configured batch cap.
+
+Sample canvas metadata for consuming the prediction fields with existing nodes:
+
+```json
+{
+  "exampleKey": "churn_rescue_smart_timing",
+  "usesProfileFields": ["churn_probability", "churn_risk_band", "best_send_hour"],
+  "ifCondition": {
+    "source": "profile",
+    "field": "churn_probability",
+    "operator": ">",
+    "value": 0.7
+  },
+  "delay": {
+    "mode": "UNTIL_PROFILE_HOUR",
+    "profileField": "best_send_hour",
+    "fallbackHour": 20
+  }
+}
+```
 
 ## Technical Scope
 
@@ -64,7 +90,7 @@ Operators gain the smallest useful predictive capability without waiting for a f
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V115__churn_prediction_smart_timing.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V165__churn_prediction_smart_timing.sql`
 - `backend/canvas-engine/src/main/resources/application.yml`
 
 ### Test Touchpoints

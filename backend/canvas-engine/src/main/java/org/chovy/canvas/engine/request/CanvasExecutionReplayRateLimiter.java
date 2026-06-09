@@ -34,6 +34,12 @@ public class CanvasExecutionReplayRateLimiter {
     /** 批量重放请求的本地窗口计数器。 */
     private final AtomicInteger batchReplayRequestCount = new AtomicInteger();
 
+    /**
+     * 创建 CanvasExecutionReplayRateLimiter 实例并注入 engine.request 场景依赖。
+     * @param distributedRateLimiter distributed rate limiter 参数，用于 CanvasExecutionReplayRateLimiter 流程中的校验、计算或对象转换。
+     * @param singleReplayPerMinute single replay per minute 参数，用于 CanvasExecutionReplayRateLimiter 流程中的校验、计算或对象转换。
+     * @param batchReplayRequestsPerMinute batch replay requests per minute 参数，用于 CanvasExecutionReplayRateLimiter 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public CanvasExecutionReplayRateLimiter(
             DistributedRateLimiter distributedRateLimiter,

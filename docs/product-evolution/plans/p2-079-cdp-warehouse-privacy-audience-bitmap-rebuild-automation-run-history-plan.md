@@ -1,5 +1,9 @@
 # CDP Warehouse Privacy Audience Bitmap Rebuild Automation Run History Implementation Plan
 
+Spec: `../specs/p2-079-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-run-history.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Persist privacy audience bitmap rebuild automation runs for manual and scheduled execution, and expose tenant-scoped run history APIs.

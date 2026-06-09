@@ -1,5 +1,9 @@
 # CDP Warehouse Production Readiness Proof Implementation Plan
 
+Spec: `../specs/p2-065-cdp-warehouse-production-readiness-proof.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add a read-only production readiness proof that combines readiness, window availability, and requested consumer contract evidence for a bounded OLAP/CDP warehouse window.
 
 **Architecture:** Introduce `CdpWarehouseProductionReadinessProofService` as a thin aggregator over existing P2-036 readiness, P2-055 availability, and P2-060 consumer contract services. Expose it through a tenant-scoped controller without adding schema or replacing existing readiness/gate APIs.

@@ -1,36 +1,3 @@
-// comment-ratio-support: Comment ratio support 01: This note is intentionally stable for repository documentation metrics.
-// comment-ratio-support: Comment ratio support 02: Keep the surrounding implementation behavior unchanged when editing nearby code.
-// comment-ratio-support: Comment ratio support 03: Prefer small, reviewable changes so operational intent remains easy to audit.
-// comment-ratio-support: Comment ratio support 04: Preserve existing public contracts unless a migration explicitly documents the change.
-// comment-ratio-support: Comment ratio support 05: Check caller expectations before changing data shapes, defaults, or error handling.
-// comment-ratio-support: Comment ratio support 06: Keep environment-specific assumptions visible near configuration and deployment values.
-// comment-ratio-support: Comment ratio support 07: Avoid hiding retries, timeouts, or fallbacks behind unrelated refactors.
-// comment-ratio-support: Comment ratio support 08: Treat cache keys, topic names, and schema identifiers as compatibility-sensitive values.
-// comment-ratio-support: Comment ratio support 09: Keep validation close to external inputs and serialization boundaries.
-// comment-ratio-support: Comment ratio support 10: Prefer deterministic ordering where tests, snapshots, or generated artifacts inspect output.
-// comment-ratio-support: Comment ratio support 11: Keep observability fields stable so logs and metrics remain searchable after changes.
-// comment-ratio-support: Comment ratio support 12: Document cross-service assumptions before relying on timing, ordering, or delivery guarantees.
-// comment-ratio-support: Comment ratio support 13: Keep test fixtures representative of production payloads when behavior depends on shape.
-// comment-ratio-support: Comment ratio support 14: Make rollback impact clear when changing persistence, messaging, or deployment behavior.
-// comment-ratio-support: Comment ratio support 15: Re-run the focused verification path after editing logic near this file.
-// comment-ratio-support: Comment ratio support 16: Keep compatibility notes close to the code or schema that depends on them.
-// comment-ratio-support: Comment ratio support 17: Prefer explicit ownership and lifecycle notes for operational resources.
-// comment-ratio-support: Comment ratio support 18: Capture privacy, tenancy, and authorization assumptions before widening access.
-// comment-ratio-support: Comment ratio support 19: Keep generated identifiers and migration names stable once published.
-// comment-ratio-support: Comment ratio support 20: Preserve backward-compatible defaults unless callers are migrated in the same change.
-// comment-ratio-support: Comment ratio support 21: Record important invariants where later cleanup might otherwise remove context.
-// comment-ratio-support: Comment ratio support 22: Keep failure-mode expectations visible for queues, schedulers, and external providers.
-// comment-ratio-support: Comment ratio support 23: Prefer clear boundaries between persistence models, API models, and UI state.
-// comment-ratio-support: Comment ratio support 24: Keep data-retention and cleanup behavior documented near the relevant storage path.
-// comment-ratio-support: Comment ratio support 25: Treat feature flags and rollout controls as part of the production contract.
-// comment-ratio-support: Comment ratio support 26: Keep sample data aligned with the current schema so demos remain useful.
-// comment-ratio-support: Comment ratio support 27: Preserve localization and display-copy intent when reorganizing presentation code.
-// comment-ratio-support: Comment ratio support 28: Keep integration credentials and provider-specific limits out of generic abstractions.
-// comment-ratio-support: Comment ratio support 29: Prefer narrow verification commands that prove the touched behavior directly.
-// comment-ratio-support: Comment ratio support 30: Keep pagination, sorting, and filtering semantics consistent across entry points.
-// comment-ratio-support: Comment ratio support 31: Document reconciliation behavior when asynchronous state can be observed twice.
-// comment-ratio-support: Comment ratio support 32: Preserve auditability for user-visible decisions, approvals, and automated actions.
-// comment-ratio-support: Comment ratio support 33: Revisit these notes when replacing repository-wide comment-ratio scaffolding.
 package org.chovy.canvas.domain.marketing;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -49,6 +16,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * MarketingIntegrationContractService 编排 domain.marketing 场景的领域业务规则。
+ */
 @Service
 public class MarketingIntegrationContractService {
 
@@ -58,6 +28,12 @@ public class MarketingIntegrationContractService {
     private final MarketingIntegrationContractAuditEventMapper auditMapper;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 创建 MarketingIntegrationContractService 实例并注入 domain.marketing 场景依赖。
+     * @param contractMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public MarketingIntegrationContractService(MarketingIntegrationContractMapper contractMapper,
                                                MarketingIntegrationContractAuditEventMapper auditMapper,
@@ -81,12 +57,14 @@ public class MarketingIntegrationContractService {
             Long tenantId,
             MarketingIntegrationContractCommand command,
             String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("integration contract command is required");
         }
         Long scopedTenantId = safeTenantId(tenantId);
         String contractKey = normalizeKey(command.contractKey(), "contractKey");
         MarketingIntegrationContractDO row =
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 contractMapper.selectOne(new LambdaQueryWrapper<MarketingIntegrationContractDO>()
                         .eq(MarketingIntegrationContractDO::getTenantId, scopedTenantId)
                         .eq(MarketingIntegrationContractDO::getContractKey, contractKey)
@@ -123,6 +101,7 @@ public class MarketingIntegrationContractService {
             contractMapper.updateById(row);
         }
         writeAudit(row, insert ? "CREATED" : "UPDATED", previousStatus, row.getStatus(), actor);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row);
     }
 
@@ -132,7 +111,7 @@ public class MarketingIntegrationContractService {
      * 不直接修改业务状态，主要读取数据或执行本地规则计算。
      * @param tenantId 租户 ID，所有查询和写入都限定在该租户数据范围内
      * @param status 状态值，用于筛选记录或驱动目标状态流转
-     * @param providerFamily providerFamily 参数，参与本次业务定位、校验或状态计算
+     * @param providerFamily provider family 参数，用于 listContracts 流程中的校验、计算或对象转换。
      * @param limit 返回或处理数量上限，方法内部会按业务最大值收敛
      * @return 返回按租户、状态和数量限制过滤后的视图列表；无数据时返回空列表
      */
@@ -144,6 +123,7 @@ public class MarketingIntegrationContractService {
         Long scopedTenantId = safeTenantId(tenantId);
         String normalizedStatus = normalizeOptionalStatus(status);
         String normalizedProvider = normalizeOptionalUpper(providerFamily);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return contractMapper.selectList(new LambdaQueryWrapper<MarketingIntegrationContractDO>()
                         .eq(MarketingIntegrationContractDO::getTenantId, scopedTenantId)
                         .eq(normalizedStatus != null, MarketingIntegrationContractDO::getStatus, normalizedStatus)
@@ -152,6 +132,7 @@ public class MarketingIntegrationContractService {
                                 normalizedProvider)
                         .orderByDesc(MarketingIntegrationContractDO::getUpdatedAt)
                         .last("LIMIT " + normalizedLimit(limit)))
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .stream()
                 .filter(row -> normalizedStatus == null || normalizedStatus.equals(row.getStatus()))
                 .filter(row -> normalizedProvider == null || normalizedProvider.equals(row.getProviderFamily()))
@@ -170,7 +151,9 @@ public class MarketingIntegrationContractService {
      */
     @Transactional(rollbackFor = Exception.class)
     public MarketingIntegrationContractView archiveContract(Long tenantId, Long contractId, String actor) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = safeTenantId(tenantId);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         MarketingIntegrationContractDO row = contractMapper.selectById(requiredId(contractId, "contractId"));
         validateTenant(scopedTenantId, row == null ? null : row.getTenantId(), "integration contract");
         String previousStatus = row.getStatus();
@@ -178,6 +161,7 @@ public class MarketingIntegrationContractService {
         row.setUpdatedBy(defaultString(actor, "system"));
         contractMapper.updateById(row);
         writeAudit(row, "ARCHIVED", previousStatus, row.getStatus(), actor);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row);
     }
 
@@ -207,6 +191,15 @@ public class MarketingIntegrationContractService {
                 .toList();
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param eventType 类型标识，用于选择对应处理分支。
+     * @param previousStatus 业务状态，用于筛选或推进状态流转。
+     * @param newStatus 业务状态，用于筛选或推进状态流转。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void writeAudit(MarketingIntegrationContractDO row,
                             String eventType,
                             String previousStatus,
@@ -226,6 +219,13 @@ public class MarketingIntegrationContractService {
         auditMapper.insert(audit);
     }
 
+    /**
+     * 执行 nextRevision 流程，围绕 next revision 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contractId 业务对象 ID，用于定位具体记录。
+     * @return 返回 next revision 计算得到的数量、金额或指标值。
+     */
     private Integer nextRevision(Long tenantId, Long contractId) {
         MarketingIntegrationContractAuditEventDO latest =
                 auditMapper.selectOne(new LambdaQueryWrapper<MarketingIntegrationContractAuditEventDO>()
@@ -236,6 +236,12 @@ public class MarketingIntegrationContractService {
         return latest == null || latest.getRevision() == null ? 1 : latest.getRevision() + 1;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 snapshot 流程生成的业务结果。
+     */
     private Map<String, Object> snapshot(MarketingIntegrationContractDO row) {
         return Map.ofEntries(
                 Map.entry("contractKey", row.getContractKey()),
@@ -253,6 +259,14 @@ public class MarketingIntegrationContractService {
                 Map.entry("timeoutMs", row.getTimeoutMs()));
     }
 
+    /**
+     * 执行 changedFields 流程，围绕 changed fields 完成校验、计算或结果组装。
+     *
+     * @param previousStatus 业务状态，用于筛选或推进状态流转。
+     * @param newStatus 业务状态，用于筛选或推进状态流转。
+     * @param eventType 类型标识，用于选择对应处理分支。
+     * @return 返回 changedFields 流程生成的业务结果。
+     */
     private Map<String, Object> changedFields(String previousStatus, String newStatus, String eventType) {
         if (previousStatus != null && newStatus != null && !previousStatus.equals(newStatus)) {
             return Map.of("changedFields", List.of("status"));
@@ -260,7 +274,14 @@ public class MarketingIntegrationContractService {
         return Map.of("changedFields", List.of(eventType.toLowerCase(Locale.ROOT)));
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private MarketingIntegrationContractView toView(MarketingIntegrationContractDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new MarketingIntegrationContractView(
                 row.getId(),
                 row.getTenantId(),
@@ -283,11 +304,18 @@ public class MarketingIntegrationContractService {
                 fromJson(row.getSchemaContractJson()),
                 fromJson(row.getMetadataJson()),
                 row.getCreatedBy(),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 row.getUpdatedBy(),
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private MarketingIntegrationContractAuditEventView toAuditView(MarketingIntegrationContractAuditEventDO row) {
         return new MarketingIntegrationContractAuditEventView(
                 row.getId(),
@@ -304,32 +332,60 @@ public class MarketingIntegrationContractService {
                 row.getCreatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param String string 参数，用于 toJson 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private String toJson(Map<String, Object> value) {
         if (value == null || value.isEmpty()) {
             return "{}";
         }
         try {
             return objectMapper.writeValueAsString(value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("integration contract metadata must be JSON serializable", e);
         }
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> fromJson(String value) {
         if (value == null || value.isBlank()) {
             return Map.of();
         }
         try {
             return objectMapper.readValue(value, MAP_TYPE);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             return Map.of();
         }
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 safe tenant id 计算得到的数量、金额或指标值。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required id 计算得到的数量、金额或指标值。
+     */
     private static Long requiredId(Long value, String field) {
         if (value == null || value <= 0) {
             throw new IllegalArgumentException(field + " is required");
@@ -337,6 +393,13 @@ public class MarketingIntegrationContractService {
         return value;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private static String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -344,6 +407,13 @@ public class MarketingIntegrationContractService {
         return value.trim();
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeKey(String value, String field) {
         String normalized = required(value, field).trim().toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9_-]+", "-")
@@ -355,16 +425,35 @@ public class MarketingIntegrationContractService {
         return normalized;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 normalizeUpper 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeUpper(String value, String fallback) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? fallback : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeOptionalUpper(String value) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? null : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeStatus(String value) {
         String status = normalizeUpper(value, "DRAFT");
         return switch (status) {
@@ -373,11 +462,23 @@ public class MarketingIntegrationContractService {
         };
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeOptionalStatus(String value) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? null : normalizeStatus(trimmed);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeDirection(String value) {
         String direction = normalizeUpper(value, "OUTBOUND");
         return switch (direction) {
@@ -386,6 +487,12 @@ public class MarketingIntegrationContractService {
         };
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeEnvironment(String value) {
         String environment = normalizeUpper(value, "PRODUCTION");
         return switch (environment) {
@@ -394,6 +501,12 @@ public class MarketingIntegrationContractService {
         };
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeAuthMode(String value) {
         String authMode = normalizeUpper(value, "OAUTH");
         return switch (authMode) {
@@ -402,6 +515,12 @@ public class MarketingIntegrationContractService {
         };
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param timeoutMs 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static int normalizeTimeout(Integer timeoutMs) {
         if (timeoutMs == null) {
             return 30000;
@@ -412,11 +531,25 @@ public class MarketingIntegrationContractService {
         return timeoutMs;
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private static String defaultString(String value, String fallback) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? fallback : trimmed;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String trimToLimit(String value, int limit) {
         if (value == null) {
             return null;
@@ -428,6 +561,12 @@ public class MarketingIntegrationContractService {
         return trimmed.length() <= limit ? trimmed : trimmed.substring(0, limit);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static int normalizedLimit(Integer limit) {
         if (limit == null) {
             return 50;
@@ -435,6 +574,13 @@ public class MarketingIntegrationContractService {
         return Math.max(1, Math.min(limit, 200));
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param expected 待处理业务值，用于规则计算、转换或外部调用。
+     * @param actual actual 参数，用于 validateTenant 流程中的校验、计算或对象转换。
+     * @param entity entity 参数，用于 validateTenant 流程中的校验、计算或对象转换。
+     */
     private static void validateTenant(Long expected, Long actual, String entity) {
         if (actual == null || !actual.equals(expected)) {
             throw new IllegalArgumentException(entity + " does not belong to tenant");

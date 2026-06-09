@@ -23,15 +23,34 @@ public class DorisQueryService {
 
     private final JdbcTemplate dorisJdbcTemplate;
 
+    /**
+     * 初始化 DorisQueryService 实例。
+     *
+     * @param dorisJdbcTemplate doris jdbc template 参数，用于 DorisQueryService 流程中的校验、计算或对象转换。
+     */
     public DorisQueryService(@Qualifier("dorisJdbcTemplate") ObjectProvider<JdbcTemplate> dorisJdbcTemplate) {
         this.dorisJdbcTemplate = dorisJdbcTemplate.getIfAvailable();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 available 的布尔判断结果。
+     */
     public boolean available() {
         return dorisJdbcTemplate != null;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @return 返回 get daily stats 汇总后的集合、分页或映射视图。
+     */
     public List<DailyStatsDTO> getDailyStats(Long canvasId, LocalDate from, LocalDate to) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!available()) {
             return List.of();
         }
@@ -52,6 +71,7 @@ public class DorisQueryService {
                 ORDER BY stat_date
                 """;
         try {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             return dorisJdbcTemplate.query(sql,
                     (rs, rowNum) -> new DailyStatsDTO(
                             rs.getDate("stat_date").toLocalDate(),
@@ -69,11 +89,20 @@ public class DorisQueryService {
         } catch (Exception e) {
             log.warn("[DORIS_QUERY] daily stats failed canvasId={} range={}..{}: {}",
                     canvasId, from, to, e.getMessage());
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return List.of();
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @return 返回 get daily stats 汇总后的集合、分页或映射视图。
+     */
     public List<DailyStatsDTO> getDailyStats(LocalDate from, LocalDate to) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!available()) {
             return List.of();
         }
@@ -93,6 +122,7 @@ public class DorisQueryService {
                 ORDER BY stat_date, canvas_id
                 """;
         try {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             return dorisJdbcTemplate.query(sql,
                     (rs, rowNum) -> new DailyStatsDTO(
                             rs.getDate("stat_date").toLocalDate(),
@@ -109,11 +139,20 @@ public class DorisQueryService {
                     from, to);
         } catch (Exception e) {
             log.warn("[DORIS_QUERY] daily stats failed range={}..{}: {}", from, to, e.getMessage());
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return List.of();
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @return 返回 getOverviewStats 流程生成的业务结果。
+     */
     public OverviewStatsDTO getOverviewStats(LocalDate from, LocalDate to) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!available()) {
             return OverviewStatsDTO.empty();
         }
@@ -130,6 +169,7 @@ public class DorisQueryService {
                 WHERE stat_date BETWEEN ? AND ?
                 """;
         try {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             return dorisJdbcTemplate.queryForObject(sql,
                     (rs, rowNum) -> new OverviewStatsDTO(
                             rs.getLong("total_executions"),
@@ -142,11 +182,21 @@ public class DorisQueryService {
                     from, to);
         } catch (Exception e) {
             log.warn("[DORIS_QUERY] overview failed range={}..{}: {}", from, to, e.getMessage());
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return OverviewStatsDTO.empty();
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @return 返回 get node stats 汇总后的集合、分页或映射视图。
+     */
     public List<NodeStatsDTO> getNodeStats(Long canvasId, LocalDate from, LocalDate to) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!available()) {
             return List.of();
         }
@@ -166,6 +216,7 @@ public class DorisQueryService {
                 ORDER BY total_entered DESC
                 """;
         try {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             return dorisJdbcTemplate.query(sql,
                     (rs, rowNum) -> new NodeStatsDTO(
                             rs.getString("node_id"),
@@ -181,11 +232,19 @@ public class DorisQueryService {
         } catch (Exception e) {
             log.warn("[DORIS_QUERY] node stats failed canvasId={} range={}..{}: {}",
                     canvasId, from, to, e.getMessage());
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return List.of();
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param executionId 业务对象 ID，用于定位具体记录。
+     * @return 返回 get execution trace 汇总后的集合、分页或映射视图。
+     */
     public List<TraceRowDTO> getExecutionTrace(String executionId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!available() || executionId == null || executionId.isBlank()) {
             return List.of();
         }
@@ -198,6 +257,7 @@ public class DorisQueryService {
                 ORDER BY started_at ASC
                 """;
         try {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             return dorisJdbcTemplate.query(sql,
                     (rs, rowNum) -> new TraceRowDTO(
                             rs.getLong("trace_id"),
@@ -217,14 +277,24 @@ public class DorisQueryService {
                     executionId);
         } catch (Exception e) {
             log.warn("[DORIS_QUERY] execution trace failed executionId={}: {}", executionId, e.getMessage());
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return List.of();
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param timestamp 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回组装或转换后的结果对象。
+     */
     private static LocalDateTime toLocalDateTime(java.sql.Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
     }
 
+    /**
+     * OverviewStatsDTO 封装本模块的核心职责、输入输出结构和协作边界。
+     */
     public record OverviewStatsDTO(
             Long totalExecutions,
             Long successCount,
@@ -233,11 +303,19 @@ public class DorisQueryService {
             Long uniqueUsers,
             Long avgDurationMs
     ) {
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @return 返回 empty 流程生成的业务结果。
+         */
         public static OverviewStatsDTO empty() {
             return new OverviewStatsDTO(0L, 0L, 0L, 0L, 0L, 0L);
         }
     }
 
+    /**
+     * NodeStatsDTO 封装本模块的核心职责、输入输出结构和协作边界。
+     */
     public record NodeStatsDTO(
             String nodeId,
             String nodeType,
@@ -250,6 +328,9 @@ public class DorisQueryService {
     ) {
     }
 
+    /**
+     * TraceRowDTO 封装本模块的核心职责、输入输出结构和协作边界。
+     */
     public record TraceRowDTO(
             Long traceId,
             Long tenantId,

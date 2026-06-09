@@ -1,5 +1,7 @@
 # Runtime Architecture Migration Evidence Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Convert broad runtime migration ideas into evidence-backed architecture decisions, proof commands, rollback notes, and child-spec gates before code rewrites begin.
@@ -13,7 +15,18 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p2-018-runtime-architecture-migration-evidence.md`
-- Optimization sources: `docs/optimization/production-design-gaps.md`, `docs/optimization/todo/plan-review-findings.md`, `docs/optimization/todo/specs`, `docs/optimization/todo/plans`
+- Optimization sources: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/todo/plan-review-findings.md`, `docs/optimization/todo/specs`, `docs/optimization/todo/plans`
+
+## Current Status Note
+
+The implementation files are present in the current worktree and fresh focused verification passed on 2026-06-09:
+
+- `JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-engine test -Dtest=TemplateRenderServiceTest,UserInputHandlerTest,WaitEventFilterTest,WaitHandlerTest,ConnectedContentHandlerTest,ExecutionRerunControllerTest,CanvasBatchOperationControllerTest,RuntimeMigrationEvidenceTest` (covered `RuntimeMigrationEvidenceTest`; 48 total selected backend tests passed).
+- `node --test tools/perf/runtime-migration-baseline.test.mjs` (5 tests passed).
+- `node tools/perf/runtime-migration-baseline.mjs --format json` emitted 7 valid ADR candidate records and `summary.invalid = 0`.
+- `rg -n "status:|owner:|proof command|rollback|child spec" docs/product-evolution/architecture-decisions` confirmed every ADR exposes the required fields.
+
+Historical RED-state checks were not reproduced because the current worktree already contains the implementation. No commit or merge was created in this audit, so commit and merge status remain unverified.
 
 ## File Structure
 
@@ -52,19 +65,19 @@
 - Create: `docs/product-evolution/architecture-decisions/ADR-006-trace-olap-storage.md`
 - Create: `docs/product-evolution/architecture-decisions/ADR-007-service-split-boundaries.md`
 
-- [ ] **Step 1: Create ADR template in README**
+- [x] **Step 1: Create ADR template in README**
 
 Define required fields: status, owner, source evidence, current-code evidence, decision, expected benefit, cost, rollback, proof command, accepted evidence, child spec, and dependency notes.
 
-- [ ] **Step 2: Add migration dependency graph**
+- [x] **Step 2: Add migration dependency graph**
 
 List dependencies: production safety before rewrites, delivery outbox before MQ split rollout, trace sink before OLAP migration, CDP identity evidence before bitmap mapping changes, and 3000/4000 hardening before service split.
 
-- [ ] **Step 3: Add ADR status table**
+- [x] **Step 3: Add ADR status table**
 
 Use statuses `Draft`, `Proof Required`, `Accepted For Child Spec`, `Deferred`, `Rejected`, and `Merged Into Existing Spec`. No ADR can be `Accepted For Child Spec` without a proof command and evidence link.
 
-- [ ] **Step 4: Commit ADR skeletons**
+Commit boundary: no commit was created in this audit; commit and merge status remain unverified.
 
 Run:
 
@@ -82,15 +95,15 @@ Expected: commit contains only ADR index and skeleton files.
 - Create: `tools/perf/runtime-migration-baseline.mjs`
 - Create: `tools/perf/runtime-migration-baseline.test.mjs`
 
-- [ ] **Step 1: Write architecture evidence tests**
+- [x] **Step 1: Write architecture evidence tests**
 
 Create `RuntimeMigrationEvidenceTest` methods named `recordsWebFluxAndMyBatisDependencies`, `recordsReactorDagAndDisruptorUsage`, `recordsGroovyScriptHandlerUsage`, `recordsBitmapHashMapping`, `recordsTraceMysqlWritePath`, and `recordsCurrentPackageBoundaries`.
 
-- [ ] **Step 2: Write baseline script tests**
+- [x] **Step 2: Write baseline script tests**
 
 Create `runtime-migration-baseline.test.mjs` tests named `printsMachineReadableJson`, `requiresCandidateKeys`, `includesProofCommandOutputFields`, `rejectsMissingMetrics`, and `exitsNonZeroWhenSourceEvidenceIsUnavailable`.
 
-- [ ] **Step 3: Run proof tests and confirm red state**
+Historical RED-state boundary: not reproduced in this audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -101,15 +114,15 @@ node --test tools/perf/runtime-migration-baseline.test.mjs
 
 Expected: FAIL because the evidence test and baseline script do not exist.
 
-- [ ] **Step 4: Implement architecture evidence test**
+- [x] **Step 4: Implement architecture evidence test**
 
 Read source files and assert the current architecture facts that each ADR cites. Keep assertions factual: dependency present, class present, handler present, topic split absent or present, and trace sink state.
 
-- [ ] **Step 5: Implement baseline script**
+- [x] **Step 5: Implement baseline script**
 
 Emit JSON with `generatedAt`, `candidates`, `sourceEvidence`, `proofCommands`, `riskLevel`, `dependencyStatus`, and `decisionStatus`. Fail when a candidate lacks source evidence, proof command, or rollback note.
 
-- [ ] **Step 6: Run proof tests**
+- [x] **Step 6: Run proof tests**
 
 Run:
 
@@ -131,31 +144,31 @@ Expected: PASS.
 - Create: `docs/product-evolution/architecture-decisions/ADR-006-trace-olap-storage.md`
 - Create: `docs/product-evolution/architecture-decisions/ADR-007-service-split-boundaries.md`
 
-- [ ] **Step 1: Fill web stack ADR**
+- [x] **Step 1: Fill web stack ADR**
 
 Record WebFlux plus blocking persistence evidence, expected benefit of MVC plus virtual threads, migration cost, compatibility constraints, rollback to current runtime, and proof command.
 
-- [ ] **Step 2: Fill DAG engine ADR**
+- [x] **Step 2: Fill DAG engine ADR**
 
 Record Reactor DAG complexity evidence, current retry/wait behavior, risk of rewriting the scheduler, accepted smaller proof scope, rollback, and child-spec gate.
 
-- [ ] **Step 3: Fill delivery and MQ ADR**
+- [x] **Step 3: Fill delivery and MQ ADR**
 
 Merge delivery queue and delivery outbox into the P0-003 path, record MQ topic split as a later candidate, and block MQ split rollout until outbox receipts and reconciliation are implemented.
 
-- [ ] **Step 4: Fill script sandbox ADR**
+- [x] **Step 4: Fill script sandbox ADR**
 
 Record Groovy handler evidence, sandbox and metaspace risk, candidate alternatives QLExpress and Aviator, compatibility test needs, rollback, and proof gate.
 
-- [ ] **Step 5: Fill bitmap identity ADR**
+- [x] **Step 5: Fill bitmap identity ADR**
 
 Record current UID mapping evidence, collision risk, deterministic mapping requirement, migration and backfill cost, dual-read rollout, rollback, and validation command.
 
-- [ ] **Step 6: Fill trace OLAP ADR**
+- [x] **Step 6: Fill trace OLAP ADR**
 
 Record MySQL trace pressure, link to P2-016 sink abstraction, compare Doris and ClickHouse criteria, rollback to MySQL sink, and evidence needed before production dual-write.
 
-- [ ] **Step 7: Fill service split ADR**
+- [x] **Step 7: Fill service split ADR**
 
 Record monolith pressure, package boundaries, runtime lanes, operational cost, sequencing after P0/P1 gates, rollback via single artifact, and child-spec requirements.
 
@@ -167,19 +180,19 @@ Record monolith pressure, package boundaries, runtime lanes, operational cost, s
 - Create: `docs/product-evolution/architecture-decisions/ADR-005-audience-bitmap-identity-mapping.md`
 - Create: `docs/product-evolution/architecture-decisions/ADR-007-service-split-boundaries.md`
 
-- [ ] **Step 1: Capture severe plan gaps**
+- [x] **Step 1: Capture severe plan gaps**
 
 List the old optimization plans that were incomplete: roaring bitmap collision, monolith split, Groovy migration, canvas tenant isolation, delivery queue/outbox split, frontend state, circuit breaker Redis, cache invalidation, and type safety.
 
-- [ ] **Step 2: Correct delivery queue/outbox sequencing**
+- [x] **Step 2: Correct delivery queue/outbox sequencing**
 
 Mark delivery queue and delivery outbox as merged into P0-003. State that MQ topic split remains an architecture candidate, not the first implementation slice.
 
-- [ ] **Step 3: Correct type and architecture requirements**
+- [x] **Step 3: Correct type and architecture requirements**
 
 Record that old plans with broken type references, missing Architecture header, missing TDD flow, description-only steps, or placeholder comments cannot be executed directly.
 
-- [ ] **Step 4: Add child-spec gate language**
+- [x] **Step 4: Add child-spec gate language**
 
 For each candidate, state the exact condition required before implementation starts: passing proof command, accepted rollback, dependency placement, and named child spec.
 
@@ -189,7 +202,7 @@ For each candidate, state the exact condition required before implementation sta
 - Modify: `docs/product-evolution/specs/p2-018-runtime-architecture-migration-evidence.md`
 - Modify: `docs/product-evolution/plans/p2-018-runtime-architecture-migration-evidence-plan.md`
 
-- [ ] **Step 1: Run evidence verification**
+- [x] **Step 1: Run evidence verification**
 
 Run:
 
@@ -201,7 +214,7 @@ node tools/perf/runtime-migration-baseline.mjs --format json
 
 Expected: PASS, and the baseline command emits JSON with all seven ADR candidate keys.
 
-- [ ] **Step 2: Run ADR completeness scan**
+- [x] **Step 2: Run ADR completeness scan**
 
 Run:
 
@@ -211,7 +224,7 @@ rg -n "status:|owner:|proof command|rollback|child spec" docs/product-evolution/
 
 Expected: every ADR contains status, owner, proof command, rollback, and child spec fields.
 
-- [ ] **Step 3: Commit implementation slice**
+Commit boundary: no commit was created in this audit; commit and merge status remain unverified.
 
 Run:
 

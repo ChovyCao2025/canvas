@@ -5,6 +5,8 @@ Sequence: 068
 Source: `docs/product-evolution/specs/p2-066-cdp-warehouse-physical-e2e-certification.md`, `docs/product-evolution/specs/p2-067-cdp-warehouse-e2e-certification-history.md`
 Implementation plan: `../plans/p2-068-cdp-warehouse-e2e-certification-scheduler-and-gate-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn persisted warehouse physical E2E certification runs into a production gate by adding scheduled certification execution and a tenant-scoped "recent PASS evidence" decision.

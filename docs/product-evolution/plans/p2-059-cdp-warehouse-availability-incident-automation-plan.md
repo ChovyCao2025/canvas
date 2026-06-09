@@ -1,10 +1,14 @@
 # CDP Warehouse Availability Incident Automation Implementation Plan
 
+Spec: `../specs/p2-059-cdp-warehouse-availability-incident-automation.md`
+
 **Goal:** Route warehouse availability WARN/FAIL gate evidence into incidents and resolve matching incidents when availability later passes.
 
 **Architecture:** Reuse `CdpWarehouseAvailabilityService` for decisions and `CdpWarehouseIncidentService` for durable incident lifecycle. Add stable `AVAILABILITY:{MODE}:{GATE_KEY}` incident keys, a scan service, an API, and a disabled-by-default lease-protected scheduler.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis mapper updates, existing warehouse incident table, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

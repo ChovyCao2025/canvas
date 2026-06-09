@@ -1,10 +1,14 @@
 # CDP Warehouse Realtime Schema Evolution Guard Implementation Plan
 
+Spec: `../specs/p2-046-cdp-warehouse-realtime-schema-evolution-guard.md`
+
 **Goal:** Add schema-version registration and compatibility checks to realtime warehouse pipelines.
 
 **Architecture:** Keep P2-032 checkpoint runtime as the control-plane entry point. Add a schema registry service that evaluates schema versions independently, then let checkpoint reports reference schema versions and fold the resulting guard status into existing PASS/WARN/FAIL runtime evaluation.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Jackson, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

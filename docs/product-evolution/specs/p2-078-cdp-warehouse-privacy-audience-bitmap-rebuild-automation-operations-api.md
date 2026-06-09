@@ -5,6 +5,8 @@ Sequence: 078
 Source: `docs/product-evolution/specs/p2-077-cdp-warehouse-privacy-audience-bitmap-rebuild-automation.md`
 Implementation plan: `../plans/p2-078-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-operations-api-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Expose the P2-077 privacy audience bitmap rebuild automation cycle as a tenant-scoped operator API so production operators can manually run a bounded scan and inspect the per-request summary without waiting for scheduler logs.

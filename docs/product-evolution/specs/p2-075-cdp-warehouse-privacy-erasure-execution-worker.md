@@ -5,6 +5,8 @@ Sequence: 075
 Source: `docs/product-evolution/specs/p2-073-cdp-warehouse-privacy-erasure-propagation-proof.md`, `docs/product-evolution/specs/p2-074-cdp-warehouse-privacy-tombstone-ingestion-guard.md`
 Implementation plan: `../plans/p2-075-cdp-warehouse-privacy-erasure-execution-worker-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn privacy erasure proof rows into executable deletion work for CDP operational state, CDP event logs, realtime retry buffers, and Doris warehouse assets, while keeping raw subject values out of the persistent privacy ledger.

@@ -15,11 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
 /**
- * This implementation is for local development and single-instance deployments.
- * It stores schedule handles in the current JVM and is not a production-grade
- * distributed scheduler. Production deployments should provide their own
- * ScheduleRegistrar bean backed by DolphinScheduler, XXL-Job, Quartz JDBC
- * cluster, or another durable scheduler.
+ * 面向本地开发和单实例部署的任务调度注册器。
+ *
+ * <p>该实现只在当前 JVM 内保存调度句柄，不是生产级分布式调度器；生产部署应提供基于
+ * DolphinScheduler、XXL-Job、Quartz JDBC 集群或其他持久化调度器的 ScheduleRegistrar Bean。
  */
 @Slf4j
 @Component
@@ -32,19 +31,25 @@ public class LocalTaskScheduleRegistrar implements ScheduleRegistrar {
     /** 当前 JVM 内已注册调度任务的句柄映射。 */
     private final Map<ScheduleKey, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
 
-    /**
-     * 注册、调度或初始化 register 相关的业务数据。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param registration registration 方法执行所需的业务参数
-     */
+    /** 注册 cron 或一次性任务，并替换相同 key 的旧任务。 */
     @Override
     public void register(ScheduleRegistration registration) {
         // 相同业务 key 重新注册时先取消旧任务，确保本 JVM 内只有一个有效调度句柄。
         unregister(registration.key());
         ScheduledFuture<?> future = registration.cronExpression() != null && !registration.cronExpression().isBlank()
+                /**
+                 * 执行核心业务流程，并协调依赖组件完成处理。
+                 *
+                 * @param registration registration 参数，用于 scheduleCron 流程中的校验、计算或对象转换。
+                 * @return 返回 scheduleCron 流程生成的业务结果。
+                 */
                 ? scheduleCron(registration)
+                /**
+                 * 执行核心业务流程，并协调依赖组件完成处理。
+                 *
+                 * @param registration registration 参数，用于 scheduleOnce 流程中的校验、计算或对象转换。
+                 * @return 返回 scheduleOnce 流程生成的业务结果。
+                 */
                 : scheduleOnce(registration);
         if (future == null) {
             throw new IllegalStateException("Local TaskScheduler returned null for " + registration.key());
@@ -52,13 +57,7 @@ public class LocalTaskScheduleRegistrar implements ScheduleRegistrar {
         tasks.put(registration.key(), future);
     }
 
-    /**
-     * 执行 unregister 对应的业务逻辑。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param key key 对应的缓存键、配置键或业务键
-     */
+    /** 如果存在指定 key 的本地调度句柄，则取消并移除。 */
     @Override
     public void unregister(ScheduleKey key) {
         ScheduledFuture<?> future = tasks.remove(key);
@@ -67,23 +66,12 @@ public class LocalTaskScheduleRegistrar implements ScheduleRegistrar {
         }
     }
 
-    /**
-     * 判断 has Task 相关的业务数据。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 判断结果，true 表示校验通过或条件成立
-     */
+    /** 测试可见：断言内存注册表生命周期。 */
     public boolean hasTask(ScheduleKey key) {
         return tasks.containsKey(key);
     }
 
-    /**
-     * 停止或关闭 shutdown 相关的业务数据。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     */
+    /** Bean 关闭时取消所有本地任务。 */
     @PreDestroy
     void shutdown() {
         tasks.values().forEach(future -> future.cancel(false));
@@ -91,12 +79,10 @@ public class LocalTaskScheduleRegistrar implements ScheduleRegistrar {
     }
 
     /**
-     * 注册、调度或初始化 schedule Cron 相关的业务数据。
+     * 注册 cron 周期任务。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param registration registration 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param registration 调度注册信息
+     * @return Spring TaskScheduler 返回的任务句柄
      */
     private ScheduledFuture<?> scheduleCron(ScheduleRegistration registration) {
         return taskScheduler.schedule(
@@ -108,12 +94,10 @@ public class LocalTaskScheduleRegistrar implements ScheduleRegistrar {
     }
 
     /**
-     * 注册、调度或初始化 schedule Once 相关的业务数据。
+     * 注册一次性定时任务。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param registration registration 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param registration 调度注册信息
+     * @return Spring TaskScheduler 返回的任务句柄
      */
     private ScheduledFuture<?> scheduleOnce(ScheduleRegistration registration) {
         return taskScheduler.schedule(
@@ -135,6 +119,7 @@ public class LocalTaskScheduleRegistrar implements ScheduleRegistrar {
         return () -> {
             try {
                 registration.callback().run();
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException e) {
                 log.error("[LOCAL_SCHEDULER] callback failed key={}: {}", registration.key(), e.getMessage(), e);
             } finally {

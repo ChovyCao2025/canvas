@@ -1,3 +1,4 @@
+# Flink TaskManager，负责实际执行 CDC、清洗、聚合和写入算子。
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,6 +9,7 @@ metadata:
     app.kubernetes.io/component: flink-taskmanager
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 两个 TaskManager 提供基础并行执行能力，后续可按吞吐横向扩容。
   replicas: 2
   selector:
     matchLabels:
@@ -20,22 +22,28 @@ spec:
         app.kubernetes.io/component: flink-taskmanager
         app.kubernetes.io/part-of: marketing-canvas
     spec:
+      # 与 JobManager 使用同一 Flink 账号，便于统一授权作业运行资源。
       serviceAccountName: canvas-flink
+      # 给运行中算子留出关闭和状态刷盘时间。
       terminationGracePeriodSeconds: 60
       containers:
         - name: flink-taskmanager
           image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
           imagePullPolicy: IfNotPresent
+          # 官方镜像入口命令，启动 TaskManager 角色。
           command: ["taskmanager"]
           env:
+            # 覆盖 slot 数，决定单个 TaskManager 可承载的并行子任务数量。
             - name: FLINK_PROPERTIES
               value: "taskmanager.numberOfTaskSlots: 4"
           volumeMounts:
+            # 与 JobManager 使用同一份 flink-conf.yaml，避免角色配置漂移。
             - name: flink-config
               mountPath: /opt/flink/conf/flink-conf.yaml
               subPath: flink-conf.yaml
             - name: canvas-flink-checkpoints
               mountPath: /opt/flink/checkpoints
+            # savepoint 目录用于人工升级、暂停和恢复作业。
             - name: canvas-flink-savepoints
               mountPath: /opt/flink/savepoints
           resources:
@@ -51,6 +59,7 @@ spec:
               drop:
                 - ALL
       volumes:
+        # TaskManager 需要读配置并共享状态目录，确保 failover 后可恢复。
         - name: flink-config
           configMap:
             name: canvas-flink

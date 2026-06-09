@@ -29,6 +29,11 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
 // ── 触发路由 ─────────────────────────────────────────────────
+    /**
+     * triggerMq 创建或触发 infrastructure.redis 场景的业务处理。
+     * @param topicKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 trigger mq 生成的文本或业务键。
+     */
     public String triggerMq(String topicKey)       { return prefix + ":trigger:mq:" + topicKey; }
     /**
      * 执行 trigger Behavior 对应的业务逻辑。
@@ -95,7 +100,19 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
 // ── 执行上下文 ─────────────────────────────────────────────────
+    /**
+     * context 处理 infrastructure.redis 场景的业务逻辑。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @return 返回 context 生成的文本或业务键。
+     */
     public String context(Long canvasId, String userId)  { return prefix + ":" + canvasId + ":user:" + userId; }
+    /**
+     * nodeState 处理 infrastructure.redis 场景的业务逻辑。
+     * @param executionId 业务对象 ID，用于定位具体记录。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @return 返回 node state 生成的文本或业务键。
+     */
     public String nodeState(String executionId, String nodeId) {
         return prefix + ":node-state:" + executionId + ":" + nodeId;
     }
@@ -211,6 +228,11 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
 // ── 并发锁 ─────────────────────────────────────────────────────
+    /**
+     * publishLock 创建或触发 infrastructure.redis 场景的业务处理。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @return 返回流程执行后的业务结果。
+     */
     public String publishLock(Long canvasId) { return prefix + ":publish:lock:" + canvasId; }
 
     /**
@@ -257,6 +279,11 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
 // ── 认证安全 ───────────────────────────────────────────────────
+    /**
+     * loginFail 处理 infrastructure.redis 场景的业务逻辑。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @return 返回 login fail 生成的文本或业务键。
+     */
     public String loginFail(String username)   { return prefix + ":login:fail:" + username; }
     /**
      * 执行 login Locked 对应的业务逻辑。
@@ -287,6 +314,12 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
 // ── 缓存 ───────────────────────────────────────────────────────
+    /**
+     * canvasConfig 校验或转换 infrastructure.redis 场景的数据。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param versionId 业务对象 ID，用于定位具体记录。
+     * @return 返回布尔判断结果。
+     */
     public String canvasConfig(Long canvasId, Long versionId) {
         return prefix + ":" + canvasId + ":v" + versionId + ":config";
     }
@@ -308,6 +341,11 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
 // ── Kill Switch ────────────────────────────────────────────────
+    /**
+     * killChannel 处理 infrastructure.redis 场景的业务逻辑。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @return 返回 kill channel 生成的文本或业务键。
+     */
     public String killChannel(Long canvasId)    { return prefix + ":kill:" + canvasId; }
     /**
      * 执行 kill Pattern 对应的业务逻辑。
@@ -327,6 +365,11 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
 // ── 消息中心 ───────────────────────────────────────────────────
+    /**
+     * notificationWsTicket 处理 infrastructure.redis 场景的业务逻辑。
+     * @param ticket ticket 参数，用于 notificationWsTicket 流程中的校验、计算或对象转换。
+     * @return 返回 notification ws ticket 生成的文本或业务键。
+     */
     public String notificationWsTicket(String ticket) { return prefix + ":notification:ws-ticket:" + ticket; }
     /**
      * 执行 notification Channel 对应的业务逻辑。

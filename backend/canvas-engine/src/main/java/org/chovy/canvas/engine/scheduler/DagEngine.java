@@ -152,6 +152,18 @@ public class DagEngine {
                 nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator, delayQueue);
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -165,6 +177,19 @@ public class DagEngine {
                 new NodeTimeoutCoordinator());
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -179,6 +204,20 @@ public class DagEngine {
                 new NodeTimeoutCoordinator());
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeGateCoordinator node gate coordinator 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -194,6 +233,21 @@ public class DagEngine {
                 new NodeTimeoutCoordinator());
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeGateCoordinator node gate coordinator 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeTimeoutCoordinator 时间参数，用于计算窗口、过期或审计时间。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -210,6 +264,22 @@ public class DagEngine {
                 nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator, null);
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeGateCoordinator node gate coordinator 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeTimeoutCoordinator 时间参数，用于计算窗口、过期或审计时间。
+     * @param delayQueue delay queue 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -227,6 +297,20 @@ public class DagEngine {
                 nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator, delayQueue);
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param specialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param ownsSpecialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -242,6 +326,21 @@ public class DagEngine {
                 dlqWriter, new NodeResultRouter(), new NodeGateCoordinator(), new NodeTimeoutCoordinator());
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param specialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param ownsSpecialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -258,6 +357,22 @@ public class DagEngine {
                 dlqWriter, nodeResultRouter, new NodeGateCoordinator(), new NodeTimeoutCoordinator());
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param specialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param ownsSpecialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeGateCoordinator node gate coordinator 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -275,6 +390,23 @@ public class DagEngine {
                 dlqWriter, nodeResultRouter, nodeGateCoordinator, new NodeTimeoutCoordinator());
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param specialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param ownsSpecialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeGateCoordinator node gate coordinator 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeTimeoutCoordinator 时间参数，用于计算窗口、过期或审计时间。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -294,6 +426,24 @@ public class DagEngine {
                 nodeTimeoutCoordinator, null);
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param specialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param ownsSpecialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param reactiveTaskRegistry reactive task registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeGateCoordinator node gate coordinator 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeTimeoutCoordinator 时间参数，用于计算窗口、过期或审计时间。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -314,6 +464,25 @@ public class DagEngine {
                 nodeTimeoutCoordinator, null);
     }
 
+    /**
+     * 初始化 DagEngine 实例。
+     *
+     * @param handlerRegistry handler registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param traceBuffer trace buffer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param cbRegistry cb registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ctxStore ctx store 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param specialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param ownsSpecialNodeTimeoutScheduler 时间参数，用于计算窗口、过期或审计时间。
+     * @param reactiveTaskRegistry reactive task registry 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param dlqWriter dlq writer 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeResultRouter node result router 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeGateCoordinator node gate coordinator 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     * @param nodeTimeoutCoordinator 时间参数，用于计算窗口、过期或审计时间。
+     * @param delayQueue delay queue 参数，用于 DagEngine 流程中的校验、计算或对象转换。
+     */
     DagEngine(HandlerRegistry handlerRegistry,
               TraceWriteBuffer traceBuffer,
               CircuitBreakerRegistry cbRegistry,
@@ -348,6 +517,11 @@ public class DagEngine {
     }
 
     @Autowired(required = false)
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param sideEffectIdempotencyService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     void setSideEffectIdempotencyService(NodeSideEffectIdempotencyService sideEffectIdempotencyService) {
         this.sideEffectIdempotencyService = sideEffectIdempotencyService;
     }
@@ -720,13 +894,25 @@ public class DagEngine {
         });
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param handler handler 参数，用于 executeWithSideEffectIdempotency 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param ctx ctx 参数，用于 executeWithSideEffectIdempotency 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param nodeType 类型标识，用于选择对应处理分支。
+     * @return 返回流程执行后的业务结果。
+     */
     private Mono<NodeResult> executeWithSideEffectIdempotency(NodeHandler handler,
                                                              Map<String, Object> config,
                                                              ExecutionContext ctx,
                                                              String nodeId,
                                                              String nodeType) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (sideEffectIdempotencyService == null
                 || !handler.requiresSideEffectIdempotency(config, ctx)) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             return handler.executeAsync(config, ctx);
         }
 
@@ -751,6 +937,7 @@ public class DagEngine {
         return handler.executeAsync(config, ctx)
                 .doOnNext(result -> {
                     if (recordId == null) {
+                        // 汇总前面计算出的状态和明细，返回给调用方。
                         return;
                     }
                     if (result.success() && !result.pending()) {
@@ -770,10 +957,12 @@ public class DagEngine {
      * 可重试异常（13.2节白名单）
      */
     private boolean isRetryable(Throwable ex) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (ex instanceof CircuitBreakerRegistry.CircuitBreakerOpenException) return false;
         if (ex instanceof java.net.SocketTimeoutException) return true;
         if (ex instanceof java.net.ConnectException) return true;
         String msg = ex.getMessage();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return msg != null && (msg.contains("5xx") || msg.contains("timeout") || msg.contains("Timeout"));
     }
 
@@ -803,6 +992,17 @@ public class DagEngine {
     @org.springframework.beans.factory.annotation.Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeout;
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param graph graph 参数，用于 executeSpecialTimeoutTriggerIfNeeded 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param node node 参数，用于 executeSpecialTimeoutTriggerIfNeeded 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param ctx ctx 参数，用于 executeSpecialTimeoutTriggerIfNeeded 流程中的校验、计算或对象转换。
+     * @param depth depth 参数，用于 executeSpecialTimeoutTriggerIfNeeded 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     private Mono<Map<String, Object>> executeSpecialTimeoutTriggerIfNeeded(
             DagGraph graph,
             String nodeId,
@@ -810,6 +1010,7 @@ public class DagEngine {
             Map<String, Object> config,
             ExecutionContext ctx,
             int depth) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!RedisDelayQueue.isSpecialTimeoutTrigger(ctx.getTriggerType())) {
             return null;
         }
@@ -823,11 +1024,21 @@ public class DagEngine {
             return Mono.just(Map.of(MapFieldKeys.SKIPPED, "stale-timeout-payload"));
         }
         int timeoutSec = timeoutSecondsForSpecialNode(node.getType(), config, ctx);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return executeSpecialTimeoutBranch(graph, nodeId, node, config, ctx, depth,
                 specialNodeLabel(node.getType()), timeoutSec);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param ctx ctx 参数，用于 timeoutPayloadMatches 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param timerKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 timeout payload matches 的布尔判断结果。
+     */
     private boolean timeoutPayloadMatches(ExecutionContext ctx, String nodeId, String timerKey) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (ctx.getNodeStatus(nodeId) != NodeStatus.WAITING) {
             return false;
         }
@@ -846,9 +1057,23 @@ public class DagEngine {
         }
         Long payloadScheduledAt = payloadLong(payload.get(MapFieldKeys.TIMEOUT_SCHEDULED_AT_EPOCH_MS));
         Long currentScheduledAt = ctx.getHubStartTimes().get(timerKey);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return payloadScheduledAt != null && Objects.equals(currentScheduledAt, payloadScheduledAt);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param graph graph 参数，用于 executeSpecialTimeoutBranch 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param node node 参数，用于 executeSpecialTimeoutBranch 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param ctx ctx 参数，用于 executeSpecialTimeoutBranch 流程中的校验、计算或对象转换。
+     * @param depth depth 参数，用于 executeSpecialTimeoutBranch 流程中的校验、计算或对象转换。
+     * @param label label 参数，用于 executeSpecialTimeoutBranch 流程中的校验、计算或对象转换。
+     * @param timeoutSec 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回流程执行后的业务结果。
+     */
     private Mono<Map<String, Object>> executeSpecialTimeoutBranch(
             DagGraph graph,
             String nodeId,
@@ -880,6 +1105,15 @@ public class DagEngine {
         return executeNode(graph, targetNodeId, ctx, depth + 1).defaultIfEmpty(Map.of());
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param ctx ctx 参数，用于 scheduleSpecialNodeTimeoutRequired 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param nodeType 类型标识，用于选择对应处理分支。
+     * @param timeoutSec 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 schedule special node timeout required 的布尔判断结果。
+     */
     private boolean scheduleSpecialNodeTimeoutRequired(
             ExecutionContext ctx, String nodeId, String nodeType, int timeoutSec) {
         String timerKey = RedisDelayQueue.timerKey(nodeType, nodeId);
@@ -902,6 +1136,14 @@ public class DagEngine {
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param ctx ctx 参数，用于 saveSpecialNodeState 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param output output 参数，用于 saveSpecialNodeState 流程中的校验、计算或对象转换。
+     */
     private void saveSpecialNodeState(
             ExecutionContext ctx, String nodeId, NodeStatus status, Map<String, Object> output) {
         if (ctx.getExecutionId() == null || ctx.getExecutionId().isBlank()) {
@@ -910,6 +1152,13 @@ public class DagEngine {
         ctxStore.saveNodeState(ctx.getExecutionId(), nodeId, status, output == null ? Map.of() : output);
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param ctx ctx 参数，用于 clearSpecialTimeoutGeneration 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param nodeType 类型标识，用于选择对应处理分支。
+     */
     private void clearSpecialTimeoutGeneration(ExecutionContext ctx, String nodeId, String nodeType) {
         if (!isSpecialTimeoutNode(nodeType)) {
             return;
@@ -919,12 +1168,27 @@ public class DagEngine {
         ctx.getScheduledHubTimeouts().remove(timerKey);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param nodeType 类型标识，用于选择对应处理分支。
+     * @return 返回布尔判断结果。
+     */
     private boolean isSpecialTimeoutNode(String nodeType) {
         return NodeType.HUB.equals(nodeType)
                 || NodeType.AGGREGATE.equals(nodeType)
                 || NodeType.THRESHOLD.equals(nodeType);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param nodeType 类型标识，用于选择对应处理分支。
+     * @param MapString map string 参数，用于 timeoutSecondsForSpecialNode 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param ctx ctx 参数，用于 timeoutSecondsForSpecialNode 流程中的校验、计算或对象转换。
+     * @return 返回 timeout seconds for special node 计算得到的数量、金额或指标值。
+     */
     private int timeoutSecondsForSpecialNode(String nodeType, Map<String, Object> config, ExecutionContext ctx) {
         Long payloadTimeout = payloadLong(ctx.getTriggerPayload().get(MapFieldKeys.TIMEOUT_SECONDS));
         if (payloadTimeout != null) {
@@ -936,6 +1200,12 @@ public class DagEngine {
         return config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param nodeType 类型标识，用于选择对应处理分支。
+     * @return 返回 special node label 生成的文本或业务键。
+     */
     private String specialNodeLabel(String nodeType) {
         return switch (nodeType) {
             case NodeType.HUB -> "HUB";
@@ -945,7 +1215,14 @@ public class DagEngine {
         };
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 payload long 计算得到的数量、金额或指标值。
+     */
     private Long payloadLong(Object value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value instanceof Number number) {
             return number.longValue();
         }
@@ -956,6 +1233,7 @@ public class DagEngine {
                 return null;
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return null;
     }
 
@@ -1152,6 +1430,18 @@ public class DagEngine {
                 e -> log.error("[THRESHOLD] 超时定时器失败 nodeId={}: {}", nodeId, e.getMessage()));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param graph graph 参数，用于 handleSpecialNodeTimeout 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param node node 参数，用于 handleSpecialNodeTimeout 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param ctx ctx 参数，用于 handleSpecialNodeTimeout 流程中的校验、计算或对象转换。
+     * @param depth depth 参数，用于 handleSpecialNodeTimeout 流程中的校验、计算或对象转换。
+     * @param label label 参数，用于 handleSpecialNodeTimeout 流程中的校验、计算或对象转换。
+     * @param timeoutSec 时间参数，用于计算窗口、过期或审计时间。
+     */
     private void handleSpecialNodeTimeout(DagGraph graph,
                                           String nodeId,
                                           DagParser.CanvasNode node,
@@ -1160,6 +1450,7 @@ public class DagEngine {
                                           int depth,
                                           String label,
                                           int timeoutSec) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.TIMEOUT)) {
             return;
         }
@@ -1172,6 +1463,7 @@ public class DagEngine {
         timeoutOutput.put(MapFieldKeys.REASON_CODE, "SPECIAL_NODE_TIMEOUT");
         timeoutOutput.put(MapFieldKeys.REASON_MESSAGE, label + " 等待超时");
         ctx.putNodeOutput(nodeId, timeoutOutput);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         saveSpecialNodeState(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
         writeTraceEnd(ctx, node, NodeResult.timeout(targetNodeId,
                 "SPECIAL_NODE_TIMEOUT", label + " 等待超时"), 0);
@@ -1190,6 +1482,7 @@ public class DagEngine {
                 "dag-timeout-continuation-" + ctx.getExecutionId() + "-" + nodeId,
                 executeNode(graph, targetNodeId, ctx, depth + 1)
                         .defaultIfEmpty(Map.of())
+                        // 遍历候选数据并按业务规则筛选、转换或聚合。
                         .flatMap(result -> completeSpecialTimeoutContinuation(graph, ctx, result))
                         .onErrorResume(e -> {
                             Map<String, Object> error = Map.of(
@@ -1203,6 +1496,14 @@ public class DagEngine {
                 e -> log.error("[{}] 超时分支执行失败 nodeId={}: {}", label, nodeId, e.getMessage()));
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param graph graph 参数，用于 completeSpecialTimeoutContinuation 流程中的校验、计算或对象转换。
+     * @param ctx ctx 参数，用于 completeSpecialTimeoutContinuation 流程中的校验、计算或对象转换。
+     * @param result result 参数，用于 completeSpecialTimeoutContinuation 流程中的校验、计算或对象转换。
+     * @return 返回 completeSpecialTimeoutContinuation 流程生成的业务结果。
+     */
     private Mono<Void> completeSpecialTimeoutContinuation(
             DagGraph graph, ExecutionContext ctx, Map<String, Object> result) {
         Map<String, Object> safeResult = result == null ? Map.of() : result;
@@ -1217,6 +1518,13 @@ public class DagEngine {
                 ExecutionStatus.SUCCESS.getCode(), safeResult);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param MapString map string 参数，用于 resolveSpecialTimeoutTarget 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @return 返回 resolve special timeout target 生成的文本或业务键。
+     */
     private String resolveSpecialTimeoutTarget(Map<String, Object> config) {
         Object timeoutTarget = config.get(MapFieldKeys.TIMEOUT_NODE_ID);
         if (timeoutTarget instanceof String s && !s.isBlank()) {
@@ -1310,6 +1618,17 @@ public class DagEngine {
                 });
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param graph graph 参数，用于 triggerDownstream 流程中的校验、计算或对象转换。
+     * @param result result 参数，用于 triggerDownstream 流程中的校验、计算或对象转换。
+     * @param sourceNodeId 业务对象 ID，用于定位具体记录。
+     * @param sourceType 类型标识，用于选择对应处理分支。
+     * @param ctx ctx 参数，用于 triggerDownstream 流程中的校验、计算或对象转换。
+     * @param depth depth 参数，用于 triggerDownstream 流程中的校验、计算或对象转换。
+     * @return 返回 triggerDownstream 流程生成的业务结果。
+     */
     private Mono<Map<String, Object>> triggerDownstream(DagGraph graph, NodeResult result,
                                                         String sourceNodeId, String sourceType,
                                                         ExecutionContext ctx,
@@ -1369,8 +1688,10 @@ public class DagEngine {
         Deque<String> queue = new ArrayDeque<>();
         Set<String> visited = new HashSet<>();
         queue.add(startNodeId);
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         while (!queue.isEmpty()) {
             String current = queue.removeFirst();
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (!visited.add(current)) {
                 continue;
             }
@@ -1379,6 +1700,7 @@ public class DagEngine {
             clearSpecialTimeoutGeneration(ctx, current, currentNode == null ? null : currentNode.getType());
             if (ctx.getExecutionId() != null && !ctx.getExecutionId().isBlank()) {
                 try {
+                    // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                     ctxStore.deleteNodeState(ctx.getExecutionId(), current);
                 } catch (RuntimeException e) {
                     log.warn("[ENGINE] reset 删除节点增量状态失败 executionId={} nodeId={}: {}",
@@ -1538,6 +1860,12 @@ public class DagEngine {
         };
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param result result 参数，用于 shouldCommitOutput 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean shouldCommitOutput(NodeResult result) {
         if (result == null || result.output() == null || result.output().isEmpty()) {
             return false;
@@ -1557,6 +1885,7 @@ public class DagEngine {
      * @return 计算得到的数值结果
      */
     private int traceStatus(NodeResult result) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!result.success()) {
             return 2;
         }
@@ -1569,6 +1898,7 @@ public class DagEngine {
         if (result.outcome() == NodeOutcome.SKIPPED) {
             return 3;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return 1;
     }
 
@@ -1583,11 +1913,13 @@ public class DagEngine {
      * @return 按业务键组织的映射结果
      */
     private Map<String, Object> pendingResponse(String nodeId, String nodeType, NodeResult result) {
+        // 准备本次处理所需的上下文和中间变量。
         Map<String, Object> response = new LinkedHashMap<>();
         response.put(MapFieldKeys.PENDING, true);
         response.put(MapFieldKeys.NODE_ID, nodeId);
         response.put(MapFieldKeys.NODE_TYPE, nodeType);
         response.put(MapFieldKeys.OUTCOME, result.outcome().name());
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (result.resumeAtEpochMs() != null) {
             response.put(MapFieldKeys.RESUME_AT_EPOCH_MS, result.resumeAtEpochMs());
         }
@@ -1597,6 +1929,7 @@ public class DagEngine {
         if (result.reasonMessage() != null) {
             response.put(MapFieldKeys.REASON_MESSAGE, result.reasonMessage());
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return response;
     }
 
@@ -1690,6 +2023,12 @@ public class DagEngine {
         private final int batchSize;
         private final java.util.concurrent.ExecutorService executor;
 
+        /**
+         * 初始化 FanOutBatcher 实例。
+         *
+         * @param batchSize batch size 参数，用于 FanOutBatcher 流程中的校验、计算或对象转换。
+         * @param maxConcurrent max concurrent 参数，用于 FanOutBatcher 流程中的校验、计算或对象转换。
+         */
         FanOutBatcher(int batchSize, int maxConcurrent) {
             if (batchSize <= 0) {
                 throw new IllegalArgumentException("batchSize must be positive");
@@ -1701,14 +2040,23 @@ public class DagEngine {
             this.executor = java.util.concurrent.Executors.newFixedThreadPool(maxConcurrent);
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @param users users 参数，用于 fanOut 流程中的校验、计算或对象转换。
+         * @param consumer consumer 参数，用于 fanOut 流程中的校验、计算或对象转换。
+         */
         void fanOut(java.util.stream.Stream<String> users, java.util.function.Consumer<List<String>> consumer) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (users == null || consumer == null) {
                 return;
             }
             List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
             List<String> batch = new ArrayList<>(batchSize);
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             users.forEach(user -> {
                 if (user == null) {
+                    // 汇总前面计算出的状态和明细，返回给调用方。
                     return;
                 }
                 batch.add(user);
@@ -1732,10 +2080,20 @@ public class DagEngine {
             }
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         */
         void shutdown() {
             executor.shutdownNow();
         }
 
+        /**
+         * 执行业务决策动作，并同步后续状态。
+         *
+         * @param batch batch 参数，用于 submit 流程中的校验、计算或对象转换。
+         * @param consumer consumer 参数，用于 submit 流程中的校验、计算或对象转换。
+         * @return 返回 submit 流程生成的业务结果。
+         */
         private java.util.concurrent.Future<?> submit(
                 List<String> batch,
                 java.util.function.Consumer<List<String>> consumer) {

@@ -5,6 +5,8 @@ Sequence: 012
 Source: `todo/p3/strategic-opportunities-from-filtered-scope.md#product-led-growth-and-community`
 Implementation plan: `../plans/p3-012-product-led-growth-and-community-plan.md`
 
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Create an executable discovery and governance slice for product-led growth and community so trial journey, activation milestones, proficiency levels, referral, public examples, case studies, templates, and customer story loops are ranked by evidence before product build-out.

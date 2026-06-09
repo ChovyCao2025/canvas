@@ -5,6 +5,8 @@ Sequence: 030
 Source: `docs/product-evolution/specs/p2-026-cdp-warehouse-quality-and-reconciliation.md`, `docs/product-evolution/specs/p2-029-cdp-warehouse-realtime-checkpoint-and-lag.md`
 Implementation plan: `../plans/p2-030-cdp-warehouse-quality-incident-loop-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a warehouse quality incident loop so failed or warning warehouse checks become tenant-scoped operational incidents that can be listed, acknowledged, and resolved.

@@ -5,6 +5,8 @@ Sequence: 032
 Source: `docs/product-evolution/specs/p2-029-cdp-warehouse-realtime-checkpoint-and-lag.md`, `docs/product-evolution/specs/p2-031-cdp-warehouse-physical-table-governance.md`
 Implementation plan: `../plans/p2-032-cdp-warehouse-realtime-pipeline-runtime-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a production control plane for realtime warehouse pipelines so CDC, Flink SQL, Kafka/RocketMQ, and Doris sink jobs can publish durable runtime evidence: offset, checkpoint id, watermark, lag, delivery semantics, and health.

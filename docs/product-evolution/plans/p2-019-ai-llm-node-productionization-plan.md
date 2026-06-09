@@ -8,6 +8,13 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux style controllers, WebClient, MyBatis, Flyway, Jackson, React 18, TypeScript, Ant Design, Vitest, JUnit 5, Mockito, WireMock or WebClient mock exchange functions.
 
+**Status:** Closed in branch `p2-019-ai-llm-production` on 2026-06-09. The current implementation uses existing migrations `V162`/`V164` plus follow-up migration `V360__ai_llm_registry_safe_overrides.sql` because the repository migration history had already advanced beyond the original planned `V114`, and main already contained another `V354` migration during integration.
+
+**Verification Evidence:**
+- Backend: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" mvn -pl canvas-engine test -Dtest=AiLlmGatewayTest,OpenAiCompatibleLlmClientTest,AiUsageAuditServiceTest,AiLlmHandlerTest,AiProviderControllerTest,AiPromptTemplateControllerTest,AiPromptEvaluationServiceTest,AiProviderModelRegistryServiceTest,AiBackendFoundationSchemaTest,AiLlmNodeProductionizationSchemaTest` -> 30 tests, 0 failures.
+- Frontend focused: `npm test -- aiLlmConfigPanel.test.tsx aiApi.test.ts constants.test.ts` -> 3 files, 11 tests, 0 failures.
+- Frontend build: `npm run build` -> `tsc && vite build` completed successfully.
+
 ---
 
 ## Spec Reference
@@ -45,7 +52,8 @@
 - Create: `frontend/src/services/aiApi.ts`
 
 **Data And Config**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V114__ai_llm_node_productionization.sql`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V164__ai_llm_node_productionization.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V360__ai_llm_registry_safe_overrides.sql`
 - Modify: `backend/canvas-engine/src/main/resources/application.yml`
 
 **Tests**
@@ -59,7 +67,8 @@
 ### Task 1: Data Model And Red Tests
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V114__ai_llm_node_productionization.sql`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V164__ai_llm_node_productionization.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V360__ai_llm_registry_safe_overrides.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/llm/AiLlmGatewayTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/AiLlmHandlerTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/AiProviderControllerTest.java`

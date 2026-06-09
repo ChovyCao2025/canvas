@@ -1,0 +1,52 @@
+groups:
+  - name: risk-control
+    rules:
+      - alert: RiskDecisionLatencySloBreach
+        expr: rate(risk_decision_latency_ms_sum[5m]) / clamp_min(rate(risk_decision_latency_ms_count[5m]), 1) > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Risk decision latency SLO is breached
+          description: Average risk decision latency has stayed above 80 ms for 10 minutes.
+
+      - alert: RiskDecisionFailureSpike
+        expr: sum(rate(risk_decision_failures_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: canvas-engine
+        annotations:
+          summary: Risk decision failures are elevated
+          description: Risk decision failures exceeded 0.05 failures/sec for 5 minutes.
+
+      - alert: RiskBlockRateSpike
+        expr: sum(rate(risk_decision_requests_total{action="block"}[5m])) / clamp_min(sum(rate(risk_decision_requests_total[5m])), 1) > 0.4
+        for: 15m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Risk block rate spiked
+          description: More than 40 percent of risk decisions have returned BLOCK for 15 minutes.
+
+      - alert: RiskFeatureMissingSpike
+        expr: sum(rate(risk_feature_missing_total[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Risk feature missing rate is elevated
+          description: Missing risk features exceeded 0.1 events/sec for 10 minutes.
+
+      - alert: RiskModelGatewayFailure
+        expr: sum(rate(risk_model_gateway_failures_total[5m])) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+          service: canvas-engine
+        annotations:
+          summary: Risk model gateway failures are elevated
+          description: Model gateway failures exceeded 0.02 failures/sec for 5 minutes.

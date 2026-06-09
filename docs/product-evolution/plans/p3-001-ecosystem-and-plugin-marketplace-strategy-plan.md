@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, JSON, Node.js 18 `node:test`, existing Git workflow.
 
+**Implementation Status:** Discovery package and validator are complete in the current workspace record. Reverified on 2026-06-08 with `node --test tools/strategy/plugin-marketplace-evidence.test.mjs` (5 tests passing) and `node tools/strategy/plugin-marketplace-evidence.mjs`. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -34,7 +36,7 @@ No migration is created. The data touchpoint is Git-tracked strategy evidence, n
 **Files:**
 - Create: `tools/strategy/plugin-marketplace-evidence.test.mjs`
 
-- [ ] **Step 1: Write failing validator tests**
+- [x] **Step 1: Write failing validator tests**
 
 Create `tools/strategy/plugin-marketplace-evidence.test.mjs`:
 
@@ -90,7 +92,7 @@ test('rejects accepted capabilities without child spec path', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -106,7 +108,7 @@ Expected: FAIL because `tools/strategy/plugin-marketplace-evidence.mjs` and the 
 - Create: `tools/strategy/plugin-marketplace-evidence.mjs`
 - Test: `tools/strategy/plugin-marketplace-evidence.test.mjs`
 
-- [ ] **Step 1: Create the validator script**
+- [x] **Step 1: Create the validator script**
 
 Create `tools/strategy/plugin-marketplace-evidence.mjs`:
 
@@ -159,7 +161,7 @@ console.log(JSON.stringify({
 }, null, 2))
 ```
 
-- [ ] **Step 2: Run tests and confirm evidence still missing**
+- [x] **Step 2: Run tests and confirm evidence still missing**
 
 Run:
 
@@ -177,7 +179,7 @@ Expected: FAIL because `docs/product-evolution/discovery/p3-001-plugin-marketpla
 - Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/governance-policy.md`
 - Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/decision-log.md`
 
-- [ ] **Step 1: Create evidence JSON**
+- [x] **Step 1: Create evidence JSON**
 
 Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json`:
 
@@ -264,7 +266,7 @@ Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json
 }
 ```
 
-- [ ] **Step 2: Create package README**
+- [x] **Step 2: Create package README**
 
 Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/README.md`:
 
@@ -289,7 +291,7 @@ node tools/strategy/plugin-marketplace-evidence.mjs
 Expected: both commands pass and the validator prints candidate keys for all marketplace capabilities.
 ```
 
-- [ ] **Step 3: Create governance policy**
+- [x] **Step 3: Create governance policy**
 
 Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/governance-policy.md`:
 
@@ -308,7 +310,7 @@ Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/governance-po
 This P3 slice has no Flyway migration and no runtime route. Rollback is a documentation rollback: revert the discovery package commit or leave capabilities below `Accepted For Child Spec`.
 ```
 
-- [ ] **Step 4: Create decision log**
+- [x] **Step 4: Create decision log**
 
 Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/decision-log.md`:
 
@@ -326,7 +328,7 @@ Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/decision-log.
 | Plugin takedown | Needs Evidence | Abuse and vulnerability response needs security ownership. |
 ```
 
-- [ ] **Step 5: Run validator tests**
+- [x] **Step 5: Run validator tests**
 
 Run:
 
@@ -343,7 +345,7 @@ Expected: PASS, and the validator prints all seven candidate keys.
 - Modify: `docs/product-evolution/specs/p3-001-ecosystem-and-plugin-marketplace-strategy.md`
 - Modify: `docs/product-evolution/plans/p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md`
 
-- [ ] **Step 1: Confirm no migration references remain**
+- [x] **Step 1: Confirm no migration references remain**
 
 Run:
 
@@ -354,7 +356,7 @@ rg -n "$pattern" docs/product-evolution/specs/p3-001-ecosystem-and-plugin-market
 
 Expected: no output.
 
-- [ ] **Step 2: Scan for implementation-deferral wording**
+- [x] **Step 2: Scan for implementation-deferral wording**
 
 Run:
 
@@ -390,7 +392,8 @@ EOF
 
 Expected: no output.
 
-- [ ] **Step 3: Commit the discovery slice**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

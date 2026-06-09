@@ -5,6 +5,8 @@ Sequence: 077
 Source: `docs/product-evolution/specs/p2-076-cdp-warehouse-privacy-audience-bitmap-rebuild-proof.md`
 Implementation plan: `../plans/p2-077-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Automate the P2-076 audience bitmap rebuild proof step so privacy erasure requests do not rely on manual operator calls after upstream CDP, realtime, and Doris erasure assets have passed.

@@ -5,6 +5,8 @@ Sequence: 034
 Source: `docs/product-evolution/specs/p2-027-cdp-warehouse-catalog-and-lineage.md`, `docs/product-evolution/specs/p2-031-cdp-warehouse-physical-table-governance.md`, `docs/product-evolution/specs/p2-023-bi-dataset-query-compiler-foundation.md`
 Implementation plan: `../plans/p2-034-cdp-warehouse-field-governance-and-bi-policy-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add field-level warehouse governance and enforce it before BI query compilation/execution so PII-related CDP fields cannot be queried by unauthorized operators.

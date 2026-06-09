@@ -11,6 +11,9 @@ import org.chovy.canvas.dal.dataobject.CdpWarehouseExternalRealtimeJobProbeTarge
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * CdpWarehouseExternalRealtimeJobProbeTargetMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
         extends BaseMapper<CdpWarehouseExternalRealtimeJobProbeTargetDO> {
@@ -37,6 +40,12 @@ public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
                 config_json = VALUES(config_json),
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsert(@Param("row") CdpWarehouseExternalRealtimeJobProbeTargetDO row);
 
     @Select("""
@@ -50,6 +59,14 @@ public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
               AND job_key = #{jobKey}
             LIMIT 1
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param jobKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     CdpWarehouseExternalRealtimeJobProbeTargetDO findByKey(@Param("tenantId") Long tenantId,
                                                            @Param("pipelineKey") String pipelineKey,
                                                            @Param("jobKey") String jobKey);
@@ -64,6 +81,13 @@ public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
               AND id = #{targetId}
             LIMIT 1
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param targetId 业务对象 ID，用于定位具体记录。
+     * @return 返回符合条件的数据列表或视图。
+     */
     CdpWarehouseExternalRealtimeJobProbeTargetDO findByTenantAndId(@Param("tenantId") Long tenantId,
                                                                    @Param("targetId") Long targetId);
 
@@ -77,6 +101,13 @@ public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
             ORDER BY pipeline_key ASC, job_key ASC, id ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<CdpWarehouseExternalRealtimeJobProbeTargetDO> listTargets(@Param("tenantId") Long tenantId,
                                                                    @Param("limit") int limit);
 
@@ -91,6 +122,13 @@ public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
             ORDER BY pipeline_key ASC, job_key ASC, id ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<CdpWarehouseExternalRealtimeJobProbeTargetDO> listEnabledTargets(@Param("tenantId") Long tenantId,
                                                                           @Param("limit") int limit);
 
@@ -101,6 +139,14 @@ public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
             WHERE tenant_id = #{tenantId}
               AND id = #{targetId}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param targetId 业务对象 ID，用于定位具体记录。
+     * @param enabled enabled 参数，用于 updateEnabled 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     int updateEnabled(@Param("tenantId") Long tenantId,
                       @Param("targetId") Long targetId,
                       @Param("enabled") int enabled);
@@ -114,6 +160,16 @@ public interface CdpWarehouseExternalRealtimeJobProbeTargetMapper
             WHERE tenant_id = #{tenantId}
               AND id = #{targetId}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param targetId 业务对象 ID，用于定位具体记录。
+     * @param lastProbedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param lastProbeStatus 业务状态，用于筛选或推进状态流转。
+     * @param lastProbeMessage last probe message 参数，用于 updateProbeResult 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     int updateProbeResult(@Param("tenantId") Long tenantId,
                           @Param("targetId") Long targetId,
                           @Param("lastProbedAt") LocalDateTime lastProbedAt,

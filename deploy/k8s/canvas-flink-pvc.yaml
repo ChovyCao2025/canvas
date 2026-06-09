@@ -1,3 +1,4 @@
+# Flink checkpoint 状态目录，保存自动恢复点。
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -7,12 +8,15 @@ metadata:
     app.kubernetes.io/name: canvas-flink
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 单节点读写模式适配当前静态部署；迁移到分布式存储时可改为 RWX。
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
+      # 预留状态后端增量 checkpoint 的基础空间。
       storage: 20Gi
 ---
+# Flink savepoint 状态目录，保存人工触发的升级/回滚恢复点。
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -22,8 +26,10 @@ metadata:
     app.kubernetes.io/name: canvas-flink
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 与 checkpoint 分开，避免自动清理或频繁写入影响人工保存点。
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
+      # 与 checkpoint 同级容量，便于保存至少一轮全量状态。
       storage: 20Gi

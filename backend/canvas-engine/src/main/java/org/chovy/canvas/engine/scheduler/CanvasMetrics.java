@@ -325,6 +325,11 @@ public class CanvasMetrics {
                 .record(Math.max(0L, durationMs), TimeUnit.MILLISECONDS);
     }
 
+    public long currentTaggedGaugeValue(String metricName, String tagName, String tagValue) {
+        AtomicLong gauge = capacityGauges.get(metricName + ":" + tagName + ":" + normalizeTag(tagValue));
+        return gauge == null ? 0L : Math.max(0L, gauge.get());
+    }
+
     private void setTaggedGauge(String metricName, String tagName, String tagValue, long value) {
         String normalizedTagValue = normalizeTag(tagValue);
         String key = metricName + ":" + tagName + ":" + normalizedTagValue;

@@ -24,12 +24,25 @@ import java.util.stream.Collectors;
 @Component
 public class NodeResultRouter {
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param result result 参数，用于 nextNodeIds 流程中的校验、计算或对象转换。
+     * @return 返回 next node ids 汇总后的集合、分页或映射视图。
+     */
     List<String> nextNodeIds(NodeResult result) {
         return NodeRouteResolver.resolveTargets(result).stream()
                 .distinct()
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param graph graph 参数，用于 failureAwareDownstream 流程中的校验、计算或对象转换。
+     * @param sourceNodeId 业务对象 ID，用于定位具体记录。
+     * @return 返回 failure aware downstream 汇总后的集合、分页或映射视图。
+     */
     List<String> failureAwareDownstream(DagGraph graph, String sourceNodeId) {
         return graph.downstream(sourceNodeId).stream()
                 .filter(nextId -> {
@@ -40,12 +53,27 @@ public class NodeResultRouter {
                 .toList();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param nodeType 类型标识，用于选择对应处理分支。
+     * @return 返回布尔判断结果。
+     */
     boolean isFailureAwareConvergenceNode(String nodeType) {
         return NodeType.HUB.equals(nodeType)
                 || NodeType.AGGREGATE.equals(nodeType)
                 || NodeType.THRESHOLD.equals(nodeType);
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param graph graph 参数，用于 markNonTakenBranchesSkipped 流程中的校验、计算或对象转换。
+     * @param sourceNodeId 业务对象 ID，用于定位具体记录。
+     * @param sourceType 类型标识，用于选择对应处理分支。
+     * @param result result 参数，用于 markNonTakenBranchesSkipped 流程中的校验、计算或对象转换。
+     * @param ctx ctx 参数，用于 markNonTakenBranchesSkipped 流程中的校验、计算或对象转换。
+     */
     void markNonTakenBranchesSkipped(DagGraph graph,
                                      String sourceNodeId,
                                      String sourceType,
@@ -64,13 +92,23 @@ public class NodeResultRouter {
         }
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param graph graph 参数，用于 markSkippedPath 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param ctx ctx 参数，用于 markSkippedPath 流程中的校验、计算或对象转换。
+     */
     private void markSkippedPath(DagGraph graph, String nodeId, ExecutionContext ctx) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (nodeId == null || nodeId.isBlank()) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         Deque<String> queue = new ArrayDeque<>();
         Set<String> visited = new HashSet<>();
         queue.add(nodeId);
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         while (!queue.isEmpty()) {
             String current = queue.removeFirst();
             if (!visited.add(current)) {
@@ -85,6 +123,14 @@ public class NodeResultRouter {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param graph graph 参数，用于 allUpstreamSkipped 流程中的校验、计算或对象转换。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param ctx ctx 参数，用于 allUpstreamSkipped 流程中的校验、计算或对象转换。
+     * @return 返回 all upstream skipped 的布尔判断结果。
+     */
     private boolean allUpstreamSkipped(DagGraph graph, String nodeId, ExecutionContext ctx) {
         List<String> upstreamIds = graph.upstream(nodeId);
         return !upstreamIds.isEmpty()

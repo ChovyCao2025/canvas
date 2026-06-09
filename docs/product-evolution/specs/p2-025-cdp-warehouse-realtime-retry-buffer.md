@@ -5,6 +5,8 @@ Sequence: 025
 Source: `docs/product-evolution/specs/p2-022-cdp-warehouse-ingestion-and-aggregation.md`, `docs/product-evolution/specs/p2-024-cdp-warehouse-operations-api-and-scheduler.md`
 Implementation plan: `../plans/p2-025-cdp-warehouse-realtime-retry-buffer-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Make near-real-time CDP warehouse delivery repairable without waiting for manual backfill: when the warehouse sink fails during ingestion, the service must record a retryable delivery row, retry due rows on a bounded schedule, and mark exhausted rows dead for operator investigation.

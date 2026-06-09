@@ -1,6 +1,18 @@
 {
   "targetConcurrency": 4000,
   "observationWindowSeconds": 1800,
+  "blockedUntil": "p1-004-accepted",
+  "protectedLanes": ["LIGHT", "STANDARD"],
+  "borrowRules": {
+    "HEAVY": { "cannotBorrowFrom": ["LIGHT", "STANDARD"] },
+    "RETRY": { "cannotBorrowFrom": ["LIGHT", "STANDARD"] }
+  },
+  "requiredProfiles": [
+    "readiness-mixed-4000",
+    "heavy-surge-4000",
+    "retry-surge-4000",
+    "downstream-bulkhead-4000"
+  ],
   "lanes": {
     "LIGHT": { "concurrency": 800, "share": 0.2 },
     "STANDARD": { "concurrency": 2400, "share": 0.6 },
@@ -13,11 +25,12 @@
     "P95_EXCEEDED",
     "LIGHT_STANDARD_STARVED_BY_HEAVY_OR_RETRY",
     "ASYNC_WRITE_BACKLOG_GROWING",
-    "REDIS_EXECUTION_STATE_LATENCY_SUSTAINED",
+    "REDIS_ROLE_LATENCY_SUSTAINED",
     "MYSQL_POOL_SATURATION",
-    "ROCKETMQ_BACKLOG_UNBOUNDED",
+    "ROCKETMQ_BACKLOG_STARVED",
+    "RETRY_BACKLOG_GROWING_AFTER_RECOVERY",
     "ADAPTIVE_RETRY_CANNOT_DRAIN_BACKLOG",
-    "DOWNSTREAM_BULKHEAD_OPEN_NO_RECOVERY"
+    "DOWNSTREAM_BULKHEAD_OPEN"
   ],
   "profiles": [
     {
@@ -32,11 +45,14 @@
       ],
       "maxFailed": 0,
       "maxP95Ms": 1200,
-      "waitAfterRunMs": 30000
+      "waitAfterRunMs": 30000,
+      "stopGates": ["RUNNER_FAILED", "VERIFIER_FAIL", "P95_EXCEEDED"],
+      "rollbackActions": ["restore_3000_lane_budgets", "pause_4000_readiness_runs"],
+      "degradeActions": ["lower_global_admission_limit", "extend_observation_window"]
     },
     {
-      "name": "readiness-retry-heavy-isolation-4000",
-      "description": "RETRY and HEAVY each reach 400 while LIGHT and STANDARD remain protected.",
+      "name": "heavy-surge-4000",
+      "description": "HEAVY reaches 400 while LIGHT and STANDARD remain protected.",
       "mode": "event",
       "eventCode": "PERF_HEAVY_FLOW",
       "stages": [
@@ -45,10 +61,29 @@
       ],
       "maxFailed": 0,
       "maxP95Ms": 3000,
-      "waitAfterRunMs": 30000
+      "waitAfterRunMs": 30000,
+      "stopGates": ["LIGHT_STANDARD_STARVED_BY_HEAVY_OR_RETRY", "ASYNC_WRITE_BACKLOG_GROWING"],
+      "rollbackActions": ["restore_3000_lane_budgets", "disable_heavy_lane_expansion"],
+      "degradeActions": ["lower_heavy_lane", "cap_heavy_batch_size"]
     },
     {
-      "name": "readiness-downstream-bulkhead-4000",
+      "name": "retry-surge-4000",
+      "description": "RETRY reaches 400 while protected lanes keep their admission budget.",
+      "mode": "event",
+      "eventCode": "PERF_RETRY_SURGE",
+      "stages": [
+        { "count": 10000, "concurrency": 200 },
+        { "count": 30000, "concurrency": 400 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 3000,
+      "waitAfterRunMs": 30000,
+      "stopGates": ["RETRY_BACKLOG_GROWING_AFTER_RECOVERY", "ROCKETMQ_BACKLOG_STARVED"],
+      "rollbackActions": ["pause_retry_replay", "restore_previous_retry_policy"],
+      "degradeActions": ["lower_retry_lane", "lengthen_retry_backoff"]
+    },
+    {
+      "name": "downstream-bulkhead-4000",
       "description": "A slow downstream dependency must not degrade LIGHT or STANDARD for the full window.",
       "mode": "event",
       "eventCode": "PERF_SLOW_DOWNSTREAM",
@@ -58,7 +93,10 @@
       ],
       "maxFailed": 200,
       "maxP95Ms": 5000,
-      "waitAfterRunMs": 30000
+      "waitAfterRunMs": 30000,
+      "stopGates": ["DOWNSTREAM_BULKHEAD_OPEN", "P95_EXCEEDED"],
+      "rollbackActions": ["restore_previous_downstream_timeout", "disable_downstream_experiment"],
+      "degradeActions": ["open_circuit_for_unhealthy_downstream", "lower_downstream_bulkhead_limit"]
     }
   ]
 }

@@ -49,6 +49,11 @@ public class MqRouteRefreshService {
     private CanvasRuntimeMetrics runtimeMetrics;
 
     @Autowired(required = false)
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param runtimeMetrics 时间参数，用于计算窗口、过期或审计时间。
+     */
     void setRuntimeMetrics(CanvasRuntimeMetrics runtimeMetrics) {
         this.runtimeMetrics = runtimeMetrics;
     }
@@ -110,8 +115,10 @@ public class MqRouteRefreshService {
                                      Map<String, Set<String>> behaviorRoutes,
                                      Map<String, Set<String>> taggerRoutes) {
         int count = 0;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (node == null) {
                 continue;
             }
@@ -153,9 +160,15 @@ public class MqRouteRefreshService {
                 }
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return count;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     */
     private void recordRouteRebuildFailure(String reason) {
         if (runtimeMetrics != null) {
             runtimeMetrics.recordRouteRebuildFailure(reason);

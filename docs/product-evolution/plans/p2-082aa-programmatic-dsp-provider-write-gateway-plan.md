@@ -6,6 +6,10 @@ Spec: `../specs/p2-082aa-programmatic-dsp-provider-write-gateway.md`
 
 Close the DSP activation write-client gap with a safe backend control plane for approved, idempotent, dry-run-first provider mutations.
 
+**Implementation Status:** Current workspace record: delivered backend first slice. Verification results are recorded below.
+
+Status: Delivered backend first slice in the current workspace record.
+
 ## Tasks
 
 ### Task 1: Index P2-082AA Docs

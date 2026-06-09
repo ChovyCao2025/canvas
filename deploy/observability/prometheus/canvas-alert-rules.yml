@@ -1,7 +1,9 @@
 groups:
+  # Runtime alerts cover execution correctness, dependency availability, and graceful shutdown.
   - name: canvas-runtime
     rules:
       - alert: CanvasExecutionFailureRate
+        # Sustained failure rate points to broken handlers, dependencies, or invalid published canvases.
         expr: sum(rate(canvas_runtime_execution_failures_total[5m])) > 0.05
         for: 10m
         labels:
@@ -12,6 +14,7 @@ groups:
           description: Runtime execution failures exceeded 0.05 failures/sec for 10 minutes.
 
       - alert: CanvasDlqBacklog
+        # Any DLQ backlog requires operator review because messages have left the normal retry lane.
         expr: canvas_runtime_dlq_backlog > 0
         for: 15m
         labels:
@@ -22,6 +25,7 @@ groups:
           description: canvas_runtime_dlq_backlog has been above zero for 15 minutes.
 
       - alert: CanvasRouteRebuildFailure
+        # Route rebuild failures can leave trigger routing stale after publish/offline operations.
         expr: increase(canvas_runtime_route_rebuild_failures_total[10m]) > 0
         for: 0m
         labels:
@@ -62,6 +66,7 @@ groups:
           description: Canvas runtime MQ availability gauge is reporting unavailable.
 
       - alert: CanvasLanePressureHigh
+        # Lane pressure tracks protected execution pools before user-visible latency degrades.
         expr: max(canvas_runtime_lane_pressure) > 0.85
         for: 10m
         labels:
@@ -92,6 +97,7 @@ groups:
           description: Hikari active connections are above 85 percent of max capacity.
 
       - alert: CanvasShutdownDrainTimeout
+        # Shutdown drain timeout means in-flight executions may need reconciliation after rollout.
         expr: increase(canvas_runtime_shutdown_drain_timeout_total[30m]) > 0
         for: 0m
         labels:

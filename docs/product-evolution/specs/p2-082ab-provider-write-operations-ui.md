@@ -1,8 +1,9 @@
 # P2-082AB - Provider Write Operations UI Spec
 
+Priority: P2
+Sequence: 082AB
 Parent spec: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082ab-provider-write-operations-ui-plan.md`
-Status: Delivered frontend first slice
 
 ## Problem
 
@@ -34,7 +35,7 @@ Frontend first slice:
 - Frontend focused tests and build pass.
 - Browser verification proves the operations queue renders without leaking obvious provider secret fields.
 
-## Delivery Status
+## Implementation Status
 
 Delivered frontend first slice:
 

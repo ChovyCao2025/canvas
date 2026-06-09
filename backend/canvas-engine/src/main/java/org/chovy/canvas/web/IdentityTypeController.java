@@ -22,7 +22,17 @@ public class IdentityTypeController {
 
     /** 身份类型服务，用于管理可导入身份标识。 */
     private final IdentityTypeService identityTypeService;
-
+    /**
+     * 查询Identity Type列表接口，对应 GET 请求。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 主要委托 identityTypeService.list 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param enabled 请求参数，可选。
+     * @param allowImport 请求参数，可选。
+     * @return 异步返回统一响应，包含分页结果。
+     */
     @GetMapping
     public Mono<R<PageResult<IdentityTypeDO>>> list(
             @RequestParam(required = false) Integer enabled,

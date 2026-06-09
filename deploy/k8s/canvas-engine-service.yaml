@@ -1,3 +1,4 @@
+# Canvas Engine 集群内服务入口，供 Ingress、Flink 回调和内部任务访问。
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,10 +8,13 @@ metadata:
     app.kubernetes.io/name: canvas-engine
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 仅在集群内部暴露，外部访问由 Ingress 或网关统一承接。
   type: ClusterIP
+  # selector 与 Deployment 模板标签保持一致，确保滚动发布时自动摘挂 Pod。
   selector:
     app.kubernetes.io/name: canvas-engine
   ports:
+    # http 端口名被探针和 targetPort 引用，改名需要同步所有引用方。
     - name: http
       port: 8080
       targetPort: http

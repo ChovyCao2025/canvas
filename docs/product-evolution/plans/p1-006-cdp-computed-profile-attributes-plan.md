@@ -8,9 +8,11 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, Jackson, QLExpress/Aviator where already present, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Vitest.
 
-**Implementation Status:** Implemented on 2026-06-05 and merged into `main`. Actual migration is `V104__cdp_computed_profile_attributes.sql` and actual tables/classes use the `cdp_` prefix.
+**Implementation Status:** Implemented in the current workspace record on 2026-06-05. Actual migration is `V104__cdp_computed_profile_attributes.sql` and actual tables/classes use the `cdp_` prefix. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
 
-**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused P1-006 backend tests pass in an isolated runner because Maven `testCompile` remains blocked by unrelated existing test-source errors. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- computedProfilePresentation.test.ts cdpApi.test.ts` passed. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
+Status: Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
+
+**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home mvn -pl canvas-engine -Dtest=ComputedProfileAttributeSchemaTest,ComputedProfileAttributeServiceTest,CdpComputedProfileControllerTest test` passed on 2026-06-08 with 9 tests, 0 failures, 0 errors, 0 skipped. `cd frontend && npm run test -- computedProfilePresentation.test.ts cdpApi.test.ts` passed on 2026-06-08 with 2 files and 7 tests.
 
 ---
 
@@ -41,7 +43,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeSchemaTest.java`
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V104__cdp_computed_profile_attributes.sql`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 ```java
 @Test
@@ -63,7 +65,7 @@ void migrationCreatesComputedProfileTables() throws Exception {
 }
 ```
 
-- [ ] **Step 2: Run schema test and confirm red state**
+- [x] **Step 2: Run schema test and confirm red state**
 
 Run:
 
@@ -73,7 +75,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=ComputedProfileAttributeSchemaTe
 
 Expected: FAIL because migration does not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
 Create tables with these required columns:
 
@@ -124,7 +126,7 @@ CREATE TABLE IF NOT EXISTS cdp_profile_attribute_change_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Run schema test**
+- [x] **Step 4: Run schema test**
 
 Run:
 
@@ -148,7 +150,8 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-006-cdp-computed-profile-attributes.md`
 - Modify: `docs/product-evolution/plans/p1-006-cdp-computed-profile-attributes-plan.md`
 
-- [ ] **Step 1: Commit computed profile attribute slice**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -175,7 +178,7 @@ Expected: commit contains only computed profile attribute schema, service, API, 
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java`
 
-- [ ] **Step 1: Write service tests**
+- [x] **Step 1: Write service tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeServiceTest.java`:
 
@@ -289,7 +292,7 @@ class ComputedProfileAttributeServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -299,7 +302,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=ComputedProfileAttributeServiceT
 
 Expected: FAIL because `ComputedProfileAttributeService` does not exist.
 
-- [ ] **Step 3: Implement service contract**
+- [x] **Step 3: Implement service contract**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java` with these public records and methods:
 
@@ -343,7 +346,7 @@ public interface ChangeLogRepository {
 }
 ```
 
-- [ ] **Step 4: Implement JSON merge and rule evaluation**
+- [x] **Step 4: Implement JSON merge and rule evaluation**
 
 Use Jackson `ObjectMapper` to merge into `properties_json` without replacing unrelated keys:
 
@@ -374,7 +377,7 @@ private boolean evaluateRule(JsonNode expression, JsonNode properties) {
 }
 ```
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -392,7 +395,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.test.ts`
 - Modify: `frontend/src/services/cdpApi.ts`
 
-- [ ] **Step 1: Add controller endpoints**
+- [x] **Step 1: Add controller endpoints**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java`:
 
@@ -432,7 +435,7 @@ public class CdpComputedProfileController {
 
 When wiring persistence, replace `List.of()` with mapper-backed list/create/runs methods instead of adding query logic to the controller.
 
-- [ ] **Step 2: Write frontend presentation tests**
+- [x] **Step 2: Write frontend presentation tests**
 
 Create `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.test.ts`:
 
@@ -464,7 +467,7 @@ describe('computedProfilePresentation', () => {
 })
 ```
 
-- [ ] **Step 3: Add frontend presentation helpers**
+- [x] **Step 3: Add frontend presentation helpers**
 
 Create `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.ts`:
 
@@ -493,7 +496,7 @@ export function formatValueChange(oldValue?: string | null, newValue?: string | 
 }
 ```
 
-- [ ] **Step 4: Add typed API wrapper**
+- [x] **Step 4: Add typed API wrapper**
 
 Modify `frontend/src/services/cdpApi.ts`:
 
@@ -524,7 +527,7 @@ export const computedProfileApi = {
 }
 ```
 
-- [ ] **Step 5: Run verification**
+- [x] **Step 5: Run verification**
 
 Run:
 

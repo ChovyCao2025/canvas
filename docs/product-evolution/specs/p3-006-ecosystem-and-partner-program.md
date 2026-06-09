@@ -5,6 +5,10 @@ Sequence: 006
 Source: `todo/p3/strategic-opportunities-from-filtered-scope.md#ecosystem-and-partner-program`
 Implementation plan: `../plans/p3-006-ecosystem-and-partner-program-plan.md`
 
+## Implementation Status
+
+Status: discovery and governance artifacts are complete in the current workspace record. Commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Convert ISV tiers, partner portal, review process, SDK samples, public submission, revenue sharing, support, and community governance into an evidence-backed ecosystem program decision.

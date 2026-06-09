@@ -2,7 +2,7 @@
 
 Priority: P1
 Sequence: 004B
-Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004b-3000-hardening-stop-gate-evaluator-plan.md`
 
 ## Implementation Status

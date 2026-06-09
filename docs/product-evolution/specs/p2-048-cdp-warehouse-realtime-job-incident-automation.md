@@ -5,6 +5,8 @@ Sequence: 048
 Source: `docs/product-evolution/specs/p2-033-cdp-warehouse-realtime-pipeline-incidents.md`, `docs/product-evolution/specs/p2-036-cdp-warehouse-readiness-and-slo-summary.md`, `docs/product-evolution/specs/p2-047-cdp-warehouse-realtime-job-control-plane.md`
 Implementation plan: `../plans/p2-048-cdp-warehouse-realtime-job-incident-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Connect realtime warehouse job health to the existing incident and readiness loops so external Flink, Kafka Connect, and Doris routine-load style job failures become operator-visible without manual status polling.

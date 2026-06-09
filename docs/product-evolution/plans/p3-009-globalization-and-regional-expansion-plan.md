@@ -1,5 +1,7 @@
 # Globalization And Regional Expansion Evidence Plan
 
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a region-readiness evidence gate so globalization and regional expansion work cannot proceed until market demand, compliance, channel, residency, proof, and rollback evidence are reviewed.
@@ -36,7 +38,7 @@
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
 
-- [ ] **Step 1: Write migration and service tests**
+- [x] **Step 1: Write migration and service tests**
 
 Create `RegionalExpansionEvidenceServiceTest`:
 
@@ -110,7 +112,7 @@ class RegionalExpansionEvidenceServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -127,7 +129,7 @@ Expected: FAIL because the migration and service do not exist.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceService.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add the additive migration**
+- [x] **Step 1: Add the additive migration**
 
 Create `V181__regional_expansion_evidence.sql`:
 
@@ -155,7 +157,7 @@ CREATE TABLE IF NOT EXISTS regional_expansion_evidence (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 2: Implement the evidence gate**
+- [x] **Step 2: Implement the evidence gate**
 
 Create `RegionalExpansionEvidenceService`:
 
@@ -235,7 +237,7 @@ public class RegionalExpansionEvidenceService {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -251,7 +253,7 @@ Expected: PASS for migration shape and service gate behavior.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceService.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add approval test**
+- [x] **Step 1: Add approval test**
 
 Add a test that proves approval needs reviewer and child spec:
 
@@ -275,7 +277,7 @@ void approvalRequiresReviewerAndChildSpec() {
 }
 ```
 
-- [ ] **Step 2: Implement approval method**
+- [x] **Step 2: Implement approval method**
 
 Add this method to `RegionalExpansionEvidenceService` and add the matching method to `EvidenceRepository`:
 
@@ -293,7 +295,7 @@ public interface EvidenceRepository {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -309,7 +311,7 @@ Expected: PASS with registration and approval gate coverage.
 - Modify: `docs/product-evolution/specs/p3-009-globalization-and-regional-expansion.md`
 - Modify: `docs/product-evolution/plans/p3-009-globalization-and-regional-expansion-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -319,7 +321,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=RegionalExpansionEvidenceService
 
 Expected: PASS.
 
-- [ ] **Step 2: Run migration naming check**
+- [x] **Step 2: Run migration naming check**
 
 Run:
 
@@ -329,11 +331,11 @@ test -f backend/canvas-engine/src/main/resources/db/migration/V181__regional_exp
 
 Expected: command exits 0.
 
-- [ ] **Step 3: Rollout notes**
+- [x] **Step 3: Rollout notes**
 
 Rollout: run `V181__regional_expansion_evidence.sql`, then allow internal strategy owners to register region evidence through the service or admin tooling. Keep all regions blocked until reviewed. Rollback: stop calling the registry writer or hide the admin entry point; the table is additive and no runtime globalization path depends on it.
 
-- [ ] **Step 4: Commit the scoped slice**
+Commit boundary: no commit was created in this docs-only audit; commit and merge status remains unverified.
 
 Run:
 

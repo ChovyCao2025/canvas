@@ -9,9 +9,9 @@ Implementation plan: `../plans/p2-082s-monitoring-provider-connectors-plan.md`
 
 Add the first provider-specific monitoring connector layer so polling sources can fetch normalized mentions from real social, video-search, review, and creator-public-content APIs without storing raw provider secrets in source metadata.
 
-## Delivery Status
+## Implementation Status
 
-Delivered backend first slice on 2026-06-06:
+Status: Delivered backend first slice on 2026-06-06.
 
 - Provider-specific `MarketingMonitorPollClient` support for X recent search, YouTube search, Google Business reviews, and TikTok Research video query.
 - Runtime credential resolution through environment/system-property references instead of raw source metadata secrets.

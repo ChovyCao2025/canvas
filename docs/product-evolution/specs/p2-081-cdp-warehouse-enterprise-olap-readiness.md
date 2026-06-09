@@ -5,6 +5,8 @@ Sequence: 081
 Source: production OLAP gap review after P2-021 through P2-080
 Implementation plan: `../plans/p2-081-cdp-warehouse-enterprise-olap-readiness-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn the existing Doris-backed CDP warehouse work into an explicit enterprise OLAP readiness gate that fails closed when production operating evidence is missing.

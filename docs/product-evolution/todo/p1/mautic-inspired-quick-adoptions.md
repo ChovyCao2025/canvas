@@ -11,10 +11,24 @@ These are practical capabilities borrowed from Mautic that can improve operator 
 
 ## Work Items
 
+### Audience Send Semantics
+
 - Add segment sending mode: static locked audience vs dynamic refreshing audience.
+
+### Safe Preview
+
 - Improve message preview across text, web push, and selected user contexts.
+
+### Import Export
+
 - Add canvas import/export for environment migration and template reuse.
+
+### Project Folder
+
 - Add basic project or folder grouping only if it does not duplicate existing canvas grouping work.
+
+### AI Policy
+
 - Publish an internal AI capability policy and roadmap if AI features are exposed to operators.
 
 ## Fact Corrections

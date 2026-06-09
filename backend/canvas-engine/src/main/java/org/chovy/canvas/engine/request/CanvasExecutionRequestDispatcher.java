@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.chovy.canvas.engine.lane.ExecutionLane;
+import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.TriggerPriorityConfig;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +53,10 @@ public class CanvasExecutionRequestDispatcher {
     private final int adaptiveIdleCanvasBonus;
     /** 高优先级画布的额外派发额度。 */
     private final int adaptiveHighPriorityCanvasBonus;
+    /** 执行 lane 解析器，用于请求派发前按 lane 做隔离。 */
+    private final ExecutionLaneResolver laneResolver;
+    /** 是否启用请求派发 lane 隔离。 */
+    private final boolean laneIsolationEnabled;
 
     @Autowired
     public CanvasExecutionRequestDispatcher(CanvasExecutionRequestMapper mapper,
@@ -64,7 +70,9 @@ public class CanvasExecutionRequestDispatcher {
                                             @Value("${canvas.execution-request.adaptive-hot-canvas-threshold-multiplier:2}") int adaptiveHotCanvasThresholdMultiplier,
                                             @Value("${canvas.execution-request.adaptive-hot-canvas-reduction-percent:50}") int adaptiveHotCanvasReductionPercent,
                                             @Value("${canvas.execution-request.adaptive-idle-canvas-bonus:1}") int adaptiveIdleCanvasBonus,
-                                            @Value("${canvas.execution-request.adaptive-high-priority-canvas-bonus:2}") int adaptiveHighPriorityCanvasBonus) {
+                                            @Value("${canvas.execution-request.adaptive-high-priority-canvas-bonus:2}") int adaptiveHighPriorityCanvasBonus,
+                                            ExecutionLaneResolver laneResolver,
+                                            @Value("${canvas.execution-request.lane-isolation.enabled:false}") boolean laneIsolationEnabled) {
         this.mapper = mapper;
         this.disruptorService = disruptorService;
         this.metrics = metrics;
@@ -77,6 +85,8 @@ public class CanvasExecutionRequestDispatcher {
         this.adaptiveHotCanvasReductionPercent = Math.max(1, Math.min(100, adaptiveHotCanvasReductionPercent));
         this.adaptiveIdleCanvasBonus = Math.max(0, adaptiveIdleCanvasBonus);
         this.adaptiveHighPriorityCanvasBonus = Math.max(0, adaptiveHighPriorityCanvasBonus);
+        this.laneResolver = laneResolver;
+        this.laneIsolationEnabled = laneIsolationEnabled;
     }
 
     @Scheduled(fixedDelayString = "${canvas.execution-request.dispatch-fixed-delay-ms:1000}")
@@ -96,9 +106,10 @@ public class CanvasExecutionRequestDispatcher {
                 continue;
             }
             try {
-                // 先发布到 Disruptor，再由 worker 池消费执行，派发线程不直接进入 DAG。
-                disruptorService.publishRequest(request.getId());
-                recordDispatched(request.getCanvasId());
+                boolean dispatched = dispatchRequest(request);
+                if (!dispatched) {
+                    recordSkipped(request.getCanvasId(), "lane_worker_capacity");
+                }
             } catch (RuntimeException e) {
                 // 发布失败直接停止本轮派发，保留剩余请求给下一次调度重试。
                 recordDispatchFailure(request.getCanvasId());
@@ -106,6 +117,41 @@ public class CanvasExecutionRequestDispatcher {
                 return;
             }
         }
+    }
+
+    private boolean dispatchRequest(CanvasExecutionRequestDO request) {
+        if (!laneIsolationEnabled) {
+            publishRequest(request);
+            return true;
+        }
+        ExecutionLane lane = resolveLane(request);
+        publishRequest(request, lane);
+        return true;
+    }
+
+    private void publishRequest(CanvasExecutionRequestDO request) {
+        // 先发布到 Disruptor，再由 worker 池消费执行，派发线程不直接进入 DAG。
+        disruptorService.publishRequest(request.getId());
+        recordDispatched(request.getCanvasId());
+    }
+
+    private void publishRequest(CanvasExecutionRequestDO request, ExecutionLane lane) {
+        disruptorService.publishRequest(request.getId(), lane);
+        recordDispatched(request.getCanvasId());
+    }
+
+    private ExecutionLane resolveLane(CanvasExecutionRequestDO request) {
+        if (laneResolver == null) {
+            return ExecutionLane.STANDARD;
+        }
+        int attemptCount = request.getAttemptCount() == null ? 0 : request.getAttemptCount();
+        return laneResolver.resolve(
+                request.getTriggerType(),
+                request.getTriggerNodeType(),
+                Map.of(),
+                false,
+                true,
+                attemptCount);
     }
 
     /**

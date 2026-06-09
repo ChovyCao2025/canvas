@@ -6,6 +6,9 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.chovy.canvas.dal.dataobject.CdpWarehouseWatermarkDO;
 
+/**
+ * CdpWarehouseWatermarkMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface CdpWarehouseWatermarkMapper extends BaseMapper<CdpWarehouseWatermarkDO> {
 
@@ -19,5 +22,11 @@ public interface CdpWarehouseWatermarkMapper extends BaseMapper<CdpWarehouseWate
                 watermark_time = VALUES(watermark_time),
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsert(@Param("row") CdpWarehouseWatermarkDO row);
 }

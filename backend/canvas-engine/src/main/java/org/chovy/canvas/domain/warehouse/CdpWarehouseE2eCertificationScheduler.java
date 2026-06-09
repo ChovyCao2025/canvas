@@ -14,6 +14,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @EnableScheduling
+/**
+ * CdpWarehouseE2eCertificationScheduler 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpWarehouseE2eCertificationScheduler {
 
     private static final String LEASE_KEY = "CDP_WAREHOUSE_E2E_CERTIFICATION";
@@ -32,6 +35,19 @@ public class CdpWarehouseE2eCertificationScheduler {
     private final long leaseTtlSeconds;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
+    /**
+     * 初始化 CdpWarehouseE2eCertificationScheduler 实例。
+     *
+     * @param runService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param enabled enabled 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param windowMinutes window minutes 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param mode mode 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param contractKeysCsv contract keys csv 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requirePhysical require physical 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requestedBy requested by 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param leaseTtlSeconds lease ttl seconds 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     */
     public CdpWarehouseE2eCertificationScheduler(
             CdpWarehouseE2eCertificationRunService runService,
             @Value("${canvas.warehouse.e2e-certification-scheduler.enabled:false}") boolean enabled,
@@ -46,6 +62,20 @@ public class CdpWarehouseE2eCertificationScheduler {
                 requirePhysical, false, false, requestedBy, leaseTtlSeconds);
     }
 
+    /**
+     * 初始化 CdpWarehouseE2eCertificationScheduler 实例。
+     *
+     * @param runService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param enabled enabled 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param windowMinutes window minutes 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param mode mode 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param contractKeysCsv contract keys csv 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requirePhysical require physical 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requireRealtime 时间参数，用于计算窗口、过期或审计时间。
+     * @param requestedBy requested by 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param leaseTtlSeconds lease ttl seconds 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     */
     public CdpWarehouseE2eCertificationScheduler(
             CdpWarehouseE2eCertificationRunService runService,
             @Value("${canvas.warehouse.e2e-certification-scheduler.enabled:false}") boolean enabled,
@@ -61,6 +91,21 @@ public class CdpWarehouseE2eCertificationScheduler {
                 requirePhysical, requireRealtime, false, requestedBy, leaseTtlSeconds);
     }
 
+    /**
+     * 初始化 CdpWarehouseE2eCertificationScheduler 实例。
+     *
+     * @param runService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param enabled enabled 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param windowMinutes window minutes 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param mode mode 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param contractKeysCsv contract keys csv 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requirePhysical require physical 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requireRealtime 时间参数，用于计算窗口、过期或审计时间。
+     * @param requireDataPathProof require data path proof 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requestedBy requested by 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param leaseTtlSeconds lease ttl seconds 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     */
     public CdpWarehouseE2eCertificationScheduler(
             CdpWarehouseE2eCertificationRunService runService,
             @Value("${canvas.warehouse.e2e-certification-scheduler.enabled:false}") boolean enabled,
@@ -77,6 +122,20 @@ public class CdpWarehouseE2eCertificationScheduler {
                 requirePhysical, requireRealtime, requireDataPathProof, requestedBy, leaseTtlSeconds);
     }
 
+    /**
+     * 初始化 CdpWarehouseE2eCertificationScheduler 实例。
+     *
+     * @param runService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param leaseService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param enabled enabled 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param windowMinutes window minutes 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param mode mode 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param contractKeysCsv contract keys csv 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requirePhysical require physical 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requestedBy requested by 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param leaseTtlSeconds lease ttl seconds 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     */
     public CdpWarehouseE2eCertificationScheduler(
             CdpWarehouseE2eCertificationRunService runService,
             CdpWarehouseJobLeaseService leaseService,
@@ -93,6 +152,22 @@ public class CdpWarehouseE2eCertificationScheduler {
     }
 
     @Autowired
+    /**
+     * 初始化 CdpWarehouseE2eCertificationScheduler 实例。
+     *
+     * @param runService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param leaseService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param enabled enabled 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param windowMinutes window minutes 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param mode mode 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param contractKeysCsv contract keys csv 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requirePhysical require physical 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requireRealtime 时间参数，用于计算窗口、过期或审计时间。
+     * @param requireDataPathProof require data path proof 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param requestedBy requested by 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     * @param leaseTtlSeconds lease ttl seconds 参数，用于 CdpWarehouseE2eCertificationScheduler 流程中的校验、计算或对象转换。
+     */
     public CdpWarehouseE2eCertificationScheduler(
             CdpWarehouseE2eCertificationRunService runService,
             CdpWarehouseJobLeaseService leaseService,
@@ -123,10 +198,18 @@ public class CdpWarehouseE2eCertificationScheduler {
     }
 
     @Scheduled(fixedDelayString = "${canvas.warehouse.e2e-certification-scheduler.fixed-delay-ms:300000}")
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     */
     public void scheduledCycle() {
         runCycle();
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @return 返回流程执行后的业务结果。
+     */
     boolean runCycle() {
         if (!enabled) {
             return false;
@@ -137,6 +220,11 @@ public class CdpWarehouseE2eCertificationScheduler {
         return executeCycle();
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @return 返回流程执行后的业务结果。
+     */
     private boolean executeCycle() {
         if (!running.compareAndSet(false, true)) {
             return false;
@@ -152,10 +240,17 @@ public class CdpWarehouseE2eCertificationScheduler {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 contract keys 汇总后的集合、分页或映射视图。
+     */
     private List<String> contractKeys() {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (contractKeysCsv.isBlank()) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return Arrays.stream(contractKeysCsv.split(","))
                 .filter(value -> value != null && !value.isBlank())
                 .map(String::trim)
@@ -163,6 +258,11 @@ public class CdpWarehouseE2eCertificationScheduler {
                 .toList();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 leaseTtl 流程生成的业务结果。
+     */
     private Duration leaseTtl() {
         return Duration.ofSeconds(leaseTtlSeconds);
     }

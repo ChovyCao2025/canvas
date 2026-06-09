@@ -35,7 +35,18 @@ public class SystemOptionController {
     /** 系统选项服务，用于管理全局配置项。 */
     private final SystemOptionService service;
     private final TenantContextResolver tenantContextResolver;
-
+    /**
+     * 查询系统选项列表接口，对应 GET 请求。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param category 请求参数，可选。
+     * @param enabled 请求参数，可选。
+     * @param keyword 搜索关键字，可选。
+     * @param tenantId 租户 ID，可选。
+     * @return 异步返回统一响应，包含分页结果。
+     */
     @GetMapping
     public Mono<R<PageResult<SystemOptionDO>>> list(
             @RequestParam(required = false) String category,
@@ -71,6 +82,11 @@ public class SystemOptionController {
                         .thenReturn(R.ok()));
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @return 返回 requireAdminContext 流程生成的业务结果。
+     */
     private Mono<TenantContext> requireAdminContext() {
         return tenantContextResolver.current()
                 .filter(context -> context.isSuperAdmin() || context.isTenantAdmin())

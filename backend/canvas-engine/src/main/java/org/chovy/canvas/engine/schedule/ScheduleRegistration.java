@@ -5,19 +5,19 @@ import java.util.Map;
 
 /**
  * Scheduler-agnostic registration payload.
+ * @param key 调度任务唯一标识.
+ * @param cronExpression 周期调度使用的 Cron 表达式.
+ * @param triggerTime 一次性调度的触发时间.
+ * @param timezone 解释 Cron 或一次性时间使用的业务时区.
+ * @param callback 调度触发时执行的回调.
+ * @param metadata 传递给调度后端的元数据快照.
  */
 public record ScheduleRegistration(
-        /** 调度任务唯一标识。 */
         ScheduleKey key,
-        /** 周期调度使用的 Cron 表达式。 */
         String cronExpression,
-        /** 一次性调度的触发时间。 */
         LocalDateTime triggerTime,
-        /** 解释 Cron 或一次性时间使用的业务时区。 */
         String timezone,
-        /** 调度触发时执行的回调。 */
         Runnable callback,
-        /** 传递给调度后端的元数据快照。 */
         Map<String, Object> metadata
 ) {
     public ScheduleRegistration {

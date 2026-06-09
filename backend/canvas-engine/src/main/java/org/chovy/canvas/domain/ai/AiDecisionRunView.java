@@ -4,6 +4,25 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * AiDecisionRunView 承载 domain.ai 场景中的不可变数据快照。
+ * @param id id 字段。
+ * @param tenantId tenantId 字段。
+ * @param modelKey modelKey 字段。
+ * @param modelVersion modelVersion 字段。
+ * @param decisionScope decisionScope 字段。
+ * @param runDate runDate 字段。
+ * @param status status 字段。
+ * @param requestedCount requestedCount 字段。
+ * @param processedCount processedCount 字段。
+ * @param skippedCount skippedCount 字段。
+ * @param failedCount failedCount 字段。
+ * @param metadata metadata 字段。
+ * @param createdBy createdBy 字段。
+ * @param startedAt startedAt 字段。
+ * @param finishedAt finishedAt 字段。
+ * @param errorMessage errorMessage 字段。
+ */
 public record AiDecisionRunView(
         Long id,
         Long tenantId,

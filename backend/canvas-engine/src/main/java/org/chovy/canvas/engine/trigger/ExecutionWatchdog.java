@@ -62,14 +62,23 @@ public class ExecutionWatchdog {
     @Value("${canvas.watchdog.wait-expire-batch-size:200}")
     private int waitExpireBatchSize;
 
+    /** 单次扫描恢复审批超时任务的批量上限。 */
     @Value("${canvas.watchdog.approval-expire-batch-size:200}")
     private int approvalExpireBatchSize;
 
+    /**
+     * 注入可选的统一审批工作流服务。
+     *
+     * @param approvalWorkflowService 统一审批工作流服务，未启用时可为空
+     */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setApprovalWorkflowService(ApprovalWorkflowService approvalWorkflowService) {
         this.approvalWorkflowService = approvalWorkflowService;
     }
 
+    /**
+     * scan 处理 engine.trigger 场景的业务逻辑。
+     */
     @Scheduled(fixedDelay = 30_000)
     public void scan() {
         // 两类扫描彼此独立，避免一类异常阻断另一类修复

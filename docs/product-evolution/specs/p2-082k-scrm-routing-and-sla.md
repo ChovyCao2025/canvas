@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082k-scrm-routing-and-sla-plan.md`
 
 Make the SCRM operator workspace production-usable for team operations by adding capacity-aware assignment, skill matching, SLA due-time calculation, and auditable breach escalation on top of existing conversation work items.
 
-## Delivery Status
+## Implementation Status
 
 Delivered backend first slice:
 

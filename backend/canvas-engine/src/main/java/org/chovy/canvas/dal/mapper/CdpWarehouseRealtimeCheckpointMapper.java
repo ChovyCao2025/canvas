@@ -6,6 +6,9 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.chovy.canvas.dal.dataobject.CdpWarehouseRealtimeCheckpointDO;
 
+/**
+ * CdpWarehouseRealtimeCheckpointMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface CdpWarehouseRealtimeCheckpointMapper extends BaseMapper<CdpWarehouseRealtimeCheckpointDO> {
 
@@ -27,6 +30,12 @@ public interface CdpWarehouseRealtimeCheckpointMapper extends BaseMapper<CdpWare
                 delivered_count = delivered_count + 1,
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsertDelivered(@Param("row") CdpWarehouseRealtimeCheckpointDO row);
 
     @Insert("""
@@ -42,5 +51,11 @@ public interface CdpWarehouseRealtimeCheckpointMapper extends BaseMapper<CdpWare
                 last_failure_message = VALUES(last_failure_message),
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsertFailure(@Param("row") CdpWarehouseRealtimeCheckpointDO row);
 }

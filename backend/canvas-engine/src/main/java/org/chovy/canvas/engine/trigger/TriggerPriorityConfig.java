@@ -38,6 +38,9 @@ public class TriggerPriorityConfig {
     /** 溢出最大重试次数（超过后写 DLQ）。 */
     private int overflowMaxRetry = 3;
 
+    /**
+     * Priority 参与画布执行引擎流程，封装节点、调度或运行时处理能力。
+     */
     public enum Priority {
         /** 高优先级触发，超限只告警并继续尝试执行。 */
         HIGH,

@@ -1,0 +1,5 @@
+org/chovy/canvas/perf/mq/PerfMqProducer$RocketMqProducerClient.class
+org/chovy/canvas/perf/mq/PerfMqProducer$ProducerClient.class
+org/chovy/canvas/perf/mq/PerfMqProducer$ProducerFactory.class
+org/chovy/canvas/perf/mq/PerfMqProducer$Config.class
+org/chovy/canvas/perf/mq/PerfMqProducer.class

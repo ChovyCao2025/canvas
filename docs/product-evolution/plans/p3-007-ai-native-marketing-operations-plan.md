@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, shell validation with `rg`, repository documentation review.
 
+**Implementation Status:** Discovery and governance artifacts are complete in the current workspace record. Reverified on 2026-06-08 by checking the P3-007 discovery, policy matrix, and governance-gate headings plus the `split` gate outcome. Commit and merge status was not verified in this docs-only audit; the commit boundaries are documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -32,7 +34,7 @@
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-007-ai-operations-discovery.md`
 
-- [ ] **Step 1: Write discovery artifact**
+- [x] **Step 1: Write discovery artifact**
 
 Create `docs/product-evolution/evidence/p3-007-ai-operations-discovery.md`:
 
@@ -66,7 +68,7 @@ Create `docs/product-evolution/evidence/p3-007-ai-operations-discovery.md`:
 Recommended gate input: split AI policy/audit foundation from any generative or autonomous workflow. Runtime AI work requires child specs with evaluation and approval gates.
 ```
 
-- [ ] **Step 2: Verify discovery headings**
+- [x] **Step 2: Verify discovery headings**
 
 Run:
 
@@ -76,7 +78,8 @@ rg -n "^## (Owners|Target Operator Workflow|Evidence Register|Discovery Conclusi
 
 Expected: finds all four headings.
 
-- [ ] **Step 3: Commit discovery artifact**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -92,7 +95,7 @@ Expected: commit contains only the discovery artifact and this plan.
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-007-ai-policy-matrix.md`
 
-- [ ] **Step 1: Write AI policy matrix**
+- [x] **Step 1: Write AI policy matrix**
 
 Create `docs/product-evolution/evidence/p3-007-ai-policy-matrix.md`:
 
@@ -120,7 +123,7 @@ Create `docs/product-evolution/evidence/p3-007-ai-policy-matrix.md`:
 - Cost per successful operator action must be estimated before runtime implementation.
 ```
 
-- [ ] **Step 2: Verify policy headings**
+- [x] **Step 2: Verify policy headings**
 
 Run:
 
@@ -130,7 +133,8 @@ rg -n "^## (Policy Matrix|Data Boundaries|Evaluation Gate)$" docs/product-evolut
 
 Expected: finds all three headings.
 
-- [ ] **Step 3: Commit policy matrix**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -146,7 +150,7 @@ Expected: commit contains only the policy matrix and this plan.
 **Files:**
 - Create: `docs/product-evolution/governance/p3-007-ai-operations-gate.md`
 
-- [ ] **Step 1: Write governance gate**
+- [x] **Step 1: Write governance gate**
 
 Create `docs/product-evolution/governance/p3-007-ai-operations-gate.md`:
 
@@ -179,7 +183,7 @@ If provider cost or compliance review cannot be completed by 2026-08-25, park ru
 | Security | Security Lead | Required |
 ```
 
-- [ ] **Step 2: Verify governance gate**
+- [x] **Step 2: Verify governance gate**
 
 Run:
 
@@ -189,7 +193,7 @@ rg -n "^- Outcome: (proceed|park|split)$|^## (Decision|Next Child Spec|Revisit T
 
 Expected: finds the split outcome and four headings.
 
-- [ ] **Step 3: Final validation**
+- [x] **Step 3: Final validation**
 
 Run:
 
@@ -200,7 +204,8 @@ git diff --check docs/product-evolution/specs/p3-007-ai-native-marketing-operati
 
 Expected: first command finds three document titles; `git diff --check` exits 0.
 
-- [ ] **Step 4: Commit governance gate**
+- [x] **Step 4: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

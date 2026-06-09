@@ -6,6 +6,8 @@ Spec: `../specs/p2-082x-monitoring-provider-oauth-wizard-ui.md`
 
 Make the P2-082U through P2-082W backend credential lifecycle usable from the monitoring workbench without exposing provider token material in the browser.
 
+**Implementation Status:** Current workspace record: delivered frontend first slice. Verification results are recorded below.
+
 ## Tasks
 
 ### Task 1: Index P2-082X Docs

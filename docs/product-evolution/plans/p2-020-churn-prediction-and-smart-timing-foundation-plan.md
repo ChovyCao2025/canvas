@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+Status: Closed in implementation; verification evidence is recorded in Task 5.
+
 **Goal:** Compute explainable churn probability and best send hour fields into CDP profiles so existing audience and canvas rules can consume them.
 
 **Architecture:** Build a deterministic baseline prediction service inside the existing Java backend. Feature snapshots read from `event_log`, `message_send_record`, and `cdp_user_profile`; prediction services write auditable snapshots and merge stable fields into `cdp_user_profile.properties_json`; a small UI exposes run status and distribution.
@@ -35,7 +37,7 @@
 - Modify: `frontend/src/App.tsx`
 
 **Data And Config**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V115__churn_prediction_smart_timing.sql`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V165__churn_prediction_smart_timing.sql`
 - Modify: `backend/canvas-engine/src/main/resources/application.yml`
 
 **Tests**
@@ -49,13 +51,13 @@
 ### Task 1: Data Model And Red Tests
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V115__churn_prediction_smart_timing.sql`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V165__churn_prediction_smart_timing.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/ai/ChurnFeatureSnapshotServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/ai/ChurnPredictionServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/ai/SmartTimingServiceTest.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/CdpAudienceSourceServiceTest.java`
 
-- [ ] **Step 1: Add additive Flyway migration**
+- [x] **Step 1: Add additive Flyway migration**
 
 Create:
 
@@ -99,7 +101,7 @@ CREATE TABLE ai_user_prediction_snapshot (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 2: Write feature snapshot tests**
+- [x] **Step 2: Write feature snapshot tests**
 
 `ChurnFeatureSnapshotServiceTest` covers:
 
@@ -110,7 +112,7 @@ CREATE TABLE ai_user_prediction_snapshot (
 @Test void capsBatchByConfiguredLimit()
 ```
 
-- [ ] **Step 3: Write prediction tests**
+- [x] **Step 3: Write prediction tests**
 
 `ChurnPredictionServiceTest` covers deterministic score values:
 
@@ -124,7 +126,7 @@ CREATE TABLE ai_user_prediction_snapshot (
 
 Use `baseline_v1` and these bands: `HIGH` for probability `>= 0.70`, `MEDIUM` for `>= 0.40`, otherwise `LOW`.
 
-- [ ] **Step 4: Write smart timing tests**
+- [x] **Step 4: Write smart timing tests**
 
 `SmartTimingServiceTest` covers most active hour, timezone fallback, sparse data default hour, and hour range validation:
 
@@ -134,11 +136,11 @@ Use `baseline_v1` and these bands: `HIGH` for probability `>= 0.70`, `MEDIUM` fo
 @Test void neverReturnsHourOutsideZeroToTwentyThree()
 ```
 
-- [ ] **Step 5: Extend audience rule tests**
+- [x] **Step 5: Extend audience rule tests**
 
 Add a test to `CdpAudienceSourceServiceTest` proving a CDP profile rule can match `churn_probability > 0.7` and `best_send_hour == 20` from `properties_json`.
 
-- [ ] **Step 6: Run red tests**
+- [x] **Step 6: Run red tests**
 
 Run:
 
@@ -146,7 +148,7 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=ChurnFeatureSnapshotServiceTest,ChurnPredictionServiceTest,SmartTimingServiceTest,CdpAudienceSourceServiceTest
 ```
 
-Expected: FAIL because prediction services and profile-field exposure do not exist.
+Historical expectation: FAIL before the implementation existed. Current closeout red coverage also verifies that disabled recompute is blocked before enabling production code changes.
 
 ### Task 2: Feature Extraction And Baseline Prediction
 
@@ -161,7 +163,7 @@ Expected: FAIL because prediction services and profile-field exposure do not exi
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/ai/ChurnFeatureSnapshotServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/ai/ChurnPredictionServiceTest.java`
 
-- [ ] **Step 1: Add prediction config**
+- [x] **Step 1: Add prediction config**
 
 Add under `canvas.ai.prediction`:
 
@@ -176,11 +178,11 @@ canvas:
       model-version: baseline_v1
 ```
 
-- [ ] **Step 2: Implement feature snapshot DTO and extraction**
+- [x] **Step 2: Implement feature snapshot DTO and extraction**
 
 `ChurnFeatureSnapshotService.FeatureSnapshot` contains `userId`, `daysSinceLastEvent`, `eventCount30d`, `sendCount30d`, `deliveryFailureRate30d`, `goalCount30d`, `profileAgeDays`, and `sparseHistory`. Use mapper queries against `event_log`, `message_send_record`, and `cdp_user_profile`; keep query methods package-private if custom XML is not needed.
 
-- [ ] **Step 3: Implement baseline scoring formula**
+- [x] **Step 3: Implement baseline scoring formula**
 
 Use this deterministic formula:
 
@@ -196,15 +198,15 @@ String band = probability >= 0.70 ? "HIGH" : probability >= 0.40 ? "MEDIUM" : "L
 
 Store contributions for idle days, failures, engagement, and goals in `contribution_json`.
 
-- [ ] **Step 4: Implement idempotent run creation**
+- [x] **Step 4: Implement idempotent run creation**
 
 Before computing, select or insert `ai_prediction_run` by `(tenant_id, model_key='churn_prediction', model_version, run_date)`. If status is `SUCCESS`, return the existing summary unless the request includes `force=true`.
 
-- [ ] **Step 5: Persist snapshots**
+- [x] **Step 5: Persist snapshots**
 
 Insert one `ai_user_prediction_snapshot` per processed user with `model_key='churn_prediction'`, `model_version='baseline_v1'`, probability, band, feature JSON, and contribution JSON.
 
-- [ ] **Step 6: Run feature and prediction tests**
+- [x] **Step 6: Run feature and prediction tests**
 
 Run:
 
@@ -223,11 +225,11 @@ Expected: PASS for extraction, deterministic score, sparse history, contribution
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/ai/SmartTimingServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/CdpAudienceSourceServiceTest.java`
 
-- [ ] **Step 1: Implement smart timing**
+- [x] **Step 1: Implement smart timing**
 
 For each user, count events by local hour over the last 30 days. Return the highest-count hour; ties choose the earliest hour. If fewer than `sparse-history-min-events` events exist, return `default-best-send-hour`.
 
-- [ ] **Step 2: Implement profile writer**
+- [x] **Step 2: Implement profile writer**
 
 Merge these fields into `CdpUserProfileDO.propertiesJson` without deleting existing keys:
 
@@ -240,11 +242,11 @@ Merge these fields into `CdpUserProfileDO.propertiesJson` without deleting exist
 }
 ```
 
-- [ ] **Step 3: Expose computed fields to audience rules**
+- [x] **Step 3: Expose computed fields to audience rules**
 
 Ensure `CdpAudienceSourceService.profileSourceFields()` includes `churn_probability`, `churn_risk_band`, and `best_send_hour`, and `matchesProfile` reads them from parsed `properties_json`.
 
-- [ ] **Step 4: Run smart timing and audience tests**
+- [x] **Step 4: Run smart timing and audience tests**
 
 Run:
 
@@ -264,11 +266,11 @@ Expected: PASS for hour selection, profile field merge, and audience rule matchi
 - Create: `frontend/src/services/aiPredictionApi.ts`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Write controller tests**
+- [x] **Step 1: Write controller tests**
 
 `AiPredictionControllerTest` covers latest run, distribution, top-risk users, manual recompute, unauthorized rejection, and tenant isolation.
 
-- [ ] **Step 2: Implement API endpoints**
+- [x] **Step 2: Implement API endpoints**
 
 Add:
 
@@ -281,15 +283,15 @@ POST /ai/predictions/recompute
 
 `POST /recompute` returns run id, status, processed count, skipped count, and failed count.
 
-- [ ] **Step 3: Write frontend tests**
+- [x] **Step 3: Write frontend tests**
 
 `aiPredictions.test.tsx` covers loading, empty run, distribution chart data, top-risk table, recompute disabled while running, recompute success, and server error.
 
-- [ ] **Step 4: Implement UI and service**
+- [x] **Step 4: Implement UI and service**
 
 `aiPredictionApi.ts` exports typed calls for the endpoints. The page renders latest run status, distribution by risk band, top-risk table with probability and best hour, and a recompute button.
 
-- [ ] **Step 5: Run API and UI tests**
+- [x] **Step 5: Run API and UI tests**
 
 Run:
 
@@ -300,50 +302,43 @@ cd frontend && npm test -- aiPredictions.test.tsx
 
 Expected: PASS for controller and page behavior.
 
-### Task 5: Verification And Commit
+### Task 5: Verification And Closeout
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-020-churn-prediction-and-smart-timing-foundation.md`
 - Modify: `docs/product-evolution/plans/p2-020-churn-prediction-and-smart-timing-foundation-plan.md`
 
-- [ ] **Step 1: Run focused backend verification**
+- [x] **Step 1: Run focused backend verification**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=ChurnFeatureSnapshotServiceTest,ChurnPredictionServiceTest,SmartTimingServiceTest,AiPredictionControllerTest,CdpAudienceSourceServiceTest
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=ChurnFeatureSnapshotServiceTest,ChurnPredictionServiceTest,SmartTimingServiceTest,AiPredictionControllerTest,CdpAudienceSourceServiceTest,PredictionProfileWriterTest,ChurnPredictionSmartTimingSchemaTest
 ```
 
-Expected: PASS.
+Result: PASS, 33 tests, 0 failures, 0 errors.
 
-- [ ] **Step 2: Run focused frontend verification**
+- [x] **Step 2: Run focused frontend verification**
 
 Run:
 
 ```bash
-cd frontend && npm test -- aiPredictions.test.tsx
+cd frontend && npm test -- aiPredictionApi aiPredictions
+cd frontend && npm run build
 ```
 
-Expected: PASS.
+Result: PASS, 2 test files and 9 tests; build completed with `tsc && vite build`.
 
-- [ ] **Step 3: Run affected regression**
+- [x] **Step 3: Run affected regression**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=CdpUserServiceTest,CdpUserDirectoryServiceTest,GoalCheckHandlerTest
-cd frontend && npm test -- --run
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=CdpUserServiceTest,CdpUserDirectoryServiceTest,GoalCheckHandlerTest
 ```
 
-Expected: PASS or record unrelated failures with exact test names and reproduction commands.
+Result: PASS for the CDP tests Maven found, 7 tests, 0 failures, 0 errors. `GoalCheckHandlerTest` is not present in this worktree. Full frontend `npm test -- --run` was not run; focused page/API tests plus `npm run build` were used for this slice.
 
-- [ ] **Step 4: Commit implementation slice**
+- [x] **Step 4: Do not commit without explicit instruction**
 
-Run:
-
-```bash
-git add backend/canvas-engine/src frontend/src docs/product-evolution/specs docs/product-evolution/plans
-git commit -m "feat: add churn prediction and smart timing foundation"
-```
-
-Expected: commit contains only prediction foundation, profile fields, AI prediction UI, spec, and plan changes.
+No commit was created because the task explicitly says not to commit unless instructed.

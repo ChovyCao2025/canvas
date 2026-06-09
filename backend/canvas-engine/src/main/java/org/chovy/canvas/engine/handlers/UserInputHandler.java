@@ -17,6 +17,9 @@ import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * UserInputHandler 参与 engine.handlers 场景的画布执行引擎处理。
+ */
 @Component
 @NodeHandlerType(NodeType.USER_INPUT)
 public class UserInputHandler implements NodeHandler {
@@ -28,13 +31,30 @@ public class UserInputHandler implements NodeHandler {
 
     private final UserInputService service;
 
+    /**
+     * 创建 UserInputHandler 实例并注入 engine.handlers 场景依赖。
+     * @param service 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public UserInputHandler(UserInputService service) {
         this.service = service;
     }
 
+    /**
+     * 执行用户输入节点：首次进入创建待填写表单并挂起执行，恢复进入时按完成或超时状态继续路由。
+     *
+     * <p>首次进入会调用 {@link UserInputService#createPending(ExecutionContext, String, Object, String, String, LocalDateTime)}
+     * 持久化待输入记录，这是本节点的主要外部副作用；方法本身不声明事务。完成恢复会把用户提交内容写入
+     * 输出并走 completedNodeId 或 nextNodeId，超时恢复会输出过期状态并按 timeoutNodeId 路由。</p>
+     *
+     * @param config 节点配置，关键字段包括表单 schema、完成节点、超时节点和最大等待时长
+     * @param ctx 执行上下文，提供用户、执行标识和恢复触发载荷
+     * @return 节点结果；首次进入返回 pending，恢复进入返回完成或超时结果
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // 准备本次处理所需的上下文和中间变量。
         String resumeStatus = resumeStatus(config, ctx);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (UserInputService.STATUS_COMPLETED.equalsIgnoreCase(resumeStatus)) {
             return Mono.just(completed(config, ctx));
         }
@@ -60,11 +80,15 @@ public class UserInputHandler implements NodeHandler {
         Long resumeAt = pending.expiresAt() == null
                 ? null
                 : pending.expiresAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return Mono.just(new NodeResult(null, null, null, null, null, output, true, null,
                 true, NodeOutcome.PENDING, Map.of(), "USER_INPUT_PENDING",
                 "waiting for user input", resumeAt));
     }
 
+    /**
+     * 构造用户已提交后的成功结果，并把响应 ID 与提交内容写回上下文。
+     */
     private NodeResult completed(Map<String, Object> config, ExecutionContext ctx) {
         Map<String, Object> output = new LinkedHashMap<>();
         Map<String, Object> payload = ctx.getTriggerPayload();
@@ -76,6 +100,9 @@ public class UserInputHandler implements NodeHandler {
         return NodeResult.ok(next, output);
     }
 
+    /**
+     * 构造用户输入超时结果，保留响应 ID 并在配置了 timeoutNodeId 时走超时分支。
+     */
     private NodeResult timeout(Map<String, Object> config, ExecutionContext ctx) {
         Map<String, Object> output = new LinkedHashMap<>();
         output.put(INPUT_STATUS, UserInputService.STATUS_EXPIRED);
@@ -90,6 +117,9 @@ public class UserInputHandler implements NodeHandler {
                 null);
     }
 
+    /**
+     * 从节点配置或恢复触发载荷读取用户输入状态，配置值优先用于测试和调度恢复。
+     */
     private String resumeStatus(Map<String, Object> config, ExecutionContext ctx) {
         String value = string(config.get(MapFieldKeys.WAIT_RESUME_STATUS), null);
         if (value != null) {
@@ -98,6 +128,9 @@ public class UserInputHandler implements NodeHandler {
         return string(ctx.getTriggerPayload().get(MapFieldKeys.WAIT_RESUME_STATUS), null);
     }
 
+    /**
+     * 根据 maxWait 计算待输入记录的过期时间；未配置时表示不自动超时。
+     */
     private LocalDateTime expiresAt(Map<String, Object> config) {
         Object raw = config.get(MapFieldKeys.MAX_WAIT);
         Duration duration = duration(raw);
@@ -105,7 +138,11 @@ public class UserInputHandler implements NodeHandler {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 解析用户输入节点的等待时长配置，兼容 value/unit 与 durationValue/durationUnit。
+     */
     private Duration duration(Object raw) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!(raw instanceof Map<?, ?> map)) {
             return null;
         }
@@ -122,6 +159,7 @@ public class UserInputHandler implements NodeHandler {
         }
         long amount = number.longValue();
         String normalizedUnit = unit == null ? "MINUTES" : String.valueOf(unit).toUpperCase();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return switch (normalizedUnit) {
             case "SECOND", "SECONDS" -> Duration.ofSeconds(amount);
             case "HOUR", "HOURS" -> Duration.ofHours(amount);
@@ -130,6 +168,13 @@ public class UserInputHandler implements NodeHandler {
         };
     }
 
+    /**
+     * 将对象转换为非空字符串。
+     *
+     * @param value 原始值
+     * @param fallback 默认值
+     * @return 字符串值或默认值
+     */
     private String string(Object value, String fallback) {
         if (value == null || String.valueOf(value).isBlank()) {
             return fallback;

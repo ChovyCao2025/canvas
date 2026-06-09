@@ -7,7 +7,7 @@ Implementation plan: `../plans/p1-005a3-event-config-write-key-and-attribute-rev
 
 ## Implementation Status
 
-Status: implemented on 2026-06-05.
+Status: Implemented on 2026-06-05; focused backend test execution is blocked by unrelated test-source compile errors in the current dirty workspace.
 
 Implemented files:
 

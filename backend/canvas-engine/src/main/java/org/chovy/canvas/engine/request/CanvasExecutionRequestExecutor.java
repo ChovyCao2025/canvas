@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
+import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infrastructure.reactor.TrackedReactiveTaskRegistry;
@@ -52,6 +53,10 @@ public class CanvasExecutionRequestExecutor {
     private final long heartbeatIntervalMs;
     /** 跟踪执行请求心跳任务，确保执行结束或关闭时可释放。 */
     private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
+    /** 自适应重试退避策略。 */
+    private final AdaptiveRetryBackoffPolicy retryBackoffPolicy;
+    /** 执行请求重试压力输入，来自实时指标或测试注入快照。 */
+    private final ExecutionRequestRetryPressureSource retryPressureSource;
 
     /**
      * 构造 CanvasExecutionRequestExecutor 实例，并根据入参初始化依赖、配置或内部状态。
@@ -66,7 +71,7 @@ public class CanvasExecutionRequestExecutor {
                                           CanvasExecutionService executionService,
                                           ObjectMapper objectMapper) {
         this(mapper, executionService, objectMapper, null, 5_000L, 5, 300L, 60_000L, 60_000L,
-                TrackedReactiveTaskRegistry.direct());
+                TrackedReactiveTaskRegistry.direct(), ExecutionRequestRetryPressureSource.healthy());
     }
 
     /**
@@ -88,9 +93,22 @@ public class CanvasExecutionRequestExecutor {
                                           int maxAttempts,
                                           long runningStaleSeconds) {
         this(mapper, executionService, objectMapper, null, retryDelayMs, maxAttempts, runningStaleSeconds,
-                60_000L, 60_000L, TrackedReactiveTaskRegistry.direct());
+                60_000L, 60_000L, TrackedReactiveTaskRegistry.direct(), ExecutionRequestRetryPressureSource.healthy());
     }
 
+    /**
+     * 创建 CanvasExecutionRequestExecutor 实例并注入 engine.request 场景依赖。
+     * @param mapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metrics metrics 参数，用于 CanvasExecutionRequestExecutor 流程中的校验、计算或对象转换。
+     * @param retryDelayMs retry delay ms 参数，用于 CanvasExecutionRequestExecutor 流程中的校验、计算或对象转换。
+     * @param maxAttempts max attempts 参数，用于 CanvasExecutionRequestExecutor 流程中的校验、计算或对象转换。
+     * @param runningStaleSeconds running stale seconds 参数，用于 CanvasExecutionRequestExecutor 流程中的校验、计算或对象转换。
+     * @param maxRetryDelayMs max retry delay ms 参数，用于 CanvasExecutionRequestExecutor 流程中的校验、计算或对象转换。
+     * @param heartbeatIntervalMs heartbeat interval ms 参数，用于 CanvasExecutionRequestExecutor 流程中的校验、计算或对象转换。
+     * @param reactiveTaskRegistry reactive task registry 参数，用于 CanvasExecutionRequestExecutor 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public CanvasExecutionRequestExecutor(CanvasExecutionRequestMapper mapper,
                                           CanvasExecutionService executionService,
@@ -101,7 +119,8 @@ public class CanvasExecutionRequestExecutor {
                                           @Value("${canvas.execution-request.running-stale-sec:300}") long runningStaleSeconds,
                                           @Value("${canvas.execution-request.max-retry-delay-ms:60000}") long maxRetryDelayMs,
                                           @Value("${canvas.execution-request.heartbeat-interval-ms:60000}") long heartbeatIntervalMs,
-                                          TrackedReactiveTaskRegistry reactiveTaskRegistry) {
+                                          TrackedReactiveTaskRegistry reactiveTaskRegistry,
+                                          ExecutionRequestRetryPressureSource retryPressureSource) {
         this.mapper = mapper;
         this.executionService = executionService;
         this.objectMapper = objectMapper;
@@ -112,6 +131,10 @@ public class CanvasExecutionRequestExecutor {
         this.maxRetryDelayMs = maxRetryDelayMs;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.reactiveTaskRegistry = reactiveTaskRegistry;
+        this.retryBackoffPolicy = new AdaptiveRetryBackoffPolicy();
+        this.retryPressureSource = retryPressureSource != null
+                ? retryPressureSource
+                : ExecutionRequestRetryPressureSource.healthy();
     }
 
     /**
@@ -137,7 +160,8 @@ public class CanvasExecutionRequestExecutor {
                                           long runningStaleSeconds,
                                           long maxRetryDelayMs) {
         this(mapper, executionService, objectMapper, metrics, retryDelayMs, maxAttempts,
-                runningStaleSeconds, maxRetryDelayMs, 60_000L, TrackedReactiveTaskRegistry.direct());
+                runningStaleSeconds, maxRetryDelayMs, 60_000L, TrackedReactiveTaskRegistry.direct(),
+                ExecutionRequestRetryPressureSource.healthy());
     }
 
     /**
@@ -149,8 +173,12 @@ public class CanvasExecutionRequestExecutor {
      * @return 异步执行结果，订阅后产生节点结果或业务响应
      */
     public Mono<Void> execute(String requestId) {
+        return execute(requestId, null);
+    }
+
+    public Mono<Void> execute(String requestId, ExecutionLane executionLaneOverride) {
         return loadRequest(requestId)
-                .flatMap(this::tryMarkAsRunning)
+                .flatMap(request -> tryMarkAsRunning(request, executionLaneOverride))
                 .flatMap(this::executeCanvas)
                 .then();
     }
@@ -168,7 +196,8 @@ public class CanvasExecutionRequestExecutor {
     /**
      * 尝试标记为运行中（基于乐观锁）
      */
-    private Mono<RunningContext> tryMarkAsRunning(CanvasExecutionRequestDO request) {
+    private Mono<RunningContext> tryMarkAsRunning(CanvasExecutionRequestDO request,
+                                                 ExecutionLane executionLaneOverride) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime staleBefore = now.minusSeconds(runningStaleSeconds);
         String runToken = UUID.randomUUID().toString();
@@ -178,7 +207,7 @@ public class CanvasExecutionRequestExecutor {
                         request.getId(), now, staleBefore, runToken))
                 .subscribeOn(Schedulers.boundedElastic())
                 .filter(updated -> updated > 0)
-                .map(updated -> new RunningContext(request, runToken));
+                .map(updated -> new RunningContext(request, runToken, executionLaneOverride));
     }
 
     /**
@@ -200,7 +229,8 @@ public class CanvasExecutionRequestExecutor {
                                     payload,
                                     ctx.request.getSourceMsgId(),
                                     ctx.request.getAttemptCount() == null ? 0 : ctx.request.getAttemptCount(),
-                                    ctx.request.getLastError()
+                                    ctx.request.getLastError(),
+                                    ctx.executionLaneOverride
                             ));
                 })
                 .flatMap(result -> finish(ctx.request, result, ctx.runToken))
@@ -241,6 +271,8 @@ public class CanvasExecutionRequestExecutor {
         final CanvasExecutionRequestDO request;
         /** 本次 RUNNING 状态的乐观锁令牌。 */
         final String runToken;
+        /** 派发阶段预解析的 lane，用于执行阶段最终并发槽位。 */
+        final ExecutionLane executionLaneOverride;
 
         /**
          * 构造 RunningContext 实例，并根据入参初始化依赖、配置或内部状态。
@@ -250,9 +282,10 @@ public class CanvasExecutionRequestExecutor {
          * @param request 请求对象，承载调用方提交的业务参数
          * @param runToken runToken 方法执行所需的业务参数
          */
-        RunningContext(CanvasExecutionRequestDO request, String runToken) {
+        RunningContext(CanvasExecutionRequestDO request, String runToken, ExecutionLane executionLaneOverride) {
             this.request = request;
             this.runToken = runToken;
+            this.executionLaneOverride = executionLaneOverride;
         }
     }
 
@@ -422,6 +455,7 @@ public class CanvasExecutionRequestExecutor {
             // 使用可变 Map 是为了后续补回 perfRunId 等执行期字段。
             return new HashMap<>(objectMapper.readValue(payloadJson, new TypeReference<>() {
             }));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalArgumentException("Execution request payload parse failed", e);
         }
@@ -438,6 +472,7 @@ public class CanvasExecutionRequestExecutor {
     private String toJson(Map<String, Object> result) {
         try {
             return objectMapper.writeValueAsString(result != null ? result : Map.of());
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             return "{}";
         }
@@ -467,18 +502,25 @@ public class CanvasExecutionRequestExecutor {
      * @return 计算得到的数值结果
      */
     private long calculateRetryDelayMs(int nextAttempt) {
-        long base = Math.max(1L, retryDelayMs);
-        long cap = Math.max(base, maxRetryDelayMs);
-        int exponent = Math.max(0, nextAttempt - 1);
-        long delay = base;
-        for (int i = 0; i < exponent; i++) {
-            if (delay >= cap / 2) {
-                return cap;
-            }
-            // 指数退避逐步放大间隔，避免同一批失败请求同步回压。
-            delay *= 2;
+        ExecutionRequestRetryPressureSource.Snapshot pressure = retryPressureSource.snapshot();
+        if (pressure == null) {
+            pressure = ExecutionRequestRetryPressureSource.Snapshot.healthy();
         }
-        return Math.min(delay, cap);
+        return retryBackoffPolicy.evaluate(new AdaptiveRetryBackoffPolicy.Input(
+                nextAttempt,
+                retryDelayMs,
+                maxRetryDelayMs,
+                maxAttempts,
+                pressure.lanePressure() != null
+                        ? pressure.lanePressure()
+                        : AdaptiveRetryBackoffPolicy.LanePressureSnapshot.healthy(),
+                pressure.downstreamErrors() != null
+                        ? pressure.downstreamErrors()
+                        : AdaptiveRetryBackoffPolicy.DownstreamErrorSnapshot.healthy(),
+                pressure.dlqGrowth() != null
+                        ? pressure.dlqGrowth()
+                        : AdaptiveRetryBackoffPolicy.DlqGrowthSnapshot.healthy()))
+                .delayMs();
     }
 
     /**
@@ -495,6 +537,7 @@ public class CanvasExecutionRequestExecutor {
         }
         try {
             metrics.recordExecutionRequestTransition(status, triggerType);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ignored) {
             // Metrics must not change execution-request state transitions.
         }

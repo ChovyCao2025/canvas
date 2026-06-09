@@ -5,6 +5,8 @@ Sequence: 072
 Source: `docs/product-evolution/specs/p2-066-cdp-warehouse-physical-e2e-certification.md`, `docs/product-evolution/specs/p2-069-cdp-warehouse-realtime-physical-e2e-certification.md`, `docs/product-evolution/specs/p2-071-cdp-warehouse-synthetic-ods-data-path-proof.md`
 Implementation plan: `../plans/p2-072-cdp-warehouse-data-path-proof-certification-gate-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Wire P2-071 synthetic ODS data-path proof into physical E2E certification, persisted certification history, scheduled certification, and production gates so production promotion can require evidence that a CDP event traversed the warehouse sink and became query-visible in Doris ODS.

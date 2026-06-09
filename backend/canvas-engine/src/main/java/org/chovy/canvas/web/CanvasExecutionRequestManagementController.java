@@ -96,6 +96,13 @@ public class CanvasExecutionRequestManagementController {
         this.tenantContextResolver = tenantContextResolver;
     }
 
+    /**
+     * 初始化 CanvasExecutionRequestManagementController 实例。
+     *
+     * @param mapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param disruptorService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param replayRateLimiter replay rate limiter 参数，用于 CanvasExecutionRequestManagementController 流程中的校验、计算或对象转换。
+     */
     public CanvasExecutionRequestManagementController(CanvasExecutionRequestMapper mapper,
                                                       CanvasDisruptorService disruptorService,
                                                       CanvasExecutionReplayRateLimiter replayRateLimiter) {
@@ -103,6 +110,17 @@ public class CanvasExecutionRequestManagementController {
     }
 
     @GetMapping
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param sourceMsgId 业务对象 ID，用于定位具体记录。
+     * @param page 分页或数量限制，避免一次处理过多数据。
+     * @param size 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public Mono<R<PageResult<CanvasExecutionRequestDO>>> list(
             @RequestParam(required = false) Long canvasId,
             @RequestParam(required = false) String status,
@@ -127,6 +145,14 @@ public class CanvasExecutionRequestManagementController {
     }
 
     @PostMapping("/{id}/replay")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @param force force 参数，用于 replay 流程中的校验、计算或对象转换。
+     * @return 返回 replay 流程生成的业务结果。
+     */
     public Mono<R<Map<String, Object>>> replay(@PathVariable String id,
                                                @RequestParam(required = false) String reason,
                                                @RequestParam(defaultValue = "false") boolean force) {
@@ -162,6 +188,18 @@ public class CanvasExecutionRequestManagementController {
     }
 
     @PostMapping("/replay")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param sourceMsgId 业务对象 ID，用于定位具体记录。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @param force force 参数，用于 replayBatch 流程中的校验、计算或对象转换。
+     * @return 返回 replayBatch 流程生成的业务结果。
+     */
     public Mono<R<Map<String, Object>>> replayBatch(
             @RequestParam(required = false) Long canvasId,
             @RequestParam(required = false) String status,
@@ -304,6 +342,12 @@ public class CanvasExecutionRequestManagementController {
         return Math.min(limit, MAX_BATCH_LIMIT);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param size 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int normalizePageSize(int size) {
         if (size <= 0) {
             return 20;
@@ -340,6 +384,11 @@ public class CanvasExecutionRequestManagementController {
                 .defaultIfEmpty("system");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 currentTenant 流程生成的业务结果。
+     */
     private Mono<TenantContext> currentTenant() {
         if (tenantContextResolver == null) {
             return Mono.just(new TenantContext(null, null, null));
@@ -348,12 +397,24 @@ public class CanvasExecutionRequestManagementController {
                 .defaultIfEmpty(new TenantContext(null, null, null));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param wrapper wrapper 参数，用于 applyTenantFilter 流程中的校验、计算或对象转换。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void applyTenantFilter(LambdaQueryWrapper<CanvasExecutionRequestDO> wrapper, TenantContext context) {
         if (!isSuperAdmin(context) && context != null && context.tenantId() != null) {
             wrapper.eq(CanvasExecutionRequestDO::getTenantId, context.tenantId());
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void requireTenantAccess(CanvasExecutionRequestDO request, TenantContext context) {
         if (isSuperAdmin(context) || context == null || context.tenantId() == null) {
             return;
@@ -363,6 +424,12 @@ public class CanvasExecutionRequestManagementController {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回布尔判断结果。
+     */
     private boolean isSuperAdmin(TenantContext context) {
         return context != null && context.isSuperAdmin();
     }

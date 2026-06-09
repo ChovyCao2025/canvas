@@ -60,6 +60,41 @@ class AiPredictionControllerTest {
     }
 
     @Test
+    void readinessUsesCurrentTenantAndExposesRecomputeGate() {
+        tenant(RoleNames.TENANT_ADMIN);
+        when(predictionService.readiness(7L)).thenReturn(new ChurnPredictionService.PredictionReadinessView(
+                false,
+                "canvas.ai.prediction.enabled must be true to recompute predictions",
+                "baseline_v1",
+                500));
+
+        StepVerifier.create(controller.readiness().map(response -> response.getData()))
+                .assertNext(result -> {
+                    assertThat(result.recomputeEnabled()).isFalse();
+                    assertThat(result.disabledReason()).contains("canvas.ai.prediction.enabled");
+                })
+                .verifyComplete();
+
+        verify(predictionService).readiness(7L);
+    }
+
+    @Test
+    void recomputeDisabledPathPropagatesServiceGate() {
+        tenant(RoleNames.TENANT_ADMIN);
+        ChurnPredictionService.RecomputeRequest request =
+                new ChurnPredictionService.RecomputeRequest(false, null, null);
+        when(predictionService.recompute(eq(7L), any()))
+                .thenThrow(new IllegalStateException("canvas.ai.prediction.enabled must be true"));
+
+        StepVerifier.create(controller.recompute(request))
+                .expectErrorSatisfies(error -> assertThat(error)
+                        .hasMessageContaining("canvas.ai.prediction.enabled"))
+                .verify();
+
+        verify(predictionService).recompute(7L, request);
+    }
+
+    @Test
     void distributionAndTopRiskUsersUseCurrentTenant() {
         tenant(RoleNames.SUPER_ADMIN);
         when(predictionService.churnDistribution(7L)).thenReturn(List.of(

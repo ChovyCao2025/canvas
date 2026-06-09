@@ -1,10 +1,14 @@
 # CDP Warehouse Semantic Metric Contracts Implementation Plan
 
+Spec: `../specs/p2-040-cdp-warehouse-semantic-metric-contracts.md`
+
 **Goal:** Reuse existing BI metric contracts and enforce metric-level dimension compatibility in BI queries while exposing a warehouse semantic metric API.
 
 **Architecture:** Extend runtime `BiMetricSpec` with allowed dimensions. Keep `bi_metric` as the source of persisted metric contracts. Add a read-only warehouse service over `BiDatasetSpecResolver`.
 
 **Tech Stack:** Java 21, Spring Boot, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

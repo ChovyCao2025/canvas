@@ -9,35 +9,35 @@ import java.util.Map;
 /**
  * 节点执行结果模型。
  * 约定：一个节点可返回“单路下一跳”“多路分支”“终止”“失败”“等待（阈值节点）”等形态。
+ * @param nextNodeId 单路下一跳节点 ID.
+ * @param successNodeId 成功分支下一跳节点 ID.
+ * @param failNodeId 失败分支下一跳节点 ID.
+ * @param elseNodeId else 兜底分支下一跳节点 ID.
+ * @param branchMap 旧版多分支路由映射，key 为分支标签，value 为节点 ID.
+ * @param output 节点输出字段，调度层会合并到执行上下文.
+ * @param success 节点是否按业务语义成功.
+ * @param errorMessage 节点失败错误信息.
+ * @param pending 是否挂起等待更多上游完成或等待恢复调度.
+ * @param outcome 节点执行结果归类.
+ * @param routes 新版多分支路由映射，key 为出口句柄，value 为节点 ID.
+ * @param reasonCode 结果原因编码，用于审计、告警和前端展示.
+ * @param reasonMessage 结果原因描述.
+ * @param resumeAtEpochMs 挂起恢复时间戳，单位毫秒.
  */
 public record NodeResult(
-        /** 单路下一跳节点 ID。 */
         String nextNodeId,
-        /** 成功分支下一跳节点 ID。 */
         String successNodeId,
-        /** 失败分支下一跳节点 ID。 */
         String failNodeId,
-        /** else 兜底分支下一跳节点 ID。 */
         String elseNodeId,
-        /** 旧版多分支路由映射，key 为分支标签，value 为节点 ID。 */
         Map<String, String> branchMap,
-        /** 节点输出字段，调度层会合并到执行上下文。 */
         Map<String, Object> output,
-        /** 节点是否按业务语义成功。 */
         boolean success,
-        /** 节点失败错误信息。 */
         String errorMessage,
-        /** 是否挂起等待更多上游完成或等待恢复调度。 */
         boolean pending,
-        /** 节点执行结果归类。 */
         NodeOutcome outcome,
-        /** 新版多分支路由映射，key 为出口句柄，value 为节点 ID。 */
         Map<String, String> routes,
-        /** 结果原因编码，用于审计、告警和前端展示。 */
         String reasonCode,
-        /** 结果原因描述。 */
         String reasonMessage,
-        /** 挂起恢复时间戳，单位毫秒。 */
         Long resumeAtEpochMs
 ) {
 // 说明：
@@ -214,7 +214,9 @@ public record NodeResult(
      */
     private static Map<String, String> routes(Map<String, String> branchMap, String elseNodeId) {
         Map<String, String> routes = new LinkedHashMap<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (branchMap != null) {
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             branchMap.forEach((branch, nodeId) -> {
                 if (!isBlank(branch) && !isBlank(nodeId)) {
                     routes.put(branch, nodeId);
@@ -224,6 +226,7 @@ public record NodeResult(
         if (!isBlank(elseNodeId)) {
             routes.put(MapFieldKeys.ELSE, elseNodeId);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return Collections.unmodifiableMap(new LinkedHashMap<>(routes));
     }
 

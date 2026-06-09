@@ -1,10 +1,14 @@
 # CDP Warehouse Scheduled Audience Availability Gate Implementation Plan
 
+Spec: `../specs/p2-058-cdp-warehouse-scheduled-audience-availability-gate.md`
+
 **Goal:** Add an availability-gated scheduled audience refresh path without changing the existing refresh-due endpoint.
 
 **Architecture:** Reuse `CdpWarehouseAvailabilityService` inside `AudienceMaterializationScheduleService`. Return a combined response that carries the availability decision and, only when allowed, the existing scheduled refresh result. Add scheduler configuration to delegate unattended cycles to the gated path.
 
 **Tech Stack:** Java 21, Spring Boot, existing audience materialization scheduler, existing warehouse availability service, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

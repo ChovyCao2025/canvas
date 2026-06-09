@@ -8,9 +8,11 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, Jackson, QLExpress/Aviator where already present, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Vitest.
 
-**Implementation Status:** Implemented on 2026-06-05 and merged into `main`. Actual migration is `V105__cdp_computed_tags_lineage.sql` and actual tables/classes use the `cdp_` prefix.
+**Implementation Status:** Implemented in the current workspace record on 2026-06-05. Actual migration is `V105__cdp_computed_tags_lineage.sql` and actual tables/classes use the `cdp_` prefix. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
 
-**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused P1-006B backend tests pass in an isolated runner because Maven `testCompile` remains blocked by unrelated existing test-source errors. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- computedTagPresentation.test.ts cdpApi.test.ts` passed. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
+Status: Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
+
+**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home mvn -pl canvas-engine -Dtest=ComputedTagSchemaTest,ComputedTagServiceTest,CdpLineageServiceTest,CdpComputedTagControllerTest test` passed on 2026-06-08 with 8 tests, 0 failures, 0 errors, 0 skipped. `cd frontend && npm run test -- computedTagPresentation.test.ts cdpApi.test.ts` passed on 2026-06-08 with 2 files and 7 tests.
 
 ---
 
@@ -42,7 +44,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java`
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java`:
 
@@ -85,7 +87,7 @@ class ComputedTagSchemaTest {
 }
 ```
 
-- [ ] **Step 2: Add migration**
+- [x] **Step 2: Add migration**
 
 Create `backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql`:
 
@@ -135,7 +137,7 @@ CREATE TABLE IF NOT EXISTS cdp_computed_tag_run (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 3: Run schema test**
+- [x] **Step 3: Run schema test**
 
 Run:
 
@@ -161,7 +163,8 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-006b-cdp-computed-tags-and-lineage.md`
 - Modify: `docs/product-evolution/plans/p1-006b-cdp-computed-tags-and-lineage-plan.md`
 
-- [ ] **Step 1: Commit computed tag and lineage slice**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -190,7 +193,7 @@ Expected: commit contains only computed tag schema, lineage checks, service/API,
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java`
 
-- [ ] **Step 1: Write service tests**
+- [x] **Step 1: Write service tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java`:
 
@@ -286,7 +289,7 @@ class ComputedTagServiceTest {
 }
 ```
 
-- [ ] **Step 2: Implement cycle detection**
+- [x] **Step 2: Implement cycle detection**
 
 Implement DFS that returns a path:
 
@@ -321,7 +324,7 @@ private String dfs(String tag, Map<String, List<String>> graph, Set<String> visi
 
 Call it in `activate` and throw `IllegalArgumentException("computed tag dependency cycle: " + cyclePath)` when it returns a non-null path.
 
-- [ ] **Step 3: Implement run-now writeback**
+- [x] **Step 3: Implement run-now writeback**
 
 For each matched user, call:
 
@@ -337,7 +340,7 @@ cdpTagService.setTag(userId, new CdpTagWriteReq(
         "computed-tag:" + runId + ":" + userId + ":" + tagCode));
 ```
 
-- [ ] **Step 4: Run service tests**
+- [x] **Step 4: Run service tests**
 
 Run:
 
@@ -357,7 +360,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts`
 - Modify: `frontend/src/services/cdpApi.ts`
 
-- [ ] **Step 1: Write lineage tests**
+- [x] **Step 1: Write lineage tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpLineageServiceTest.java`:
 
@@ -421,7 +424,7 @@ class CdpLineageServiceTest {
 }
 ```
 
-- [ ] **Step 2: Implement lineage scanning**
+- [x] **Step 2: Implement lineage scanning**
 
 Scan:
 
@@ -433,7 +436,7 @@ canvas.graph_json
 
 Return impacted object type, id, name, and reference path.
 
-- [ ] **Step 3: Add controller endpoints**
+- [x] **Step 3: Add controller endpoints**
 
 Expose computed tag list/create/preview/activate/pause/run/runs plus:
 
@@ -442,7 +445,7 @@ GET /cdp/computed-tags/{tagCode}/lineage
 POST /cdp/computed-tags/{tagCode}/impact-check
 ```
 
-- [ ] **Step 4: Run verification**
+- [x] **Step 4: Run verification**
 
 Run:
 
@@ -453,7 +456,7 @@ cd frontend && npm test -- computedTagPresentation.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Add frontend presentation tests and helpers**
+- [x] **Step 5: Add frontend presentation tests and helpers**
 
 Create `frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts`:
 

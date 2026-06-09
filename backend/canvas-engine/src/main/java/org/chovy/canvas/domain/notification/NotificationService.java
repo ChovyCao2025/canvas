@@ -14,10 +14,9 @@ import org.chovy.canvas.dal.dataobject.NotificationDO;
 import org.chovy.canvas.dal.mapper.NotificationMapper;
 
 /**
- * 通知消息 通知领域组件。
+ * 站内通知持久化服务。
  *
- * <p>负责站内通知的创建、收件人解析、未读状态和实时推送封装。
- * <p>该组件连接异步任务、WebSocket 和通知持久化模型，保证消息中心口径一致。
+ * <p>负责通知创建、查询、未读计数、已读和归档状态维护；持久化成功后触发实时推送。
  */
 @Service
 @RequiredArgsConstructor
@@ -93,6 +92,7 @@ public class NotificationService {
         notification.setPayloadJson(command.payloadJson());
         try {
             mapper.insert(notification);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DuplicateKeyException e) {
             // 通知去重命中时返回已存在消息，不再重复推送相同业务通知。
             NotificationDO existing = findExisting(notification);
@@ -200,8 +200,10 @@ public class NotificationService {
     /** 构建用户通知基础查询条件，统一处理归档和未读过滤。 */
     private LambdaQueryWrapper<NotificationDO> baseUserQuery(
             Long tenantId, String userId, boolean unreadOnly, boolean archived) {
+        // 准备本次处理所需的上下文和中间变量。
         LambdaQueryWrapper<NotificationDO> query = new LambdaQueryWrapper<NotificationDO>()
                 .eq(NotificationDO::getUserId, userId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (tenantId != null) {
             query.eq(NotificationDO::getTenantId, tenantId);
         }
@@ -213,6 +215,7 @@ public class NotificationService {
         if (unreadOnly) {
             query.isNull(NotificationDO::getReadAt);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return query;
     }
 
@@ -223,7 +226,9 @@ public class NotificationService {
 
     /** 在唯一键冲突后按去重键或任务维度查询已有通知。 */
     private NotificationDO findExisting(NotificationDO notification) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (hasText(notification.getDedupKey())) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             NotificationDO existing = mapper.selectOne(new LambdaQueryWrapper<NotificationDO>()
                     .eq(notification.getTenantId() != null, NotificationDO::getTenantId, notification.getTenantId())
                     .eq(NotificationDO::getUserId, notification.getUserId())
@@ -270,6 +275,12 @@ public class NotificationService {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 执行 userUpdate 流程，围绕 user update 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 userUpdate 流程生成的业务结果。
+     */
     private LambdaUpdateWrapper<NotificationDO> userUpdate(Long tenantId) {
         LambdaUpdateWrapper<NotificationDO> wrapper = new LambdaUpdateWrapper<>();
         if (tenantId != null) {

@@ -5,6 +5,10 @@ Sequence: 008
 Source: `todo/p3/strategic-opportunities-from-filtered-scope.md#industry-packaging`
 Implementation plan: `../plans/p3-008-industry-packaging-plan.md`
 
+## Implementation Status
+
+Status: discovery and governance artifacts are complete in the current workspace record. Commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Convert industry templates, nodes, metrics, and compliance profiles for selected verticals into an evidence-backed packaging decision.

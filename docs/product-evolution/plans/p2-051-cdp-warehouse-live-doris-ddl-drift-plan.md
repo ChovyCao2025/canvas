@@ -1,10 +1,14 @@
 # CDP Warehouse Live Doris DDL Drift Implementation Plan
 
+Spec: `../specs/p2-051-cdp-warehouse-live-doris-ddl-drift.md`
+
 **Goal:** Extend warehouse physical table governance from repository DDL inspection to live Doris table drift detection.
 
 **Architecture:** Reuse `CdpWarehouseTableGovernanceService` and `cdp_warehouse_table_inspection`. Add a live DDL reader backed by optional `dorisJdbcTemplate`, feed live `SHOW CREATE TABLE` output through the existing contract checks, and expose tenant-scoped live inspection endpoints.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, optional Doris `JdbcTemplate`, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

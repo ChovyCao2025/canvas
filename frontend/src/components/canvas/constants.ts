@@ -58,6 +58,7 @@ export const DEFAULT_NAMES: Record<string, string> = {
   AI_LLM: 'AI 智能节点',
   TAGGER: 'Tagger 标签',
   COMMIT_ACTION: '提交动作',
+  RISK_DECISION: '风险决策',
   SUB_FLOW_REF: '子流程引用',
 }
 

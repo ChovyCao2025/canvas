@@ -20,6 +20,13 @@ public interface CanvasExecutionMapper extends BaseMapper<CanvasExecutionDO> {
     int updateContextSnapshot(@Param("executionId") String executionId,
                               @Param("contextSnapshotJson") String contextSnapshotJson);
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @return 返回符合条件的数据列表或视图。
+     */
     CanvasExecutionDO selectLatestPausedContextSnapshot(@Param("canvasId") Long canvasId,
                                                         @Param("userId") String userId);
 }

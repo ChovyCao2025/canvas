@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, Flyway, BCrypt, JUnit 5, Mockito, AssertJ.
 
+**Implementation Status:** Implemented on 2026-06-05 with the actual migration version `V100__cdp_write_key_management.sql` because `V97` is not the current migration sequence in this workspace. Focused Java 21 verification passed on 2026-06-08 for `CdpWriteKeySchemaTest`, `CdpWriteKeyAuthServiceTest`, and `CdpWriteKeyControllerTest`, covering schema, authentication, and admin API behavior.
+
 ---
 
 ## Spec Reference
@@ -135,7 +137,7 @@ public interface CdpWriteKeyMapper extends BaseMapper<CdpWriteKeyDO> {
 }
 ```
 
-- [ ] **Step 5: Run schema test**
+- [x] **Step 5: Run schema test**
 
 Run:
 
@@ -145,7 +147,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeySchemaTest
 
 Expected: PASS.
 
-Observed: Blocked on 2026-06-05 by unrelated backend compile errors outside P1-005.
+Observed on 2026-06-08: PASS with Java 21 as part of `CdpWriteKeySchemaTest,CdpWriteKeyAuthServiceTest,CdpWriteKeyControllerTest` focused verification.
 
 ### Task 2: Authentication Service
 
@@ -318,7 +320,7 @@ public class CdpWriteKeyAuthService {
 }
 ```
 
-- [ ] **Step 4: Run auth tests**
+- [x] **Step 4: Run auth tests**
 
 Run:
 
@@ -328,7 +330,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeyAuthServiceTest
 
 Expected: PASS.
 
-Observed: Blocked on 2026-06-05 by unrelated backend compile errors outside P1-005.
+Observed on 2026-06-08: PASS with Java 21 as part of `CdpWriteKeySchemaTest,CdpWriteKeyAuthServiceTest,CdpWriteKeyControllerTest` focused verification.
 
 ### Task 3: Admin DTOs And Controller
 
@@ -484,7 +486,7 @@ void createReturnsRawKeyOnceAndListReturnsOnlyPrefix() {
 }
 ```
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -494,7 +496,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeySchemaTest,CdpWriteKe
 
 Expected: PASS.
 
-Observed: Blocked on 2026-06-05 by unrelated backend compile errors outside P1-005. Static checks confirmed:
+Observed on 2026-06-08: PASS with Java 21:
+
+```bash
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home mvn -pl canvas-engine -Dtest=CdpWriteKeySchemaTest,CdpWriteKeyAuthServiceTest,CdpWriteKeyControllerTest test
+```
+
+Result: 7 tests, 0 failures, 0 errors, 0 skipped.
+
+Earlier static checks also confirmed:
 
 ```bash
 rg -n "CREATE TABLE IF NOT EXISTS cdp_write_key|key_prefix|key_hash|raw_key|UNIQUE KEY uk_cdp_write_key_prefix" backend/canvas-engine/src/main/resources/db/migration/V100__cdp_write_key_management.sql
@@ -508,7 +518,8 @@ rg -n "class CdpWriteKeySchemaTest|class CdpWriteKeyAuthServiceTest|class CdpWri
 - Read: `docs/product-evolution/specs/p1-005-cdp-write-key-management-and-authentication.md`
 - Read: `docs/product-evolution/plans/p1-005-cdp-write-key-management-and-authentication-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

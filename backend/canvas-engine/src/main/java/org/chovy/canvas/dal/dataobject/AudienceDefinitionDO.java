@@ -22,6 +22,7 @@ public class AudienceDefinitionDO {
     /** 人群定义主键 ID */
     private Long id;
 
+    /** 所属租户 ID */
     @TableField("tenant_id")
     private Long tenantId;
 

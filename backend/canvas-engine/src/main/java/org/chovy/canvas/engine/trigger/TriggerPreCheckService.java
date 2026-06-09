@@ -65,11 +65,21 @@ public class TriggerPreCheckService {
     private CanvasControlGroupService controlGroupService;
 
     @Autowired(required = false)
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param backgroundExecutor 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
         this.backgroundExecutor = backgroundExecutor;
     }
 
     @Autowired(required = false)
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param controlGroupService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     void setControlGroupService(CanvasControlGroupService controlGroupService) {
         this.controlGroupService = controlGroupService;
     }
@@ -301,13 +311,16 @@ public class TriggerPreCheckService {
      * {@code canvas:global_count:*} 与 {@code canvas:quota:total:*} key。
      */
     public int reconcileInactiveCanvasQuotas() {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<CanvasDO> inactive = canvasMapper.selectList(
                 new LambdaQueryWrapper<CanvasDO>()
                         .ne(CanvasDO::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (inactive == null || inactive.isEmpty()) {
             return 0;
         }
         int count = 0;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CanvasDO canvas : inactive) {
             if (canvas.getId() == null) {
                 continue;

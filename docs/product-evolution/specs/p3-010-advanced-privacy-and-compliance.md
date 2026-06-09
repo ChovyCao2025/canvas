@@ -5,6 +5,8 @@ Sequence: 010
 Source: `todo/p3/strategic-opportunities-from-filtered-scope.md#advanced-privacy-and-compliance`
 Implementation plan: `../plans/p3-010-advanced-privacy-and-compliance-plan.md`
 
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Create an executable discovery and governance slice for advanced privacy and compliance so GDPR, CCPA, PIPL, deletion/export, differential privacy, federated learning, trusted execution, and residency ideas are ranked by evidence before implementation.

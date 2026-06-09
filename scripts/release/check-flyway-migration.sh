@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Enforces release-time Flyway migration policy.
+#
+# The script is intentionally read-only: it validates filename/version ordering
+# and requires backup/restore evidence for new high-risk migrations after the
+# released baseline.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -11,6 +16,7 @@ fail() {
   exit 1
 }
 
+# Print the migration policy contract and accepted baseline override options.
 usage() {
   cat <<'EOF'
 Usage: scripts/release/check-flyway-migration.sh [--from-version VERSION]
@@ -60,6 +66,7 @@ if git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   fi
 fi
 
+# Resolve released baseline from CLI/env first, then from the checked-in evidence file.
 if [[ -z "$FROM_VERSION" && -f "$BASELINE_FILE" ]]; then
   FROM_VERSION="$(tr -d '[:space:]' < "$BASELINE_FILE")"
 fi
@@ -83,9 +90,11 @@ for file in "${files[@]}"; do
   versions+=("${BASH_REMATCH[1]}")
 done
 
+# Duplicate migration versions would make deployment order ambiguous across environments.
 duplicates="$(printf '%s\n' "${versions[@]}" | sort -n | uniq -d | tr '\n' ' ')"
 [[ -z "${duplicates// }" ]] || fail "duplicate Flyway migration versions: $duplicates"
 
+# Numeric ordering must be strictly increasing after natural version sort.
 previous=0
 highest=0
 while IFS= read -r version; do
@@ -104,6 +113,7 @@ for file in "${files[@]}"; do
   version="${BASH_REMATCH[1]}"
   if [[ "$version" -gt "$FROM_VERSION" ]]; then
     new_migrations+=("$base")
+    # High-risk migrations need human-readable backup, restore, dry-run, and owner evidence.
     if grep -Eiq "$HIGH_RISK_PATTERN" "$file"; then
       high_risk_migrations+=("$base")
       note="$NOTES_DIR/${base}.md"

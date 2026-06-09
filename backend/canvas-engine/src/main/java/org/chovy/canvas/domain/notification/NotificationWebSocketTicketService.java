@@ -57,6 +57,13 @@ public class NotificationWebSocketTicketService {
         return decode(consumeTicket(ticket));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @return 返回 encode 生成的文本或业务键。
+     */
     private String encode(Long tenantId, String userId) {
         if (tenantId == null) {
             return userId;
@@ -64,7 +71,14 @@ public class NotificationWebSocketTicketService {
         return tenantId + "|" + userId;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param raw raw 参数，用于 decode 流程中的校验、计算或对象转换。
+     * @return 返回 decode 流程生成的业务结果。
+     */
     private TicketSubject decode(String raw) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (raw == null || raw.isBlank()) {
             return null;
         }
@@ -78,9 +92,13 @@ public class NotificationWebSocketTicketService {
         if (!tenantPart.isBlank()) {
             tenantId = Long.valueOf(tenantPart);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new TicketSubject(tenantId, userId);
     }
 
+    /**
+     * TicketSubject 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record TicketSubject(Long tenantId, String userId) {
     }
 }

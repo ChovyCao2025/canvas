@@ -5,6 +5,8 @@ Sequence: 051
 Source: `docs/product-evolution/specs/p2-031-cdp-warehouse-physical-table-governance.md`
 Implementation plan: `../plans/p2-051-cdp-warehouse-live-doris-ddl-drift-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add live Doris DDL drift detection so table contracts are not only checked against repository SQL assets, but also against the actual physical tables running in production.

@@ -1,5 +1,7 @@
 # BI Dataset Query Compiler Foundation Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a white-listed BI query compiler for Doris-backed marketing analytics datasets.
@@ -13,6 +15,17 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p2-023-bi-dataset-query-compiler-foundation.md`
+
+## Current Status Note
+
+The implementation files are present in the current worktree and fresh focused
+verification passed on 2026-06-09:
+
+- `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=BiQueryCompilerTest,MarketingBiDatasetRegistryTest` passed with 10 tests, zero failures, and zero errors.
+
+Historical RED-state checks were not reproduced because the current worktree
+already contains the implementation. No commit or merge was created in this
+audit, so commit and merge status remain unverified.
 
 ## File Structure
 
@@ -32,11 +45,11 @@
 - Create: `BiQueryRequest.java`
 - Create: `BiCompiledQuery.java`
 
-- [ ] **Step 1: Write failing compiler tests**
+- [x] **Step 1: Write failing compiler tests**
 
 Create `BiQueryCompilerTest` with grouped query, filter binding, unknown dimension, unknown metric, and unsafe limit cases.
 
-- [ ] **Step 2: Run tests to verify red**
+Historical RED-state boundary: not reproduced in this audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -46,11 +59,11 @@ cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.
 
 Expected: FAIL because compiler records and compiler do not exist.
 
-- [ ] **Step 3: Implement value objects and compiler**
+- [x] **Step 3: Implement value objects and compiler**
 
 Implement immutable records, safe operator handling, tenant predicate injection, parameter binding, group by, order by, and limit validation.
 
-- [ ] **Step 4: Run compiler tests**
+- [x] **Step 4: Run compiler tests**
 
 Expected: PASS.
 
@@ -60,25 +73,25 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/query/MarketingBiDatasetRegistry.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/query/MarketingBiDatasetRegistryTest.java`
 
-- [ ] **Step 1: Write failing registry test**
+- [x] **Step 1: Write failing registry test**
 
 Create `MarketingBiDatasetRegistryTest` proving `canvas_daily_stats` maps to `canvas_dws.canvas_daily_stats`, tenant column `tenant_id`, and core canvas stats fields and metrics.
 
-- [ ] **Step 2: Run registry test to verify red**
+Historical RED-state boundary: not reproduced in this audit because the current worktree already contains the implementation.
 
 Expected: FAIL because the registry does not exist.
 
-- [ ] **Step 3: Implement registry**
+- [x] **Step 3: Implement registry**
 
 Register dimensions `stat_date`, `canvas_id`, `canvas_name`, `trigger_type`; measures and metrics for executions, success/fail counts, unique users, duration, and success rate.
 
-- [ ] **Step 4: Run registry test**
+- [x] **Step 4: Run registry test**
 
 Expected: PASS.
 
 ### Task 3: Focused Verification
 
-- [ ] **Step 1: Run BI tests**
+- [x] **Step 1: Run BI tests**
 
 Run:
 
@@ -91,5 +104,5 @@ Expected: PASS with zero failures and zero errors.
 ## Self-Review
 
 - Spec coverage: tasks cover value objects, compiler, registry, and focused verification.
-- Placeholder scan: no placeholder or TODO steps remain.
+- Placeholder scan: no placeholder markers remain.
 - Type consistency: file and class names match the implemented package.

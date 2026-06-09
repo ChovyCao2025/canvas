@@ -74,16 +74,31 @@ public class CanvasController {
     /** 可选发布审批服务；存在时发布必须先经过审批门禁。 */
     private CanvasPublishApprovalService canvasPublishApprovalService;
 
+    /**
+     * 执行 setAuditEventService 流程，围绕 set audit event service 完成校验、计算或结果组装。
+     *
+     * @param auditEventService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setAuditEventService(AuditEventService auditEventService) {
         this.auditEventService = auditEventService;
     }
 
+    /**
+     * 执行 setProjectPermissionService 流程，围绕 set project permission service 完成校验、计算或结果组装。
+     *
+     * @param projectPermissionService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setProjectPermissionService(CanvasProjectPermissionService projectPermissionService) {
         this.projectPermissionService = projectPermissionService;
     }
 
+    /**
+     * 执行 setCanvasPublishApprovalService 流程，围绕 set canvas publish approval service 完成校验、计算或结果组装。
+     *
+     * @param canvasPublishApprovalService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setCanvasPublishApprovalService(CanvasPublishApprovalService canvasPublishApprovalService) {
         this.canvasPublishApprovalService = canvasPublishApprovalService;
@@ -149,6 +164,11 @@ public class CanvasController {
                             requireCanvasAction(id, context, CanvasProjectAction.EDIT);
                             canvasService.updateDraft(id, req);
                             recordCanvasAudit(context, context.username(), "canvas update",
+                                    /**
+                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+                                     *
+                                     * @return 返回 metadata 流程生成的业务结果。
+                                     */
                                     id, metadata("name", req.getName()));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -201,7 +221,16 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 提交画布请求接口（OpenAPI: Submit canvas publish approval）。
+     * 接口先解析当前租户上下文，并把操作人和角色传入服务层执行权限校验。
+     * 副作用：会提交业务请求。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体，可选。
+     * @return 异步返回统一响应，包含提交画布请求后的业务数据。
+     */
     @PostMapping("/{id}/submit-review")
     @Operation(operationId = "submitCanvasPublishReview", summary = "Submit canvas publish approval")
     public Mono<R<ApprovalInstanceView>> submitReview(
@@ -216,7 +245,15 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 查询画布状态接口（OpenAPI: Get canvas publish approval status）。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @return 异步返回统一响应，包含查询画布状态后的业务数据。
+     */
     @GetMapping("/{id}/approval-status")
     @Operation(operationId = "getCanvasPublishApprovalStatus", summary = "Get canvas publish approval status")
     public Mono<R<CanvasPublishApprovalStatusView>> approvalStatus(@PathVariable Long id) {
@@ -228,7 +265,16 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 执行画布发布前检查接口（OpenAPI: Run pre-publish checks）。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 主要委托 prePublishCheckService.check 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @return 异步返回统一响应，包含发布 画布后的业务数据。
+     */
     @GetMapping("/{id}/pre-publish-checks")
     @Operation(operationId = "prePublishChecks", summary = "Run pre-publish checks")
     public Mono<R<CanvasPrePublishCheckService.Result>> prePublishChecks(@PathVariable Long id) {
@@ -264,7 +310,17 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .thenReturn(R.ok()));
     }
-
+    /**
+     * 归档 画布接口（OpenAPI: Archive canvas）。
+     * 接口先解析当前租户上下文，按租户隔离处理数据。
+     * 主要委托 canvasService.archive 完成业务处理。
+     * 副作用：会归档资源。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @param operator 操作人标识，默认值为 system。
+     * @return 异步返回统一响应，表示操作完成。
+     */
     @PostMapping("/{id}/archive")
     @Operation(operationId = "archiveCanvas", summary = "Archive canvas")
     public Mono<R<Void>> archive(
@@ -364,6 +420,11 @@ public class CanvasController {
                             requireTenantAccess(id, context);
                             canvasService.revertToVersion(id, versionId);
                             recordCanvasAudit(context, context.username(), "canvas revert",
+                                    /**
+                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+                                     *
+                                     * @return 返回 metadata 流程生成的业务结果。
+                                     */
                                     id, metadata("toVersion", versionId));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -388,6 +449,11 @@ public class CanvasController {
                             notifyCanvasChange("CANVAS_CANARY_STARTED", id, "画布灰度已启动",
                                     "operator=" + operator + " percent=" + percent, "INFO", operator);
                             recordCanvasAudit(context, operator, "canvas canary start",
+                                    /**
+                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+                                     *
+                                     * @return 返回 metadata 流程生成的业务结果。
+                                     */
                                     id, metadata("percent", percent));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -518,6 +584,11 @@ public class CanvasController {
                                     id, req.getName(), req.getDescription(),
                                     req.getGraphJson(), req.getEditVersion(), operator);
                             recordCanvasAudit(context, operator, "canvas safe update",
+                                    /**
+                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+                                     *
+                                     * @return 返回 metadata 流程生成的业务结果。
+                                     */
                                     id, metadata("editVersion", req.getEditVersion()));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -528,7 +599,17 @@ public class CanvasController {
                             return Mono.error(e);
                         })));
     }
-
+    /**
+     * 预览画布结果接口（OpenAPI: Preview canvas message node）。
+     * 接口先解析当前租户上下文，按租户隔离处理数据。
+     * 主要委托 messagePreviewService.preview 完成业务处理。
+     * 副作用由下游服务封装，通常会写入状态、审计或任务记录。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含预览画布结果后的业务数据。
+     */
     @PostMapping("/{id}/message-preview")
     @Operation(operationId = "previewCanvasMessage", summary = "Preview canvas message node")
     public Mono<R<MessagePreviewResp>> previewMessage(
@@ -544,7 +625,17 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 导出 画布接口（OpenAPI: Export canvas package）。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 主要委托 importExportService.exportCanvas 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @param versionId version ID。
+     * @return 异步返回统一响应，包含导出 画布后的业务数据。
+     */
     @GetMapping("/{id}/export")
     @Operation(operationId = "exportCanvas", summary = "Export canvas package")
     public Mono<R<CanvasExportPackage>> exportCanvas(
@@ -558,7 +649,16 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 导入 画布接口（OpenAPI: Import canvas package）。
+     * 接口先解析当前租户上下文，按租户隔离处理数据。
+     * 主要委托 importExportService.importCanvas 完成业务处理。
+     * 副作用：会导入并落库资源。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含导入 画布后的业务数据。
+     */
     @PostMapping("/import")
     @Operation(operationId = "importCanvas", summary = "Import canvas package")
     public Mono<R<CanvasImportResp>> importCanvas(@RequestBody CanvasImportReq req) {
@@ -569,7 +669,16 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 获取画布详情接口（OpenAPI: Get canvas project folder metadata）。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 主要委托 projectFolderMetadataService.getMetadata 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @return 异步返回统一响应，包含获取画布详情后的业务数据。
+     */
     @GetMapping("/{id}/project-folder-metadata")
     @Operation(operationId = "getCanvasProjectFolderMetadata", summary = "Get canvas project folder metadata")
     public Mono<R<ProjectFolderMetadataResp>> getProjectFolderMetadata(@PathVariable Long id) {
@@ -582,7 +691,17 @@ public class CanvasController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 保存画布配置接口（OpenAPI: Save canvas project folder metadata）。
+     * 接口先解析当前租户上下文，按租户隔离处理数据。
+     * 主要委托 projectFolderMetadataService.saveMetadata 完成业务处理。
+     * 副作用：会保存配置或运行态。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含保存画布配置后的业务数据。
+     */
     @PutMapping("/{id}/project-folder-metadata")
     @Operation(operationId = "saveCanvasProjectFolderMetadata", summary = "Save canvas project folder metadata")
     public Mono<R<ProjectFolderMetadataResp>> saveProjectFolderMetadata(
@@ -605,13 +724,6 @@ public class CanvasController {
                         .map(R::ok));
     }
 
-    /**
-     * 执行 current User 对应的业务逻辑。
-     *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
-     */
 // ── helpers ───────────────────────────────────────────────────
 
     /** 从安全上下文读取当前用户名，缺失时回退 system。 */
@@ -624,11 +736,22 @@ public class CanvasController {
                 .defaultIfEmpty("system");
     }
 
+    /**
+     * 获取当前请求的登录上下文或租户信息。
+     *
+     * @return 返回 currentTenant 流程生成的业务结果。
+     */
     private Mono<TenantContext> currentTenant() {
         return tenantContextResolver.current()
                 .defaultIfEmpty(new TenantContext(null, null, null));
     }
 
+    /**
+     * 应用请求中的业务字段或租户约束。
+     *
+     * @param req 请求对象，承载本次操作的输入参数。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void applyCreateTenant(CanvasCreateReq req, TenantContext context) {
         if (context.tenantId() == null) {
             return;
@@ -638,6 +761,12 @@ public class CanvasController {
         }
     }
 
+    /**
+     * 应用请求中的业务字段或租户约束。
+     *
+     * @param query query 参数，用于 applyQueryTenant 流程中的校验、计算或对象转换。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void applyQueryTenant(CanvasListQuery query, TenantContext context) {
         if (context.tenantId() == null) {
             return;
@@ -647,40 +776,91 @@ public class CanvasController {
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void requireTenantAccess(Long canvasId, TenantContext context) {
         canvasService.requireTenantAccess(canvasId, tenantId(context), isSuperAdmin(context));
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param action action 参数，用于 requireCanvasAction 流程中的校验、计算或对象转换。
+     * @return 返回 requireCanvasAction 流程生成的业务结果。
+     */
     private CanvasDO requireCanvasAction(Long canvasId, TenantContext context, CanvasProjectAction action) {
         CanvasDO canvas = canvasService.requireTenantAccess(canvasId, tenantId(context), isSuperAdmin(context));
         requireCanvasAction(canvas, context, action);
         return canvas;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param canvas canvas 参数，用于 requireCanvasAction 流程中的校验、计算或对象转换。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param action action 参数，用于 requireCanvasAction 流程中的校验、计算或对象转换。
+     */
     private void requireCanvasAction(CanvasDO canvas, TenantContext context, CanvasProjectAction action) {
         if (projectPermissionService != null) {
             projectPermissionService.requireCanvasAction(canvas, context, action);
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param projectId 业务对象 ID，用于定位具体记录。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param action action 参数，用于 requireTargetProjectAction 流程中的校验、计算或对象转换。
+     */
     private void requireTargetProjectAction(Long projectId, TenantContext context, CanvasProjectAction action) {
         if (projectId != null && projectPermissionService != null) {
             projectPermissionService.requireProjectAction(tenantId(context), projectId, context, action);
         }
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 tenant id 计算得到的数量、金额或指标值。
+     */
     private Long tenantId(TenantContext context) {
         return context == null ? null : context.tenantId();
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回布尔判断结果。
+     */
     private boolean isSuperAdmin(TenantContext context) {
         return context != null && context.isSuperAdmin();
     }
 
+    /**
+     * 解析操作人标识。
+     *
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 default operator 生成的文本或业务键。
+     */
     private String defaultOperator(String operator) {
         return operator == null || operator.isBlank() ? "system" : operator.trim();
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @return 返回 requiredCanvasPublishApprovalService 流程生成的业务结果。
+     */
     private CanvasPublishApprovalService requiredCanvasPublishApprovalService() {
         if (canvasPublishApprovalService == null) {
             throw new IllegalStateException("Canvas publish approval service is not configured");
@@ -689,16 +869,14 @@ public class CanvasController {
     }
 
     /**
-     * 发布或发送 notify Canvas Change 相关的业务数据。
+     * 执行 notifyCanvasChange 流程，围绕 notify canvas change 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param type type 类型标识或分类条件
-     * @param canvasId canvasId 对应的业务主键或标识
-     * @param title title 方法执行所需的业务参数
-     * @param content content 方法执行所需的业务参数
-     * @param severity severity 方法执行所需的业务参数
-     * @param operator operator 操作人标识
+     * @param type 类型标识，用于选择对应处理分支。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param title title 参数，用于 notifyCanvasChange 流程中的校验、计算或对象转换。
+     * @param content content 参数，用于 notifyCanvasChange 流程中的校验、计算或对象转换。
+     * @param severity severity 参数，用于 notifyCanvasChange 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
      */
     private void notifyCanvasChange(
             String type,
@@ -711,11 +889,28 @@ public class CanvasController {
         notificationEventService.canvasChanged(type, canvasId, title, content, severity, operator);
     }
 
+    /**
+     * 记录审计、指标或状态变更信息。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @param version version 参数，用于 recordPublishAudit 流程中的校验、计算或对象转换。
+     */
     private void recordPublishAudit(TenantContext context, Long canvasId, String operator, CanvasVersionDO version) {
         Long versionId = version == null ? null : version.getId();
         recordCanvasAudit(context, operator, "canvas publish", canvasId, metadata("toVersion", versionId), versionId);
     }
 
+    /**
+     * 记录审计、指标或状态变更信息。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @param operation 待调度任务或操作名称，用于封装阻塞工作。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param metadata metadata 参数，用于 recordCanvasAudit 流程中的校验、计算或对象转换。
+     */
     private void recordCanvasAudit(TenantContext context,
                                    String operator,
                                    String operation,
@@ -724,6 +919,16 @@ public class CanvasController {
         recordCanvasAudit(context, operator, operation, canvasId, metadata, null);
     }
 
+    /**
+     * 记录审计、指标或状态变更信息。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @param operation 待调度任务或操作名称，用于封装阻塞工作。
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param metadata metadata 参数，用于 recordCanvasAudit 流程中的校验、计算或对象转换。
+     * @param toVersion to version 参数，用于 recordCanvasAudit 流程中的校验、计算或对象转换。
+     */
     private void recordCanvasAudit(TenantContext context,
                                    String operator,
                                    String operation,
@@ -745,6 +950,12 @@ public class CanvasController {
                 .build());
     }
 
+    /**
+     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+     *
+     * @param keyValues key values 参数，用于 metadata 流程中的校验、计算或对象转换。
+     * @return 返回 metadata 流程生成的业务结果。
+     */
     private Map<String, Object> metadata(Object... keyValues) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         for (int i = 0; i + 1 < keyValues.length; i += 2) {

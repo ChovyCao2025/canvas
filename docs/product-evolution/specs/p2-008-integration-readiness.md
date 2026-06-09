@@ -5,6 +5,8 @@ Sequence: 008
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#integration-readiness`
 Implementation plan: `../plans/p2-008-integration-readiness-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Package inbound webhooks, outbound webhooks, API keys, SSO/OIDC decision, data source management, and data sync into an integration foundation.

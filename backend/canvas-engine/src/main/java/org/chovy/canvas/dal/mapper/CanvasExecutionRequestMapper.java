@@ -40,6 +40,12 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
              #{payloadJson}, #{sourceMsgId}, #{status}, #{attemptCount}, #{nextRetryAt},
              #{lastError}, #{resultJson}, NOW(), NOW())
             """)
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 insert ignore 计算得到的数量、金额或指标值。
+     */
     int insertIgnore(CanvasExecutionRequestDO request);
 
     @Update("""
@@ -55,6 +61,15 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
                     OR (status = 'RUNNING' AND updated_at < #{staleBefore})
                   )
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param staleBefore stale before 参数，用于 markRunning 流程中的校验、计算或对象转换。
+     * @param runToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回 mark running 计算得到的数量、金额或指标值。
+     */
     int markRunning(@Param("id") String id,
                     @Param("now") LocalDateTime now,
                     @Param("staleBefore") LocalDateTime staleBefore,
@@ -67,6 +82,14 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
               AND status = 'RUNNING'
               AND run_token = #{runToken}
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param runToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回组装或转换后的结果对象。
+     */
     int touchRunning(@Param("id") String id,
                      @Param("now") LocalDateTime now,
                      @Param("runToken") String runToken);
@@ -82,6 +105,15 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
             WHERE id = #{id}
               AND run_token = #{runToken}
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param resultJson JSON 字符串，承载结构化配置或明细。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param runToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回 mark succeeded 计算得到的数量、金额或指标值。
+     */
     int markSucceeded(@Param("id") String id,
                       @Param("resultJson") String resultJson,
                       @Param("now") LocalDateTime now,
@@ -97,6 +129,16 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
             WHERE id = #{id}
               AND run_token = #{runToken}
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param error error 参数，用于 markRetry 流程中的校验、计算或对象转换。
+     * @param nextRetryAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param runToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回 mark retry 计算得到的数量、金额或指标值。
+     */
     int markRetry(@Param("id") String id,
                   @Param("error") String error,
                   @Param("nextRetryAt") LocalDateTime nextRetryAt,
@@ -113,6 +155,15 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
             WHERE id = #{id}
               AND run_token = #{runToken}
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param error error 参数，用于 markFailed 流程中的校验、计算或对象转换。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param runToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回 mark failed 计算得到的数量、金额或指标值。
+     */
     int markFailed(@Param("id") String id,
                    @Param("error") String error,
                    @Param("now") LocalDateTime now,
@@ -129,6 +180,13 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
             WHERE canvas_id = #{canvasId}
               AND status IN ('PENDING', 'RETRY', 'RUNNING')
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 mark force cancelled by canvas 计算得到的数量、金额或指标值。
+     */
     int markForceCancelledByCanvas(@Param("canvasId") Long canvasId,
                                    @Param("now") LocalDateTime now);
 
@@ -144,6 +202,14 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
               AND tenant_id = #{tenantId}
               AND status IN ('PENDING', 'RETRY', 'RUNNING')
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 mark force cancelled by canvas and tenant 计算得到的数量、金额或指标值。
+     */
     int markForceCancelledByCanvasAndTenant(@Param("canvasId") Long canvasId,
                                             @Param("tenantId") Long tenantId,
                                             @Param("now") LocalDateTime now);
@@ -163,6 +229,15 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
                 updated_at = #{now}
             WHERE id = #{id}
             """)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param replayBy replay by 参数，用于 markPendingForReplay 流程中的校验、计算或对象转换。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @return 返回 mark pending for replay 计算得到的数量、金额或指标值。
+     */
     int markPendingForReplay(@Param("id") String id,
                              @Param("now") LocalDateTime now,
                              @Param("replayBy") String replayBy,
@@ -181,6 +256,11 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
             WHERE status IN ('PENDING', 'RETRY', 'RUNNING')
             GROUP BY status
             """)
+    /**
+     * 统计符合条件的数据规模或状态数量。
+     *
+     * @return 返回统计数量。
+     */
     List<CanvasExecutionRequestStatusCount> countByStatus();
 
     @Select("""
@@ -197,12 +277,20 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
             ORDER BY updated_at ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param staleBefore stale before 参数，用于 selectDue 流程中的校验、计算或对象转换。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<String> selectDue(@Param("limit") int limit,
                            @Param("now") LocalDateTime now,
                            @Param("staleBefore") LocalDateTime staleBefore);
 
     @Select("""
-            SELECT id, tenant_id, canvas_id, trigger_type
+            SELECT id, tenant_id, canvas_id, trigger_type, trigger_node_type, status, attempt_count
             FROM canvas_execution_request
             WHERE (
                     status IN ('PENDING', 'RETRY')
@@ -215,6 +303,14 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
             ORDER BY updated_at ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param staleBefore stale before 参数，用于 selectDueRequests 流程中的校验、计算或对象转换。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<CanvasExecutionRequestDO> selectDueRequests(@Param("limit") int limit,
                                                    @Param("now") LocalDateTime now,
                                                    @Param("staleBefore") LocalDateTime staleBefore);

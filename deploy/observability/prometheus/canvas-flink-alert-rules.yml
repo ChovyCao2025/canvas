@@ -1,7 +1,9 @@
 groups:
+  # Realtime warehouse alerts cover Flink control-plane liveness and streaming health.
   - name: canvas-flink-realtime-warehouse
     rules:
       - alert: CanvasFlinkJobManagerDown
+        # JobManager loss stops checkpoint coordination and job submission.
         expr: up{job=~"canvas-flink-jobmanager|flink-jobmanager"} == 0
         for: 5m
         labels:
@@ -12,6 +14,7 @@ groups:
           description: The realtime warehouse Flink JobManager target has been unavailable for 5 minutes.
 
       - alert: CanvasFlinkTaskManagerMissing
+        # No TaskManagers means SQL pipelines cannot execute even if the JobManager is up.
         expr: flink_jobmanager_numRegisteredTaskManagers < 1
         for: 5m
         labels:
@@ -22,6 +25,7 @@ groups:
           description: No TaskManager is registered with the realtime warehouse JobManager.
 
       - alert: CanvasFlinkCheckpointFailures
+        # Failed checkpoints threaten exactly-once recovery for MySQL-to-Doris pipelines.
         expr: increase(flink_jobmanager_job_numberOfFailedCheckpoints[10m]) > 0
         for: 0m
         labels:
@@ -32,6 +36,7 @@ groups:
           description: At least one realtime warehouse Flink checkpoint failed in the last 10 minutes.
 
       - alert: CanvasFlinkBackpressureHigh
+        # Sustained backpressure usually points to Doris sink pressure or under-provisioned TaskManagers.
         expr: max(flink_taskmanager_job_task_backPressuredTimeMsPerSecond) > 60000
         for: 10m
         labels:
@@ -42,6 +47,7 @@ groups:
           description: A realtime warehouse Flink task has sustained high backpressure for 10 minutes.
 
       - alert: CanvasFlinkCheckpointDurationHigh
+        # Long checkpoints are an early signal that state size or sink latency is growing.
         expr: max(flink_jobmanager_job_lastCheckpointDuration) > 60000
         for: 10m
         labels:

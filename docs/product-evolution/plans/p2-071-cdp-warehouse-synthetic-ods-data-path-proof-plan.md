@@ -1,5 +1,9 @@
 # CDP Warehouse Synthetic ODS Data Path Proof Implementation Plan
 
+Spec: `../specs/p2-071-cdp-warehouse-synthetic-ods-data-path-proof.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove the real CDP warehouse source-to-Doris-ODS data path with a reserved synthetic event and persisted audit evidence.

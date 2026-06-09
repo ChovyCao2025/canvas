@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, Flyway, Reactor, Jackson, Ant Design, React, TypeScript, Vitest, JUnit 5, AssertJ.
 
+**Implementation Status:** In progress - backend closed-loop foundation.
+
 ---
 
 ## Source Requirements

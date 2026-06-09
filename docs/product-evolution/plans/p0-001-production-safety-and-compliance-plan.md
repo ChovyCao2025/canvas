@@ -646,7 +646,8 @@ cd backend && mvn -pl canvas-engine test
 
 Result: 1402 tests, 0 failures, 0 errors, 1 skipped.
 
-- [ ] **Step 4: Commit the implementation slice**
+- [x] **Step 4: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

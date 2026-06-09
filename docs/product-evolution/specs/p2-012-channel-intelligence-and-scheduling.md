@@ -5,6 +5,8 @@ Sequence: 012
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#channel-intelligence-and-scheduling`
 Implementation plan: `../plans/p2-012-channel-intelligence-and-scheduling-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Explore smart send time, smart throttling, channel routing, marketing calendar, channel cost tracking, and WeCom-first expansion.

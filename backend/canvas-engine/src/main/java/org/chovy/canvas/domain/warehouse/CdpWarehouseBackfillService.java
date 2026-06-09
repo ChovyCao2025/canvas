@@ -15,6 +15,9 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+/**
+ * CdpWarehouseBackfillService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpWarehouseBackfillService {
 
     private static final String JOB_TYPE = "BACKFILL";
@@ -29,13 +32,24 @@ public class CdpWarehouseBackfillService {
     private final CdpWarehouseSyncRunMapper runMapper;
     private final CdpWarehouseWatermarkMapper watermarkMapper;
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param lastId 业务对象 ID，用于定位具体记录。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 backfill 流程生成的业务结果。
+     */
     public BackfillResult backfill(Long tenantId, Long lastId, int limit, String operator) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive");
         }
         Long scopedTenantId = normalizeTenant(tenantId);
         long startId = lastId == null ? 0L : lastId;
         CdpWarehouseSyncRunDO run = newRun(scopedTenantId, startId, operator);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         runMapper.insert(run);
 
         List<CdpEventLogDO> rows = eventLogMapper.selectList(new LambdaQueryWrapper<CdpEventLogDO>()
@@ -49,6 +63,7 @@ public class CdpWarehouseBackfillService {
         long failed = 0L;
         long maxId = startId;
         String error = null;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CdpEventLogDO row : rows) {
             try {
                 eventSink.writeAccepted(row);
@@ -75,6 +90,14 @@ public class CdpWarehouseBackfillService {
         return new BackfillResult(run.getStatus(), loaded, failed, maxId);
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param startId 业务对象 ID，用于定位具体记录。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 newRun 流程生成的业务结果。
+     */
     private CdpWarehouseSyncRunDO newRun(Long tenantId, Long startId, String operator) {
         CdpWarehouseSyncRunDO run = new CdpWarehouseSyncRunDO();
         run.setTenantId(tenantId);
@@ -89,6 +112,12 @@ public class CdpWarehouseBackfillService {
         return run;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param maxId 业务对象 ID，用于定位具体记录。
+     */
     private void upsertWatermark(Long tenantId, Long maxId) {
         CdpWarehouseWatermarkDO watermark = new CdpWarehouseWatermarkDO();
         watermark.setTenantId(tenantId);
@@ -99,10 +128,22 @@ public class CdpWarehouseBackfillService {
         watermarkMapper.upsert(watermark);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String limit(String message) {
         String value = message == null ? "warehouse backfill failed" : message;
         if (value.length() <= MAX_ERROR_LENGTH) {
@@ -111,6 +152,9 @@ public class CdpWarehouseBackfillService {
         return value.substring(0, MAX_ERROR_LENGTH);
     }
 
+    /**
+     * BackfillResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record BackfillResult(String status, long loaded, long failed, long lastEventId) {
     }
 }

@@ -151,8 +151,10 @@ public class WaitSubscriptionService {
 
     /** 通过 status=ACTIVE 条件完成 CAS 状态流转，避免并发重复恢复。 */
     private int finishWait(Long id, String status, String resumePayload) {
+        // 准备本次处理所需的上下文和中间变量。
         Objects.requireNonNull(id, "id");
 
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CanvasWaitSubscriptionDO update = new CanvasWaitSubscriptionDO();
         update.setStatus(status);
         update.setResumePayload(resumePayload);
@@ -181,6 +183,7 @@ public class WaitSubscriptionService {
             String resumePayload,
             LocalDateTime expiresAt
     ) {
+        // 准备本次处理所需的上下文和中间变量。
         Objects.requireNonNull(executionId, "executionId");
         Objects.requireNonNull(canvasId, "canvasId");
         Objects.requireNonNull(versionId, "versionId");
@@ -201,7 +204,9 @@ public class WaitSubscriptionService {
         wait.setExpiresAt(expiresAt);
         wait.setStatus(STATUS_ACTIVE);
         wait.setCreatedAt(now);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         wait.setUpdatedAt(now);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return wait;
     }
 }

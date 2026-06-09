@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Runs the live Lark approval evidence flow against a real backend and Lark tenant.
+#
+# Use this only with explicit credentials and evidence collection enabled; it creates
+# real approval instances/tasks and copies response artifacts for review.
 set -euo pipefail
 
 API_BASE="${API_BASE:-http://localhost:8080}"

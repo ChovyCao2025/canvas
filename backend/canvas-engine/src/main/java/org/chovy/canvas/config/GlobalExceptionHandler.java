@@ -38,10 +38,17 @@ public class GlobalExceptionHandler {
     private static final String TRACE_ID_MDC_KEY = CorrelationIdWebFilter.MDC_KEY;
     private final PiiMaskingService maskingService;
 
+    /**
+     * 创建 GlobalExceptionHandler 实例并注入 config 场景依赖。
+     */
     public GlobalExceptionHandler() {
         this(new PiiMaskingService());
     }
 
+    /**
+     * 创建 GlobalExceptionHandler 实例并注入 config 场景依赖。
+     * @param maskingService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public GlobalExceptionHandler(PiiMaskingService maskingService) {
         this.maskingService = maskingService;
@@ -74,10 +81,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public R<Void> handleConstraintViolation(ConstraintViolationException e) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         String message = e.getConstraintViolations().stream()
                 .map(v -> v.getPropertyPath() + " " + v.getMessage())
                 .sorted()
                 .collect(Collectors.joining("; "));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return fail(ErrorCode.API_001, HttpStatus.BAD_REQUEST.value(), message);
     }
 
@@ -88,14 +97,7 @@ public class GlobalExceptionHandler {
         return fail(ErrorCode.API_002, HttpStatus.BAD_REQUEST.value(), "请求体或参数格式不合法");
     }
 
-    /**
-     * 执行 handle Trigger Rejected 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param e e 方法执行所需的业务参数
-     * @return 接口响应包装结果
-     */
+    /** 触发前置校验拒绝时返回限流语义，并透传具体的配额错误码。 */
     @ExceptionHandler(TriggerRejectedException.class)
     @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
     public R<Void> handleTriggerRejected(TriggerRejectedException e) {
@@ -113,14 +115,7 @@ public class GlobalExceptionHandler {
                 .body(fail(errorCodeFor(status), status, e.getReason() != null ? e.getReason() : e.getMessage()));
     }
 
-    /**
-     * 执行 handle Forbidden 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param e e 方法执行所需的业务参数
-     * @return 接口响应包装结果
-     */
+    /** JDK 安全异常统一映射为 403，避免把内部授权细节返回给调用方。 */
     @ExceptionHandler(SecurityException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public R<Void> handleForbidden(SecurityException e) {
@@ -144,6 +139,14 @@ public class GlobalExceptionHandler {
         return R.fail(ErrorCode.API_005, HttpStatus.INTERNAL_SERVER_ERROR.value(), "系统错误", currentTraceId());
     }
 
+    /**
+     * 构造统一错误响应，并在返回前对错误消息做 PII 脱敏。
+     *
+     * @param errorCode 业务错误码
+     * @param code HTTP 状态码
+     * @param message 原始错误消息
+     * @return 统一错误响应
+     */
     private R<Void> fail(String errorCode, int code, String message) {
         String safeMessage = maskingService.maskText(message);
         return optionalTraceId()
@@ -151,6 +154,12 @@ public class GlobalExceptionHandler {
                 .orElseGet(() -> R.fail(errorCode, code, safeMessage));
     }
 
+    /**
+     * 将 HTTP 状态码映射为统一业务错误码。
+     *
+     * @param status HTTP 状态码
+     * @return 业务错误码
+     */
     private String errorCodeFor(int status) {
         return switch (status) {
             case 400 -> ErrorCode.API_001;
@@ -162,22 +171,41 @@ public class GlobalExceptionHandler {
         };
     }
 
+    /**
+     * 将 WebFlux 绑定错误转换为稳定、可读的字段校验消息。
+     *
+     * @param e 参数绑定异常
+     * @return 校验错误消息
+     */
     private String validationMessage(WebExchangeBindException e) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         String message = e.getFieldErrors().stream()
                 .map(field -> field.getField() + " " + field.getDefaultMessage())
                 .sorted()
                 .collect(Collectors.joining("; "));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!message.isBlank()) {
             return message;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return "请求参数校验失败";
     }
 
+    /**
+     * 从 MDC 中读取当前 traceId。
+     *
+     * @return 当前 traceId，缺失时为空
+     */
     private Optional<String> optionalTraceId() {
         return Optional.ofNullable(MDC.get(TRACE_ID_MDC_KEY))
                 .filter(traceId -> !traceId.isBlank());
     }
 
+    /**
+     * 获取当前 traceId，缺失时生成新的兜底 UUID。
+     *
+     * @return 可用于错误响应的 traceId
+     */
     private String currentTraceId() {
         return optionalTraceId()
                 .orElseGet(() -> UUID.randomUUID().toString());

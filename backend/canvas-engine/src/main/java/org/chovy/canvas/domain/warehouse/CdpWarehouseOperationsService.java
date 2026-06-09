@@ -11,6 +11,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+/**
+ * CdpWarehouseOperationsService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpWarehouseOperationsService {
 
     private static final int MAX_BACKFILL_LIMIT = 5000;
@@ -36,6 +39,14 @@ public class CdpWarehouseOperationsService {
     private final CdpWarehouseSyncRunMapper runMapper;
     private final CdpWarehouseWatermarkMapper watermarkMapper;
 
+    /**
+     * 初始化 CdpWarehouseOperationsService 实例。
+     *
+     * @param backfillService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param aggregationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param watermarkMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpWarehouseOperationsService(CdpWarehouseBackfillService backfillService,
                                          CdpWarehouseAggregationService aggregationService,
                                          CdpWarehouseSyncRunMapper runMapper,
@@ -46,6 +57,13 @@ public class CdpWarehouseOperationsService {
         this.watermarkMapper = watermarkMapper;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 status 流程生成的业务结果。
+     */
     public WarehouseStatus status(Long tenantId, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         int boundedLimit = boundStatusLimit(limit);
@@ -64,20 +82,49 @@ public class CdpWarehouseOperationsService {
                 safeList(watermarks).stream().map(this::toWatermarkRow).toList());
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param lastId 业务对象 ID，用于定位具体记录。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 triggerBackfill 流程生成的业务结果。
+     */
     public CdpWarehouseBackfillService.BackfillResult triggerBackfill(
             Long tenantId, Long lastId, int limit, String operator) {
         requireBackfillLimit(limit);
         return backfillService.backfill(normalizeTenant(tenantId), lastId, limit, normalizeOperator(operator));
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 triggerAggregation 流程生成的业务结果。
+     */
     public CdpWarehouseAggregationService.AggregationResult triggerAggregation(
             Long tenantId, LocalDateTime from, LocalDateTime to, String operator) {
         return aggregationService.aggregate(normalizeTenant(tenantId), from, to, normalizeOperator(operator));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param backfillLimit backfill limit 参数，用于 planOfflineCycle 流程中的校验、计算或对象转换。
+     * @param aggregationWindowMinutes aggregation window minutes 参数，用于 planOfflineCycle 流程中的校验、计算或对象转换。
+     * @return 返回 planOfflineCycle 流程生成的业务结果。
+     */
     public OfflineCyclePlan planOfflineCycle(
             Long tenantId, LocalDateTime now, int backfillLimit, int aggregationWindowMinutes) {
+        // 准备本次处理所需的上下文和中间变量。
         requireBackfillLimit(backfillLimit);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (aggregationWindowMinutes <= 0) {
             throw new IllegalArgumentException("aggregationWindowMinutes must be positive");
         }
@@ -85,6 +132,7 @@ public class CdpWarehouseOperationsService {
         LocalDateTime effectiveNow = now == null ? LocalDateTime.now() : now;
         long lastEventId = parseLongWatermark(findWatermark(scopedTenantId, BACKFILL_JOB, BACKFILL_WATERMARK), 0L);
         AggregationWindow aggregationWindow = nextAggregationWindow(scopedTenantId, effectiveNow, aggregationWindowMinutes);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new OfflineCyclePlan(
                 scopedTenantId,
                 effectiveNow,
@@ -118,18 +166,30 @@ public class CdpWarehouseOperationsService {
                                 aggregationWindow.to())));
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param backfillLimit backfill limit 参数，用于 runOfflineCycle 流程中的校验、计算或对象转换。
+     * @param aggregationWindowMinutes aggregation window minutes 参数，用于 runOfflineCycle 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回流程执行后的业务结果。
+     */
     public OfflineCycleResult runOfflineCycle(
             Long tenantId,
             LocalDateTime now,
             int backfillLimit,
             int aggregationWindowMinutes,
             String operator) {
+        // 准备本次处理所需的上下文和中间变量。
         OfflineCyclePlan plan = planOfflineCycle(tenantId, now, backfillLimit, aggregationWindowMinutes);
         Long scopedTenantId = plan.tenantId();
         OfflineCycleStepPlan backfillPlan = plan.steps().get(0);
         OfflineCycleStepPlan aggregationPlan = plan.steps().get(1);
         String actor = normalizeOperator(operator);
         CdpWarehouseSyncRunDO run = newOfflineCycleRun(scopedTenantId, backfillPlan, aggregationPlan, actor);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         runMapper.insert(run);
 
         CdpWarehouseBackfillService.BackfillResult backfillResult = null;
@@ -232,6 +292,7 @@ public class CdpWarehouseOperationsService {
         run.setErrorMessage(error);
         run.setFinishedAt(LocalDateTime.now());
         runMapper.updateById(run);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new OfflineCycleResult(
                 run.getId(),
                 scopedTenantId,
@@ -242,6 +303,13 @@ public class CdpWarehouseOperationsService {
                 List.of(backfillStep, aggregationStep));
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回流程执行后的业务结果。
+     */
     public CdpWarehouseBackfillService.BackfillResult runIncrementalBackfill(Long tenantId, int limit) {
         requireBackfillLimit(limit);
         Long scopedTenantId = normalizeTenant(tenantId);
@@ -249,8 +317,17 @@ public class CdpWarehouseOperationsService {
         return backfillService.backfill(scopedTenantId, lastId, limit, SCHEDULER_OPERATOR);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param windowMinutes window minutes 参数，用于 runIncrementalAggregation 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     public CdpWarehouseAggregationService.AggregationResult runIncrementalAggregation(
             Long tenantId, LocalDateTime now, int windowMinutes) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (windowMinutes <= 0) {
             throw new IllegalArgumentException("windowMinutes must be positive");
         }
@@ -266,14 +343,32 @@ public class CdpWarehouseOperationsService {
         if (!from.isBefore(to)) {
             return new CdpWarehouseAggregationService.AggregationResult("SKIPPED", 0, 0);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return aggregationService.aggregate(scopedTenantId, from, to, SCHEDULER_OPERATOR);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param backfillLimit backfill limit 参数，用于 runScheduledOfflineCycle 流程中的校验、计算或对象转换。
+     * @param aggregationWindowMinutes aggregation window minutes 参数，用于 runScheduledOfflineCycle 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     public OfflineCycleResult runScheduledOfflineCycle(Long tenantId, LocalDateTime now, int backfillLimit,
                                                        int aggregationWindowMinutes) {
         return runOfflineCycle(tenantId, now, backfillLimit, aggregationWindowMinutes, SCHEDULER_OPERATOR);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param jobName 名称文本，用于展示或唯一性校验。
+     * @param type 类型标识，用于选择对应处理分支。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private CdpWarehouseWatermarkDO findWatermark(Long tenantId, String jobName, String type) {
         return watermarkMapper.selectOne(new LambdaQueryWrapper<CdpWarehouseWatermarkDO>()
                 .eq(CdpWarehouseWatermarkDO::getTenantId, tenantId)
@@ -282,6 +377,14 @@ public class CdpWarehouseOperationsService {
                 .last("LIMIT 1"));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param windowMinutes window minutes 参数，用于 nextAggregationWindow 流程中的校验、计算或对象转换。
+     * @return 返回 nextAggregationWindow 流程生成的业务结果。
+     */
     private AggregationWindow nextAggregationWindow(Long tenantId, LocalDateTime now, int windowMinutes) {
         LocalDateTime from = parseTimeWatermark(
                 findWatermark(tenantId, AGGREGATE_JOB, AGGREGATE_WATERMARK),
@@ -293,6 +396,15 @@ public class CdpWarehouseOperationsService {
         return new AggregationWindow(from, to, from.isBefore(to));
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param backfillPlan backfill plan 参数，用于 newOfflineCycleRun 流程中的校验、计算或对象转换。
+     * @param aggregationPlan aggregation plan 参数，用于 newOfflineCycleRun 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 newOfflineCycleRun 流程生成的业务结果。
+     */
     private CdpWarehouseSyncRunDO newOfflineCycleRun(
             Long tenantId,
             OfflineCycleStepPlan backfillPlan,
@@ -313,6 +425,12 @@ public class CdpWarehouseOperationsService {
         return run;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param run run 参数，用于 toRunRow 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private RunRow toRunRow(CdpWarehouseSyncRunDO run) {
         return new RunRow(
                 run.getId(),
@@ -331,6 +449,12 @@ public class CdpWarehouseOperationsService {
                 run.getCreatedBy());
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param watermark watermark 参数，用于 toWatermarkRow 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private WatermarkRow toWatermarkRow(CdpWarehouseWatermarkDO watermark) {
         return new WatermarkRow(
                 watermark.getId(),
@@ -341,6 +465,12 @@ public class CdpWarehouseOperationsService {
                 watermark.getUpdatedAt());
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundStatusLimit(int limit) {
         if (limit <= 0) {
             return 20;
@@ -348,12 +478,24 @@ public class CdpWarehouseOperationsService {
         return Math.min(limit, MAX_STATUS_LIMIT);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     */
     private void requireBackfillLimit(int limit) {
         if (limit <= 0 || limit > MAX_BACKFILL_LIMIT) {
             throw new IllegalArgumentException("limit must be between 1 and " + MAX_BACKFILL_LIMIT);
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param watermark watermark 参数，用于 parseLongWatermark 流程中的校验、计算或对象转换。
+     * @param defaultValue 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private long parseLongWatermark(CdpWarehouseWatermarkDO watermark, long defaultValue) {
         if (watermark == null || watermark.getWatermarkValue() == null) {
             return defaultValue;
@@ -366,6 +508,13 @@ public class CdpWarehouseOperationsService {
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param watermark watermark 参数，用于 parseTimeWatermark 流程中的校验、计算或对象转换。
+     * @param defaultValue 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private LocalDateTime parseTimeWatermark(CdpWarehouseWatermarkDO watermark, LocalDateTime defaultValue) {
         if (watermark == null || watermark.getWatermarkValue() == null) {
             return defaultValue;
@@ -377,6 +526,12 @@ public class CdpWarehouseOperationsService {
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOperator(String operator) {
         if (operator == null || operator.isBlank()) {
             return "operator";
@@ -384,6 +539,13 @@ public class CdpWarehouseOperationsService {
         return operator;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     * @param fallback fallback 参数，用于 limit 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String limit(String message, String fallback) {
         String value = message == null || message.isBlank() ? fallback : message;
         if (value.length() <= MAX_ERROR_LENGTH) {
@@ -392,24 +554,48 @@ public class CdpWarehouseOperationsService {
         return value.substring(0, MAX_ERROR_LENGTH);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 null to zero 计算得到的数量、金额或指标值。
+     */
     private long nullToZero(Long value) {
         return value == null ? 0L : value;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * WarehouseStatus 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record WarehouseStatus(
             Long tenantId,
             List<RunRow> recentRuns,
             List<WatermarkRow> watermarks) {
     }
 
+    /**
+     * RunRow 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record RunRow(
             Long id,
             String jobType,
@@ -427,6 +613,9 @@ public class CdpWarehouseOperationsService {
             String createdBy) {
     }
 
+    /**
+     * WatermarkRow 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record WatermarkRow(
             Long id,
             String jobName,
@@ -436,6 +625,9 @@ public class CdpWarehouseOperationsService {
             LocalDateTime updatedAt) {
     }
 
+    /**
+     * OfflineCyclePlan 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record OfflineCyclePlan(
             Long tenantId,
             LocalDateTime generatedAt,
@@ -444,6 +636,9 @@ public class CdpWarehouseOperationsService {
             List<OfflineCycleStepPlan> steps) {
     }
 
+    /**
+     * OfflineCycleStepPlan 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record OfflineCycleStepPlan(
             String stepKey,
             String status,
@@ -454,6 +649,9 @@ public class CdpWarehouseOperationsService {
             LocalDateTime windowEnd) {
     }
 
+    /**
+     * OfflineCycleResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record OfflineCycleResult(
             Long runId,
             Long tenantId,
@@ -464,6 +662,9 @@ public class CdpWarehouseOperationsService {
             List<OfflineCycleStepResult> steps) {
     }
 
+    /**
+     * OfflineCycleStepResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record OfflineCycleStepResult(
             String stepKey,
             String status,
@@ -475,6 +676,9 @@ public class CdpWarehouseOperationsService {
             String message) {
     }
 
+    /**
+     * AggregationWindow 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private record AggregationWindow(LocalDateTime from, LocalDateTime to, boolean due) {
     }
 }

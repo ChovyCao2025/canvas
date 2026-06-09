@@ -680,7 +680,8 @@ cd frontend && npm run build
 
 Result: passed.
 
-- [ ] **Step 5: Commit the implementation slice**
+- [x] **Step 5: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

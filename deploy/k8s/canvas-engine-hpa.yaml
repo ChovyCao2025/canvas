@@ -1,3 +1,4 @@
+# Canvas Engine 的水平扩缩容策略，根据 CPU/内存压力调整后端副本数。
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -7,19 +8,24 @@ metadata:
     app.kubernetes.io/name: canvas-engine
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 直接绑定后端 Deployment，HPA 只调整该工作负载的 replicas。
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
     name: canvas-engine
+  # 保持 3 个基础副本覆盖滚动发布、节点维护和单实例故障。
   minReplicas: 3
+  # 限制最大副本数，避免依赖 MySQL、Redis、RocketMQ 被瞬时扩容压垮。
   maxReplicas: 10
   metrics:
+    # CPU 触发业务计算、规则匹配和导出任务带来的扩容。
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
           averageUtilization: 65
+    # 内存触发长连接、缓存和批量查询导致的扩容。
     - type: Resource
       resource:
         name: memory
@@ -28,14 +34,18 @@ spec:
           averageUtilization: 75
   behavior:
     scaleDown:
+      # 缩容等待 5 分钟，避免营销波峰后的短暂回落造成副本抖动。
       stabilizationWindowSeconds: 300
       policies:
+        # 每分钟最多缩掉一半副本，给连接和后台任务自然收敛时间。
         - type: Percent
           value: 50
           periodSeconds: 60
     scaleUp:
+      # 扩容窗口较短，保证突增流量能更快获得新实例。
       stabilizationWindowSeconds: 60
       policies:
+        # 每分钟最多翻倍，平衡响应速度和依赖系统承压能力。
         - type: Percent
           value: 100
           periodSeconds: 60

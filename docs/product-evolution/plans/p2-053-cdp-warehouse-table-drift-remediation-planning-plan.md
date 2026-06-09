@@ -1,10 +1,14 @@
 # CDP Warehouse Table Drift Remediation Planning Implementation Plan
 
+Spec: `../specs/p2-053-cdp-warehouse-table-drift-remediation-planning.md`
+
 **Goal:** Convert table drift inspection evidence into safe, reviewable remediation plans without executing Doris DDL.
 
 **Architecture:** Extend `CdpWarehouseTableGovernanceService` so remediation planning runs a fresh asset/live inspection, maps known violations to conservative steps, and returns executable SQL only for safe property changes. Keep all behavior read-only except the existing inspection evidence write.
 
 **Tech Stack:** Java 21, Spring Boot, Doris SQL text generation, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

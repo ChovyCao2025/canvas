@@ -63,7 +63,17 @@ public class TagDefinitionController {
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(R.ok());
     }
-
+    /**
+     * 查询标签定义列表接口，对应 GET /{tagCode}/values。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 主要委托 tagDefinitionService.listValues 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param tagCode 标签编码。
+     * @param enabled 请求参数，可选。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/{tagCode}/values")
     public Mono<R<List<TagValueDefinitionDO>>> listValues(
             @PathVariable String tagCode,
@@ -74,13 +84,10 @@ public class TagDefinitionController {
     }
 
     /**
-     * 处理 create Value 对应的 HTTP 接口请求。
-     *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @param tagCode tagCode 方法执行所需的业务参数
-     * @param body body 请求体、消息体或事件载荷
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * createValue 创建或触发 web 场景的业务处理。
+     * @param tagCode 业务编码，用于匹配对应类型或状态。
+     * @param body 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回流程执行后的业务结果。
      */
     @PostMapping("/{tagCode}/values")
     public Mono<R<TagValueDefinitionDO>> createValue(@PathVariable String tagCode, @RequestBody TagValueDefinitionDO body) {

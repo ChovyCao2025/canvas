@@ -45,7 +45,15 @@ public class CdpTagOperationController {
         return Mono.fromCallable(() -> R.ok(service.create(req)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
-
+    /**
+     * 查询 CDP 标签操作列表接口，对应 GET 请求。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param limit 返回数量上限，默认值为 20。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping
     public Mono<R<List<CdpTagOperationDO>>> list(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int limit) {
         return Mono.fromCallable(() -> R.ok(service.listRecent(limit)))

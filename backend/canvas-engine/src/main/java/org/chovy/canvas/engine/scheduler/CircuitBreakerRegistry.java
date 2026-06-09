@@ -44,13 +44,28 @@ public class CircuitBreakerRegistry {
     private final String redisPubSubChannel;
     private final RedisScript<String> transitionScript;
 
+    /**
+     * 创建 CircuitBreakerRegistry 实例并注入 engine.scheduler 场景依赖。
+     */
     public CircuitBreakerRegistry() {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         this.redisTemplate = null;
         this.redisKeyPrefix = "cb:";
         this.redisPubSubChannel = "circuit-breaker-events";
         this.transitionScript = null;
     }
 
+    /**
+     * 使用 Redis 后端创建熔断器注册表。
+     *
+     * @param redisTemplate Redis 字符串模板
+     * @param defaultFailureThreshold 默认失败阈值
+     * @param defaultOpenDurationSec 默认打开持续时间，单位秒
+     * @param defaultHalfOpenAttempts 默认半开探测次数
+     * @param redisKeyPrefix Redis 熔断状态 key 前缀
+     * @param redisPubSubChannel Redis 状态事件频道
+     * @param ignoredLocalCacheSize 兼容旧配置的本地缓存大小参数，当前不再使用
+     */
     CircuitBreakerRegistry(StringRedisTemplate redisTemplate,
                            int defaultFailureThreshold,
                            long defaultOpenDurationSec,
@@ -58,6 +73,7 @@ public class CircuitBreakerRegistry {
                            String redisKeyPrefix,
                            String redisPubSubChannel,
                            int ignoredLocalCacheSize) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         this.redisTemplate = Objects.requireNonNull(redisTemplate, "redisTemplate");
         this.defaultFailureThreshold = defaultFailureThreshold;
         this.defaultOpenDurationSec = defaultOpenDurationSec;
@@ -92,23 +108,51 @@ public class CircuitBreakerRegistry {
         });
     }
 
+    /**
+     * 查询指定节点类型的当前熔断状态。
+     *
+     * @param nodeType 节点类型
+     * @return 当前熔断状态
+     */
     CircuitBreaker.State getState(String nodeType) {
         return get(nodeType).currentState();
     }
 
+    /**
+     * 更新本实例中的熔断状态覆盖值。
+     *
+     * @param nodeType 节点类型
+     * @param state Redis 广播过来的最新状态
+     */
     void updateLocalState(String nodeType, CircuitBreaker.State state) {
         get(nodeType).forceState(state);
     }
 
+    /**
+     * 移除本实例缓存的熔断器，让下次读取重新初始化状态。
+     *
+     * @param nodeType 节点类型
+     */
     void invalidateLocalState(String nodeType) {
         registry.remove(nodeType);
     }
 
+    /**
+     * 通过 Redis Lua 脚本执行一次状态机转换。
+     *
+     * @param nodeType 节点类型
+     * @param action 状态机动作
+     * @param threshold 失败阈值
+     * @param openDurationMs 熔断打开持续时间，单位毫秒
+     * @param halfOpenAttempts 半开探测次数
+     * @return Redis 后端返回的转换结果
+     */
     private TransitionResult transitionRedis(String nodeType,
                                              String action,
                                              int threshold,
                                              long openDurationMs,
                                              int halfOpenAttempts) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         String wire = redisTemplate.execute(transitionScript,
                 List.of(redisKeyPrefix + nodeType),
                 action,
@@ -117,6 +161,7 @@ public class CircuitBreakerRegistry {
                 String.valueOf(halfOpenAttempts),
                 String.valueOf(System.currentTimeMillis()),
                 redisPubSubChannel);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return TransitionResult.parse(wire);
     }
 
@@ -154,9 +199,19 @@ public class CircuitBreakerRegistry {
             this(name, failureThreshold, openDurationSec, halfOpenAttempts, null);
         }
 
+        /**
+         * 创建可选 Redis 后端驱动的熔断器。
+         *
+         * @param name 熔断器名称，通常是节点类型
+         * @param failureThreshold 连续失败阈值
+         * @param openDurationSec 熔断打开持续时间，单位秒
+         * @param halfOpenAttempts 半开探测次数
+         * @param backend 状态转换后端，为空时使用本地状态机
+         */
         CircuitBreaker(String name, int failureThreshold,
                        long openDurationSec, int halfOpenAttempts,
                        TransitionBackend backend) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (failureThreshold <= 0) {
                 throw new IllegalArgumentException("failureThreshold must be greater than 0");
             }
@@ -178,6 +233,7 @@ public class CircuitBreakerRegistry {
          * @throws CircuitBreakerOpenException 熔断打开时
          */
         public void checkState() {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (backend != null) {
                 localOverride.set(null);
                 TransitionResult result = backend.transition("CHECK", failureThreshold, openDurationMs, halfOpenAttempts);
@@ -186,6 +242,7 @@ public class CircuitBreakerRegistry {
                 }
                 return;
             }
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             while (true) {
                 BreakerState current = stateRef.get();
                 if (current.state == State.CLOSED) {
@@ -209,6 +266,7 @@ public class CircuitBreakerRegistry {
                 }
                 BreakerState next = current.withHalfTries(current.halfTries + 1);
                 if (stateRef.compareAndSet(current, next)) {
+                    // 汇总前面计算出的状态和明细，返回给调用方。
                     return;
                 }
             }
@@ -229,6 +287,14 @@ public class CircuitBreakerRegistry {
                             : BreakerState.closed();
                     case OPEN -> current.failures == 0
                             ? current
+                            /**
+                             * 执行 BreakerState 流程，围绕 breaker state 完成校验、计算或结果组装。
+                             *
+                             * @param OPEN open 参数，用于 BreakerState 流程中的校验、计算或对象转换。
+                             * @param halfTries half tries 参数，用于 BreakerState 流程中的校验、计算或对象转换。
+                             * @param openedAt 时间参数，用于计算窗口、过期或审计时间。
+                             * @return 返回 BreakerState 流程生成的业务结果。
+                             */
                             : new BreakerState(State.OPEN, 0, current.halfTries, current.openedAt);
                     case HALF_OPEN -> BreakerState.closed();
                 };
@@ -261,13 +327,28 @@ public class CircuitBreakerRegistry {
                 } else {
                     int count = current.failures + 1;
                     next = count >= failureThreshold
+                            /**
+                             * 执行 BreakerState 流程，围绕 breaker state 完成校验、计算或结果组装。
+                             *
+                             * @param OPEN open 参数，用于 BreakerState 流程中的校验、计算或对象转换。
+                             * @param count 分页、数量或序号参数，用于控制处理规模。
+                             * @return 返回 BreakerState 流程生成的业务结果。
+                             */
                             ? new BreakerState(State.OPEN, count, 0, now)
+                            /**
+                             * 执行 BreakerState 流程，围绕 breaker state 完成校验、计算或结果组装。
+                             *
+                             * @param CLOSED closed 参数，用于 BreakerState 流程中的校验、计算或对象转换。
+                             * @param count 分页、数量或序号参数，用于控制处理规模。
+                             * @return 返回 BreakerState 流程生成的业务结果。
+                             */
                             : new BreakerState(State.CLOSED, count, 0, 0);
                 }
 
                 if (stateRef.compareAndSet(current, next)) {
                     if (current.state == State.HALF_OPEN) {
                         log.warn("[CIRCUIT] {} HALF_OPEN → OPEN（探测失败）", name);
+                    // 根据前序判断结果进入后续条件分支。
                     } else if (next.state == State.OPEN) {
                         log.warn("[CIRCUIT] {} CLOSED → OPEN（失败次数={}）", name, next.failures);
                     }
@@ -276,6 +357,11 @@ public class CircuitBreakerRegistry {
             }
         }
 
+        /**
+         * 读取当前状态，优先使用本地覆盖值，其次读取后端状态。
+         *
+         * @return 当前熔断状态
+         */
         State currentState() {
             State override = localOverride.get();
             if (override != null) {
@@ -287,14 +373,29 @@ public class CircuitBreakerRegistry {
             return stateRef.get().state;
         }
 
+        /**
+         * 查询本地连续失败次数。
+         *
+         * @return 本地状态机中的失败计数
+         */
         int failureCount() {
             return stateRef.get().failures;
         }
 
+        /**
+         * 查询本地半开探测次数。
+         *
+         * @return 本地状态机中的半开探测计数
+         */
         int halfOpenTryCount() {
             return stateRef.get().halfTries;
         }
 
+        /**
+         * 强制设置当前实例可见的熔断状态。
+         *
+         * @param state 目标状态
+         */
         void forceState(State state) {
             if (backend != null) {
                 localOverride.set(state);
@@ -304,16 +405,38 @@ public class CircuitBreakerRegistry {
             stateRef.set(new BreakerState(state, 0, 0, openedAt));
         }
 
+        /**
+         * 本地熔断器状态快照。
+         *
+         * @param state 当前状态
+         * @param failures 连续失败次数
+         * @param halfTries 半开探测次数
+         * @param openedAt 进入 OPEN 状态的时间戳
+         */
         private record BreakerState(State state, int failures, int halfTries, long openedAt) {
+            /**
+             * 创建关闭状态的初始快照。
+             *
+             * @return CLOSED 状态快照
+             */
             static BreakerState closed() {
                 return new BreakerState(State.CLOSED, 0, 0, 0);
             }
 
+            /**
+             * 复制当前状态并更新半开探测次数。
+             *
+             * @param halfTries 新的半开探测次数
+             * @return 更新后的状态快照
+             */
             BreakerState withHalfTries(int halfTries) {
                 return new BreakerState(state, failures, halfTries, openedAt);
             }
         }
 
+        /**
+         * 熔断器状态。
+         */
         enum State {
             /** 熔断关闭，正常放行并统计连续失败。 */
             CLOSED,
@@ -324,12 +447,37 @@ public class CircuitBreakerRegistry {
         }
     }
 
+    /**
+     * 熔断状态转换后端。
+     */
     @FunctionalInterface
     interface TransitionBackend {
+        /**
+         * 执行一次状态转换动作。
+         *
+         * @param action 状态机动作
+         * @param threshold 失败阈值
+         * @param openDurationMs 熔断打开持续时间，单位毫秒
+         * @param halfOpenAttempts 半开探测次数
+         * @return 转换后的状态结果
+         */
         TransitionResult transition(String action, int threshold, long openDurationMs, int halfOpenAttempts);
     }
 
+    /**
+     * Redis 或本地状态机转换结果。
+     *
+     * @param state 转换后的状态
+     * @param allowed 当前请求是否允许继续
+     * @param changed 本次动作是否导致状态变化
+     */
     record TransitionResult(CircuitBreaker.State state, boolean allowed, boolean changed) {
+        /**
+         * 解析 Redis Lua 脚本返回的线协议。
+         *
+         * @param wire 形如 STATE|allowed|changed 的返回值
+         * @return 转换结果
+         */
         static TransitionResult parse(String wire) {
             if (wire == null || wire.isBlank()) {
                 return new TransitionResult(CircuitBreaker.State.CLOSED, true, false);

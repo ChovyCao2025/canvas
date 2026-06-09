@@ -32,6 +32,11 @@ public class RedisConfig {
         return new ReactiveStringRedisTemplate(factory);
     }
 
+    /**
+     * redisMessageListenerContainer 处理 config 场景的业务逻辑。
+     * @param factory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @return 返回 redis message listener container 汇总后的集合、分页或映射视图。
+     */
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
             RedisConnectionFactory factory) {

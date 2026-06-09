@@ -1,5 +1,9 @@
 # CDP Warehouse E2E Certification History Implementation Plan
 
+Spec: `../specs/p2-067-cdp-warehouse-e2e-certification-history.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Persist P2-066 physical E2E certification runs so warehouse production readiness decisions are auditable.

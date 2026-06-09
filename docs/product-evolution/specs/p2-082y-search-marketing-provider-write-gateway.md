@@ -1,8 +1,9 @@
 # P2-082Y - Search Marketing Provider Write Gateway Spec
 
+Priority: P2
+Sequence: 082Y
 Parent spec: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082y-search-marketing-provider-write-gateway-plan.md`
-Status: Delivered backend first slice
 
 ## Problem
 
@@ -60,9 +61,9 @@ Each mutation must include a provider source, mutation type, entity type, idempo
 - Controller tests prove tenant/operator propagation for propose, approve, execute, and list endpoints.
 - Focused backend tests pass with Java 21.
 
-## Delivery Status
+## Implementation Status
 
-Delivered backend first slice on 2026-06-06:
+Status: Delivered backend first slice on 2026-06-06.
 
 - Additive Flyway migration `V338__search_marketing_mutation_gateway.sql`.
 - Tenant-scoped `search_marketing_mutation` ledger with mutation key, idempotency key, request hash, approval status, dry-run/apply status, sanitized payload, provider request/response evidence, and error fields.

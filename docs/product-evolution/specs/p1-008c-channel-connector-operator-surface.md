@@ -2,7 +2,7 @@
 
 Priority: P1
 Sequence: 008C
-Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/bmad-product-review-2026-05.md`
+Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`
 Implementation plan: `../plans/p1-008c-channel-connector-operator-surface-plan.md`
 
 ## Goal
@@ -44,7 +44,7 @@ Expose connector modes, health, provider limits, fallback decisions, and dedupe 
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05; broader Maven focused backend testing is still blocked by unrelated testCompile failures.
 
 - Backend `ChannelConnectorController` exposes connector list, limits, mode update, health test, fallback validation, fallback decisions, and dedupe records with tenant-scoped service access.
 - Frontend `channelConnectorApi`, channel connector page, and presentation helpers expose mode/health badges, provider limits, fallback decisions, and dedupe records.

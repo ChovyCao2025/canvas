@@ -5,6 +5,8 @@ Sequence: 079
 Source: `docs/product-evolution/specs/p2-077-cdp-warehouse-privacy-audience-bitmap-rebuild-automation.md`, `docs/product-evolution/specs/p2-078-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-operations-api.md`
 Implementation plan: `../plans/p2-079-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-run-history-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Persist manual and scheduled privacy audience bitmap rebuild automation cycles as tenant-scoped run history so production operators can audit what ran, when it ran, which source triggered it, and what P2-077 returned.

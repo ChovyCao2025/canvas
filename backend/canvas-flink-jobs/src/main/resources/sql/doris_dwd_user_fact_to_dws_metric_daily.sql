@@ -1,5 +1,6 @@
 -- pipeline: doris_dwd_user_fact_to_dws_metric_daily
 -- sink: canvas_dws.user_event_metric_daily
+-- Purpose: aggregate normalized user-event facts into daily per-user metrics.
 CREATE TABLE doris_cdp_user_event_fact_dwd_source (
     tenant_id BIGINT,
     user_id STRING,
@@ -20,6 +21,7 @@ CREATE TABLE doris_cdp_user_event_fact_dwd_source (
     'password' = '${DORIS_PASSWORD}'
 );
 
+-- DWS daily metrics feed dashboards and audience/readiness checks.
 CREATE TABLE doris_user_event_metric_daily_dws_sink (
     stat_date DATE,
     tenant_id BIGINT,
@@ -48,6 +50,7 @@ SELECT
     user_id,
     event_code,
     COUNT(*) AS count_value,
+    -- Numeric aggregation columns are reserved for future typed event-property metrics.
     CAST(0 AS DOUBLE) AS numeric_sum,
     MAX(CAST(NULL AS DOUBLE)) AS max_numeric,
     MAX(event_time) AS latest_event_time

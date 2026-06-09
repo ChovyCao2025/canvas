@@ -59,6 +59,13 @@ public class TagImportSourceService {
     /** 统一阻塞适配器，避免在 Netty 事件循环线程上等待远程调用结果。 */
     private final BlockingWorkScheduler blockingWorkScheduler;
 
+    /**
+     * 创建 TagImportSourceService 实例并注入 domain.meta 场景依赖。
+     * @param tagImportSourceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param tagImportService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param webClientBuilder 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public TagImportSourceService(TagImportSourceMapper tagImportSourceMapper,
                                   TagImportService tagImportService,
@@ -182,6 +189,7 @@ public class TagImportSourceService {
                 }
             }
             return current;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ex) {
             throw new IllegalArgumentException("invalid headersJson", ex);
         }
@@ -191,6 +199,7 @@ public class TagImportSourceService {
     private Object parseBodyTemplate(String bodyTemplate) {
         try {
             return objectMapper.readValue(bodyTemplate, Object.class);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ex) {
             throw new IllegalArgumentException("invalid bodyTemplate", ex);
         }
@@ -202,6 +211,7 @@ public class TagImportSourceService {
         JsonNode recordsNode;
         if ("$".equals(recordsPath)) {
             recordsNode = response;
+        // 根据前序判断结果进入后续条件分支。
         } else if ("$.data".equals(recordsPath)) {
             if (response == null || !response.isObject()) {
                 throw new IllegalArgumentException("recordsPath $.data requires response object");
@@ -234,8 +244,10 @@ public class TagImportSourceService {
                 throw new IllegalArgumentException("fieldMapping is required");
             }
             return normalized;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IllegalArgumentException ex) {
             throw ex;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ex) {
             throw new IllegalArgumentException("invalid fieldMapping", ex);
         }
@@ -273,6 +285,7 @@ public class TagImportSourceService {
 
     /** 兼容多种时间对象和默认字符串格式，解析标签发生时间。 */
     private static LocalDateTime parseTagTime(Object value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null) {
             return null;
         }
@@ -292,11 +305,13 @@ public class TagImportSourceService {
         if (text.isEmpty()) {
             return null;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return LocalDateTime.parse(text, TAG_TIME_FORMATTER);
     }
 
     /** 校验来源配置必填字段并规范化请求、路径和模板字段。 */
     private static void validateAndNormalize(TagImportSourceDO body) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (body == null) {
             throw new IllegalArgumentException("tag import source body is required");
         }
@@ -326,6 +341,7 @@ public class TagImportSourceService {
 
     /** 为来源配置写入启用、请求方法、分页大小和记录路径默认值。 */
     private static void applyDefaults(TagImportSourceDO body) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (body.getEnabled() == null) {
             body.setEnabled(1);
         }
@@ -376,6 +392,12 @@ public class TagImportSourceService {
         return value != null && !value.trim().isEmpty();
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeHeaderName(String value) {
         if (!hasText(value)) {
             throw new IllegalArgumentException("headersJson 包含空请求头名");

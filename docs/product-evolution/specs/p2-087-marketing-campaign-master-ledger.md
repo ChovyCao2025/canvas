@@ -5,6 +5,8 @@ Sequence: 087
 Source: user-requested marketing middle-platform production completeness gap
 Implementation plan: `../plans/p2-087-marketing-campaign-master-ledger-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add the campaign master-data ledger that turns the marketing middle platform from a control-plane summary into an operator-managed glue layer. A campaign must be represented once per tenant and linked to the journeys, content releases, paid-media assets, measurement dashboards, and provider-write gateways required for launch.

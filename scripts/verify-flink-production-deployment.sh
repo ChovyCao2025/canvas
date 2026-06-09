@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROD_IMAGE="registry.example.com/marketing-canvas/canvas-flink-jobs:prod"
 
+# Realtime warehouse cutover depends on these four Flink SQL pipelines being deployed together.
 REQUIRED_PIPELINES=(
   "mysql_cdp_event_log_to_doris_ods"
   "mysql_canvas_trace_to_doris_ods"
@@ -11,6 +12,7 @@ REQUIRED_PIPELINES=(
   "doris_dwd_user_fact_to_dws_metric_daily"
 )
 
+# Secret keys consumed by submitter jobs and Flink runtime containers.
 REQUIRED_SECRET_KEYS=(
   "canvas-flink-mysql-url"
   "canvas-flink-mysql-username"
@@ -24,6 +26,7 @@ REQUIRED_SECRET_KEYS=(
   "canvas-flink-internal-api-token"
 )
 
+# Prometheus alerts that must exist before production cutover is considered observable.
 REQUIRED_ALERTS=(
   "CanvasFlinkJobManagerDown"
   "CanvasFlinkTaskManagerMissing"
@@ -45,11 +48,13 @@ path() {
   printf '%s/%s' "${ROOT_DIR}" "$1"
 }
 
+# Assert that a repository-relative file exists before inspecting its contents.
 require_file() {
   local relative_path="$1"
   [[ -f "$(path "${relative_path}")" ]] || fail "missing required file: ${relative_path}"
 }
 
+# Verify a manifest/runbook/source file contains a required static contract string.
 require_contains() {
   local relative_path="$1"
   local expected="$2"
@@ -57,6 +62,7 @@ require_contains() {
     || fail "${relative_path} does not contain required text: ${expected}"
 }
 
+# Guard against accidentally deploying the upstream bare Flink image instead of the product image.
 require_not_contains() {
   local relative_path="$1"
   local unexpected="$2"
@@ -65,12 +71,14 @@ require_not_contains() {
   fi
 }
 
+# Count exact fixed-string occurrences in a file; used for static manifest cardinality checks.
 count_fixed() {
   local relative_path="$1"
   local pattern="$2"
   grep -F -- "${pattern}" "$(path "${relative_path}")" | wc -l | tr -d ' '
 }
 
+# Ensure production manifests always use the internal runtime image with bundled SQL jobs.
 reject_bare_flink_image() {
   local manifests=(
     "deploy/k8s/canvas-flink-jobmanager-deployment.yaml"
@@ -85,6 +93,7 @@ reject_bare_flink_image() {
   log "PASS static production manifests do not use the bare Flink image"
 }
 
+# Check both raw Kubernetes manifests and Helm prod values point at the immutable production image.
 require_static_runtime_image() {
   require_contains "deploy/k8s/canvas-flink-jobmanager-deployment.yaml" "image: ${PROD_IMAGE}"
   require_contains "deploy/k8s/canvas-flink-taskmanager-deployment.yaml" "image: ${PROD_IMAGE}"
@@ -94,6 +103,7 @@ require_static_runtime_image() {
   log "PASS static and Helm production values point at ${PROD_IMAGE}"
 }
 
+# Validate the static submitter manifest defines one Kubernetes Job per required pipeline.
 require_static_submitter_jobs() {
   local submitter="deploy/k8s/canvas-flink-job-submitter.yaml"
   local job_count
@@ -109,6 +119,7 @@ require_static_submitter_jobs() {
   log "PASS static submitter defines all ${#REQUIRED_PIPELINES[@]} required pipeline jobs"
 }
 
+# Validate the Helm chart renders submitter jobs from the values-driven pipeline list.
 require_helm_submitter_jobs() {
   require_contains "deploy/helm/canvas/values.yaml" "pipelines:"
   require_contains "deploy/helm/canvas/templates/flink-job-submitter.yaml" "range .Values.flink.pipelines"
@@ -120,6 +131,7 @@ require_helm_submitter_jobs() {
   log "PASS Helm submitter renders from the required pipeline list"
 }
 
+# Keep the example Secret, Helm values, and submitter envFrom/keyRef contract aligned.
 require_secret_contract() {
   local secret="deploy/k8s/canvas-flink-secret.example.yaml"
   local values="deploy/helm/canvas/values.yaml"
@@ -134,6 +146,7 @@ require_secret_contract() {
   log "PASS runtime Secret key contract is present in example and static submitter"
 }
 
+# Confirm the Java cutover gate and runbook require the same pipeline set as deployment manifests.
 require_cutover_gate_pipelines() {
   local service="backend/canvas-engine/src/main/java/org/chovy/canvas/domain/warehouse/CdpWarehouseRealtimeCutoverReadinessService.java"
   local runbook="docs/runbooks/flink-production-deployment.md"
@@ -147,6 +160,7 @@ require_cutover_gate_pipelines() {
   log "PASS cutover gate and runbook require all realtime warehouse pipelines"
 }
 
+# Check that production Flink alert rules cover liveness, checkpointing, and backpressure risks.
 require_prometheus_alerts() {
   local alerts="deploy/observability/prometheus/canvas-flink-alert-rules.yml"
   for alert in "${REQUIRED_ALERTS[@]}"; do
@@ -160,6 +174,7 @@ require_prometheus_alerts() {
   fi
 }
 
+# Render the Helm chart when helm is installed, otherwise leave a clear SKIP line for CI logs.
 render_helm_chart_if_available() {
   if ! command -v helm >/dev/null 2>&1; then
     log "SKIP helm template deploy/helm/canvas; helm is not installed"

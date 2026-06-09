@@ -5,6 +5,8 @@ Sequence: 011
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#editor-productivity-beyond-baseline`
 Implementation plan: `../plans/p2-011-editor-productivity-beyond-baseline-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Improve large-canvas productivity with shortcuts, node search, batch operations, context menu, breadcrumbs, recent/favorites, field help, skeleton loading, rich inputs, async validation, auto-save, and table customization.

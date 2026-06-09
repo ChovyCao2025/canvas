@@ -10,6 +10,8 @@
 
 **Implementation status (2026-06-06):** Completed. The actual Flyway migration is `V322__search_marketing_foundation.sql`. Focused search tests passed 8/8, paid-media + creator + search regression passed 23/23, and conversation adapter compatibility tests passed 41/41 after fixing a provider-attribute function invocation compile issue.
 
+Status: Completed on 2026-06-06.
+
 ---
 
 ## Scope

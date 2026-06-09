@@ -29,6 +29,15 @@ public interface CanvasUserQuotaMapper extends BaseMapper<CanvasUserQuotaDO> {
                 total_count = total_count + 1,
                 last_trigger_at = VALUES(last_trigger_at)
             """)
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param triggerDate 时间参数，用于计算窗口、过期或审计时间。
+     * @param lastTriggerAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsertUsage(@Param("canvasId") Long canvasId,
                     @Param("userId") String userId,
                     @Param("triggerDate") LocalDate triggerDate,

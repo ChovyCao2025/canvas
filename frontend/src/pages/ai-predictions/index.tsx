@@ -3,6 +3,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Alert,
   Button,
   Checkbox,
   Col,
@@ -21,6 +22,7 @@ import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import {
   aiPredictionApi,
+  type PredictionReadinessView,
   type PredictionRunView,
   type RiskDistributionItem,
   type TopRiskUser,
@@ -40,24 +42,31 @@ const { Title, Text } = Typography
 
 export default function AiPredictionsPage() {
   const [latestRun, setLatestRun] = useState<PredictionRunView | null>(null)
+  const [readiness, setReadiness] = useState<PredictionReadinessView | null>(null)
   const [distribution, setDistribution] = useState<RiskDistributionItem[]>([])
   const [topRiskUsers, setTopRiskUsers] = useState<TopRiskUser[]>([])
   const [loading, setLoading] = useState(false)
   const [recomputing, setRecomputing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [limit, setLimit] = useState(100)
   const [force, setForce] = useState(false)
 
   const load = async (nextLimit = limit) => {
     setLoading(true)
     try {
-      const [runRes, distributionRes, topRiskRes] = await Promise.all([
+      setError(null)
+      const [runRes, readinessRes, distributionRes, topRiskRes] = await Promise.all([
         aiPredictionApi.latestRun(),
+        aiPredictionApi.readiness(),
         aiPredictionApi.churnDistribution(),
         aiPredictionApi.topRiskUsers(nextLimit),
       ])
       setLatestRun(runRes.data ?? null)
+      setReadiness(readinessRes.data ?? null)
       setDistribution(distributionRes.data ?? [])
       setTopRiskUsers(topRiskRes.data ?? [])
+    } catch (err) {
+      setError('预测数据加载失败')
     } finally {
       setLoading(false)
     }
@@ -70,10 +79,13 @@ export default function AiPredictionsPage() {
   const runRecompute = async () => {
     setRecomputing(true)
     try {
+      setError(null)
       const res = await aiPredictionApi.recompute({ force, limit })
       setLatestRun(res.data)
       message.success('预测已重新计算')
       await load(limit)
+    } catch (err) {
+      setError('预测重新计算失败')
     } finally {
       setRecomputing(false)
     }
@@ -81,6 +93,8 @@ export default function AiPredictionsPage() {
 
   const total = useMemo(() => distributionTotal(distribution), [distribution])
   const ordered = useMemo(() => orderedDistribution(distribution), [distribution])
+  const readinessDisabled = readiness?.recomputeEnabled === false
+  const recomputeDisabled = latestRun?.status === 'RUNNING' || loading || readinessDisabled
 
   const columns: ColumnsType<TopRiskUser> = [
     {
@@ -131,11 +145,27 @@ export default function AiPredictionsPage() {
           />
           <Checkbox checked={force} onChange={event => setForce(event.target.checked)}>强制重算</Checkbox>
           <Button icon={<ReloadOutlined />} onClick={() => load(limit)} loading={loading}>刷新</Button>
-          <Button type="primary" icon={<ThunderboltOutlined />} onClick={runRecompute} loading={recomputing}>
+          <Button
+            type="primary"
+            icon={<ThunderboltOutlined />}
+            onClick={runRecompute}
+            loading={recomputing}
+            disabled={recomputeDisabled}
+          >
             重新计算
           </Button>
         </Space>
       </div>
+
+      {error ? <Alert type="error" showIcon message={error} /> : null}
+      {readinessDisabled ? (
+        <Alert
+          type="info"
+          showIcon
+          message="预测重算暂未启用"
+          description={readiness?.disabledReason ?? 'canvas.ai.prediction.enabled must be true to recompute predictions'}
+        />
+      ) : null}
 
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 4 }}>
         <Descriptions.Item label="状态">

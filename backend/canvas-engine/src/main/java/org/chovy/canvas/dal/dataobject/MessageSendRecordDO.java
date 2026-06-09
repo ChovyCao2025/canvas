@@ -34,6 +34,7 @@ public class MessageSendRecordDO {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    /** 所属租户 ID */
     @TableField("tenant_id")
     private Long tenantId;
 

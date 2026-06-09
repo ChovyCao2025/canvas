@@ -113,12 +113,9 @@ public class MetaController {
     }
 
     /**
-     * 处理 get Options 对应的 HTTP 接口请求。
-     *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @param category category 方法执行所需的业务参数
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * getOptions 查询 web 场景的业务数据。
+     * @param category category 参数，用于 getOptions 流程中的校验、计算或对象转换。
+     * @return 返回 get options 汇总后的集合、分页或映射视图。
      */
     @GetMapping("/options")
     public Mono<R<List<StubOption>>> getOptions(@RequestParam String category) {
@@ -130,12 +127,9 @@ public class MetaController {
     }
 
     /**
-     * 处理 get Options Batch 对应的 HTTP 接口请求。
-     *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @param categories categories 方法执行所需的业务参数
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * getOptionsBatch 查询 web 场景的业务数据。
+     * @param categories categories 参数，用于 getOptionsBatch 流程中的校验、计算或对象转换。
+     * @return 返回 get options batch 汇总后的集合、分页或映射视图。
      */
     @GetMapping("/options/batch")
     public Mono<R<Map<String, List<StubOption>>>> getOptionsBatch(@RequestParam List<String> categories) {
@@ -166,10 +160,19 @@ public class MetaController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 获取Meta详情接口，对应 GET /ai-providers。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/ai-providers")
     public Mono<R<List<StubOption>>> getAiProviders() {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return currentTenant()
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .flatMap(context -> Mono.fromCallable(() -> aiProviderModelRegistryService
                                 .listProviders(context.tenantId())
                                 .stream()
@@ -181,10 +184,19 @@ public class MetaController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 获取Meta详情接口，对应 GET /ai-templates。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/ai-templates")
     public Mono<R<List<StubOption>>> getAiTemplates() {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return currentTenant()
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .flatMap(context -> Mono.fromCallable(() -> aiPromptTemplateService
                                 .listTemplates(context.tenantId())
                                 .stream()
@@ -195,10 +207,20 @@ public class MetaController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 获取Meta详情接口，对应 GET /ai-models。
+     * 接口先解析当前租户上下文，按租户隔离读取数据。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param providerId provider ID，可选。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/ai-models")
     public Mono<R<List<StubOption>>> getAiModels(@RequestParam(required = false) Long providerId) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return currentTenant()
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .flatMap(context -> Mono.fromCallable(() -> aiProviderModelRegistryService
                                 .listModels(context.tenantId(), providerId)
                                 .stream()
@@ -216,16 +238,19 @@ public class MetaController {
     public Mono<R<List<Map<String, Object>>>> getMqDefinitions() {
         return Mono.fromCallable(() -> {
             List<org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO> defs =
+                    // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                     mqMapper.selectList(
                             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
                                     org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO>()
                                     .eq(org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO::getEnabled, 1)
                                     .orderByAsc(org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO::getId));
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             return defs.stream().map(d -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
                 m.put(MapFieldKeys.VALUE, d.getMessageCode());
                 m.put(MapFieldKeys.LABEL, d.getName());
                 m.put(MapFieldKeys.REQUEST_SCHEMA, d.getRequestSchema() != null ? d.getRequestSchema() : "[]");
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return m;
             }).collect(Collectors.toList());
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
@@ -267,11 +292,13 @@ public class MetaController {
     @GetMapping("/ab-experiments")
     public Mono<R<List<StubOption>>> getAbExperiments() {
         return Mono.fromCallable(() -> {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             List<AbExperimentDO> experiments = abExperimentMapper.selectList(
                     new LambdaQueryWrapper<AbExperimentDO>()
                             .eq(AbExperimentDO::getEnabled, 1)
                             .orderByAsc(AbExperimentDO::getId)
             );
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             return experiments.stream()
                     .map(e -> new StubOption(e.getExperimentKey(), e.getName()))
                     .collect(Collectors.toList());
@@ -309,17 +336,20 @@ public class MetaController {
     @GetMapping("/api-definitions")
     public Mono<R<List<Map<String, Object>>>> getApiDefinitions() {
         return Mono.fromCallable(() -> {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             List<ApiDefinitionDO> defs = apiDefinitionMapper.selectList(
                     new LambdaQueryWrapper<ApiDefinitionDO>()
                             .eq(ApiDefinitionDO::getEnabled, 1)
                             .orderByAsc(ApiDefinitionDO::getId)
             );
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             return defs.stream().map(def -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
                 m.put(MapFieldKeys.VALUE, def.getApiKey());
                 m.put(MapFieldKeys.LABEL, def.getName());
                 m.put(MapFieldKeys.REQUEST_SCHEMA, def.getRequestSchema() != null ? def.getRequestSchema() : "[]");
                 m.put(MapFieldKeys.INCLUDE_CONTEXT_PAYLOAD, def.getIncludeContextPayload() != null ? def.getIncludeContextPayload() : 0);
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return m;
             }).collect(Collectors.toList());
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
@@ -367,15 +397,13 @@ public class MetaController {
     }
 
     /**
-     * 处理 get Tagger Tag Values 对应的 HTTP 接口请求。
-     *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @param tagCode tagCode 方法执行所需的业务参数
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * getTaggerTagValues 查询 web 场景的业务数据。
+     * @param tagCode 业务编码，用于匹配对应类型或状态。
+     * @return 返回 get tagger tag values 汇总后的集合、分页或映射视图。
      */
     @GetMapping("/tagger-tag-values")
     public Mono<R<List<StubOption>>> getTaggerTagValues(@RequestParam String tagCode) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return Mono.fromCallable(() -> tagDefinitionService.listValues(tagCode, 1).stream()
                         .map(item -> new StubOption(item.getValue(), item.getLabel()))
                         .collect(Collectors.toList()))
@@ -392,10 +420,20 @@ public class MetaController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 获取Meta详情接口，对应 GET /identity-types。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 主要委托 identityTypeService.list 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param allowImport 请求参数，默认值为 1。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/identity-types")
     public Mono<R<List<StubOption>>> getIdentityTypes(
             @RequestParam(defaultValue = "1") Integer allowImport) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return Mono.fromCallable(() -> identityTypeService.list(1, allowImport).stream()
                         .map(item -> new StubOption(item.getCode(), item.getName()))
                         .collect(Collectors.toList()))
@@ -410,16 +448,19 @@ public class MetaController {
     public Mono<R<List<Map<String, Object>>>> getEventDefinitions() {
         return Mono.fromCallable(() -> {
             List<org.chovy.canvas.dal.dataobject.EventDefinitionDO> defs =
+                    // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                     eventDefinitionMapper.selectList(
                             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
                                     org.chovy.canvas.dal.dataobject.EventDefinitionDO>()
                                     .eq(org.chovy.canvas.dal.dataobject.EventDefinitionDO::getEnabled, 1)
                                     .orderByAsc(org.chovy.canvas.dal.dataobject.EventDefinitionDO::getId));
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             return defs.stream().map(d -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
                 m.put(MapFieldKeys.VALUE, d.getEventCode());
                 m.put(MapFieldKeys.LABEL, d.getName());
                 m.put(MapFieldKeys.REQUEST_SCHEMA, d.getAttributes() != null ? d.getAttributes() : "[]");
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return m;
             }).collect(Collectors.toList());
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
@@ -494,6 +535,7 @@ public class MetaController {
                             String type = str(a.getOrDefault("type", "STRING"));
                             fields.add(field(key, name + "（" + evt.getName() + "）", type, "EVENT_TRIGGER"));
                         }
+                    // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                     } catch (Exception ignored) {
                     }
                 }
@@ -524,6 +566,7 @@ public class MetaController {
                             String type = str(f.getOrDefault("type", "STRING"));
                             fields.add(field(key, desc + "（" + def.getName() + "）", type, "API_CALL"));
                         }
+                    // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                     } catch (Exception ignored) {
                     }
                 }
@@ -534,15 +577,13 @@ public class MetaController {
     }
 
     /**
-     * 执行 field 对应的业务逻辑。
+     * 执行 field 流程，围绕 field 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param name name 方法执行所需的业务参数
-     * @param type type 类型标识或分类条件
-     * @param source source 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param name 名称文本，用于展示或唯一性校验。
+     * @param type 类型标识，用于选择对应处理分支。
+     * @param source source 参数，用于 field 流程中的校验、计算或对象转换。
+     * @return 返回 field 流程生成的业务结果。
      */
     private static ContextFieldDO field(String key, String name, String type, String source) {
         ContextFieldDO f = new ContextFieldDO();
@@ -553,17 +594,20 @@ public class MetaController {
         return f;
     }
 
+    /**
+     * 获取当前请求的登录上下文或租户信息。
+     *
+     * @return 返回 currentTenant 流程生成的业务结果。
+     */
     private Mono<TenantContext> currentTenant() {
         return tenantContextResolver.current();
     }
 
     /**
-     * 执行 str 对应的业务逻辑。
+     * 执行 str 流程，围绕 str 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param o o 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param o o 参数，用于 str 流程中的校验、计算或对象转换。
+     * @return 返回 str 生成的文本或业务键。
      */
     private static String str(Object o) {
         return o == null ? "" : String.valueOf(o);

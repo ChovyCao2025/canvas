@@ -44,6 +44,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+/**
+ * MarketingPlatformControlPlaneService 汇总平台控制面能力、证据数据和交付状态。
+ */
 public class MarketingPlatformControlPlaneService {
 
     private static final String LIVE = "LIVE";
@@ -54,14 +57,30 @@ public class MarketingPlatformControlPlaneService {
     private final Clock clock;
 
     @Autowired
+    /**
+     * 初始化 MarketingPlatformControlPlaneService 实例。
+     *
+     * @param evidenceProvider evidence provider 参数，用于 MarketingPlatformControlPlaneService 流程中的校验、计算或对象转换。
+     */
     public MarketingPlatformControlPlaneService(MarketingPlatformControlPlaneEvidenceProvider evidenceProvider) {
         this(evidenceProvider, Clock.systemDefaultZone());
     }
 
+    /**
+     * 初始化 MarketingPlatformControlPlaneService 实例。
+     *
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingPlatformControlPlaneService(Clock clock) {
         this(MarketingPlatformControlPlaneEvidenceProvider.empty(), clock);
     }
 
+    /**
+     * 初始化 MarketingPlatformControlPlaneService 实例。
+     *
+     * @param evidenceProvider evidence provider 参数，用于 MarketingPlatformControlPlaneService 流程中的校验、计算或对象转换。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingPlatformControlPlaneService(MarketingPlatformControlPlaneEvidenceProvider evidenceProvider,
                                          Clock clock) {
         this.evidenceProvider = evidenceProvider == null
@@ -80,6 +99,7 @@ public class MarketingPlatformControlPlaneService {
      * @return 控制面汇总快照，包含生成时间和各能力状态
      */
     public ControlPlaneSummary summary(Long tenantId) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = tenantId == null ? 0L : tenantId;
         MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence =
                 this.evidenceProvider.evidence(scopedTenantId);
@@ -92,9 +112,11 @@ public class MarketingPlatformControlPlaneService {
                 : evidence);
         List<ActionItem> actions = actionItems(capabilities);
         ReadinessGate gate = readinessGate(capabilities, lanes, assets);
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         long liveCount = capabilities.stream()
                 .filter(capability -> LIVE.equals(capability.status()))
                 .count();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ControlPlaneSummary(
                 scopedTenantId,
                 LocalDateTime.now(clock).withNano(0).toString(),
@@ -109,19 +131,35 @@ public class MarketingPlatformControlPlaneService {
                 actions);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param capabilities capabilities 参数，用于 overallStatus 流程中的校验、计算或对象转换。
+     * @return 返回 overall status 生成的文本或业务键。
+     */
     private static String overallStatus(List<CapabilityCard> capabilities) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         boolean needsConfiguration = capabilities.stream()
                 .anyMatch(capability -> CONFIGURATION_REQUIRED.equals(capability.status()));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (needsConfiguration) {
             return CONFIGURATION_REQUIRED;
         }
         boolean apiOnly = capabilities.stream()
                 .anyMatch(capability -> API_ONLY.equals(capability.status()));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return apiOnly ? API_ONLY : "READY";
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 capabilities 流程中的校验、计算或对象转换。
+     * @return 返回 capabilities 汇总后的集合、分页或映射视图。
+     */
     private static List<CapabilityCard> capabilities(
             MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         boolean journeyReady = evidence.publishedJourneyCount() > 0;
         boolean contentReady = evidence.activeContentReleaseCount() > 0;
         boolean monitoringReady = evidence.activeMonitoringSourceCount() > 0
@@ -134,6 +172,7 @@ public class MarketingPlatformControlPlaneService {
                 && campaignLaunchCoverageReady(evidence);
         boolean growthActivityReady = growthActivityReady(evidence);
         boolean integrationContractReady = integrationContractReady(evidence);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return List.of(
                 capability(
                         "campaign-master-ledger",
@@ -337,6 +376,21 @@ public class MarketingPlatformControlPlaneService {
                                 evidence.activeProviderCredentialCount()))));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param displayName 名称文本，用于展示或唯一性校验。
+     * @param domain domain 参数，用于 capability 流程中的校验、计算或对象转换。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param route route 参数，用于 capability 流程中的校验、计算或对象转换。
+     * @param apiRoot api root 参数，用于 capability 流程中的校验、计算或对象转换。
+     * @param surface surface 参数，用于 capability 流程中的校验、计算或对象转换。
+     * @param productionSignals production signals 参数，用于 capability 流程中的校验、计算或对象转换。
+     * @param gaps gaps 参数，用于 capability 流程中的校验、计算或对象转换。
+     * @param evidence evidence 参数，用于 capability 流程中的校验、计算或对象转换。
+     * @return 返回 capability 流程生成的业务结果。
+     */
     private static CapabilityCard capability(String key,
                                              String displayName,
                                              String domain,
@@ -351,29 +405,72 @@ public class MarketingPlatformControlPlaneService {
                 evidence);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param ready ready 参数，用于 readyStatus 流程中的校验、计算或对象转换。
+     * @return 返回 ready status 生成的文本或业务键。
+     */
     private static String readyStatus(boolean ready) {
         return ready ? LIVE : CONFIGURATION_REQUIRED;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param ready ready 参数，用于 gaps 流程中的校验、计算或对象转换。
+     * @param gap gap 参数，用于 gaps 流程中的校验、计算或对象转换。
+     * @return 返回 gaps 汇总后的集合、分页或映射视图。
+     */
     private static List<String> gaps(boolean ready, String gap) {
         return ready ? List.of() : List.of(gap);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param signalKey 业务键，用于在同一租户下定位资源。
+     * @param label label 参数，用于 signal 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static EvidenceSignal signal(String signalKey, String label, long value) {
         return new EvidenceSignal(signalKey, label, value, value > 0 ? "PRESENT" : "MISSING");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param signalKey 业务键，用于在同一租户下定位资源。
+     * @param label label 参数，用于 absenceSignal 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 absenceSignal 流程生成的业务结果。
+     */
     private static EvidenceSignal absenceSignal(String signalKey, String label, long value) {
         return new EvidenceSignal(signalKey, label, value, value == 0 ? "PRESENT" : "MISSING");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param signals signals 参数，用于 evidence 流程中的校验、计算或对象转换。
+     * @return 返回 evidence 汇总后的集合、分页或映射视图。
+     */
     private static List<EvidenceSignal> evidence(EvidenceSignal... signals) {
         return List.of(signals);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param capabilities capabilities 参数，用于 integrationLanes 流程中的校验、计算或对象转换。
+     * @return 返回 integration lanes 汇总后的集合、分页或映射视图。
+     */
     private static List<IntegrationLane> integrationLanes(List<CapabilityCard> capabilities) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         Map<String, String> capabilityStatuses = capabilities.stream()
                 .collect(Collectors.toMap(CapabilityCard::capabilityKey, CapabilityCard::status));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return List.of(
                 lane(
                         "campaign-to-growth-activities",
@@ -437,6 +534,14 @@ public class MarketingPlatformControlPlaneService {
                         List.of("approval gate", "dry-run-first execution", "mutation audit")));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param capabilityStatuses capability statuses 参数，用于 laneStatus 流程中的校验、计算或对象转换。
+     * @param sourceCapabilityKey 业务键，用于在同一租户下定位资源。
+     * @param targetCapabilityKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 lane status 生成的文本或业务键。
+     */
     private static String laneStatus(Map<String, String> capabilityStatuses,
                                      String sourceCapabilityKey,
                                      String targetCapabilityKey) {
@@ -445,14 +550,23 @@ public class MarketingPlatformControlPlaneService {
         return LIVE.equals(sourceStatus) && LIVE.equals(targetStatus) ? "GOVERNED" : CONFIGURATION_REQUIRED;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 integrationAssets 流程中的校验、计算或对象转换。
+     * @return 返回 integration assets 汇总后的集合、分页或映射视图。
+     */
     private static List<IntegrationAsset> integrationAssets(
             MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
+        // 准备本次处理所需的上下文和中间变量。
         boolean credentialReady = evidence.activeProviderCredentialCount() > 0;
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         boolean contentJourneyReady = evidence.activeContentReleaseCount() > 0 && evidence.publishedJourneyCount() > 0;
         boolean monitoringReady = evidence.activeMonitoringSourceCount() > 0
                 && evidence.enabledAlertChannelCount() > 0
                 && credentialReady;
         boolean paidMediaReady = evidence.enabledPaidMediaDestinationCount() > 0 && credentialReady;
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return List.of(
                 asset(
                         "growth-activity-center",
@@ -668,10 +782,25 @@ public class MarketingPlatformControlPlaneService {
                                         evidence.programmaticDspFailedWriteCount()))));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param configuredSourceCount configured source count 参数，用于 providerWriteStatus 流程中的校验、计算或对象转换。
+     * @param credentialReady credential ready 参数，用于 providerWriteStatus 流程中的校验、计算或对象转换。
+     * @return 返回 provider write status 生成的文本或业务键。
+     */
     private static String providerWriteStatus(long configuredSourceCount, boolean credentialReady) {
         return configuredSourceCount > 0 && credentialReady ? API_ONLY : CONFIGURATION_REQUIRED;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param configuredSourceCount configured source count 参数，用于 providerWriteGaps 流程中的校验、计算或对象转换。
+     * @param credentialReady credential ready 参数，用于 providerWriteGaps 流程中的校验、计算或对象转换。
+     * @param liveClientGap 依赖组件，用于完成数据访问或外部能力调用。
+     * @return 返回 provider write gaps 汇总后的集合、分页或映射视图。
+     */
     private static List<String> providerWriteGaps(long configuredSourceCount, boolean credentialReady, String liveClientGap) {
         List<String> gaps = new ArrayList<>();
         if (configuredSourceCount <= 0) {
@@ -684,8 +813,16 @@ public class MarketingPlatformControlPlaneService {
         return gaps;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 campaignGaps 流程中的校验、计算或对象转换。
+     * @return 返回 campaign gaps 汇总后的集合、分页或映射视图。
+     */
     private static List<String> campaignGaps(MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
+        // 准备本次处理所需的上下文和中间变量。
         List<String> gaps = new ArrayList<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (evidence.activeCampaignMasterCount() <= 0) {
             gaps.add("create at least one active campaign master record");
         }
@@ -704,9 +841,16 @@ public class MarketingPlatformControlPlaneService {
         if (evidence.campaignsMissingMeasurementDependency() > 0) {
             gaps.add("attach an active MEASUREMENT or BI dashboard dependency to every active campaign");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return gaps;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 campaignLaunchCoverageReady 流程中的校验、计算或对象转换。
+     * @return 返回 campaign launch coverage ready 的布尔判断结果。
+     */
     private static boolean campaignLaunchCoverageReady(
             MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
         return evidence.blockedCampaignResourceLinkCount() == 0
@@ -715,6 +859,12 @@ public class MarketingPlatformControlPlaneService {
                 && evidence.campaignsMissingMeasurementDependency() == 0;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 growthActivityReady 流程中的校验、计算或对象转换。
+     * @return 返回 growth activity ready 的布尔判断结果。
+     */
     private static boolean growthActivityReady(
             MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
         return evidence.activeGrowthActivityCount() > 0
@@ -723,9 +873,17 @@ public class MarketingPlatformControlPlaneService {
                 && evidence.blockedGrowthActivityReadinessCount() == 0;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 growthActivityGaps 流程中的校验、计算或对象转换。
+     * @return 返回 growth activity gaps 汇总后的集合、分页或映射视图。
+     */
     private static List<String> growthActivityGaps(
             MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
+        // 准备本次处理所需的上下文和中间变量。
         List<String> gaps = new ArrayList<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (evidence.activeGrowthActivityCount() <= 0) {
             gaps.add("create at least one active growth activity");
         }
@@ -738,9 +896,16 @@ public class MarketingPlatformControlPlaneService {
         if (evidence.blockedGrowthActivityReadinessCount() > 0) {
             gaps.add("resolve growth activity readiness blockers");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return gaps;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 integrationContractReady 流程中的校验、计算或对象转换。
+     * @return 返回 integration contract ready 的布尔判断结果。
+     */
     private static boolean integrationContractReady(
             MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
         return evidence.productionIntegrationContractCount() > 0
@@ -753,9 +918,17 @@ public class MarketingPlatformControlPlaneService {
                 && evidence.openIntegrationContractSloAlertCount() == 0;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 integrationContractGaps 流程中的校验、计算或对象转换。
+     * @return 返回 integration contract gaps 汇总后的集合、分页或映射视图。
+     */
     private static List<String> integrationContractGaps(
             MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
+        // 准备本次处理所需的上下文和中间变量。
         List<String> gaps = new ArrayList<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (evidence.productionIntegrationContractCount() <= 0) {
             gaps.add("register at least one active production integration contract");
         }
@@ -779,9 +952,28 @@ public class MarketingPlatformControlPlaneService {
         if (evidence.openIntegrationContractSloAlertCount() > 0) {
             gaps.add("resolve OPEN integration contract SLO burn-rate alerts");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return gaps;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param assetKey 业务键，用于在同一租户下定位资源。
+     * @param displayName 名称文本，用于展示或唯一性校验。
+     * @param assetType 类型标识，用于选择对应处理分支。
+     * @param ownerCapabilityKey 业务键，用于在同一租户下定位资源。
+     * @param providerFamily provider family 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param apiRoot api root 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @param credentialDependency credential dependency 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @param pendingWrites pending writes 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @param failedWrites failed writes 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @param controls controls 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @param gaps gaps 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @param evidence evidence 参数，用于 asset 流程中的校验、计算或对象转换。
+     * @return 返回 asset 流程生成的业务结果。
+     */
     private static IntegrationAsset asset(String assetKey,
                                           String displayName,
                                           String assetType,
@@ -811,6 +1003,17 @@ public class MarketingPlatformControlPlaneService {
                 evidence);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param laneKey 业务键，用于在同一租户下定位资源。
+     * @param displayName 名称文本，用于展示或唯一性校验。
+     * @param sourceCapabilityKey 业务键，用于在同一租户下定位资源。
+     * @param targetCapabilityKey 业务键，用于在同一租户下定位资源。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param controls controls 参数，用于 lane 流程中的校验、计算或对象转换。
+     * @return 返回 lane 流程生成的业务结果。
+     */
     private static IntegrationLane lane(String laneKey,
                                         String displayName,
                                         String sourceCapabilityKey,
@@ -820,12 +1023,22 @@ public class MarketingPlatformControlPlaneService {
         return new IntegrationLane(laneKey, displayName, sourceCapabilityKey, targetCapabilityKey, status, controls);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param capabilities capabilities 参数，用于 readinessGate 流程中的校验、计算或对象转换。
+     * @param lanes lanes 参数，用于 readinessGate 流程中的校验、计算或对象转换。
+     * @param assets assets 参数，用于 readinessGate 流程中的校验、计算或对象转换。
+     * @return 返回 readinessGate 流程生成的业务结果。
+     */
     private static ReadinessGate readinessGate(List<CapabilityCard> capabilities,
                                                List<IntegrationLane> lanes,
                                                List<IntegrationAsset> assets) {
         List<ReadinessFinding> blockers = new ArrayList<>();
         List<ReadinessFinding> warnings = new ArrayList<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CapabilityCard capability : capabilities) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (CONFIGURATION_REQUIRED.equals(capability.status())) {
                 blockers.add(new ReadinessFinding(
                         "BLOCKER",
@@ -886,6 +1099,7 @@ public class MarketingPlatformControlPlaneService {
         String status = blockers.isEmpty()
                 ? (warnings.isEmpty() ? "READY" : "DEGRADED")
                 : "BLOCKED";
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ReadinessGate(
                 status,
                 blockers.isEmpty(),
@@ -895,10 +1109,22 @@ public class MarketingPlatformControlPlaneService {
                 warnings);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param gaps gaps 参数，用于 reason 流程中的校验、计算或对象转换。
+     * @return 返回 reason 生成的文本或业务键。
+     */
     private static String reason(List<String> gaps) {
         return gaps == null || gaps.isEmpty() ? "no additional detail" : String.join("; ", gaps);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param capabilities capabilities 参数，用于 actionItems 流程中的校验、计算或对象转换。
+     * @return 返回 action items 汇总后的集合、分页或映射视图。
+     */
     private static List<ActionItem> actionItems(List<CapabilityCard> capabilities) {
         List<ActionItem> actions = new ArrayList<>();
         for (CapabilityCard capability : capabilities) {
@@ -916,6 +1142,12 @@ public class MarketingPlatformControlPlaneService {
         return actions;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param capability capability 参数，用于 actionTitle 流程中的校验、计算或对象转换。
+     * @return 返回 action title 生成的文本或业务键。
+     */
     private static String actionTitle(CapabilityCard capability) {
         return switch (capability.capabilityKey()) {
             case "journey-orchestration" -> "Publish a production journey";
@@ -933,6 +1165,9 @@ public class MarketingPlatformControlPlaneService {
         };
     }
 
+    /**
+     * ControlPlaneSummary 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record ControlPlaneSummary(
             Long tenantId,
             String generatedAt,
@@ -947,6 +1182,9 @@ public class MarketingPlatformControlPlaneService {
             List<ActionItem> actionItems) {
     }
 
+    /**
+     * CapabilityCard 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record CapabilityCard(
             String capabilityKey,
             String displayName,
@@ -960,6 +1198,9 @@ public class MarketingPlatformControlPlaneService {
             List<EvidenceSignal> evidence) {
     }
 
+    /**
+     * EvidenceSignal 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record EvidenceSignal(
             String signalKey,
             String label,
@@ -967,6 +1208,9 @@ public class MarketingPlatformControlPlaneService {
             String status) {
     }
 
+    /**
+     * IntegrationLane 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record IntegrationLane(
             String laneKey,
             String displayName,
@@ -976,6 +1220,9 @@ public class MarketingPlatformControlPlaneService {
             List<String> controls) {
     }
 
+    /**
+     * IntegrationAsset 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record IntegrationAsset(
             String assetKey,
             String displayName,
@@ -992,6 +1239,9 @@ public class MarketingPlatformControlPlaneService {
             List<EvidenceSignal> evidence) {
     }
 
+    /**
+     * ReadinessGate 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record ReadinessGate(
             String status,
             boolean productionReady,
@@ -1001,6 +1251,9 @@ public class MarketingPlatformControlPlaneService {
             List<ReadinessFinding> warnings) {
     }
 
+    /**
+     * ReadinessFinding 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record ReadinessFinding(
             String severity,
             String itemType,
@@ -1010,6 +1263,9 @@ public class MarketingPlatformControlPlaneService {
             String reason) {
     }
 
+    /**
+     * ActionItem 汇总平台控制面能力、证据数据和交付状态。
+     */
     public record ActionItem(
             String priority,
             String capabilityKey,

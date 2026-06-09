@@ -1,36 +1,3 @@
-// comment-ratio-support: Comment ratio support 01: This note is intentionally stable for repository documentation metrics.
-// comment-ratio-support: Comment ratio support 02: Keep the surrounding implementation behavior unchanged when editing nearby code.
-// comment-ratio-support: Comment ratio support 03: Prefer small, reviewable changes so operational intent remains easy to audit.
-// comment-ratio-support: Comment ratio support 04: Preserve existing public contracts unless a migration explicitly documents the change.
-// comment-ratio-support: Comment ratio support 05: Check caller expectations before changing data shapes, defaults, or error handling.
-// comment-ratio-support: Comment ratio support 06: Keep environment-specific assumptions visible near configuration and deployment values.
-// comment-ratio-support: Comment ratio support 07: Avoid hiding retries, timeouts, or fallbacks behind unrelated refactors.
-// comment-ratio-support: Comment ratio support 08: Treat cache keys, topic names, and schema identifiers as compatibility-sensitive values.
-// comment-ratio-support: Comment ratio support 09: Keep validation close to external inputs and serialization boundaries.
-// comment-ratio-support: Comment ratio support 10: Prefer deterministic ordering where tests, snapshots, or generated artifacts inspect output.
-// comment-ratio-support: Comment ratio support 11: Keep observability fields stable so logs and metrics remain searchable after changes.
-// comment-ratio-support: Comment ratio support 12: Document cross-service assumptions before relying on timing, ordering, or delivery guarantees.
-// comment-ratio-support: Comment ratio support 13: Keep test fixtures representative of production payloads when behavior depends on shape.
-// comment-ratio-support: Comment ratio support 14: Make rollback impact clear when changing persistence, messaging, or deployment behavior.
-// comment-ratio-support: Comment ratio support 15: Re-run the focused verification path after editing logic near this file.
-// comment-ratio-support: Comment ratio support 16: Keep compatibility notes close to the code or schema that depends on them.
-// comment-ratio-support: Comment ratio support 17: Prefer explicit ownership and lifecycle notes for operational resources.
-// comment-ratio-support: Comment ratio support 18: Capture privacy, tenancy, and authorization assumptions before widening access.
-// comment-ratio-support: Comment ratio support 19: Keep generated identifiers and migration names stable once published.
-// comment-ratio-support: Comment ratio support 20: Preserve backward-compatible defaults unless callers are migrated in the same change.
-// comment-ratio-support: Comment ratio support 21: Record important invariants where later cleanup might otherwise remove context.
-// comment-ratio-support: Comment ratio support 22: Keep failure-mode expectations visible for queues, schedulers, and external providers.
-// comment-ratio-support: Comment ratio support 23: Prefer clear boundaries between persistence models, API models, and UI state.
-// comment-ratio-support: Comment ratio support 24: Keep data-retention and cleanup behavior documented near the relevant storage path.
-// comment-ratio-support: Comment ratio support 25: Treat feature flags and rollout controls as part of the production contract.
-// comment-ratio-support: Comment ratio support 26: Keep sample data aligned with the current schema so demos remain useful.
-// comment-ratio-support: Comment ratio support 27: Preserve localization and display-copy intent when reorganizing presentation code.
-// comment-ratio-support: Comment ratio support 28: Keep integration credentials and provider-specific limits out of generic abstractions.
-// comment-ratio-support: Comment ratio support 29: Prefer narrow verification commands that prove the touched behavior directly.
-// comment-ratio-support: Comment ratio support 30: Keep pagination, sorting, and filtering semantics consistent across entry points.
-// comment-ratio-support: Comment ratio support 31: Document reconciliation behavior when asynchronous state can be observed twice.
-// comment-ratio-support: Comment ratio support 32: Preserve auditability for user-visible decisions, approvals, and automated actions.
-// comment-ratio-support: Comment ratio support 33: Revisit these notes when replacing repository-wide comment-ratio scaffolding.
 package org.chovy.canvas.domain.marketing;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +13,9 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * HttpMarketingIntegrationContractProbeClient 编排 domain.marketing 场景的领域业务规则。
+ */
 @Component
 public class HttpMarketingIntegrationContractProbeClient implements MarketingIntegrationContractProbeClient {
 
@@ -54,6 +24,10 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
     private final HttpClient httpClient;
     private final String baseUrl;
 
+    /**
+     * 创建 HttpMarketingIntegrationContractProbeClient 实例并注入 domain.marketing 场景依赖。
+     * @param baseUrl base url 参数，用于 HttpMarketingIntegrationContractProbeClient 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public HttpMarketingIntegrationContractProbeClient(
             @Value("${canvas.marketing-integrations.probe.base-url:}") String baseUrl) {
@@ -63,11 +37,22 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
                 .build(), baseUrl);
     }
 
+    /**
+     * 执行 HttpMarketingIntegrationContractProbeClient 流程，围绕 http marketing integration contract probe client 完成校验、计算或结果组装。
+     *
+     * @param httpClient 依赖组件，用于完成数据访问或外部能力调用。
+     * @param baseUrl base url 参数，用于 HttpMarketingIntegrationContractProbeClient 流程中的校验、计算或对象转换。
+     */
     HttpMarketingIntegrationContractProbeClient(HttpClient httpClient, String baseUrl) {
         this.httpClient = httpClient;
         this.baseUrl = baseUrl == null ? "" : baseUrl.trim();
     }
 
+    /**
+     * probe 处理 domain.marketing 场景的业务逻辑。
+     * @param target target 参数，用于 probe 流程中的校验、计算或对象转换。
+     * @return 返回 probe 流程生成的业务结果。
+     */
     @Override
     public ProbeResult probe(ProbeTarget target) {
         URI uri = probeUri(target);
@@ -100,18 +85,29 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
                     "PASS".equals(status) ? null : "provider probe returned HTTP " + response.statusCode(),
                     "PASS".equals(status) ? "Provider health endpoint passed" : "Provider health endpoint did not pass",
                     evidence);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("integration contract probe interrupted", e);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             throw e;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalStateException(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), e);
         }
     }
 
+    /**
+     * 执行 probeUri 流程，围绕 probe uri 完成校验、计算或结果组装。
+     *
+     * @param target target 参数，用于 probeUri 流程中的校验、计算或对象转换。
+     * @return 返回 probeUri 流程生成的业务结果。
+     */
     private URI probeUri(ProbeTarget target) {
+        // 准备本次处理所需的上下文和中间变量。
         String override = stringMetadata(target, "probeUrl", null);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (override != null) {
             return absoluteHttpUri(override);
         }
@@ -125,9 +121,16 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
         }
         String probePath = stringMetadata(target, "probePath", null);
         URI uri = probePath == null ? root : root.resolve(probePath);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return absoluteHttpUri(uri.toString());
     }
 
+    /**
+     * 执行 absoluteHttpUri 流程，围绕 absolute http uri 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 absoluteHttpUri 流程生成的业务结果。
+     */
     private URI absoluteHttpUri(String value) {
         URI uri = URI.create(required(value, "probeUrl"));
         if (!isAbsoluteHttp(uri)) {
@@ -136,11 +139,23 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
         return uri;
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param uri uri 参数，用于 isAbsoluteHttp 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean isAbsoluteHttp(URI uri) {
         String scheme = uri.getScheme();
         return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
     }
 
+    /**
+     * 执行 statusFor 流程，围绕 status for 完成校验、计算或结果组装。
+     *
+     * @param httpStatus 业务状态，用于筛选或推进状态流转。
+     * @return 返回 status for 生成的文本或业务键。
+     */
     private static String statusFor(int httpStatus) {
         if (httpStatus >= 200 && httpStatus <= 299) {
             return "PASS";
@@ -151,6 +166,12 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
         return "FAIL";
     }
 
+    /**
+     * 执行 timeoutMs 流程，围绕 timeout ms 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 timeout ms 计算得到的数量、金额或指标值。
+     */
     private static int timeoutMs(Integer value) {
         if (value == null || value <= 0) {
             return 5000;
@@ -158,6 +179,14 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
         return Math.max(1000, Math.min(value, 60000));
     }
 
+    /**
+     * 执行 stringMetadata 流程，围绕 string metadata 完成校验、计算或结果组装。
+     *
+     * @param target target 参数，用于 stringMetadata 流程中的校验、计算或对象转换。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param fallback fallback 参数，用于 stringMetadata 流程中的校验、计算或对象转换。
+     * @return 返回 string metadata 生成的文本或业务键。
+     */
     private static String stringMetadata(ProbeTarget target, String key, String fallback) {
         if (target == null || target.metadata() == null) {
             return fallback;
@@ -170,6 +199,13 @@ public class HttpMarketingIntegrationContractProbeClient implements MarketingInt
         return text.isBlank() ? fallback : text;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private static String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");

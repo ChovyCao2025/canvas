@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Implemented; focused backend verification passed on 2026-06-09. Commit and merge status were not verified in this closeout.
+
 **Goal:** Build the first operational CDP warehouse loop with realtime best-effort Doris ingestion, offline backfill, bounded aggregation, and run/watermark metadata.
 
 **Architecture:** Keep MySQL `cdp_event_log` authoritative, mirror accepted rows to Doris through a shared sink, and run bounded ODS-to-DWD-to-DWS SQL jobs. Doris remains optional; failures never block CDP ingestion.
@@ -17,7 +19,7 @@
 
 ## File Structure
 
-- Create `V190__cdp_warehouse_runs_and_watermarks.sql` for run and watermark metadata.
+- Create `V215__cdp_warehouse_runs_and_watermarks.sql` for run and watermark metadata.
 - Create `CdpWarehouseSyncRunDO`, `CdpWarehouseWatermarkDO`, and mappers under `dal`.
 - Create `CdpWarehouseEventSink` under `domain/warehouse`.
 - Create `DorisCdpEventStreamLoader` under `infrastructure/doris`.
@@ -28,7 +30,7 @@
 ### Task 1: Schema Metadata
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V190__cdp_warehouse_runs_and_watermarks.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V215__cdp_warehouse_runs_and_watermarks.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/warehouse/CdpWarehouseSchemaTest.java`
 
 - [ ] **Step 1: Write failing schema tests**
@@ -43,7 +45,7 @@ Run:
 cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=CdpWarehouseSchemaTest
 ```
 
-Expected: FAIL because `V190__cdp_warehouse_runs_and_watermarks.sql` does not exist.
+Expected at initial TDD time: FAIL because the metadata migration does not exist.
 
 - [ ] **Step 3: Add metadata migration**
 
@@ -181,3 +183,15 @@ Expected: PASS with zero failures and zero errors.
 - Spec coverage: Tasks cover schema, realtime sink, offline backfill, aggregation, metadata, and verification.
 - Placeholder scan: no placeholders or open-ended implementation steps.
 - Type consistency: service and test names match the planned Java packages.
+
+## Closeout Verification
+
+- Actual metadata migration: `backend/canvas-engine/src/main/resources/db/migration/V215__cdp_warehouse_runs_and_watermarks.sql`.
+- Focused verification passed on 2026-06-09 with Java 21:
+
+```bash
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=CdpWarehouseSchemaTest,DorisCdpEventStreamLoaderTest,CdpEventIngestionWarehouseSinkTest,CdpWarehouseBackfillServiceTest,CdpWarehouseAggregationServiceTest,CdpOlapAudienceSchemaTest,AudienceMaterializationServiceTest
+```
+
+- Result: 18 tests run, 0 failures, 0 errors, 0 skipped.
+- Commit and merge status were not verified in this closeout.

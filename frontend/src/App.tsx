@@ -74,6 +74,8 @@ const CanvasUsersPage = lazy(() => import('./pages/canvas-users'))
 const TestUsersPage = lazy(() => import('./pages/test-users'))
 /** AI 流失预测运营页懒加载组件。 */
 const AiPredictionsPage = lazy(() => import('./pages/ai-predictions'))
+/** 事件分析运营页懒加载组件。 */
+const AnalyticsPage = lazy(() => import('./pages/analytics'))
 /** 投递 outbox 和回执监控页懒加载组件。 */
 const MessageDeliveryPage = lazy(() => import('./pages/message-delivery'))
 /** SCRM 会话工作台懒加载组件。 */
@@ -94,6 +96,8 @@ const MarketingPlatformPage = lazy(() => import('./pages/marketing-platform'))
 const SearchMarketingPage = lazy(() => import('./pages/search-marketing'))
 /** 增长活动中心懒加载组件。 */
 const GrowthActivitiesPage = lazy(() => import('./pages/growth-activities'))
+/** 风控策略工作台懒加载组件。 */
+const RiskStudioPage = lazy(() => import('./pages/risk'))
 /** 营销偏好中心懒加载组件。 */
 const MarketingPreferencesPage = lazy(() => import('./pages/marketing-preferences'))
 /** 营销表单中心懒加载组件。 */
@@ -167,9 +171,11 @@ export default function App() {
                     <Route path="/conversations" element={<ConversationsPage />} />
                     <Route path="/marketing-monitoring" element={<MarketingMonitoringPage />} />
                     <Route path="/bi" element={<BiWorkbenchPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/mautic-insights" element={<MauticInsightsPage />} />
                     <Route path="/marketing-platform" element={<MarketingPlatformPage />} />
                     <Route path="/search-marketing" element={<SearchMarketingPage />} />
+                    <Route path="/risk" element={<RiskStudioPage />} />
                     <Route path="/growth-activities" element={<GrowthActivitiesPage />} />
                     <Route path="/marketing-preferences" element={<MarketingPreferencesPage />} />
                     <Route path="/marketing-forms" element={<MarketingFormsPage />} />

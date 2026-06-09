@@ -5,6 +5,8 @@ Sequence: 021
 Source: `docs/optimization/todo/specs/2026-05-30-data-infrastructure-spec.md`, `docs/optimization/todo/specs/2026-05-30-audience-streaming-load-spec.md`, `docs/optimization/todo/specs/2026-05-30-roaringbitmap-collision-fix-spec.md`, `docs/product-evolution/specs/p1-006c-realtime-audiences-overlap-and-snapshots.md`
 Implementation plan: `../plans/p2-021-cdp-olap-audience-materialization-plan.md`
 
+Status: Historical plan evidence records implementation and verification; historical RED-state checks plus commit and merge status were not verified in this docs-only audit.
+
 ## Goal
 
 Build the first production-oriented bridge between the current CDP, Doris OLAP, and audience segmentation: CDP events become OLAP facts, behavior-based audience rules materialize into versioned online bitmaps, and runtime TAGGER membership stays fast and deterministic.

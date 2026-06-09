@@ -1,10 +1,14 @@
 # CDP Warehouse Operational Retention And Cleanup Implementation Plan
 
+Spec: `../specs/p2-050-cdp-warehouse-operational-retention-and-cleanup.md`
+
 **Goal:** Add bounded cleanup for warehouse operational ledgers so production tenants can retain enough audit history without letting run, retry, and resolved incident rows grow without limit.
 
 **Architecture:** Reuse existing warehouse ledger tables and MyBatis mappers. `CdpWarehouseRetentionService` owns plan and cleanup rules, `CdpWarehouseController` exposes tenant-scoped operator APIs, and `CdpWarehouseRetentionScheduler` runs the same cleanup entrypoint behind the existing warehouse lease pattern.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

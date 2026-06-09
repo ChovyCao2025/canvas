@@ -18,11 +18,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Groovy script node orchestration.
+ * Groovy 脚本节点编排处理器。
  *
- * <p>The handler owns node config parsing, validation, and routing. Expression
- * compilation, sandboxing, timeouts, and output size limits are delegated to
- * {@link ExpressionEngine}.
+ * <p>处理器负责节点配置解析、校验和路由；表达式编译、沙箱、超时和输出大小限制委托给
+ * {@link ExpressionEngine}。
  */
 @Component
 @Slf4j
@@ -31,18 +30,27 @@ public class GroovyHandler implements NodeHandler {
 
     private final ExpressionEngine expressionEngine;
 
+    /**
+     * 创建 GroovyHandler 实例并注入 engine.handlers 场景依赖。
+     * @param expressionEngine expression engine 参数，用于 GroovyHandler 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public GroovyHandler(ExpressionEngine expressionEngine) {
         this.expressionEngine = expressionEngine;
     }
 
+    /**
+     * 使用脚本缓存创建兼容旧测试的 Groovy 处理器。
+     *
+     * @param scriptCache Groovy 脚本缓存
+     */
     GroovyHandler(GroovyScriptCache scriptCache) {
         this(new GroovyExpressionEngine(scriptCache));
     }
 
-    /** Kept for legacy unit tests that manually instantiate the handler. */
+    /** 保留给手动实例化处理器的旧单元测试。 */
     void init() {
-        // ExpressionEngine initializes its own runtime resources.
+        // ExpressionEngine 会自行初始化运行时资源。
     }
 
     /** 暴露给 CanvasService.publish() 调用预编译 */
@@ -56,13 +64,7 @@ public class GroovyHandler implements NodeHandler {
     }
 
     /**
-     * 执行当前节点或服务的核心处理流程。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * 根据配置参数构造脚本输入，执行 Groovy 表达式并按需校验输出后路由。
      */
     @Override
     @SuppressWarnings("unchecked")
@@ -107,6 +109,7 @@ public class GroovyHandler implements NodeHandler {
             }
 
             return Mono.just(NodeResult.ok(nextNodeId, output));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[GROOVY] 表达式引擎执行异常: {}", e.getMessage());
             return Mono.just(NodeResult.fail(e.getMessage()));

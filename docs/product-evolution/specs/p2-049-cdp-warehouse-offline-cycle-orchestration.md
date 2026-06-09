@@ -5,6 +5,8 @@ Sequence: 049
 Source: `docs/product-evolution/specs/p2-022-cdp-warehouse-ingestion-and-aggregation.md`, `docs/product-evolution/specs/p2-024-cdp-warehouse-operations-api-and-scheduler.md`, `docs/product-evolution/specs/p2-028-cdp-warehouse-scheduler-lease.md`
 Implementation plan: `../plans/p2-049-cdp-warehouse-offline-cycle-orchestration-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add an offline warehouse orchestration layer that plans and runs a tenant-scoped CDP warehouse cycle with explicit dependency gates: accepted-event backfill must succeed before bounded aggregation is allowed to run.

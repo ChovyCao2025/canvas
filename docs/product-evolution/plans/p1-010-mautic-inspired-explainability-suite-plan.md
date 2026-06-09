@@ -1,10 +1,16 @@
 # Mautic Inspired Explainability Suite Implementation Plan
 
+Spec: `../specs/p1-010-mautic-inspired-explainability-suite.md`
+
 **Goal:** Implement six Mautic-inspired operator evidence surfaces without duplicating existing Canvas execution, fallback, audience, or compliance logic.
 
 **Architecture:** Add a read-only insight service above existing mappers and policy-adjacent data. Expose one WebFlux controller and one frontend workbench page. Keep each concept as a compact DTO so future richer screens can reuse the same contract.
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, JUnit 5, Mockito, AssertJ, React, Ant Design, Vitest.
+
+**Implementation Status:** Completed on 2026-06-05.
+
+Status: Completed on 2026-06-05.
 
 ## Task 1: Product Documentation
 

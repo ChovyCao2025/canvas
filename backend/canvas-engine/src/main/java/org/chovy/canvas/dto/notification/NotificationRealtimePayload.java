@@ -8,17 +8,17 @@ import java.util.List;
  *
  * <p>用于在控制器、服务、异步任务或实时推送之间传递结构化数据，隔离外部 API 契约与数据库实体。
  * <p>该类型应保持轻量，只表达字段语义和序列化边界，不放入复杂业务流程。
+ * @param eventType 实时事件类型，如 SYNC、CREATED、UPDATED、READ、PONG.
+ * @param notification 单条事件关联的通知对象，批量同步事件可为空.
+ * @param notifications 批量同步时返回的通知列表.
+ * @param unreadCount 当前用户未读通知数.
+ * @param serverTime 服务端生成该推送载荷的时间.
  */
 public record NotificationRealtimePayload(
-        /** 实时事件类型，如 SYNC、CREATED、UPDATED、READ、PONG。 */
         String eventType,
-        /** 单条事件关联的通知对象，批量同步事件可为空。 */
         NotificationDTO notification,
-        /** 批量同步时返回的通知列表。 */
         List<NotificationDTO> notifications,
-        /** 当前用户未读通知数。 */
         Long unreadCount,
-        /** 服务端生成该推送载荷的时间。 */
         LocalDateTime serverTime
 ) {
     /**

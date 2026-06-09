@@ -22,15 +22,34 @@ public class EventReportAuthService {
 
     private final CanvasHmacVerifier verifier;
 
+    /**
+     * 创建 EventReportAuthService 实例并注入 web 场景依赖。
+     * @param secret secret 参数，用于 EventReportAuthService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public EventReportAuthService(@Value("${canvas.events.report-secret:}") String secret) {
         this(secret, Clock.systemUTC());
     }
 
+    /**
+     * 执行 EventReportAuthService 流程，围绕 event report auth service 完成校验、计算或结果组装。
+     *
+     * @param secret secret 参数，用于 EventReportAuthService 流程中的校验、计算或对象转换。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     EventReportAuthService(String secret, Clock clock) {
         this.verifier = new CanvasHmacVerifier(secret, clock);
     }
 
+    /**
+     * 校验事件上报请求的 HMAC 签名。
+     *
+     * <p>方法读取时间戳和签名请求头，并使用原始请求体参与验签；校验失败会抛出认证异常，
+     * 成功时无返回且不会修改请求体或写入业务数据。</p>
+     *
+     * @param headers 外部上报请求头，需包含时间戳和签名
+     * @param rawBody 未反序列化的原始请求体
+     */
     public void verify(HttpHeaders headers, String rawBody) {
         verifier.verify(headers, rawBody, "事件上报");
     }

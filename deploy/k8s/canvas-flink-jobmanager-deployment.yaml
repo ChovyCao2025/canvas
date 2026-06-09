@@ -1,3 +1,4 @@
+# Flink JobManager，负责作业调度、REST 提交入口和 checkpoint 协调。
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,6 +9,7 @@ metadata:
     app.kubernetes.io/component: flink-jobmanager
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # JobManager 以单主方式运行；高可用能力由底层重建和状态目录保障。
   replicas: 1
   selector:
     matchLabels:
@@ -20,24 +22,29 @@ spec:
         app.kubernetes.io/component: flink-jobmanager
         app.kubernetes.io/part-of: marketing-canvas
     spec:
+      # 独立账号便于后续限制其访问 Secret、ConfigMap 和作业相关资源。
       serviceAccountName: canvas-flink
+      # 终止窗口用于 Flink 优雅停止、写入最终 checkpoint 元信息。
       terminationGracePeriodSeconds: 60
       containers:
         - name: flink-jobmanager
           image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
           imagePullPolicy: IfNotPresent
+          # 官方镜像入口命令，启动 JobManager 角色。
           command: ["jobmanager"]
           ports:
             - name: rest
               containerPort: 8081
             - name: rpc
               containerPort: 6123
+          # REST overview 可用时才认为调度入口已准备接收提交请求。
           readinessProbe:
             httpGet:
               path: /overview
               port: rest
             initialDelaySeconds: 20
             periodSeconds: 10
+          # 长期无法访问 overview 时交给 Kubernetes 重启实例。
           livenessProbe:
             httpGet:
               path: /overview
@@ -45,11 +52,13 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 20
           volumeMounts:
+            # 使用 ConfigMap 覆盖 Flink 主配置，保持镜像不可变。
             - name: flink-config
               mountPath: /opt/flink/conf/flink-conf.yaml
               subPath: flink-conf.yaml
             - name: canvas-flink-checkpoints
               mountPath: /opt/flink/checkpoints
+            # savepoint 与 checkpoint 分目录，避免人工保存点被自动清理策略误伤。
             - name: canvas-flink-savepoints
               mountPath: /opt/flink/savepoints
           resources:
@@ -65,6 +74,7 @@ spec:
               drop:
                 - ALL
       volumes:
+        # 配置、checkpoint、savepoint 三类数据分别挂载，职责清晰。
         - name: flink-config
           configMap:
             name: canvas-flink

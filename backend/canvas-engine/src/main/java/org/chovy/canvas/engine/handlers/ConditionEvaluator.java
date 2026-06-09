@@ -18,25 +18,71 @@ import java.util.function.Function;
 final class ConditionEvaluator {
     private static final RuleParser RULE_PARSER = new RuleParser(new ObjectMapper());
 
+    /**
+     * 初始化 ConditionEvaluator 实例。
+     */
     private ConditionEvaluator() {
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param MapString map string 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param rule rule 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param ctx ctx 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @return 返回 evaluate 的布尔判断结果。
+     */
     static boolean evaluate(Map<String, Object> rule, ExecutionContext ctx) {
         return evaluate(rule, ctx::getContextValue);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param MapString map string 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param rule rule 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param MapString map string 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param values values 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @return 返回 evaluate 的布尔判断结果。
+     */
     static boolean evaluate(Map<String, Object> rule, Map<String, Object> values) {
         return evaluate(rule, values::get);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param ListMapString list map string 参数，用于 allMatch 流程中的校验、计算或对象转换。
+     * @param rules rules 参数，用于 allMatch 流程中的校验、计算或对象转换。
+     * @param ctx ctx 参数，用于 allMatch 流程中的校验、计算或对象转换。
+     * @return 返回 all match 的布尔判断结果。
+     */
     static boolean allMatch(List<Map<String, Object>> rules, ExecutionContext ctx) {
         return rules == null || rules.stream().allMatch(rule -> evaluate(rule, ctx));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param ListMapString list map string 参数，用于 allMatch 流程中的校验、计算或对象转换。
+     * @param rules rules 参数，用于 allMatch 流程中的校验、计算或对象转换。
+     * @param MapString map string 参数，用于 allMatch 流程中的校验、计算或对象转换。
+     * @param values values 参数，用于 allMatch 流程中的校验、计算或对象转换。
+     * @return 返回 all match 的布尔判断结果。
+     */
     static boolean allMatch(List<Map<String, Object>> rules, Map<String, Object> values) {
         return rules == null || rules.stream().allMatch(rule -> evaluate(rule, values));
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param MapString map string 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param rule rule 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param FunctionString function string 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param resolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @return 返回 evaluate 的布尔判断结果。
+     */
     private static boolean evaluate(Map<String, Object> rule, Function<String, Object> resolver) {
         if (rule == null) return false;
         try {

@@ -43,6 +43,7 @@ public class LlmBiInsightPlanner implements BiInsightPlanner {
                 request.modelKey(),
                 null,
                 variables(context),
+                null,
                 request.params(),
                 request.timeoutMs(),
                 null,

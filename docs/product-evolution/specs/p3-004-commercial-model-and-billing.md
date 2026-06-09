@@ -5,6 +5,10 @@ Sequence: 004
 Source: `todo/p3/strategic-opportunities-from-filtered-scope.md#commercial-model-and-billing`
 Implementation plan: `../plans/p3-004-commercial-model-and-billing-plan.md`
 
+## Implementation Status
+
+Status: discovery package and validator are complete in the current workspace record. Commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Define the evidence, governance, and child-spec gates for billable metrics, plan tiers, overage policy, payment, invoices, renewals, and upgrade recommendations before billing infrastructure is built.

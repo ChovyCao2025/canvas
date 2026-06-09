@@ -1,5 +1,7 @@
 # CDP OLAP Audience Materialization Implementation Plan
 
+Status: Historical plan evidence records implementation and verification; historical RED-state checks plus commit and merge status were not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the first production-oriented CDP OLAP audience materialization slice with stable user indexes, bounded behavior rules, versioned bitmaps, and data quality checks.
@@ -84,7 +86,7 @@ class CdpOlapAudienceSchemaTest {
 }
 ```
 
-- [ ] **Step 2: Run schema tests to verify red**
+Historical RED-state boundary: not reproduced in this docs-only audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -140,7 +142,7 @@ Test behaviors:
 - Duplicate insert race reloads the existing row.
 - Blank user id is rejected.
 
-- [ ] **Step 2: Run tests to verify red**
+Historical RED-state boundary: not reproduced in this docs-only audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -183,7 +185,7 @@ Test behaviors:
 - Membership checks load the latest ready version.
 - Incomplete versions are not used by latest membership checks.
 
-- [ ] **Step 2: Run tests to verify red**
+Historical RED-state boundary: not reproduced in this docs-only audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -222,7 +224,7 @@ Test behaviors:
 - Valid `CDP_EVENT_METRIC` rule compiles to a request containing tenant, event code, window days, metric, operator, threshold, filters, and limit.
 - Missing tenant, blank event code, non-positive window, unsupported metric, unsupported operator, unsafe filter path, and more than 10 filters are rejected.
 
-- [ ] **Step 2: Run tests to verify red**
+Historical RED-state boundary: not reproduced in this docs-only audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -264,7 +266,7 @@ Test behaviors:
 - Failed OLAP query marks the run `FAILED` and does not publish a ready bitmap.
 - Empty OLAP result still publishes a ready empty bitmap.
 
-- [ ] **Step 2: Run tests to verify red**
+Historical RED-state boundary: not reproduced in this docs-only audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -312,7 +314,7 @@ Test behaviors:
 - Bitmap drift above fail threshold returns `FAIL`.
 - Every verdict inserts a check row.
 
-- [ ] **Step 2: Run tests to verify red**
+Historical RED-state boundary: not reproduced in this docs-only audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -383,7 +385,7 @@ Expected: P2-021 files are visible and unrelated dirty files are left untouched.
 
 Observed on 2026-06-06: the focused P2-021 implementation files are present in the current tree; broad unrelated dirty worktree changes remain outside this plan.
 
-- [ ] **Step 3: Commit optional**
+Commit boundary: no commit was created in this docs-only audit; commit and merge status remains unverified.
 
 Only commit when requested by the operator. This worktree already contains unrelated dirty changes, so do not create a mixed commit without explicit approval.
 

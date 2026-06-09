@@ -66,16 +66,31 @@ public class ExecutionController {
     /** 可选项目权限服务，用于 dry-run 项目角色校验。 */
     private CanvasProjectPermissionService projectPermissionService;
 
+    /**
+     * 执行 setTenantContextResolver 流程，围绕 set tenant context resolver 完成校验、计算或结果组装。
+     *
+     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     @Autowired(required = false)
     void setTenantContextResolver(TenantContextResolver tenantContextResolver) {
         this.tenantContextResolver = tenantContextResolver;
     }
 
+    /**
+     * 执行 setCanvasService 流程，围绕 set canvas service 完成校验、计算或结果组装。
+     *
+     * @param canvasService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setCanvasService(CanvasService canvasService) {
         this.canvasService = canvasService;
     }
 
+    /**
+     * 执行 setProjectPermissionService 流程，围绕 set project permission service 完成校验、计算或结果组装。
+     *
+     * @param projectPermissionService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setProjectPermissionService(CanvasProjectPermissionService projectPermissionService) {
         this.projectPermissionService = projectPermissionService;
@@ -95,6 +110,18 @@ public class ExecutionController {
             description = "Public machine-to-machine trigger protected by HMAC headers. Callers should provide idempotencyKey for retry safety.",
             security = @SecurityRequirement(name = "triggerHmac")
     )
+    /**
+     * 处理 Execution 请求控制器公开辅助方法，供同类 endpoint 复用。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 主要委托 executionService.trigger 完成业务处理。
+     * 副作用取决于下游服务实现。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param request 请求体。
+     * @param canvasId 画布 ID。
+     * @param rawBody 请求体，包含本次操作所需字段。
+     * @return 异步返回统一响应，包含键值结果。
+     */
     public Mono<R<Map<String, Object>>> directCall(
             ServerHttpRequest request,
             @PathVariable Long canvasId,
@@ -130,6 +157,17 @@ public class ExecutionController {
             description = "Public machine-to-machine behavior trigger protected by HMAC headers and admitted through the Disruptor buffer.",
             security = @SecurityRequirement(name = "triggerHmac")
     )
+    /**
+     * 处理 Execution 请求控制器公开辅助方法，供同类 endpoint 复用。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 主要委托 disruptorService.publish 完成业务处理。
+     * 副作用取决于下游服务实现。
+     * 方法以 Mono 作为异步边界返回，实际执行由 Reactor 链路承载。
+     *
+     * @param request 请求体。
+     * @param rawBody 请求体，包含本次操作所需字段。
+     * @return 异步返回统一响应，表示操作完成。
+     */
     public Mono<R<Void>> behaviorTrigger(
             ServerHttpRequest request,
             @RequestBody Mono<String> rawBody) {
@@ -160,6 +198,17 @@ public class ExecutionController {
             description = "Bearer-authenticated debug execution that uses the supplied graph JSON and does not create real side effects.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
+    /**
+     * 触发Execution运行控制器公开辅助方法，供同类 endpoint 复用。
+     * 接口先解析当前租户上下文，按租户隔离处理数据。
+     * 主要委托 executionService.triggerDryRun 完成业务处理。
+     * 副作用：会触发一次运行流程。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param canvasId 画布 ID。
+     * @param req 请求体。
+     * @return 异步返回统一响应，包含键值结果。
+     */
     public Mono<R<Map<String, Object>>> dryRun(
             @PathVariable Long canvasId,
             @Valid @RequestBody DirectCallReq req) {
@@ -175,11 +224,9 @@ public class ExecutionController {
     }
 
     /**
-     * 执行 current User Id 对应的业务逻辑。
+     * 获取当前请求的登录上下文或租户信息。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @return 返回 current user id 生成的文本或业务键。
      */
     private Mono<String> currentUserId() {
         return ReactiveSecurityContextHolder.getContext()
@@ -197,6 +244,11 @@ public class ExecutionController {
                 .defaultIfEmpty("system");
     }
 
+    /**
+     * 获取当前请求的登录上下文或租户信息。
+     *
+     * @return 返回 currentTenant 流程生成的业务结果。
+     */
     private Mono<TenantContext> currentTenant() {
         if (tenantContextResolver == null) {
             return Mono.just(new TenantContext(null, null, "system"));
@@ -205,6 +257,12 @@ public class ExecutionController {
                 .defaultIfEmpty(new TenantContext(null, null, "system"));
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void requireDryRunAccess(Long canvasId, TenantContext context) {
         if (canvasService == null || projectPermissionService == null) {
             return;
@@ -215,12 +273,21 @@ public class ExecutionController {
         projectPermissionService.requireCanvasAction(canvas, context, CanvasProjectAction.EXECUTE);
     }
 
+    /**
+     * 解析并校验输入数据。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @param rawBody raw body 参数，用于 parseSignedBody 流程中的校验、计算或对象转换。
+     * @param bodyType 类型标识，用于选择对应处理分支。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private <T> Mono<T> parseSignedBody(ServerHttpRequest request, Mono<String> rawBody, Class<T> bodyType) {
         return rawBody.defaultIfEmpty("")
                 .flatMap(body -> Mono.fromCallable(() -> {
                             publicTriggerAuthService.verify(request.getHeaders(), body);
                             try {
                                 return ApiRequestValidation.validate(objectMapper.readValue(body, bodyType));
+                            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                             } catch (IOException e) {
                                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请求体 JSON 不合法", e);
                             }
@@ -228,6 +295,13 @@ public class ExecutionController {
                         .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 require text 生成的文本或业务键。
+     */
     private String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required");
@@ -235,6 +309,13 @@ public class ExecutionController {
         return value;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 requireValue 流程生成的业务结果。
+     */
     private <T> T requireValue(T value, String fieldName) {
         if (value == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required");

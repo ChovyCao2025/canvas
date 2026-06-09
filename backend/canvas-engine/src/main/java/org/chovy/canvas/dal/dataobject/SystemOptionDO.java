@@ -23,6 +23,7 @@ public class SystemOptionDO {
     /** 系统选项主键 ID */
     private Long id;
 
+    /** 节点执行耗时（毫秒） */
     @TableField("tenant_id")
     private Long tenantId;
 

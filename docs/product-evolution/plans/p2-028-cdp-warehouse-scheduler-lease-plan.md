@@ -1,5 +1,9 @@
 # CDP Warehouse Scheduler Lease Implementation Plan
 
+Spec: `../specs/p2-028-cdp-warehouse-scheduler-lease.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add a tenant-scoped database lease for warehouse schedulers so multi-instance deployments do not run the same warehouse job concurrently.
 
 **Architecture:** Add an additive MySQL lease table and a small service around MyBatis lease acquisition. Existing schedulers keep their local `AtomicBoolean` guard and call the lease service before invoking warehouse work.

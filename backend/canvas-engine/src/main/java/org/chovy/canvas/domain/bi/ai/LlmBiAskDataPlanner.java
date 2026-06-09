@@ -56,6 +56,7 @@ public class LlmBiAskDataPlanner implements BiAskDataPlanner {
                 request == null ? null : request.modelKey(),
                 null,
                 variables(context),
+                null,
                 request == null ? Map.of() : request.params(),
                 request == null ? null : request.timeoutMs(),
                 null,

@@ -57,6 +57,6 @@ Add tenant-scoped webhook subscription storage, delivery log storage, callback U
 
 ## Implementation Status
 
-- Status: implemented on 2026-06-05.
+- Status: implemented on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - Production compile: `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.
 - Focused backend tests were added, but Maven `testCompile` is currently blocked by unrelated existing test-source errors before these tests can run. Known blockers include duplicate `KillSwitchSubscriberTest`, missing P2-079 automation-run classes, stale constructor/API expectations in existing tests, and missing `ExecutionContext#getNodeOutput(...)` expected by `ExecutionContextNamespaceTest`.

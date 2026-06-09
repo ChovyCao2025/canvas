@@ -10,6 +10,8 @@
 
 **Implementation status (2026-06-06):** Completed. The actual Flyway migration is `V324__programmatic_dsp_foundation.sql`. Focused DSP tests passed 8/8, and paid-media + creator + search + DSP regression passed 31/31.
 
+Status: Completed on 2026-06-06.
+
 ---
 
 ## Scope

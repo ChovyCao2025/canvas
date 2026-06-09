@@ -10,6 +10,7 @@ import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
 import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.domain.approval.ApprovalWorkflowService;
 import org.chovy.canvas.domain.notification.NotificationEventService;
+import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,11 @@ public class CanvasExecutionManagementController {
     /** 统一审批工作流服务；存在时执行审批决策优先写入统一审批任务。 */
     private ApprovalWorkflowService approvalWorkflowService;
 
+    /**
+     * 执行 setApprovalWorkflowService 流程，围绕 set approval workflow service 完成校验、计算或结果组装。
+     *
+     * @param approvalWorkflowService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setApprovalWorkflowService(ApprovalWorkflowService approvalWorkflowService) {
         this.approvalWorkflowService = approvalWorkflowService;
@@ -133,6 +139,10 @@ public class CanvasExecutionManagementController {
             return;
         }
 
+        if (!isWatchdog) {
+            ensureApprovalTenant(actor == null ? 0L : actor.tenantId(), approval);
+        }
+
         // 审批人身份校验（设计文档 18.2节安全要求；Watchdog 超时处理时跳过）
         if (!isWatchdog) {
             try {
@@ -143,8 +153,10 @@ public class CanvasExecutionManagementController {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                             "AUTH_003: 当前用户不在审批人列表中，无权操作此审批");
                 }
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (ResponseStatusException e) {
                 throw e;
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception ignored) {
             }
         }
@@ -168,6 +180,31 @@ public class CanvasExecutionManagementController {
     }
 
     /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param requestTenantId 业务对象 ID，用于定位具体记录。
+     * @param approval approval 参数，用于 ensureApprovalTenant 流程中的校验、计算或对象转换。
+     */
+    private void ensureApprovalTenant(Long requestTenantId, CanvasManualApprovalDO approval) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
+        if (approval.getTenantId() != null) {
+            if (!approval.getTenantId().equals(requestTenantId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current tenant cannot access approval");
+            }
+            // 汇总前面计算出的状态和明细，返回给调用方。
+            return;
+        }
+
+        ExecutionContext ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
+        if (ctx == null
+                || ctx.getTenantId() == null
+                || !ctx.getTenantId().equals(requestTenantId)
+                || !approval.getExecutionId().equals(ctx.getExecutionId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current tenant cannot access approval");
+        }
+    }
+
+    /**
      * 从 JWT SecurityContext 获取当前登录用户名
      */
     private Mono<RuntimeActor> currentActor() {
@@ -181,6 +218,12 @@ public class CanvasExecutionManagementController {
                 .defaultIfEmpty(new RuntimeActor(0L, null, "system"));
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 read long 计算得到的数量、金额或指标值。
+     */
     private Long readLong(Object value) {
         if (value instanceof Number number) {
             return number.longValue();
@@ -190,15 +233,26 @@ public class CanvasExecutionManagementController {
         }
         try {
             return Long.valueOf(String.valueOf(value));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (NumberFormatException ignored) {
             return 0L;
         }
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultIfBlank 流程中的校验、计算或对象转换。
+     * @return 返回 default if blank 生成的文本或业务键。
+     */
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    /**
+     * RuntimeActor 数据记录。
+     */
     private record RuntimeActor(Long tenantId, String role, String username) {
     }
 }

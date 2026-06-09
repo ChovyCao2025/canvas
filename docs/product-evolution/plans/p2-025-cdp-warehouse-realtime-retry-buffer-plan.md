@@ -1,5 +1,9 @@
 # CDP Warehouse Realtime Retry Buffer Implementation Plan
 
+Spec: `../specs/p2-025-cdp-warehouse-realtime-retry-buffer.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Persist failed near-real-time warehouse sink attempts and retry them with bounded, observable semantics.
 
 **Architecture:** Keep MySQL `cdp_event_log` authoritative. On inline sink failure, enqueue a retry row keyed by tenant and event log id. A retry service claims due rows, reuses `CdpWarehouseEventSink`, and marks rows `SUCCESS`, `RETRY`, or `DEAD`. A scheduler runs the retry service only when enabled.

@@ -32,12 +32,23 @@ public class AudienceEvaluationContextFetcher {
     private final ConcurrentMap<String, List<String>> fieldCache = new ConcurrentHashMap<>();
 
     @Autowired
+    /**
+     * 初始化 AudienceEvaluationContextFetcher 实例。
+     *
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param blockingWorkScheduler blocking work scheduler 参数，用于 AudienceEvaluationContextFetcher 流程中的校验、计算或对象转换。
+     */
     public AudienceEvaluationContextFetcher(ObjectMapper objectMapper,
                                             BlockingWorkScheduler blockingWorkScheduler) {
         this.objectMapper = objectMapper;
         this.blockingWorkScheduler = blockingWorkScheduler;
     }
 
+    /**
+     * 初始化 AudienceEvaluationContextFetcher 实例。
+     *
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public AudienceEvaluationContextFetcher(ObjectMapper objectMapper) {
         this(objectMapper, new BlockingWorkScheduler());
     }
@@ -74,6 +85,14 @@ public class AudienceEvaluationContextFetcher {
         return result;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param client 依赖组件，用于完成数据访问或外部能力调用。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param ruleJson JSON 字符串，承载结构化配置或明细。
+     * @return 返回 fetchAsync 流程生成的业务结果。
+     */
     public Mono<Map<String, Object>> fetchAsync(WebClient client, String userId, String ruleJson) {
         return blockingWorkScheduler.call("audience context fetch", () -> fetch(client, userId, ruleJson));
     }

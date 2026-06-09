@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Runs a local Lark approval integration smoke check against a developer backend.
+#
+# The script validates request/response behavior without requiring the live Lark
+# environment, so it is suitable for pre-merge verification and local debugging.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

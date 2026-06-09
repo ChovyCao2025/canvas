@@ -1,10 +1,16 @@
 # Marketing Forms And Lead Capture Implementation Plan
 
+Spec: `../specs/p1-012-marketing-forms-and-lead-capture.md`
+
 **Goal:** Implement the missing Mautic-style public form and lead-capture capability, with operator management UI and CDP/policy side effects.
 
 **Architecture:** Add additive form definition/submission tables, a tenant-scoped domain service, authenticated operator endpoints, anonymous public endpoints, and React routes for both operator and public form experiences.
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ, React, Ant Design, Vitest.
+
+**Implementation Status:** Completed on 2026-06-05 with focused backend/frontend verification and frontend build evidence. Full backend regression is a residual verification gap and is not recorded as run/passing in this plan.
+
+Status: Completed on 2026-06-05 with focused backend/frontend verification and frontend build evidence. Full backend regression is a residual verification gap and is not recorded as run/passing in this plan.
 
 ## Task 1: Product Documentation
 
@@ -65,7 +71,7 @@ npm run build
 
 - [x] Backend main compile passes on 2026-06-05: `JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" mvn -pl canvas-engine test -Dmaven.test.skip=true`.
 - [x] New backend test sources compile standalone on 2026-06-05 with Maven-generated test classpath.
-- [ ] Full backend test run was not rerun in this session; previous broader runs reported unrelated dirty-tree failures outside P1-012.
+- Residual verification gap: full backend test run was not rerun in this session; previous broader runs reported unrelated dirty-tree failures outside P1-012.
 - [x] Frontend focused tests pass on 2026-06-05: `npm run test -- src/services/marketingFormsApi.test.ts src/pages/marketing-forms/marketingFormsPresentation.test.ts src/components/layout/AppLayout.a11y.test.tsx` (3 files, 8 tests).
 - [x] Frontend production build passes on 2026-06-05: `npm run build`.
 - [x] Reverified in this session on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=MarketingFormServiceTest,MarketingFormControllerTest,SecurityConfigRouteTest test` from `backend` (10 tests, 0 failures, 0 errors, 0 skipped).

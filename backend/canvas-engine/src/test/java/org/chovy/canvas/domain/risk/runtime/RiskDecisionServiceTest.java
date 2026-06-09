@@ -1,0 +1,281 @@
+package org.chovy.canvas.domain.risk.runtime;
+
+import org.chovy.canvas.domain.risk.dsl.RiskRuleConditionNode;
+import org.chovy.canvas.domain.risk.dsl.RiskRuleGroupNode;
+import org.chovy.canvas.domain.risk.dsl.RiskRuleLogic;
+import org.chovy.canvas.domain.risk.dsl.RiskRuleOperand;
+import org.chovy.canvas.domain.risk.dsl.RiskRuleOperator;
+import org.chovy.canvas.domain.risk.dsl.RiskRuntimeMode;
+import org.junit.jupiter.api.Test;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+
+class RiskDecisionServiceTest {
+
+    private final FakeStrategyReader strategyReader = new FakeStrategyReader();
+    private final FakeLedger ledger = new FakeLedger();
+    private final RecordingFeatureResolver featureResolver = new RecordingFeatureResolver();
+    private final RiskDecisionService service = new RiskDecisionService(
+            strategyReader,
+            ledger,
+            featureResolver,
+            new RiskRuleEvaluator(),
+            new RiskDecisionMerger(),
+            Clock.fixed(Instant.parse("2026-06-08T10:00:00Z"), ZoneOffset.UTC));
+
+    @Test
+    void evaluatesActiveStrategyForScene() {
+        strategyReader.strategy = strategyWithRules(rule("score-high",
+                RiskRuleOperand.feature("risk.score"),
+                RiskRuleOperator.GTE,
+                RiskRuleOperand.literal(85),
+                RiskDecisionAction.BLOCK,
+                90));
+        featureResolver.values.put(RiskRuleOperand.feature("risk.score"), RiskResolvedValue.present(90));
+
+        RiskDecisionResponse response = service.evaluate(request("req-1"));
+
+        assertThat(response.action()).isEqualTo(RiskDecisionAction.BLOCK);
+        assertThat(response.score()).isEqualTo(90);
+        assertThat(response.riskBand()).isEqualTo(RiskBand.HIGH);
+        assertThat(response.matchedRules()).containsExactly("velocity:score-high");
+    }
+
+    @Test
+    void repeatedRequestIdWithSameCanonicalPayloadReturnsPersistedDecision() {
+        strategyReader.strategy = strategyWithRules(rule("score-high",
+                RiskRuleOperand.feature("risk.score"),
+                RiskRuleOperator.GTE,
+                RiskRuleOperand.literal(85),
+                RiskDecisionAction.BLOCK,
+                90));
+        featureResolver.values.put(RiskRuleOperand.feature("risk.score"), RiskResolvedValue.present(90));
+
+        RiskDecisionResponse first = service.evaluate(request("same-req"));
+        RiskDecisionResponse second = service.evaluate(request("same-req"));
+
+        assertThat(second).isEqualTo(first);
+        assertThat(ledger.savedRuns).hasSize(1);
+    }
+
+    @Test
+    void repeatedRequestIdWithDifferentPayloadThrowsReplayMismatch() {
+        strategyReader.strategy = strategyWithRules();
+        service.evaluate(request("same-req"));
+
+        RiskDecisionRequest changed = request("same-req").withEvent(Map.of("amount", 999));
+
+        assertThatExceptionOfType(RiskDecisionReplayMismatchException.class)
+                .isThrownBy(() -> service.evaluate(changed));
+    }
+
+    @Test
+    void featureResolverReceivesRequiredFeaturesOnly() {
+        strategyReader.strategy = strategyWithRules(
+                rule("score-high", RiskRuleOperand.feature("risk.score"), RiskRuleOperator.GTE,
+                        RiskRuleOperand.literal(85), RiskDecisionAction.BLOCK, 90)
+        ).withRequiredFeatures(List.of("risk.score"));
+        featureResolver.values.put(RiskRuleOperand.feature("risk.score"), RiskResolvedValue.present(90));
+        featureResolver.values.put(RiskRuleOperand.feature("unused.feature"), RiskResolvedValue.present(1));
+
+        service.evaluate(request("req-features"));
+
+        assertThat(featureResolver.resolvedFeatureKeys).containsExactly("risk.score");
+    }
+
+    @Test
+    void persistsDecisionRunBeforeReturning() {
+        strategyReader.strategy = strategyWithRules();
+
+        RiskDecisionResponse response = service.evaluate(request("persist-me"));
+
+        assertThat(ledger.savedRuns).hasSize(1);
+        assertThat(ledger.savedRuns.getFirst().requestId()).isEqualTo("persist-me");
+        assertThat(ledger.savedRuns.getFirst().response()).isEqualTo(response);
+    }
+
+    @Test
+    void persistsRuleHitsForEffectiveAndShadowSignals() {
+        strategyReader.strategy = strategyWithRules(
+                rule("score-high", RiskRuleOperand.feature("risk.score"), RiskRuleOperator.GTE,
+                        RiskRuleOperand.literal(85), RiskDecisionAction.BLOCK, 90),
+                rule("shadow-review", RiskRuleOperand.feature("risk.shadow"), RiskRuleOperator.GTE,
+                        RiskRuleOperand.literal(1), RiskDecisionAction.REVIEW, 20).shadow()
+        ).withRequiredFeatures(List.of("risk.score", "risk.shadow"));
+        featureResolver.values.put(RiskRuleOperand.feature("risk.score"), RiskResolvedValue.present(90));
+        featureResolver.values.put(RiskRuleOperand.feature("risk.shadow"), RiskResolvedValue.present(1));
+
+        service.evaluate(request("hits"));
+
+        assertThat(ledger.savedHits).extracting(RiskDecisionRuleHit::ruleKey)
+                .containsExactly("score-high", "shadow-review");
+        assertThat(ledger.savedHits).extracting(RiskDecisionRuleHit::shadow).containsExactly(false, true);
+    }
+
+    @Test
+    void appliesFailOpenWhenRuntimeDependencyFails() {
+        strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_OPEN);
+        featureResolver.fail = true;
+
+        RiskDecisionResponse response = service.evaluate(request("fail-open"));
+
+        assertThat(response.action()).isEqualTo(RiskDecisionAction.ALLOW);
+        assertThat(response.reasons()).contains("RUNTIME_FAILURE:feature resolver failed");
+    }
+
+    @Test
+    void appliesFailReviewWhenRuntimeDependencyFails() {
+        strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_REVIEW);
+        featureResolver.fail = true;
+
+        RiskDecisionResponse response = service.evaluate(request("fail-review"));
+
+        assertThat(response.action()).isEqualTo(RiskDecisionAction.REVIEW);
+    }
+
+    @Test
+    void appliesFailClosedWhenRuntimeDependencyFails() {
+        strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_CLOSED);
+        featureResolver.fail = true;
+
+        RiskDecisionResponse response = service.evaluate(request("fail-closed"));
+
+        assertThat(response.action()).isEqualTo(RiskDecisionAction.BLOCK);
+    }
+
+    @Test
+    void deadlineExceededUsesSceneFailPolicy() {
+        strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_CLOSED);
+
+        RiskDecisionResponse response = service.evaluate(request("deadline").withDeadlineMs(0));
+
+        assertThat(response.action()).isEqualTo(RiskDecisionAction.BLOCK);
+        assertThat(response.reasons()).contains("RUNTIME_FAILURE:deadline exceeded");
+    }
+
+    @Test
+    void inputSnapshotMasksRawPiiBeforePersistence() {
+        strategyReader.strategy = strategyWithRules();
+
+        service.evaluate(request("pii"));
+
+        String snapshot = ledger.savedRuns.getFirst().inputSnapshotJson();
+        assertThat(ledger.savedRuns.getFirst().subjectHash())
+                .startsWith("sha256:")
+                .doesNotContain("user-123", "user@example.com", "+15551234567");
+        assertThat(snapshot).doesNotContain("user@example.com");
+        assertThat(snapshot).doesNotContain("+15551234567");
+        assertThat(snapshot).contains("u***3");
+        assertThat(snapshot).contains("***4567");
+    }
+
+    private RiskDecisionRequest request(String requestId) {
+        return new RiskDecisionRequest(
+                10L,
+                requestId,
+                "MARKETING_BENEFIT_ISSUE",
+                Instant.parse("2026-06-08T09:59:00Z"),
+                orderedMap("amount", 100, "channel", "APP"),
+                orderedMap("userId", "user-123", "email", "user@example.com", "phone", "+15551234567"),
+                orderedMap("caller", "CANVAS_NODE", "canvasId", 42),
+                orderedMap("risk.score", 90),
+                50);
+    }
+
+    private RiskCompiledStrategy strategyWithRules(RiskCompiledRule... rules) {
+        return new RiskCompiledStrategy(
+                "MARKETING_BENEFIT_ISSUE",
+                "benefit_default",
+                12,
+                RiskRuntimeMode.ENFORCE,
+                RiskFailPolicy.FAIL_REVIEW,
+                List.of("risk.score"),
+                List.of(rules));
+    }
+
+    private RiskCompiledRule rule(String ruleKey,
+                                  RiskRuleOperand left,
+                                  RiskRuleOperator operator,
+                                  RiskRuleOperand right,
+                                  RiskDecisionAction action,
+                                  int scoreDelta) {
+        return new RiskCompiledRule(
+                "velocity",
+                ruleKey,
+                new RiskRuleGroupNode(RiskRuleLogic.AND,
+                        List.of(new RiskRuleConditionNode(left, operator, right)),
+                        List.of()),
+                action,
+                scoreDelta,
+                ruleKey,
+                false);
+    }
+
+    private Map<String, Object> orderedMap(Object... pairs) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            map.put((String) pairs[i], pairs[i + 1]);
+        }
+        return map;
+    }
+
+    private static final class FakeStrategyReader implements RiskActiveStrategyReader {
+        private RiskCompiledStrategy strategy;
+
+        @Override
+        public RiskCompiledStrategy findActiveStrategy(Long tenantId, String sceneKey) {
+            return strategy;
+        }
+    }
+
+    private static final class FakeLedger implements RiskDecisionLedger {
+        private final List<RiskDecisionRunRecord> savedRuns = new ArrayList<>();
+        private final List<RiskDecisionRuleHit> savedHits = new ArrayList<>();
+
+        @Override
+        public Optional<RiskDecisionRunRecord> findByRequest(Long tenantId, String requestId) {
+            return savedRuns.stream()
+                    .filter(run -> run.tenantId().equals(tenantId) && run.requestId().equals(requestId))
+                    .findFirst();
+        }
+
+        @Override
+        public RiskDecisionRunRecord saveRun(RiskDecisionRunRecord run) {
+            RiskDecisionRunRecord saved = run.withDecisionRunId("rd-" + (savedRuns.size() + 1));
+            savedRuns.add(saved);
+            return saved;
+        }
+
+        @Override
+        public void saveRuleHits(String decisionRunId, List<RiskDecisionRuleHit> hits) {
+            savedHits.addAll(hits);
+        }
+    }
+
+    private static final class RecordingFeatureResolver implements RiskRequestFeatureResolver {
+        private final Map<RiskRuleOperand, RiskResolvedValue> values = new LinkedHashMap<>();
+        private final List<String> resolvedFeatureKeys = new ArrayList<>();
+        private boolean fail;
+
+        @Override
+        public RiskResolvedValue resolve(RiskDecisionRequest request, RiskRuleOperand operand) {
+            if (fail) {
+                throw new IllegalStateException("feature resolver failed");
+            }
+            if (operand instanceof RiskRuleOperand.FeatureOperand feature) {
+                resolvedFeatureKeys.add(feature.key());
+            }
+            return values.getOrDefault(operand, RiskResolvedValue.missing());
+        }
+    }
+}

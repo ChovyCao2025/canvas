@@ -21,6 +21,9 @@ import java.util.Map;
 
 @Service
 @Slf4j
+/**
+ * CdpWarehouseRealtimePipelineService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpWarehouseRealtimePipelineService {
 
     private static final int DEFAULT_CHECKPOINT_INTERVAL_SECONDS = 60;
@@ -50,6 +53,15 @@ public class CdpWarehouseRealtimePipelineService {
     private final Clock clock;
 
     @Autowired
+    /**
+     * 初始化 CdpWarehouseRealtimePipelineService 实例。
+     *
+     * @param pipelineMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param checkpointMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param incidentServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param schemaServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param consumerAvailabilityServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpWarehouseRealtimePipelineService(CdpWarehouseStreamPipelineMapper pipelineMapper,
                                                CdpWarehouseStreamCheckpointMapper checkpointMapper,
                                                ObjectProvider<CdpWarehouseIncidentService> incidentServiceProvider,
@@ -60,12 +72,27 @@ public class CdpWarehouseRealtimePipelineService {
                 schemaServiceProvider, consumerAvailabilityServiceProvider);
     }
 
+    /**
+     * 初始化 CdpWarehouseRealtimePipelineService 实例。
+     *
+     * @param pipelineMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param checkpointMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     CdpWarehouseRealtimePipelineService(CdpWarehouseStreamPipelineMapper pipelineMapper,
                                         CdpWarehouseStreamCheckpointMapper checkpointMapper,
                                         Clock clock) {
         this(pipelineMapper, checkpointMapper, clock, null, null, null);
     }
 
+    /**
+     * 初始化 CdpWarehouseRealtimePipelineService 实例。
+     *
+     * @param pipelineMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param checkpointMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param incidentServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     CdpWarehouseRealtimePipelineService(CdpWarehouseStreamPipelineMapper pipelineMapper,
                                         CdpWarehouseStreamCheckpointMapper checkpointMapper,
                                         Clock clock,
@@ -73,6 +100,15 @@ public class CdpWarehouseRealtimePipelineService {
         this(pipelineMapper, checkpointMapper, clock, incidentServiceProvider, null, null);
     }
 
+    /**
+     * 初始化 CdpWarehouseRealtimePipelineService 实例。
+     *
+     * @param pipelineMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param checkpointMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param incidentServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param schemaServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     CdpWarehouseRealtimePipelineService(CdpWarehouseStreamPipelineMapper pipelineMapper,
                                         CdpWarehouseStreamCheckpointMapper checkpointMapper,
                                         Clock clock,
@@ -81,6 +117,16 @@ public class CdpWarehouseRealtimePipelineService {
         this(pipelineMapper, checkpointMapper, clock, incidentServiceProvider, schemaServiceProvider, null);
     }
 
+    /**
+     * 初始化 CdpWarehouseRealtimePipelineService 实例。
+     *
+     * @param pipelineMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param checkpointMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param incidentServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param schemaServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param consumerAvailabilityServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     CdpWarehouseRealtimePipelineService(CdpWarehouseStreamPipelineMapper pipelineMapper,
                                         CdpWarehouseStreamCheckpointMapper checkpointMapper,
                                         Clock clock,
@@ -96,7 +142,15 @@ public class CdpWarehouseRealtimePipelineService {
         this.consumerAvailabilityServiceProvider = consumerAvailabilityServiceProvider;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public PipelineContractView upsertPipeline(Long tenantId, PipelineContractCommand command) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("pipeline command is required");
         }
@@ -121,10 +175,19 @@ public class CdpWarehouseRealtimePipelineService {
         row.setLifecycleStatus(upperDefault(command.lifecycleStatus(), STATUS_ACTIVE));
         row.setOwnerName(blankToNull(command.ownerName()));
         row.setConfigJson(blankToNull(command.configJson()));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         pipelineMapper.upsert(row);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toPipeline(row);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param lifecycleStatus 业务状态，用于筛选或推进状态流转。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<PipelineContractView> listPipelines(Long tenantId, String lifecycleStatus) {
         Long scopedTenantId = normalizeTenant(tenantId);
         LambdaQueryWrapper<CdpWarehouseStreamPipelineDO> query =
@@ -144,7 +207,15 @@ public class CdpWarehouseRealtimePipelineService {
         return new ArrayList<>(byKey.values());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回 report checkpoint 计算得到的数量、金额或指标值。
+     */
     public CheckpointReport reportCheckpoint(Long tenantId, CheckpointCommand command) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("checkpoint command is required");
         }
@@ -178,6 +249,7 @@ public class CdpWarehouseRealtimePipelineService {
         row.setSourceSchemaVersion(blankToNull(command.sourceSchemaVersion()));
         row.setSinkSchemaVersion(blankToNull(command.sinkSchemaVersion()));
         row.setSchemaStatus(schemaStatus(command, evaluation));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         checkpointMapper.upsert(row);
 
         CdpWarehouseStreamPipelineDO latest = new CdpWarehouseStreamPipelineDO();
@@ -215,22 +287,41 @@ public class CdpWarehouseRealtimePipelineService {
                 evaluation.reasons());
         recordRealtimeAssetAvailability(pipeline, report);
         recordIncidentIfNeeded(pipeline, report);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return report;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param recentLimit recent limit 参数，用于 status 流程中的校验、计算或对象转换。
+     * @return 返回 status 流程生成的业务结果。
+     */
     public PipelineStatusSummary status(Long tenantId, int recentLimit) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = normalizeTenant(tenantId);
         List<PipelineContractView> pipelines = listPipelines(scopedTenantId, STATUS_ACTIVE);
         int limit = boundLimit(recentLimit);
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         List<PipelineRuntimeView> runtimeRows = pipelines.stream()
                 .map(pipeline -> runtime(scopedTenantId, pipeline, limit))
                 .toList();
         long passed = runtimeRows.stream().filter(row -> STATUS_PASS.equals(row.runtimeStatus())).count();
         long warned = runtimeRows.stream().filter(row -> STATUS_WARN.equals(row.runtimeStatus())).count();
         long failed = runtimeRows.stream().filter(row -> STATUS_FAIL.equals(row.runtimeStatus())).count();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new PipelineStatusSummary(scopedTenantId, runtimeRows.size(), passed, warned, failed, runtimeRows);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipeline pipeline 参数，用于 runtime 流程中的校验、计算或对象转换。
+     * @param recentLimit recent limit 参数，用于 runtime 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     private PipelineRuntimeView runtime(Long tenantId, PipelineContractView pipeline, int recentLimit) {
         List<CheckpointReport> recent = recentCheckpoints(tenantId, pipeline.pipelineKey(), recentLimit);
         CheckpointReport latest = recent.isEmpty() ? null : recent.get(0);
@@ -250,6 +341,14 @@ public class CdpWarehouseRealtimePipelineService {
                 recent);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private List<CheckpointReport> recentCheckpoints(Long tenantId, String pipelineKey, int limit) {
         List<CdpWarehouseStreamCheckpointDO> rows = checkpointMapper.selectList(
                 new LambdaQueryWrapper<CdpWarehouseStreamCheckpointDO>()
@@ -261,28 +360,50 @@ public class CdpWarehouseRealtimePipelineService {
         return safeList(rows).stream().map(this::toCheckpoint).toList();
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private CdpWarehouseStreamPipelineDO findPipeline(Long tenantId, String pipelineKey) {
         LambdaQueryWrapper<CdpWarehouseStreamPipelineDO> query =
                 new LambdaQueryWrapper<CdpWarehouseStreamPipelineDO>()
                         .in(CdpWarehouseStreamPipelineDO::getTenantId, tenantScope(tenantId))
                         .eq(CdpWarehouseStreamPipelineDO::getPipelineKey, pipelineKey)
                         .orderByAsc(CdpWarehouseStreamPipelineDO::getTenantId);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CdpWarehouseStreamPipelineDO selected = null;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CdpWarehouseStreamPipelineDO row : safeList(pipelineMapper.selectList(query))) {
             selected = row;
         }
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (selected == null) {
             throw new IllegalArgumentException("stream pipeline not found: " + pipelineKey);
         }
         return selected;
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param pipeline pipeline 参数，用于 evaluate 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param reportedStatus 业务状态，用于筛选或推进状态流转。
+     * @param checkpointTime 时间参数，用于计算窗口、过期或审计时间。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 evaluate 流程生成的业务结果。
+     */
     private RuntimeEvaluation evaluate(CdpWarehouseStreamPipelineDO pipeline,
                                        CheckpointCommand command,
                                        String reportedStatus,
                                        LocalDateTime checkpointTime,
                                        LocalDateTime now) {
+        // 准备本次处理所需的上下文和中间变量。
         List<String> reasons = new ArrayList<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (isFail(reportedStatus)) {
             String detail = hasText(command.errorMessage()) ? ": " + command.errorMessage().trim() : "";
             reasons.add("reported status is " + reportedStatus + detail);
@@ -311,13 +432,22 @@ public class CdpWarehouseRealtimePipelineService {
             }
         }
         String status = isFail(reportedStatus) ? STATUS_FAIL : (reasons.isEmpty() ? STATUS_PASS : STATUS_WARN);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new RuntimeEvaluation(status, reasons.isEmpty() ? "Realtime pipeline healthy" : String.join("; ", reasons),
                 List.copyOf(reasons));
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param pipeline pipeline 参数，用于 evaluateStored 流程中的校验、计算或对象转换。
+     * @return 返回 evaluateStored 流程生成的业务结果。
+     */
     private RuntimeEvaluation evaluateStored(PipelineContractView pipeline) {
+        // 准备本次处理所需的上下文和中间变量。
         List<String> reasons = new ArrayList<>();
         String storedStatus = upperDefault(pipeline.lastRuntimeStatus(), "");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (STATUS_FAIL.equals(storedStatus)) {
             reasons.add(defaultString(pipeline.lastStatusMessage(), "last runtime status is FAIL"));
             return new RuntimeEvaluation(STATUS_FAIL, String.join("; ", reasons), List.copyOf(reasons));
@@ -348,12 +478,22 @@ public class CdpWarehouseRealtimePipelineService {
             reasons.add(STARTUP_EVIDENCE_REASON);
         }
         String status = reasons.isEmpty() ? STATUS_PASS : STATUS_WARN;
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new RuntimeEvaluation(status, reasons.isEmpty() ? "Realtime pipeline healthy" : String.join("; ", reasons),
                 List.copyOf(reasons));
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param pipeline pipeline 参数，用于 evaluateCheckpoint 流程中的校验、计算或对象转换。
+     * @param checkpoint checkpoint 参数，用于 evaluateCheckpoint 流程中的校验、计算或对象转换。
+     * @return 返回 evaluateCheckpoint 流程生成的业务结果。
+     */
     private RuntimeEvaluation evaluateCheckpoint(PipelineContractView pipeline, CheckpointReport checkpoint) {
+        // 准备本次处理所需的上下文和中间变量。
         List<String> reasons = new ArrayList<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (STATUS_FAIL.equals(checkpoint.status())) {
             reasons.add(defaultString(checkpoint.message(), "last checkpoint failed"));
             return new RuntimeEvaluation(STATUS_FAIL, String.join("; ", reasons), List.copyOf(reasons));
@@ -385,10 +525,20 @@ public class CdpWarehouseRealtimePipelineService {
             reasons.add(checkpoint.message());
         }
         String status = reasons.isEmpty() ? STATUS_PASS : STATUS_WARN;
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new RuntimeEvaluation(status, reasons.isEmpty() ? "Realtime pipeline healthy" : String.join("; ", reasons),
                 List.copyOf(reasons));
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param checkpointId 业务对象 ID，用于定位具体记录。
+     * @param sourcePartition source partition 参数，用于 isStartupSubmission 流程中的校验、计算或对象转换。
+     * @param sourceOffset source offset 参数，用于 isStartupSubmission 流程中的校验、计算或对象转换。
+     * @param committedOffset committed offset 参数，用于 isStartupSubmission 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean isStartupSubmission(String checkpointId,
                                         String sourcePartition,
                                         String sourceOffset,
@@ -399,7 +549,14 @@ public class CdpWarehouseRealtimePipelineService {
                 && STARTUP_OFFSET.equalsIgnoreCase(defaultString(committedOffset, "")));
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CheckpointReport toCheckpoint(CdpWarehouseStreamCheckpointDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new CheckpointReport(
                 row.getId(),
                 row.getTenantId(),
@@ -421,12 +578,20 @@ public class CdpWarehouseRealtimePipelineService {
                 List.of());
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param pipeline pipeline 参数，用于 recordIncidentIfNeeded 流程中的校验、计算或对象转换。
+     * @param report report 参数，用于 recordIncidentIfNeeded 流程中的校验、计算或对象转换。
+     */
     private void recordIncidentIfNeeded(CdpWarehouseStreamPipelineDO pipeline, CheckpointReport report) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (report == null || STATUS_PASS.equals(report.status()) || incidentServiceProvider == null) {
             return;
         }
         CdpWarehouseIncidentService incidentService = incidentServiceProvider.getIfAvailable();
         if (incidentService == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         try {
@@ -447,12 +612,20 @@ public class CdpWarehouseRealtimePipelineService {
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param pipeline pipeline 参数，用于 recordRealtimeAssetAvailability 流程中的校验、计算或对象转换。
+     * @param report report 参数，用于 recordRealtimeAssetAvailability 流程中的校验、计算或对象转换。
+     */
     private void recordRealtimeAssetAvailability(CdpWarehouseStreamPipelineDO pipeline, CheckpointReport report) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (report == null || pipeline == null || consumerAvailabilityServiceProvider == null) {
             return;
         }
         CdpWarehouseConsumerAvailabilityService service = consumerAvailabilityServiceProvider.getIfAvailable();
         if (service == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         try {
@@ -482,7 +655,14 @@ public class CdpWarehouseRealtimePipelineService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private PipelineContractView toPipeline(CdpWarehouseStreamPipelineDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new PipelineContractView(
                 row.getId(),
                 row.getTenantId(),
@@ -513,16 +693,33 @@ public class CdpWarehouseRealtimePipelineService {
                 row.getLastReportedBy());
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回布尔判断结果。
+     */
     private boolean isFail(String status) {
         String normalized = upperDefault(status, STATUS_PASS);
         return STATUS_FAIL.equals(normalized) || "FAILED".equals(normalized) || "ERROR".equals(normalized);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evaluation evaluation 参数，用于 withSchemaEvaluation 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param pipelineKey 业务键，用于在同一租户下定位资源。
+     * @param sourceSchemaVersion source schema version 参数，用于 withSchemaEvaluation 流程中的校验、计算或对象转换。
+     * @param sinkSchemaVersion sink schema version 参数，用于 withSchemaEvaluation 流程中的校验、计算或对象转换。
+     * @return 返回 withSchemaEvaluation 流程生成的业务结果。
+     */
     private RuntimeEvaluation withSchemaEvaluation(RuntimeEvaluation evaluation,
                                                    Long tenantId,
                                                    String pipelineKey,
                                                    String sourceSchemaVersion,
                                                    String sinkSchemaVersion) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!hasText(sourceSchemaVersion) && !hasText(sinkSchemaVersion)) {
             return evaluation;
         }
@@ -540,9 +737,18 @@ public class CdpWarehouseRealtimePipelineService {
         }
         List<String> reasons = new ArrayList<>(evaluation.reasons());
         reasons.addAll(schema.reasons());
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return mergeEvaluation(evaluation, schema.status(), reasons);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param current current 参数，用于 mergeEvaluation 流程中的校验、计算或对象转换。
+     * @param nextStatus 业务状态，用于筛选或推进状态流转。
+     * @param reasons reasons 参数，用于 mergeEvaluation 流程中的校验、计算或对象转换。
+     * @return 返回 mergeEvaluation 流程生成的业务结果。
+     */
     private RuntimeEvaluation mergeEvaluation(RuntimeEvaluation current, String nextStatus, List<String> reasons) {
         String mergedStatus;
         if (STATUS_FAIL.equals(current.status()) || STATUS_FAIL.equals(nextStatus)) {
@@ -558,6 +764,13 @@ public class CdpWarehouseRealtimePipelineService {
                 List.copyOf(reasons));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param evaluation evaluation 参数，用于 schemaStatus 流程中的校验、计算或对象转换。
+     * @return 返回 schema status 生成的文本或业务键。
+     */
     private String schemaStatus(CheckpointCommand command, RuntimeEvaluation evaluation) {
         if (!hasText(command.sourceSchemaVersion()) && !hasText(command.sinkSchemaVersion())) {
             return null;
@@ -568,6 +781,12 @@ public class CdpWarehouseRealtimePipelineService {
         return STATUS_PASS;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 semantics 生成的文本或业务键。
+     */
     private String semantics(String value) {
         String normalized = upperDefault(value, SEMANTICS_AT_LEAST_ONCE);
         if (!SEMANTICS_AT_LEAST_ONCE.equals(normalized) && !SEMANTICS_EXACTLY_ONCE.equals(normalized)) {
@@ -576,6 +795,14 @@ public class CdpWarehouseRealtimePipelineService {
         return normalized;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param defaultValue 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 positive or default 计算得到的数量、金额或指标值。
+     */
     private Integer positiveOrDefault(Integer value, int defaultValue, String fieldName) {
         int resolved = value == null ? defaultValue : value;
         if (resolved <= 0) {
@@ -584,6 +811,14 @@ public class CdpWarehouseRealtimePipelineService {
         return resolved;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param defaultValue 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 positive or default 计算得到的数量、金额或指标值。
+     */
     private Long positiveOrDefault(Long value, long defaultValue, String fieldName) {
         long resolved = value == null ? defaultValue : value;
         if (resolved <= 0) {
@@ -592,6 +827,12 @@ public class CdpWarehouseRealtimePipelineService {
         return resolved;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundLimit(int limit) {
         if (limit <= 0) {
             return 5;
@@ -599,6 +840,12 @@ public class CdpWarehouseRealtimePipelineService {
         return Math.min(limit, MAX_STATUS_LIMIT);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 tenant scope 汇总后的集合、分页或映射视图。
+     */
     private List<Long> tenantScope(Long tenantId) {
         if (tenantId == null || tenantId == 0L) {
             return List.of(0L);
@@ -606,14 +853,33 @@ public class CdpWarehouseRealtimePipelineService {
         return List.of(0L, tenantId);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOperator(String operator) {
         return hasText(operator) ? operator.trim() : "operator";
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String fieldName) {
         if (!hasText(value)) {
             throw new IllegalArgumentException(fieldName + " is required");
@@ -621,22 +887,55 @@ public class CdpWarehouseRealtimePipelineService {
         return value.trim();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 upper required 生成的文本或业务键。
+     */
     private String upperRequired(String value, String fieldName) {
         return required(value, fieldName).toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param defaultValue 待处理值，用于规则计算或转换。
+     * @return 返回 upper default 生成的文本或业务键。
+     */
     private String upperDefault(String value, String defaultValue) {
         return hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : defaultValue;
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param defaultValue 待处理值，用于规则计算或转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private String defaultString(String value, String defaultValue) {
         return hasText(value) ? value.trim() : defaultValue;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String blankToNull(String value) {
         return hasText(value) ? value.trim() : null;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String limit(String value) {
         if (value == null || value.length() <= MAX_MESSAGE_LENGTH) {
             return value;
@@ -644,21 +943,44 @@ public class CdpWarehouseRealtimePipelineService {
         return value.substring(0, MAX_MESSAGE_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * RuntimeEvaluation 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private record RuntimeEvaluation(String status, String message, List<String> reasons) {
     }
 
+    /**
+     * PipelineContractCommand 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record PipelineContractCommand(
             String pipelineKey,
             String displayName,
@@ -678,6 +1000,9 @@ public class CdpWarehouseRealtimePipelineService {
             String configJson) {
     }
 
+    /**
+     * CheckpointCommand 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record CheckpointCommand(
             String pipelineKey,
             String checkpointId,
@@ -694,6 +1019,22 @@ public class CdpWarehouseRealtimePipelineService {
             String sourceSchemaVersion,
             String sinkSchemaVersion) {
 
+        /**
+         * 初始化 CheckpointCommand 实例。
+         *
+         * @param pipelineKey 业务键，用于在同一租户下定位资源。
+         * @param checkpointId 业务对象 ID，用于定位具体记录。
+         * @param sourcePartition source partition 参数，用于 CheckpointCommand 流程中的校验、计算或对象转换。
+         * @param sourceOffset source offset 参数，用于 CheckpointCommand 流程中的校验、计算或对象转换。
+         * @param committedOffset committed offset 参数，用于 CheckpointCommand 流程中的校验、计算或对象转换。
+         * @param watermarkTime 时间参数，用于计算窗口、过期或审计时间。
+         * @param checkpointTime 时间参数，用于计算窗口、过期或审计时间。
+         * @param lagMs lag ms 参数，用于 CheckpointCommand 流程中的校验、计算或对象转换。
+         * @param rowCount row count 参数，用于 CheckpointCommand 流程中的校验、计算或对象转换。
+         * @param status 业务状态，用于筛选或推进状态流转。
+         * @param errorMessage error message 参数，用于 CheckpointCommand 流程中的校验、计算或对象转换。
+         * @param reportedBy reported by 参数，用于 CheckpointCommand 流程中的校验、计算或对象转换。
+         */
         public CheckpointCommand(String pipelineKey,
                                  String checkpointId,
                                  String sourcePartition,
@@ -711,6 +1052,9 @@ public class CdpWarehouseRealtimePipelineService {
         }
     }
 
+    /**
+     * PipelineContractView 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record PipelineContractView(
             Long id,
             Long tenantId,
@@ -741,6 +1085,9 @@ public class CdpWarehouseRealtimePipelineService {
             String lastReportedBy) {
     }
 
+    /**
+     * CheckpointReport 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record CheckpointReport(
             Long id,
             Long tenantId,
@@ -761,6 +1108,25 @@ public class CdpWarehouseRealtimePipelineService {
             String schemaStatus,
             List<String> reasons) {
 
+        /**
+         * 初始化 CheckpointReport 实例。
+         *
+         * @param id 业务对象 ID，用于定位具体记录。
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param pipelineKey 业务键，用于在同一租户下定位资源。
+         * @param checkpointId 业务对象 ID，用于定位具体记录。
+         * @param sourcePartition source partition 参数，用于 CheckpointReport 流程中的校验、计算或对象转换。
+         * @param sourceOffset source offset 参数，用于 CheckpointReport 流程中的校验、计算或对象转换。
+         * @param committedOffset committed offset 参数，用于 CheckpointReport 流程中的校验、计算或对象转换。
+         * @param watermarkTime 时间参数，用于计算窗口、过期或审计时间。
+         * @param checkpointTime 时间参数，用于计算窗口、过期或审计时间。
+         * @param lagMs lag ms 参数，用于 CheckpointReport 流程中的校验、计算或对象转换。
+         * @param rowCount row count 参数，用于 CheckpointReport 流程中的校验、计算或对象转换。
+         * @param status 业务状态，用于筛选或推进状态流转。
+         * @param message 原因或消息文本，用于记录状态变化的业务依据。
+         * @param reportedBy reported by 参数，用于 CheckpointReport 流程中的校验、计算或对象转换。
+         * @param reasons reasons 参数，用于 CheckpointReport 流程中的校验、计算或对象转换。
+         */
         public CheckpointReport(Long id,
                                 Long tenantId,
                                 String pipelineKey,
@@ -782,6 +1148,9 @@ public class CdpWarehouseRealtimePipelineService {
         }
     }
 
+    /**
+     * PipelineRuntimeView 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record PipelineRuntimeView(
             PipelineContractView contract,
             String runtimeStatus,
@@ -797,6 +1166,9 @@ public class CdpWarehouseRealtimePipelineService {
             List<CheckpointReport> recentCheckpoints) {
     }
 
+    /**
+     * PipelineStatusSummary 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record PipelineStatusSummary(
             Long tenantId,
             int total,

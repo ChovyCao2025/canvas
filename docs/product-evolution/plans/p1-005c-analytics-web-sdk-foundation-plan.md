@@ -8,7 +8,9 @@
 
 **Tech Stack:** TypeScript, Vitest, browser `fetch`, browser `localStorage`, Web Crypto fallback-free UUID generation, npm scripts.
 
-**Implementation Status:** Implemented and merged into `main` on 2026-06-05. Added a self-contained `sdk/analytics-web` package exporting `CanvasAnalytics` and `createAnalytics`.
+**Implementation Status:** Implemented in the current workspace record on 2026-06-05. Added a self-contained `sdk/analytics-web` package exporting `CanvasAnalytics` and `createAnalytics`. Commit and merge status was not verified in this docs-only audit; the commit boundaries are documented because no commit was requested.
+
+Status: Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 
 **Verification:** `cd sdk/analytics-web && npm test` passed. `cd sdk/analytics-web && npm run build` passed. `node_modules` and `dist` are ignored; `package-lock.json` remains for reproducible SDK installs.
 
@@ -37,7 +39,7 @@
 - Create: `sdk/analytics-web/tsconfig.json`
 - Create: `sdk/analytics-web/src/index.test.ts`
 
-- [ ] **Step 1: Create package metadata**
+- [x] **Step 1: Create package metadata**
 
 Create `sdk/analytics-web/package.json`:
 
@@ -78,7 +80,7 @@ Create `sdk/analytics-web/tsconfig.json`:
 }
 ```
 
-- [ ] **Step 2: Write SDK behavior tests**
+- [x] **Step 2: Write SDK behavior tests**
 
 Create `sdk/analytics-web/src/index.test.ts`:
 
@@ -189,7 +191,7 @@ describe('CanvasAnalytics', () => {
 })
 ```
 
-- [ ] **Step 3: Run tests and confirm red state**
+- [x] **Step 3: Run tests and confirm red state**
 
 Run:
 
@@ -205,7 +207,7 @@ Expected: FAIL because `src/index.ts` does not exist.
 - Create: `sdk/analytics-web/src/index.ts`
 - Test: `sdk/analytics-web/src/index.test.ts`
 
-- [ ] **Step 1: Implement SDK public API**
+- [x] **Step 1: Implement SDK public API**
 
 Create `sdk/analytics-web/src/index.ts`:
 
@@ -455,7 +457,7 @@ function base64(value: string) {
 }
 ```
 
-- [ ] **Step 2: Run SDK tests**
+- [x] **Step 2: Run SDK tests**
 
 Run:
 
@@ -465,7 +467,7 @@ cd sdk/analytics-web && npm test -- index.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Run SDK type build**
+- [x] **Step 3: Run SDK type build**
 
 Run:
 
@@ -475,7 +477,8 @@ cd sdk/analytics-web && npm run build
 
 Expected: PASS and `dist/index.d.ts` is generated.
 
-- [ ] **Step 4: Commit SDK implementation**
+- [x] **Step 4: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -491,7 +494,7 @@ Expected: commit contains only SDK package metadata, source, and tests.
 **Files:**
 - Create: `sdk/analytics-web/README.md`
 
-- [ ] **Step 1: Write README**
+- [x] **Step 1: Write README**
 
 Create `sdk/analytics-web/README.md`:
 
@@ -604,7 +607,7 @@ Authorization: Basic base64(writeKey + ":")
 ```
 ````
 
-- [ ] **Step 2: Verify README contains required examples**
+- [x] **Step 2: Verify README contains required examples**
 
 Run:
 
@@ -614,7 +617,8 @@ rg -n "Immediate Load|Delayed Consent|track|identify|page|optOut|flush|reset|Aut
 
 Expected: each term appears at least once.
 
-- [ ] **Step 3: Commit README**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -631,7 +635,7 @@ Expected: commit contains only SDK README.
 - Modify: `docs/product-evolution/specs/p1-005c-analytics-web-sdk-foundation.md`
 - Modify: `docs/product-evolution/plans/p1-005c-analytics-web-sdk-foundation-plan.md`
 
-- [ ] **Step 1: Run SDK verification**
+- [x] **Step 1: Run SDK verification**
 
 Run:
 
@@ -642,7 +646,7 @@ cd sdk/analytics-web && npm run build
 
 Expected: PASS.
 
-- [ ] **Step 2: Verify docs contract**
+- [x] **Step 2: Verify docs contract**
 
 Run:
 
@@ -652,7 +656,8 @@ rg -n "writeKey|/cdp/events/track|messageId|anonymousId|optOut|reset|Basic" sdk/
 
 Expected: all protocol terms are present.
 
-- [ ] **Step 3: Commit docs plan**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

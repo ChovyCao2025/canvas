@@ -48,7 +48,7 @@ Add provider rate-limit decisions, one-level fallback routing, and cross-canvas 
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05; full Maven test execution is still blocked by unrelated legacy test compilation issues.
 
 - Actual migration is `V121__channel_provider_policies.sql`; earlier migration numbers were already allocated.
 - Provider limit, fallback policy/decision, and dedupe repositories/services are present under `org.chovy.canvas.engine.channel`.

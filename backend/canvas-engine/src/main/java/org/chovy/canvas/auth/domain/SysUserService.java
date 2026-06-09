@@ -31,7 +31,7 @@ public class SysUserService {
             RoleNames.TENANT_ADMIN,
             RoleNames.OPERATOR);
 
-    /** Platform administrator roles are only visible/manageable by platform administrators. */
+    /** 平台管理员角色只允许平台管理员查看或管理。 */
     private static final Set<String> PLATFORM_ADMIN_ROLES = Set.of(
             RoleNames.ADMIN,
             RoleNames.SUPER_ADMIN);
@@ -65,6 +65,15 @@ public class SysUserService {
         return sysUserMapper.selectList(null);
     }
 
+    /**
+     * 查询当前管理员可见的后台用户列表。
+     *
+     * <p>平台超级管理员可查看全部用户；租户管理员只能查看本租户用户，并过滤平台级管理员角色，
+     * 避免租户侧枚举或管理跨租户账号。
+     *
+     * @param operator 当前操作人上下文
+     * @return 按权限裁剪后的用户列表
+     */
     public List<SysUserDO> listVisible(TenantContext operator) {
         requireUserAdmin(operator);
         if (operator.isSuperAdmin()) {
@@ -100,6 +109,7 @@ public class SysUserService {
         user.setEnabled(1);
         try {
             sysUserMapper.insert(user);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DuplicateKeyException e) {
             throw new IllegalArgumentException("用户名已存在: " + normalizedUsername, e);
         }
@@ -108,7 +118,9 @@ public class SysUserService {
 
     /** 更新已有记录，仅修改允许变更的字段。 */
     public void update(Long id, String displayName, String rawPassword, String role, TenantContext operator) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         SysUserDO user = sysUserMapper.selectById(id);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (user == null) throw new IllegalArgumentException("用户不存在: " + id);
         String normalizedRole = role == null ? null : requireRole(role);
         requireManagePermission(operator, user.getTenantId(), user.getRole(), normalizedRole);
@@ -156,6 +168,12 @@ public class SysUserService {
         return normalizedRole;
     }
 
+    /**
+     * 校验目标租户 ID 必须存在。
+     *
+     * @param tenantId 待校验的租户 ID
+     * @return 已确认非空的租户 ID
+     */
     private Long requireTenantId(Long tenantId) {
         if (tenantId == null) {
             throw new IllegalArgumentException("租户 ID 不能为空");
@@ -163,6 +181,12 @@ public class SysUserService {
         return tenantId;
     }
 
+    /**
+     * 从操作人上下文中提取租户 ID。
+     *
+     * @param operator 当前操作人上下文
+     * @return 操作人所属租户 ID
+     */
     private Long requireContextTenantId(TenantContext operator) {
         if (operator.tenantId() == null) {
             throw new AccessDeniedException("当前用户缺少租户 ID");
@@ -170,15 +194,30 @@ public class SysUserService {
         return operator.tenantId();
     }
 
+    /**
+     * 校验操作人必须具备用户管理权限。
+     *
+     * @param operator 当前操作人上下文
+     */
     private void requireUserAdmin(TenantContext operator) {
         if (operator == null || (!operator.isSuperAdmin() && !operator.isTenantAdmin())) {
             throw new AccessDeniedException("无权限管理用户");
         }
     }
 
+    /**
+     * 校验创建后台用户时的租户和角色边界。
+     *
+     * @param operator 当前操作人上下文
+     * @param targetTenantId 待创建用户所属租户
+     * @param targetRole 待创建用户角色
+     */
     private void requireCreatePermission(TenantContext operator, Long targetTenantId, String targetRole) {
+        // 准备本次处理所需的上下文和中间变量。
         requireUserAdmin(operator);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (operator.isSuperAdmin()) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (isPlatformAdminRole(targetRole)) {
@@ -190,13 +229,24 @@ public class SysUserService {
         }
     }
 
+    /**
+     * 校验更新或禁用用户时的租户和角色边界。
+     *
+     * @param operator 当前操作人上下文
+     * @param targetTenantId 被管理用户所属租户
+     * @param currentTargetRole 被管理用户当前角色
+     * @param requestedTargetRole 请求更新后的目标角色，可为空
+     */
     private void requireManagePermission(
             TenantContext operator,
             Long targetTenantId,
             String currentTargetRole,
             String requestedTargetRole) {
+        // 准备本次处理所需的上下文和中间变量。
         requireUserAdmin(operator);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (operator.isSuperAdmin()) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (isPlatformAdminRole(currentTargetRole)) {
@@ -211,6 +261,12 @@ public class SysUserService {
         }
     }
 
+    /**
+     * 判断角色是否属于平台管理员角色。
+     *
+     * @param role 待判断的角色
+     * @return true 表示该角色属于平台管理范围
+     */
     private boolean isPlatformAdminRole(String role) {
         return role != null && PLATFORM_ADMIN_ROLES.contains(role.trim().toUpperCase(Locale.ROOT));
     }

@@ -1,5 +1,9 @@
 # CDP Warehouse Enterprise OLAP Evidence Automation Implementation Plan
 
+Spec: `../specs/p2-084-cdp-warehouse-enterprise-olap-evidence-automation.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add scheduled and manual enterprise OLAP evidence collection with auditable run history, so P2-083 evidence is refreshed continuously instead of only being evaluated on demand.

@@ -1,10 +1,14 @@
 # CDP Warehouse Metric Impact Transitive Lineage Implementation Plan
 
+Spec: `../specs/p2-044-cdp-warehouse-metric-impact-transitive-lineage.md`
+
 **Goal:** Extend metric impact and metric-change review to use P2-043 bounded transitive lineage.
 
 **Architecture:** Keep P2-041 direct lineage fields intact. `CdpWarehouseMetricLineageService` calls the existing catalog transitive traversal and places the graph on the impact response. `CdpWarehouseMetricChangeReviewService` summarizes the transitive graph into review impact counts and risk classification.
 
 **Tech Stack:** Java 21, Spring Boot, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

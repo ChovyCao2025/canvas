@@ -59,6 +59,17 @@ test('rejects missing required evidence fields', () => {
   }
 })
 
+test('rejects launch gates that do not contain required topic evidence', () => {
+  for (const [key, launchGate, message] of [
+    ['security-review', 'Generic owner approves launch.', /security-review launchGate must mention security/],
+    ['partner-support', 'Generic owner approves launch.', /partner-support launchGate must mention support/],
+    ['plugin-takedown', 'Generic owner approves launch.', /plugin-takedown launchGate must mention security/],
+  ]) {
+    const payload = validPayload({ key, launchGate })
+    assert.throws(() => run(writePayload(payload)), message)
+  }
+})
+
 test('rejects accepted capabilities without child spec path', () => {
   const payload = validPayload({ status: 'Accepted For Child Spec' })
 

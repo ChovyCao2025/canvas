@@ -19,6 +19,9 @@ import java.util.Locale;
 import java.util.UUID;
 
 @Service
+/**
+ * CdpWarehouseSyntheticDataPathProbeService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpWarehouseSyntheticDataPathProbeService {
 
     private static final String DEFAULT_PROBE_KEY = "synthetic_ods";
@@ -45,6 +48,15 @@ public class CdpWarehouseSyntheticDataPathProbeService {
     private final Clock clock;
 
     @Autowired
+    /**
+     * 初始化 CdpWarehouseSyntheticDataPathProbeService 实例。
+     *
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param eventSinkProvider event sink provider 参数，用于 CdpWarehouseSyntheticDataPathProbeService 流程中的校验、计算或对象转换。
+     * @param dorisJdbcTemplate doris jdbc template 参数，用于 CdpWarehouseSyntheticDataPathProbeService 流程中的校验、计算或对象转换。
+     * @param sourceEventLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpWarehouseSyntheticDataPathProbeService(
             CdpWarehouseSyntheticDataPathProbeRunMapper runMapper,
             ObjectProvider<CdpWarehouseEventSink> eventSinkProvider,
@@ -55,6 +67,14 @@ public class CdpWarehouseSyntheticDataPathProbeService {
                 objectMapper, Clock.systemDefaultZone());
     }
 
+    /**
+     * 初始化 CdpWarehouseSyntheticDataPathProbeService 实例。
+     *
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param eventSinkProvider event sink provider 参数，用于 CdpWarehouseSyntheticDataPathProbeService 流程中的校验、计算或对象转换。
+     * @param dorisJdbcTemplate doris jdbc template 参数，用于 CdpWarehouseSyntheticDataPathProbeService 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpWarehouseSyntheticDataPathProbeService(
             CdpWarehouseSyntheticDataPathProbeRunMapper runMapper,
             ObjectProvider<CdpWarehouseEventSink> eventSinkProvider,
@@ -63,6 +83,16 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         this(runMapper, eventSinkProvider, dorisJdbcTemplate, null, objectMapper, Clock.systemDefaultZone());
     }
 
+    /**
+     * 初始化 CdpWarehouseSyntheticDataPathProbeService 实例。
+     *
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param eventSinkProvider event sink provider 参数，用于 CdpWarehouseSyntheticDataPathProbeService 流程中的校验、计算或对象转换。
+     * @param dorisJdbcTemplate doris jdbc template 参数，用于 CdpWarehouseSyntheticDataPathProbeService 流程中的校验、计算或对象转换。
+     * @param sourceEventLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     CdpWarehouseSyntheticDataPathProbeService(
             CdpWarehouseSyntheticDataPathProbeRunMapper runMapper,
             ObjectProvider<CdpWarehouseEventSink> eventSinkProvider,
@@ -78,7 +108,15 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         this.clock = clock;
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public ProbeRunView run(Long tenantId, RunCommand command) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = normalizeTenant(tenantId);
         RunCommand scopedCommand = command == null
                 ? new RunCommand(null, null, true, DEFAULT_VERIFY_ATTEMPTS, DEFAULT_VERIFY_DELAY_MS, null)
@@ -93,6 +131,7 @@ public class CdpWarehouseSyntheticDataPathProbeService {
 
         CdpWarehouseSyntheticDataPathProbeRunDO row =
                 newRun(scopedTenantId, probeKey, sourceMode, messageId, eventCode, userId, strict, startedAt);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         runMapper.insert(row);
 
         List<StepEvidence> evidence = new ArrayList<>();
@@ -188,9 +227,17 @@ public class CdpWarehouseSyntheticDataPathProbeService {
                         : "Doris ODS did not expose the synthetic event"));
         finish(row, worstStatus(evidence), sourceStatus, sinkStatus, odsStatus, odsRows, evidence,
                 odsRows > 0 ? null : "Doris ODS did not expose the synthetic event");
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<ProbeRunView> recent(Long tenantId, int limit) {
         return safeList(runMapper.listRecent(normalizeTenant(tenantId), boundLimit(limit)))
                 .stream()
@@ -198,6 +245,17 @@ public class CdpWarehouseSyntheticDataPathProbeService {
                 .toList();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param doris doris 参数，用于 verifyOds 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param messageId 业务对象 ID，用于定位具体记录。
+     * @param eventCode 业务编码，用于匹配对应类型或状态。
+     * @param attempts attempts 参数，用于 verifyOds 流程中的校验、计算或对象转换。
+     * @param delayMs delay ms 参数，用于 verifyOds 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private long verifyOds(JdbcTemplate doris,
                            Long tenantId,
                            String messageId,
@@ -216,6 +274,11 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         return rows;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 ods read sql 生成的文本或业务键。
+     */
     private String odsReadSql() {
         return """
                 SELECT COUNT(1)
@@ -226,12 +289,24 @@ public class CdpWarehouseSyntheticDataPathProbeService {
                 """;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param messageId 业务对象 ID，用于定位具体记录。
+     * @param eventCode 业务编码，用于匹配对应类型或状态。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param probeKey 业务键，用于在同一租户下定位资源。
+     * @param time 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 syntheticEvent 流程生成的业务结果。
+     */
     private CdpEventLogDO syntheticEvent(Long tenantId,
                                          String messageId,
                                          String eventCode,
                                          String userId,
                                          String probeKey,
                                          LocalDateTime time) {
+        // 准备本次处理所需的上下文和中间变量。
         CdpEventLogDO row = new CdpEventLogDO();
         row.setTenantId(tenantId);
         row.setWriteKeyId(0L);
@@ -251,9 +326,17 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         row.setReceivedAt(time);
         row.setStatus(CdpEventLogDO.ACCEPTED);
         row.setCreatedAt(time);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return row;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param probeKey 业务键，用于在同一租户下定位资源。
+     * @param messageId 业务对象 ID，用于定位具体记录。
+     * @return 返回 properties 生成的文本或业务键。
+     */
     private String properties(String probeKey, String messageId) {
         try {
             var node = objectMapper.createObjectNode();
@@ -267,6 +350,19 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         }
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param probeKey 业务键，用于在同一租户下定位资源。
+     * @param sourceMode source mode 参数，用于 newRun 流程中的校验、计算或对象转换。
+     * @param messageId 业务对象 ID，用于定位具体记录。
+     * @param eventCode 业务编码，用于匹配对应类型或状态。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param strict strict 参数，用于 newRun 流程中的校验、计算或对象转换。
+     * @param startedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 newRun 流程生成的业务结果。
+     */
     private CdpWarehouseSyntheticDataPathProbeRunDO newRun(Long tenantId,
                                                            String probeKey,
                                                            String sourceMode,
@@ -289,6 +385,18 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         return row;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param sourceStatus 业务状态，用于筛选或推进状态流转。
+     * @param sinkStatus 业务状态，用于筛选或推进状态流转。
+     * @param odsStatus 业务状态，用于筛选或推进状态流转。
+     * @param odsRowCount ods row count 参数，用于 finish 流程中的校验、计算或对象转换。
+     * @param evidence evidence 参数，用于 finish 流程中的校验、计算或对象转换。
+     * @param errorMessage error message 参数，用于 finish 流程中的校验、计算或对象转换。
+     */
     private void finish(CdpWarehouseSyntheticDataPathProbeRunDO row,
                         String status,
                         String sourceStatus,
@@ -308,6 +416,12 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         runMapper.updateCompletion(row);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 evidenceJson 流程中的校验、计算或对象转换。
+     * @return 返回 evidence json 生成的文本或业务键。
+     */
     private String evidenceJson(List<StepEvidence> evidence) {
         try {
             return objectMapper.writeValueAsString(evidence == null ? List.of() : evidence);
@@ -316,7 +430,14 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private ProbeRunView toView(CdpWarehouseSyntheticDataPathProbeRunDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ProbeRunView(
                 row.getId(),
                 row.getTenantId(),
@@ -336,9 +457,16 @@ public class CdpWarehouseSyntheticDataPathProbeService {
                 row.getErrorMessage(),
                 row.getEvidenceJson(),
                 row.getCreatedAt(),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 row.getUpdatedAt());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param evidence evidence 参数，用于 worstStatus 流程中的校验、计算或对象转换。
+     * @return 返回 worst status 生成的文本或业务键。
+     */
     private String worstStatus(List<StepEvidence> evidence) {
         if (evidence.stream().map(StepEvidence::status).anyMatch(STATUS_FAIL::equals)) {
             return STATUS_FAIL;
@@ -349,6 +477,12 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         return STATUS_PASS;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 event code 生成的文本或业务键。
+     */
     private String eventCode(String value) {
         String eventCode = defaultString(value, DEFAULT_EVENT_CODE);
         if (!eventCode.startsWith("__warehouse_probe")) {
@@ -357,6 +491,12 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         return eventCode;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 source mode 生成的文本或业务键。
+     */
     private String sourceMode(String value) {
         String normalized = defaultString(value, SOURCE_DIRECT_SINK)
                 .toUpperCase(Locale.ROOT)
@@ -370,21 +510,44 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         throw new IllegalArgumentException("sourceMode must be DIRECT_SINK or MYSQL_CDC");
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundedAttempts(Integer value) {
         int attempts = value == null || value <= 0 ? DEFAULT_VERIFY_ATTEMPTS : value;
         return Math.min(attempts, MAX_VERIFY_ATTEMPTS);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundedDelayMs(Integer value) {
         int delay = value == null || value < 0 ? DEFAULT_VERIFY_DELAY_MS : value;
         return Math.min(delay, MAX_VERIFY_DELAY_MS);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundLimit(int value) {
         int limit = value <= 0 ? 20 : value;
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param delayMs delay ms 参数，用于 sleep 流程中的校验、计算或对象转换。
+     */
     private void sleep(int delayMs) {
         if (delayMs <= 0) {
             return;
@@ -397,14 +560,33 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private String defaultString(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String limit(String message) {
         if (message == null) {
             return null;
@@ -412,15 +594,29 @@ public class CdpWarehouseSyntheticDataPathProbeService {
         return message.length() <= MAX_ERROR_LENGTH ? message : message.substring(0, MAX_ERROR_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private List<CdpWarehouseSyntheticDataPathProbeRunDO> safeList(
             List<CdpWarehouseSyntheticDataPathProbeRunDO> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * RunCommand 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record RunCommand(
             String probeKey,
             String eventCode,
@@ -430,6 +626,9 @@ public class CdpWarehouseSyntheticDataPathProbeService {
             String sourceMode) {
     }
 
+    /**
+     * ProbeRunView 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ProbeRunView(
             Long id,
             Long tenantId,
@@ -452,6 +651,9 @@ public class CdpWarehouseSyntheticDataPathProbeService {
             LocalDateTime updatedAt) {
     }
 
+    /**
+     * StepEvidence 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record StepEvidence(
             String key,
             String status,

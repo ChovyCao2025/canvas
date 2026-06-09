@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082g-sentiment-competitor-monitoring-plan.md`
 
 Add the first backend slice for sentiment and competitor monitoring so marketing teams can ingest monitored mentions, classify sentiment, extract competitor references, and manage alert workflow state without relying on live social/search credentials in local tests.
 
-## Delivery Status
+## Implementation Status
 
 Delivered backend first slice:
 

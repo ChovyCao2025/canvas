@@ -46,6 +46,7 @@ public class DagGraph {
 
     /** 找入边为 0 的节点（触发器节点） */
     public List<String> entryNodes() {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return inDegree.entrySet().stream()
                 .filter(e -> e.getValue() == 0)
                 .map(Map.Entry::getKey)

@@ -68,46 +68,47 @@ public class ApiCallHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String apiKey       = (String) config.get(MapFieldKeys.API_KEY);
 
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (apiKey == null || apiKey.isBlank()) {
             return Mono.just(NodeResult.fail("API_CALL: apiKey 未配置"));
         }
 
         return Mono.fromCallable(() -> prepareApiCall(config, ctx, apiKey))
             .subscribeOn(Schedulers.boundedElastic())
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             .flatMap(prepared -> {
                 if (prepared.failure() != null) {
                     return Mono.just(prepared.failure());
                 }
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 return executePreparedCall(prepared);
             });
     }
 
+    /**
+     * 声明 API_CALL 会调用外部 HTTP 接口并可能产生外部副作用，需要节点级幂等保护。
+     *
+     * <p>返回 {@code true} 后，调度层会在执行前占用幂等记录；重复执行时可复用首次接口响应写入的上下文输出，避免重复
+     * POST/PUT 等有副作用请求。
+     *
+     * @param config 当前接口节点配置，包含 apiKey、入参和幂等键
+     * @param ctx 画布执行上下文
+     * @return 始终为 {@code true}
+     */
     @Override
     public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
         return true;
     }
 
-    @Override
-    public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
-        Object explicit = config.get(MapFieldKeys.IDEMPOTENCY_KEY);
-        if (explicit != null && !explicit.toString().isBlank()) {
-            return explicit.toString();
-        }
-        Object apiKey = config.get(MapFieldKeys.API_KEY);
-        return ctx.getUserId() + ":api:" + (apiKey == null ? "" : apiKey);
-    }
-
-    /**
-     * 执行 prepare Api Call 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @param apiKey apiKey 对应的缓存键、配置键或业务键
-     * @return 方法执行后的业务结果
-     */
     @SuppressWarnings("unchecked")
+    /**
+     * 准备 API 调用定义、限流检查和请求体。
+     *
+     * @param config 节点配置
+     * @param ctx 执行上下文
+     * @param apiKey 接口业务 key
+     * @return 已准备的 API 调用或前置失败结果
+     */
     private PreparedApiCall prepareApiCall(Map<String, Object> config, ExecutionContext ctx, String apiKey) {
         String outputPrefix = (String) config.getOrDefault(MapFieldKeys.OUTPUT_PREFIX, "");
         String nextNodeId   = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
@@ -126,6 +127,7 @@ public class ApiCallHandler implements NodeHandler {
             String rateLimitKey = keys.apiRateLimit(apiKey, Instant.now().getEpochSecond());
             try {
                 rateLimitCheck = checkRateLimit(redis, rateLimitKey, def.getRateLimitPerSec());
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception e) {
                 log.error("[API_CALL] 速率限制检查失败 apiKey={} key={}", apiKey, rateLimitKey, e);
                 return PreparedApiCall.failure(NodeResult.fail(
@@ -171,12 +173,10 @@ public class ApiCallHandler implements NodeHandler {
     }
 
     /**
-     * 执行 execute Prepared Call 对应的业务逻辑。
+     * 执行已准备好的 API 调用。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param prepared prepared 方法执行所需的业务参数
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param prepared 已准备的 API 调用
+     * @return 节点执行结果
      */
     private Mono<NodeResult> executePreparedCall(PreparedApiCall prepared) {
         String apiKey = prepared.apiKey();
@@ -191,6 +191,7 @@ public class ApiCallHandler implements NodeHandler {
         try {
             // 出站 URL 做白名单格式校验，避免节点配置把后端变成任意地址代理。
             OutboundUrlValidator.validateHttpUrl(url);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IllegalArgumentException e) {
             return Mono.just(NodeResult.fail("API_CALL: " + e.getMessage()));
         }
@@ -218,6 +219,7 @@ public class ApiCallHandler implements NodeHandler {
                         Map<?, ?> parsed = objectMapper.readValue(body, Map.class);
                         parsed.forEach((k, v) -> out.put(prefix + k, v));
                     }
+                // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                 } catch (Exception ignored) {
                     out.put(prefix + MapFieldKeys.BODY, body);
                     out.put(prefix + MapFieldKeys.IS_JSON, false);
@@ -235,16 +237,14 @@ public class ApiCallHandler implements NodeHandler {
             });
     }
 
-    /**
-     * 校验 validate Response 相关的业务数据。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param output output 方法执行所需的业务参数
-     * @return 判断结果，true 表示校验通过或条件成立
-     */
     @SuppressWarnings("unchecked")
+    /**
+     * 根据节点响应规则校验接口输出。
+     *
+     * @param config 节点配置
+     * @param output 接口输出字段
+     * @return true 表示响应满足规则
+     */
     private boolean validateResponse(Map<String, Object> config, Map<String, Object> output) {
         if (!Boolean.TRUE.equals(config.get(MapFieldKeys.VALIDATE_RESULT))) {
             return true;
@@ -256,15 +256,13 @@ public class ApiCallHandler implements NodeHandler {
     }
 
     /**
-     * 判断 is Rate Limit Exceeded 相关的业务数据。
+     * 判断指定接口在当前秒是否已超过限流。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param redis redis 方法执行所需的业务参数
-     * @param apiKey apiKey 对应的缓存键、配置键或业务键
-     * @param limitPerSec limitPerSec 数量、阈值或分页参数
-     * @param now now 方法执行所需的业务参数
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param redis Redis 模板
+     * @param apiKey 接口业务 key
+     * @param limitPerSec 每秒限制
+     * @param now 当前时间
+     * @return true 表示已超过限流或限流检查失败
      */
     static boolean isRateLimitExceeded(StringRedisTemplate redis,
                                        String apiKey, int limitPerSec, Instant now) {
@@ -274,14 +272,12 @@ public class ApiCallHandler implements NodeHandler {
     }
 
     /**
-     * 校验 check Rate Limit 相关的业务数据。
+     * 执行 Redis 秒级限流计数。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param redis redis 方法执行所需的业务参数
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param limitPerSec limitPerSec 数量、阈值或分页参数
-     * @return 方法执行后的业务结果
+     * @param redis Redis 模板
+     * @param key 限流键
+     * @param limitPerSec 每秒限制
+     * @return 限流检查结果
      */
     private static RateLimitCheck checkRateLimit(StringRedisTemplate redis, String key, int limitPerSec) {
         if (limitPerSec <= 0) {
@@ -300,16 +296,26 @@ public class ApiCallHandler implements NodeHandler {
         return count > limitPerSec ? RateLimitCheck.EXCEEDED : RateLimitCheck.ALLOWED;
     }
 
+    /**
+     * 生成可安全记录到日志的 URL。
+     *
+     * @param url 原始 URL
+     * @return 去掉查询、用户信息和片段后的 URL
+     */
     private static String safeUrlForLog(String url) {
         try {
             URI uri = URI.create(url);
             return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(),
                     uri.getPath(), null, null).toString();
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             return "<invalid-url>";
         }
     }
 
+    /**
+     * RateLimitCheck 枚举类型。
+     */
     private enum RateLimitCheck {
         /** 限流检查通过，可以继续调用接口。 */
         ALLOWED,
@@ -321,35 +327,30 @@ public class ApiCallHandler implements NodeHandler {
         CHECK_FAILED
     }
 
+    /**
+     * PreparedApiCall record.
+     * @param failure 前置校验失败时直接返回的节点结果.
+     * @param apiKey 当前调用使用的接口业务键.
+     * @param outputPrefix 写入上下文时使用的输出字段前缀.
+     * @param nextNodeId 接口调用成功后继续执行的下游节点 ID.
+     * @param def 已启用的接口定义配置.
+     * @param requestBody 已解析并组装完成的 HTTP 请求体.
+     * @param config 当前节点原始配置，用于后置响应校验.
+     */
     private record PreparedApiCall(
-            /** 前置校验失败时直接返回的节点结果。 */
-            NodeResult failure,
-
-            /** 当前调用使用的接口业务键。 */
-            String apiKey,
-
-            /** 写入上下文时使用的输出字段前缀。 */
-            String outputPrefix,
-
-            /** 接口调用成功后继续执行的下游节点 ID。 */
-            String nextNodeId,
-
-            /** 已启用的接口定义配置。 */
-            ApiDefinitionDO def,
-
-            /** 已解析并组装完成的 HTTP 请求体。 */
-            List<Map<String, Object>> requestBody,
-
-            /** 当前节点原始配置，用于后置响应校验。 */
-            Map<String, Object> config
+        NodeResult failure,
+        String apiKey,
+        String outputPrefix,
+        String nextNodeId,
+        ApiDefinitionDO def,
+        List<Map<String, Object>> requestBody,
+        Map<String, Object> config
     ) {
         /**
-         * 执行 failure 对应的业务逻辑。
+         * 构造前置校验失败的 API 调用准备结果。
          *
-         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-         *
-         * @param failure failure 方法执行所需的业务参数
-         * @return 当前对象实例，便于继续链式配置或后续处理
+         * @param failure 失败节点结果
+         * @return 失败准备结果
          */
         static PreparedApiCall failure(NodeResult failure) {
             return new PreparedApiCall(failure, null, null, null, null, null, Map.of());

@@ -3,8 +3,11 @@
 import { pathToFileURL } from 'node:url'
 
 const DEFAULT_ARGS = {
+  /** Local-to-production CPU conversion keeps headroom for GC and scheduler noise. */
   cpuEfficiencyFactor: 0.75,
+  /** Final recommendation is intentionally below the computed bottleneck capacity. */
   safetyFactor: 0.5,
+  /** Capacity estimation is only meaningful after the verifier proves ledger correctness. */
   verifierVerdict: 'PASS',
 }
 
@@ -27,6 +30,7 @@ const FLAG_NAMES = {
 
 const VERIFIER_VERDICTS = new Set(['PASS', 'PASS_WITH_EXPECTED_FAILURES', 'FAIL'])
 
+/** Required inputs for converting local benchmark evidence into production capacity. */
 const REQUIRED_POSITIVE_ARGS = [
   'localStableQps',
   'localAppCores',
@@ -56,6 +60,7 @@ function parsePositiveNumber(flag, value) {
   return parsed
 }
 
+/** Read a positive numeric input and fail fast with the business key in the error. */
 function requirePositive(input, name) {
   const value = input[name]
   if (!Number.isFinite(value) || value <= 0) {
@@ -64,6 +69,7 @@ function requirePositive(input, name) {
   return value
 }
 
+/** Prevent capacity reports from being generated from failed correctness verification. */
 function requireVerifierVerdict(input) {
   const verdict = input.verifierVerdict || DEFAULT_ARGS.verifierVerdict
 
@@ -78,9 +84,16 @@ function requireVerifierVerdict(input) {
   return verdict
 }
 
+/**
+ * Evaluate runtime hardening stop gates from sampled infrastructure metrics.
+ *
+ * <p>These gates encode conditions where throughput numbers should not be trusted even if the
+ * request runner completed, because downstream queues or protected lanes are already unstable.
+ */
 export function evaluateHardeningGates(samples) {
   const stopGates = []
 
+  // Redis route registry latency above this range usually means trigger admission is no longer stable.
   if (samples.redisP95Ms > 20 || samples.redisP99Ms > 50) {
     stopGates.push('REDIS_REGISTRY_LATENCY_SUSTAINED')
   }
@@ -112,15 +125,23 @@ export function evaluateHardeningGates(samples) {
   }
 }
 
+/**
+ * Estimate safe production QPS from local benchmark and production resource ceilings.
+ *
+ * <p>The minimum candidate is treated as the bottleneck, then reduced by the configured safety
+ * factor to produce the recommended operating limit and alert threshold.
+ */
 export function estimateCapacity(input) {
   for (const name of REQUIRED_POSITIVE_ARGS) {
     requirePositive(input, name)
   }
   const verifierVerdict = requireVerifierVerdict(input)
 
+  // Scale local application CPU by production core count before comparing with shared dependencies.
   const appCpuCapacity = input.localStableQps
     * (input.prodAppCoresTotal / input.localAppCores)
     * input.cpuEfficiencyFactor
+  // Normalize dependency ceilings into event QPS by dividing by per-event cost.
   const dbWriteCapacity = input.prodDbSafeWriteQps / input.writesPerEvent
   const redisOpsCapacity = input.prodRedisSafeOps / input.redisOpsPerEvent
   const downstreamCapacity = input.downstreamRateLimitPerSec / input.downstreamCallsPerEvent
@@ -151,6 +172,7 @@ export function estimateCapacity(input) {
   }
 }
 
+/** Parse CLI flags into typed capacity inputs. */
 export function parseCapacityArgs(argv) {
   const args = { ...DEFAULT_ARGS }
 
@@ -181,10 +203,12 @@ export function parseCapacityArgs(argv) {
   return args
 }
 
+/** Detect direct CLI execution while keeping the module importable from tests. */
 export function isCliEntrypoint(moduleUrl, argvPath) {
   return Boolean(argvPath) && moduleUrl === pathToFileURL(argvPath).href
 }
 
+/** CLI entrypoint: parse flags, compute capacity, and print machine-readable JSON. */
 function main() {
   const result = estimateCapacity(parseCapacityArgs(process.argv.slice(2)))
   console.log(JSON.stringify(result, null, 2))

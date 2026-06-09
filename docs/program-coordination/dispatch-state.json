@@ -1,0 +1,538 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-09",
+  "readiness": {
+    "level": "R0",
+    "gate": "G0/G0B-before-code-writing/G1/G2",
+    "backendTarget": "no code worker active",
+    "writeMode": "coordinator-only for planning docs"
+  },
+  "activeDispatches": [],
+  "workerBoard": [
+    {
+      "taskId": "DDD-C00",
+      "status": "READY",
+      "mode": "coordinator",
+      "gate": "G3 then G4",
+      "writeScope": [
+        "coordinator-owned foundation files"
+      ]
+    },
+    {
+      "taskId": "DDD-E01",
+      "status": "READY",
+      "mode": "read-only",
+      "gate": "R0",
+      "writeScope": []
+    },
+    {
+      "taskId": "DDD-E02",
+      "status": "READY",
+      "mode": "read-only",
+      "gate": "R0",
+      "writeScope": []
+    },
+    {
+      "taskId": "DDD-E03",
+      "status": "READY",
+      "mode": "read-only",
+      "gate": "R0",
+      "writeScope": []
+    },
+    {
+      "taskId": "DDD-E04",
+      "status": "READY",
+      "mode": "read-only",
+      "gate": "R0",
+      "writeScope": []
+    },
+    {
+      "taskId": "DDD-W01",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G4",
+      "writeScope": [
+        "backend/canvas-platform/**"
+      ]
+    },
+    {
+      "taskId": "DDD-W02",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G4",
+      "writeScope": [
+        "backend/canvas-context-risk/**"
+      ]
+    },
+    {
+      "taskId": "DDD-W03",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G4",
+      "writeScope": [
+        "backend/canvas-context-marketing/**"
+      ]
+    },
+    {
+      "taskId": "DDD-W04",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G5",
+      "writeScope": [
+        "backend/canvas-context-cdp/**"
+      ]
+    },
+    {
+      "taskId": "DDD-W05",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G5",
+      "writeScope": [
+        "backend/canvas-context-bi/**"
+      ]
+    },
+    {
+      "taskId": "DDD-W06",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G5",
+      "writeScope": [
+        "backend/canvas-context-conversation/**"
+      ]
+    },
+    {
+      "taskId": "DDD-C07",
+      "status": "NOT_STARTED",
+      "mode": "coordinator",
+      "gate": "G6 then G7",
+      "writeScope": [
+        "coordinator-owned canvas/execution contract files"
+      ]
+    },
+    {
+      "taskId": "DDD-W07",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G7",
+      "writeScope": [
+        "backend/canvas-context-canvas/**"
+      ]
+    },
+    {
+      "taskId": "DDD-W08",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G8",
+      "writeScope": [
+        "backend/canvas-context-execution/**"
+      ]
+    },
+    {
+      "taskId": "DDD-C09",
+      "status": "NOT_STARTED",
+      "mode": "coordinator",
+      "gate": "G12",
+      "writeScope": [
+        "coordinator-owned boot and cutover files"
+      ]
+    },
+    {
+      "taskId": "OSG-W01",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "G0/G1",
+      "writeScope": [
+        "README.md",
+        ".github/ISSUE_TEMPLATE/**",
+        ".github/pull_request_template.md",
+        "CONTRIBUTING.md",
+        "CODE_OF_CONDUCT.md",
+        "SECURITY.md",
+        "docs/open-source/quickstart.md",
+        "docs/open-source/positioning.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W02",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "G0/G1",
+      "writeScope": [
+        "docker-compose.demo.yml",
+        "wiremock/**",
+        "docs/open-source/demo.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W03",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "G0/G1",
+      "writeScope": [
+        "frontend/src/components/config-panel/**",
+        "frontend/src/plugins/**"
+      ]
+    },
+    {
+      "taskId": "OSG-W04",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "G0/G1",
+      "writeScope": [
+        "tools/canvas-cli/**",
+        "docs/open-source/marketingops-as-code.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W05A",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "G0/G1",
+      "writeScope": [
+        "docs/open-source-growth/contracts/**"
+      ]
+    },
+    {
+      "taskId": "OSG-C05B",
+      "status": "NOT_STARTED",
+      "mode": "coordinator",
+      "gate": "after relevant OSG contract draft",
+      "writeScope": [
+        "coordinator-owned DDD mirror files"
+      ]
+    },
+    {
+      "taskId": "OSG-W06",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "G0/G1",
+      "writeScope": [
+        "docs/open-source/en/**",
+        "docs/open-source/release-posts/**"
+      ]
+    },
+    {
+      "taskId": "OSG-C07",
+      "status": "NOT_STARTED",
+      "mode": "coordinator",
+      "gate": "G9 then G10",
+      "writeScope": [
+        "coordinator-owned plugin registry decision files"
+      ]
+    },
+    {
+      "taskId": "OSG-W07A",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G9/G10 plus OSG-C07",
+      "writeScope": [
+        "backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/webhook/**",
+        "backend/canvas-context-execution/src/test/java/org/chovy/canvas/execution/adapter/plugin/official/webhook/**",
+        "docs/open-source/plugins/official/webhook.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W07B",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G9/G10 plus OSG-C07",
+      "writeScope": [
+        "backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/message/**",
+        "backend/canvas-context-execution/src/test/java/org/chovy/canvas/execution/adapter/plugin/official/message/**",
+        "docs/open-source/plugins/official/message.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W07C",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G9/G10 plus OSG-C07",
+      "writeScope": [
+        "backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/coupon/**",
+        "backend/canvas-context-execution/src/test/java/org/chovy/canvas/execution/adapter/plugin/official/coupon/**",
+        "docs/open-source/plugins/official/coupon.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W07D",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G9/G10 plus OSG-C07",
+      "writeScope": [
+        "backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/approval/**",
+        "backend/canvas-context-execution/src/test/java/org/chovy/canvas/execution/adapter/plugin/official/approval/**",
+        "docs/open-source/plugins/official/approval.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W07E",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G9/G10 plus OSG-C07",
+      "writeScope": [
+        "backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/ai/**",
+        "backend/canvas-context-execution/src/test/java/org/chovy/canvas/execution/adapter/plugin/official/ai/**",
+        "docs/open-source/plugins/official/ai.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W07F",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G9/G10 plus OSG-C07",
+      "writeScope": [
+        "backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/risk/**",
+        "backend/canvas-context-execution/src/test/java/org/chovy/canvas/execution/adapter/plugin/official/risk/**",
+        "docs/open-source/plugins/official/risk-check.md"
+      ]
+    },
+    {
+      "taskId": "OSG-W08",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "G0/G1 docs/catalog",
+      "writeScope": [
+        "docs/open-source/templates/**",
+        "assigned template data files",
+        "frontend/src/pages/canvas-list/templateCatalog.ts"
+      ]
+    },
+    {
+      "taskId": "OSG-W09",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G10",
+      "writeScope": [
+        "target canvas module or named CURRENT_ENGINE_BRIDGE files"
+      ]
+    },
+    {
+      "taskId": "OSG-W10",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G10",
+      "writeScope": [
+        "target canvas/web module or named CURRENT_ENGINE_BRIDGE files"
+      ]
+    },
+    {
+      "taskId": "OSG-W11",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G10",
+      "writeScope": [
+        "tools/canvas-cli/**"
+      ]
+    },
+    {
+      "taskId": "OSG-W12",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "G10",
+      "writeScope": [
+        "target marketing/canvas/execution APIs or named bridge files"
+      ]
+    },
+    {
+      "taskId": "OSG-W13",
+      "status": "READY",
+      "mode": "code-writing",
+      "gate": "R0 mock preview",
+      "writeScope": [
+        "frontend/src/pages/canvas-editor/AiJourneyAssistant.tsx",
+        "frontend/src/pages/canvas-editor/aiJourneyAssistant.test.tsx",
+        "optional exact editor integration file named by coordinator"
+      ]
+    },
+    {
+      "taskId": "OSG-W14",
+      "status": "NOT_STARTED",
+      "mode": "code-writing",
+      "gate": "R5 live flow or R0 docs-only",
+      "writeScope": [
+        "docs/open-source/playground.md",
+        "assigned home/canvas-list/canvas-editor files"
+      ]
+    }
+  ],
+  "parallelGroups": [
+    {
+      "groupId": "P0-discovery",
+      "startCondition": "Current repo available",
+      "maxCodeWriters": 0,
+      "maxReadOnlyReviewers": 8,
+      "taskIds": [
+        "DDD-E01",
+        "DDD-E02",
+        "DDD-E03",
+        "DDD-E04"
+      ],
+      "notes": "Read-only discovery can run in shared workspace or isolated worker mode."
+    },
+    {
+      "groupId": "P1-immediate-shell",
+      "startCondition": "Coordination docs accepted",
+      "maxCodeWriters": 6,
+      "maxReadOnlyReviewers": 4,
+      "taskIds": [
+        "DDD-C00",
+        "DDD-E01",
+        "DDD-E02",
+        "DDD-E03",
+        "DDD-E04",
+        "OSG-W01",
+        "OSG-W02",
+        "OSG-W03",
+        "OSG-W04",
+        "OSG-W05A",
+        "OSG-W06"
+      ],
+      "notes": "Peak useful wave: coordinator keeps DDD-C00 local while six OSG writers and four DDD read-only explorers run in isolated mode."
+    },
+    {
+      "groupId": "P2-ddd-first-context-wave",
+      "startCondition": "DDD-C00 complete",
+      "maxCodeWriters": 6,
+      "maxReadOnlyReviewers": 3,
+      "taskIds": [
+        "DDD-W01",
+        "DDD-W02",
+        "DDD-W03"
+      ],
+      "notes": "Core DDD first wave has three context writers; spare writer slots may be filled only by unfinished P1 OSG workers with disjoint reservations."
+    },
+    {
+      "groupId": "P3-ddd-second-context-wave",
+      "startCondition": "DDD wave 1 integrated",
+      "maxCodeWriters": 5,
+      "maxReadOnlyReviewers": 3,
+      "taskIds": [
+        "DDD-W04",
+        "DDD-W05",
+        "DDD-W06",
+        "OSG-W08"
+      ],
+      "notes": "CDP, BI, conversation, and template docs/catalog can run together when reservations stay disjoint."
+    },
+    {
+      "groupId": "P5-canvas-rewrite",
+      "startCondition": "Canvas/execution contracts frozen",
+      "maxCodeWriters": 3,
+      "maxReadOnlyReviewers": 3,
+      "taskIds": [
+        "DDD-W07",
+        "OSG-W13"
+      ],
+      "notes": "Do not run DDD-W08 here. Frontend/doc workers require exact editor file reservations."
+    },
+    {
+      "groupId": "P6-execution-rewrite",
+      "startCondition": "DDD-W07 integrated",
+      "maxCodeWriters": 3,
+      "maxReadOnlyReviewers": 3,
+      "taskIds": [
+        "DDD-W08",
+        "OSG-W13"
+      ],
+      "notes": "Do not run backend OSG ecosystem workers against execution-owned files in this wave."
+    },
+    {
+      "groupId": "P7-plugin-burst",
+      "startCondition": "DDD-W08 integrated and OSG-C07 done",
+      "maxCodeWriters": 6,
+      "maxReadOnlyReviewers": 2,
+      "taskIds": [
+        "OSG-W07A",
+        "OSG-W07B",
+        "OSG-W07C",
+        "OSG-W07D",
+        "OSG-W07E",
+        "OSG-W07F"
+      ],
+      "notes": "Six official plugin workers can run together because each owns one plugin package, one test package, and one docs file."
+    },
+    {
+      "groupId": "P8-ecosystem-backend",
+      "startCondition": "G10 public extension/API stability gate passed",
+      "maxCodeWriters": 4,
+      "maxReadOnlyReviewers": 3,
+      "taskIds": [
+        "OSG-W09",
+        "OSG-W10",
+        "OSG-W11",
+        "OSG-W12"
+      ],
+      "notes": "Serialize any pair that needs the same controller, facade, editor integration file, or CLI path."
+    },
+    {
+      "groupId": "P9-final-playground-release",
+      "startCondition": "Ecosystem APIs integrated",
+      "maxCodeWriters": 3,
+      "maxReadOnlyReviewers": 3,
+      "taskIds": [
+        "OSG-W06",
+        "OSG-W14"
+      ],
+      "notes": "Release docs and playground work can run together when exact frontend/docs files are reserved."
+    },
+    {
+      "groupId": "P10-cutover",
+      "startCondition": "All context and OSG ecosystem work integrated",
+      "maxCodeWriters": 1,
+      "maxReadOnlyReviewers": 4,
+      "taskIds": [
+        "DDD-C09"
+      ],
+      "notes": "Coordinator performs final web/boot cutover; use reviewers only as read-only agents."
+    }
+  ],
+  "reviewerBoard": [],
+  "recoveryAudit": {
+    "status": "clean",
+    "activeDispatches": 0,
+    "commandsToRunBeforeDispatch": [
+      "G0",
+      "G0B before code-writing",
+      "G1",
+      "G2"
+    ]
+  },
+  "lastVerifiedEvidence": [
+    {
+      "command": "bash docs/program-coordination/checks/program-coordination-checks.sh .",
+      "result": "passed"
+    },
+    {
+      "command": "node tools/program-coordination/check-dispatch-state.mjs .",
+      "result": "passed"
+    },
+    {
+      "command": "node --test docs/program-coordination/checks/program-coordination-checks.test.mjs",
+      "result": "passed"
+    },
+    {
+      "command": "node --test tools/program-coordination/*.test.mjs",
+      "result": "passed"
+    },
+    {
+      "command": "node --test tools/open-source-growth/guardrail-verifier.test.mjs",
+      "result": "passed"
+    },
+    {
+      "command": "node tools/open-source-growth/guardrail-verifier.mjs",
+      "result": "passed"
+    },
+    {
+      "command": "bash -n docs/ddd-rewrite/guardrails/checks/ddd-guardrail-checks.sh",
+      "result": "passed"
+    },
+    {
+      "command": "bash docs/ddd-rewrite/guardrails/checks/ddd-guardrail-checks.sh .",
+      "result": "passed"
+    },
+    {
+      "command": "bash -n docs/ddd-rewrite/inventory/check-inventory-readiness.sh",
+      "result": "passed"
+    }
+  ]
+}

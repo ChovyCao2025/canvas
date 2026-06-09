@@ -57,6 +57,16 @@ jobs:
       - run: bash scripts/release/check-flyway-migration.sh
       - run: cd backend && mvn -pl canvas-engine -am -Dtest=FlywayMigrationPolicyTest test
 
+  open-source-growth-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs
+      - run: node tools/open-source-growth/guardrail-verifier.mjs
+
   deployment-config:
     runs-on: ubuntu-latest
     steps:
@@ -77,6 +87,7 @@ jobs:
       - backend-integration-tests
       - profile-validation
       - flyway-migration-policy
+      - open-source-growth-guardrails
       - deployment-config
     steps:
       - uses: actions/checkout@v4

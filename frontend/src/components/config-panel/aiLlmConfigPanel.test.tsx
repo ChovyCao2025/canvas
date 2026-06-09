@@ -17,6 +17,7 @@ describe('AiLlmConfigPanel helpers', () => {
       bizConfig: {
         outputPrefix: 'ai',
         timeoutMs: 1000,
+        failNodeId: 'old-fail',
       },
     }
 
@@ -24,6 +25,8 @@ describe('AiLlmConfigPanel helpers', () => {
       name: 'New AI',
       templateId: '1',
       modelKey: 'gpt-test',
+      maxTokens: 800,
+      schemaOverride: '{"type":"object"}',
     })).toEqual({
       name: 'New AI',
       bizConfig: {
@@ -31,6 +34,8 @@ describe('AiLlmConfigPanel helpers', () => {
         timeoutMs: 1000,
         templateId: '1',
         modelKey: 'gpt-test',
+        maxTokens: 800,
+        schemaOverride: '{"type":"object"}',
       },
     })
   })

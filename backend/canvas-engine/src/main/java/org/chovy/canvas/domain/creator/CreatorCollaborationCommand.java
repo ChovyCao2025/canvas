@@ -3,6 +3,19 @@ package org.chovy.canvas.domain.creator;
 import java.math.BigDecimal;
 import java.util.Map;
 
+/**
+ * CreatorCollaborationCommand 承载 domain.creator 场景中的不可变数据快照。
+ * @param campaignId campaignId 字段。
+ * @param creatorId creatorId 字段。
+ * @param offerType offerType 字段。
+ * @param fixedFeeAmount fixedFeeAmount 字段。
+ * @param commissionRate commissionRate 字段。
+ * @param trackingLink trackingLink 字段。
+ * @param discountCode discountCode 字段。
+ * @param status status 字段。
+ * @param permissionsMetadata permissionsMetadata 字段。
+ * @param metadata metadata 字段。
+ */
 public record CreatorCollaborationCommand(
         Long campaignId,
         Long creatorId,

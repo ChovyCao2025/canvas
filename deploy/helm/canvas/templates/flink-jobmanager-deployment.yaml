@@ -1,4 +1,5 @@
 {{- if .Values.flink.enabled }}
+# Flink JobManager coordinates realtime warehouse SQL jobs and checkpoint metadata.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,6 +31,7 @@ spec:
         - name: flink-jobmanager
           image: "{{ .Values.flink.image.repository }}:{{ .Values.flink.image.tag }}"
           imagePullPolicy: {{ .Values.flink.image.pullPolicy }}
+          # Use the standard Flink entrypoint role so configmap-provided flink-conf.yaml is honored.
           command: ["jobmanager"]
           ports:
             - name: rest
@@ -37,6 +39,7 @@ spec:
             - name: rpc
               containerPort: {{ .Values.flink.jobManager.rpcPort }}
           readinessProbe:
+            # /overview confirms the REST endpoint is ready for submitter jobs.
             httpGet:
               path: /overview
               port: rest
@@ -49,6 +52,7 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 20
           volumeMounts:
+            # Mount generated Flink config plus persistent checkpoint/savepoint volumes.
             - name: flink-config
               mountPath: /opt/flink/conf/flink-conf.yaml
               subPath: flink-conf.yaml

@@ -1,5 +1,7 @@
 # Conversational Session Foundation Implementation Plan
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a reusable conversation session foundation so inbound customer replies can persist conversation state and resume canvas WAIT nodes through `CONVERSATION_REPLY`.

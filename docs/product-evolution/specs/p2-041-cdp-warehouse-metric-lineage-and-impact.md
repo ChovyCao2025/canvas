@@ -5,6 +5,8 @@ Sequence: 041
 Source: `docs/product-evolution/specs/p2-027-cdp-warehouse-catalog-and-lineage.md`, `docs/product-evolution/specs/p2-040-cdp-warehouse-semantic-metric-contracts.md`
 Implementation plan: `../plans/p2-041-cdp-warehouse-metric-lineage-and-impact-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add read-only metric lineage and impact analysis so operators can see which warehouse fields, dataset lineage edges, BI charts, and BI dashboards depend on a semantic metric before changing it.

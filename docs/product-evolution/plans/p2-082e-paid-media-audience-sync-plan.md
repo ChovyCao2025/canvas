@@ -1,5 +1,9 @@
 # Paid-Media Audience Sync Implementation Plan
 
+Spec: `../specs/p2-082e-paid-media-audience-sync.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add tenant-scoped paid-media destination configuration, hashed audience export, eligibility audit, and sync-run APIs.

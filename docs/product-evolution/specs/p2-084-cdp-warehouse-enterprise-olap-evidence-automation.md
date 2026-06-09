@@ -5,6 +5,8 @@ Sequence: 084
 Source: production OLAP completion audit after P2-083 operational evidence
 Implementation plan: `../plans/p2-084-cdp-warehouse-enterprise-olap-evidence-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn P2-083's on-demand enterprise OLAP evidence evaluation into an auditable automated collection loop that can run on a schedule, persist collection runs, and give operators a manual trigger plus history before release gates are evaluated.

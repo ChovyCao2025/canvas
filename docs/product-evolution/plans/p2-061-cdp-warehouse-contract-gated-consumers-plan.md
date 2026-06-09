@@ -1,5 +1,9 @@
 # CDP Warehouse Contract Gated Consumers Implementation Plan
 
+Spec: `../specs/p2-061-cdp-warehouse-contract-gated-consumers.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Connect P2-060 consumer availability contracts to BI query execution and manual audience materialization.
 
 **Architecture:** Inject `CdpWarehouseConsumerAvailabilityService` into BI query execution and audience materialization operations. Add contract-gated methods that evaluate a `contractKey`, block when `allowed=false`, and delegate to the existing execution path when allowed.

@@ -2,7 +2,7 @@
 
 Priority: P1
 Sequence: 004C
-Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004c-execution-lane-metrics-and-registry-guards-plan.md`
 
 ## Implementation Status

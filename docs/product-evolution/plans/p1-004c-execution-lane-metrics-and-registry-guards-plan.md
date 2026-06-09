@@ -8,12 +8,14 @@
 
 **Tech Stack:** Java 21, Spring Boot, Micrometer, Redis, Maven, JUnit 5, Mockito, AssertJ.
 
+**Implementation Status:** Implemented and focused-verified on 2026-06-05. Registry admission now records outcome, Redis latency, and lane active metrics; retry backlog and lane routing matrix coverage are in place, and `application.yml` retains the explicit 3000 lane budgets.
+
 ---
 
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-004c-execution-lane-metrics-and-registry-guards.md`
-- Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+- Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 
 ## File Structure
 
@@ -372,7 +374,8 @@ cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.
 
 Result: 4 tests, 0 failures, 0 errors, 0 skipped.
 
-- [ ] **Step 2: Commit implementation slice**
+- [x] **Step 2: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

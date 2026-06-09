@@ -1,7 +1,7 @@
 package org.chovy.canvas.engine.disruptor;
 
-import com.lmax.disruptor.InsufficientCapacityException;
 import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.Sequence;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
 import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleException;
@@ -49,9 +49,11 @@ class CanvasDisruptorServiceTest {
         service = new CanvasDisruptorService(
                 mock(CanvasExecutionService.class), mock(CanvasExecutionRequestExecutor.class), metrics, 1024, 1);
 
-        @SuppressWarnings("unchecked")
-        RingBuffer<CanvasExecutionEvent> ringBuffer = mock(RingBuffer.class);
-        when(ringBuffer.tryNext()).thenThrow(InsufficientCapacityException.INSTANCE);
+        RingBuffer<CanvasExecutionEvent> ringBuffer = testRingBuffer(1);
+        ringBuffer.addGatingSequences(new Sequence(-1L));
+        long reservedSequence = ringBuffer.tryNext();
+        assertThat(reservedSequence).isZero();
+        ringBuffer.publish(reservedSequence);
         ReflectionTestUtils.setField(service, "ringBuffer", ringBuffer);
 
         assertThatThrownBy(() -> service.publish(
@@ -59,7 +61,6 @@ class CanvasDisruptorServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Disruptor Ring Buffer is full");
 
-        verify(ringBuffer, never()).publish(0L);
         verify(metrics).recordDisruptorOverflow("MQ");
     }
 
@@ -69,16 +70,16 @@ class CanvasDisruptorServiceTest {
         service = new CanvasDisruptorService(
                 mock(CanvasExecutionService.class), mock(CanvasExecutionRequestExecutor.class), metrics, 1024, 1);
 
-        @SuppressWarnings("unchecked")
-        RingBuffer<CanvasExecutionEvent> ringBuffer = mock(RingBuffer.class);
-        CanvasExecutionEvent event = new CanvasExecutionEvent();
-        when(ringBuffer.tryNext()).thenReturn(0L);
-        when(ringBuffer.get(0L)).thenReturn(event);
+        RingBuffer<CanvasExecutionEvent> ringBuffer = testRingBuffer(1024);
         ReflectionTestUtils.setField(service, "ringBuffer", ringBuffer);
 
         service.publish(1L, "user-1", "MQ", "MQ_TRIGGER", "order.paid", Map.of("k", "v"), "msg-1");
 
-        verify(ringBuffer).publish(0L);
+        CanvasExecutionEvent event = ringBuffer.get(0L);
+        assertThat(event.canvasId).isEqualTo(1L);
+        assertThat(event.userId).isEqualTo("user-1");
+        assertThat(event.triggerType).isEqualTo("MQ");
+        assertThat(event.payload).containsEntry("k", "v");
         verify(metrics).recordDisruptorPublished("MQ");
     }
 
@@ -88,16 +89,12 @@ class CanvasDisruptorServiceTest {
         service = new CanvasDisruptorService(
                 mock(CanvasExecutionService.class), mock(CanvasExecutionRequestExecutor.class), metrics, 1024, 1);
 
-        @SuppressWarnings("unchecked")
-        RingBuffer<CanvasExecutionEvent> ringBuffer = mock(RingBuffer.class);
-        CanvasExecutionEvent event = new CanvasExecutionEvent();
-        when(ringBuffer.tryNext()).thenReturn(0L);
-        when(ringBuffer.get(0L)).thenReturn(event);
+        RingBuffer<CanvasExecutionEvent> ringBuffer = testRingBuffer(1024);
         ReflectionTestUtils.setField(service, "ringBuffer", ringBuffer);
 
         service.publishRequest("req-1");
 
-        verify(ringBuffer).publish(0L);
+        assertThat(ringBuffer.get(0L).requestId).isEqualTo("req-1");
         verify(metrics).recordDisruptorPublished("REQUEST");
     }
 
@@ -115,16 +112,11 @@ class CanvasDisruptorServiceTest {
                 gate);
         gate.beginShutdown();
 
-        @SuppressWarnings("unchecked")
-        RingBuffer<CanvasExecutionEvent> ringBuffer = mock(RingBuffer.class);
-        ReflectionTestUtils.setField(service, "ringBuffer", ringBuffer);
-
         assertThatThrownBy(() -> service.publish(
                 1L, "user-1", "MQ", "MQ_TRIGGER", "order.paid", Map.of(), "msg-1"))
                 .isInstanceOf(ExecutionLifecycleException.class)
                 .hasMessageContaining("disruptor:MQ");
 
-        verify(ringBuffer, never()).tryNext();
         verify(metrics, never()).recordDisruptorPublished("MQ");
     }
 
@@ -142,15 +134,10 @@ class CanvasDisruptorServiceTest {
                 gate);
         gate.beginShutdown();
 
-        @SuppressWarnings("unchecked")
-        RingBuffer<CanvasExecutionEvent> ringBuffer = mock(RingBuffer.class);
-        ReflectionTestUtils.setField(service, "ringBuffer", ringBuffer);
-
         assertThatThrownBy(() -> service.publishRequest("req-1"))
                 .isInstanceOf(ExecutionLifecycleException.class)
                 .hasMessageContaining("disruptor:REQUEST");
 
-        verify(ringBuffer, never()).tryNext();
         verify(metrics, never()).recordDisruptorPublished("REQUEST");
     }
 
@@ -177,5 +164,9 @@ class CanvasDisruptorServiceTest {
         assertThat(subscribed.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat((Integer) ReflectionTestUtils.invokeMethod(backgroundSubscriptions, "activeCount"))
                 .isEqualTo(1);
+    }
+
+    private RingBuffer<CanvasExecutionEvent> testRingBuffer(int size) {
+        return RingBuffer.createMultiProducer(CanvasExecutionEvent::new, size);
     }
 }

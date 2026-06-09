@@ -36,6 +36,11 @@ public record DataSourceConfigReq(
         @Size(max = 128)
         String createdBy
 ) {
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @return 返回组装或转换后的结果对象。
+     */
     public DataSourceConfigDO toDataObject() {
         DataSourceConfigDO body = new DataSourceConfigDO();
         body.setTenantId(tenantId);

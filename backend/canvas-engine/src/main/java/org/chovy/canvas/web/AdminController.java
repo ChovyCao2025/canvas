@@ -80,6 +80,11 @@ public class AdminController {
                         .onErrorMap(AccessDeniedException.class, this::forbidden));
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @return 返回 requireUserAdmin 流程生成的业务结果。
+     */
     private Mono<TenantContext> requireUserAdmin() {
         return tenantContextResolver.current()
                 .filter(context -> context.isSuperAdmin() || context.isTenantAdmin())
@@ -87,6 +92,12 @@ public class AdminController {
                         HttpStatus.FORBIDDEN, "无权限管理用户")));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param e e 参数，用于 forbidden 流程中的校验、计算或对象转换。
+     * @return 返回 forbidden 流程生成的业务结果。
+     */
     private ResponseStatusException forbidden(AccessDeniedException e) {
         return new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage(), e);
     }

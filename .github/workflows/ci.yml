@@ -69,6 +69,19 @@ jobs:
       - name: Run migration policy test
         run: mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=FlywayMigrationPolicyTest test
 
+  open-source-growth-guardrails:
+    name: Open Source Growth guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run guardrail verifier tests
+        run: node --test tools/open-source-growth/guardrail-verifier.test.mjs
+      - name: Verify guardrail artifacts
+        run: node tools/open-source-growth/guardrail-verifier.mjs
+
   docker-build:
     name: Docker build smoke
     runs-on: ubuntu-latest
@@ -77,6 +90,7 @@ jobs:
       - frontend-test
       - frontend-build
       - migration-validation
+      - open-source-growth-guardrails
     steps:
       - uses: actions/checkout@v4
       - name: Build backend image

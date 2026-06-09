@@ -13,10 +13,10 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * 通知消息 Web Socket节点处理器。
+ * 通知消息 WebSocket 连接处理器。
  *
- * <p>由 DAG 执行器在运行画布节点时调用，读取节点 config 与执行上下文，产出 NodeResult 决定后续路由。
- * <p>处理器应保持单节点职责，跨节点编排、重试和状态持久化由执行引擎统一管理。
+ * <p>负责校验客户端携带的一次性连接票据，并在连接建立时返回当前通知快照。
+ * <p>后续实时消息由 {@link NotificationRealtimeService} 统一维护会话和广播。
  */
 @Slf4j
 @Component
@@ -34,12 +34,13 @@ public class NotificationWebSocketHandler implements WebSocketHandler {
     private final NotificationRealtimeService realtimeService;
 
     /**
-     * 执行 handle 对应的业务逻辑。
+     * 处理通知 WebSocket 建连请求。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     * <p>连接必须携带有效 ticket；校验失败时关闭连接，校验通过后先发送初始通知快照，
+     * 再把会话注册到实时推送服务。
      *
-     * @param session session 方法执行所需的业务参数
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param session 当前 WebSocket 会话，包含握手 URI 和底层消息通道
+     * @return 会话生命周期对应的异步完成信号
      */
     @Override
     public Mono<Void> handle(WebSocketSession session) {
@@ -65,12 +66,12 @@ public class NotificationWebSocketHandler implements WebSocketHandler {
     }
 
     /**
-     * 注册、调度或初始化 initial Payload 相关的业务数据。
+     * 构造 WebSocket 建连后的首屏同步载荷。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     * <p>载荷包含最近通知列表和当前未读数，供前端在开始接收增量事件前完成本地状态初始化。
      *
-     * @param userId userId 对应的业务主键或标识
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param subject 已通过 ticket 校验的连接主体，包含租户和用户身份
+     * @return 首屏同步通知载荷
      */
     private Mono<NotificationRealtimePayload> initialPayload(NotificationWebSocketTicketService.TicketSubject subject) {
         return Mono.fromCallable(() -> {
@@ -88,12 +89,10 @@ public class NotificationWebSocketHandler implements WebSocketHandler {
     }
 
     /**
-     * 执行 extract Ticket 对应的业务逻辑。
+     * 从 WebSocket 握手 URI 的查询参数中提取连接票据。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param session session 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param session 当前 WebSocket 会话
+     * @return ticket 参数值；参数不存在时返回 null
      */
     private String extractTicket(WebSocketSession session) {
         return UriComponentsBuilder.fromUri(session.getHandshakeInfo().getUri())

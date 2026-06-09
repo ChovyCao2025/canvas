@@ -22,6 +22,7 @@ public class NotificationDO {
     /** 通知表自增主键 ID */
     private Long id;
 
+    /** 所属租户 ID */
     @TableField("tenant_id")
     private Long tenantId;
 

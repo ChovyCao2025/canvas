@@ -1,10 +1,14 @@
 # CDP Warehouse Audience Materialization Operations Implementation Plan
 
+Spec: `../specs/p2-035-cdp-warehouse-audience-materialization-operations.md`
+
 **Goal:** Add a production operations API for triggering and inspecting P2-021 OLAP audience materialization.
 
 **Architecture:** Keep the existing `AudienceMaterializationService` as the only materialization engine. Add a thin operations service for run listing and controller delegation.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

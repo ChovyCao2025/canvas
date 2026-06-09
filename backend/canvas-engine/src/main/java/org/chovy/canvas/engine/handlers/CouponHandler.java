@@ -34,6 +34,14 @@ public class CouponHandler implements NodeHandler {
     private final ChannelDedupeService dedupeService;
 
     @Autowired
+    /**
+     * 初始化 CouponHandler 实例。
+     *
+     * @param webClientBuilder 依赖组件，用于完成数据访问或外部能力调用。
+     * @param url url 参数，用于 CouponHandler 流程中的校验、计算或对象转换。
+     * @param backpressureProvider backpressure provider 参数，用于 CouponHandler 流程中的校验、计算或对象转换。
+     * @param dedupeProvider dedupe provider 参数，用于 CouponHandler 流程中的校验、计算或对象转换。
+     */
     public CouponHandler(WebClient.Builder webClientBuilder,
                          @Value("${canvas.integration.coupon-service-url}") String url,
                          ObjectProvider<ProviderBackpressureService> backpressureProvider,
@@ -43,6 +51,12 @@ public class CouponHandler implements NodeHandler {
         this.dedupeService = dedupeProvider == null ? null : dedupeProvider.getIfAvailable();
     }
 
+    /**
+     * 初始化 CouponHandler 实例。
+     *
+     * @param webClientBuilder 依赖组件，用于完成数据访问或外部能力调用。
+     * @param url url 参数，用于 CouponHandler 流程中的校验、计算或对象转换。
+     */
     public CouponHandler(WebClient.Builder webClientBuilder,
                          @Value("${canvas.integration.coupon-service-url}") String url) {
         this.webClient = webClientBuilder.clone().baseUrl(url).build();
@@ -50,6 +64,14 @@ public class CouponHandler implements NodeHandler {
         this.dedupeService = null;
     }
 
+    /**
+     * 初始化 CouponHandler 实例。
+     *
+     * @param webClientBuilder 依赖组件，用于完成数据访问或外部能力调用。
+     * @param url url 参数，用于 CouponHandler 流程中的校验、计算或对象转换。
+     * @param backpressureService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dedupeService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     CouponHandler(WebClient.Builder webClientBuilder,
                   String url,
                   ProviderBackpressureService backpressureService,
@@ -154,11 +176,27 @@ public class CouponHandler implements NodeHandler {
     }
 
     @Override
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param MapString map string 参数，用于 requiresSideEffectIdempotency 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param ctx ctx 参数，用于 requiresSideEffectIdempotency 流程中的校验、计算或对象转换。
+     * @return 返回 requires side effect idempotency 的布尔判断结果。
+     */
     public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
         return true;
     }
 
     @Override
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 sideEffectOperationKey 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param ctx ctx 参数，用于 sideEffectOperationKey 流程中的校验、计算或对象转换。
+     * @return 返回 side effect operation key 生成的文本或业务键。
+     */
     public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
         Object explicit = config.get(MapFieldKeys.IDEMPOTENCY_KEY);
         if (explicit != null && !explicit.toString().isBlank()) {
@@ -168,6 +206,14 @@ public class CouponHandler implements NodeHandler {
         return ctx.getUserId() + ":coupon:" + couponTypeKey;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param provider provider 参数，用于 providerOutput 流程中的校验、计算或对象转换。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @return 返回 providerOutput 流程生成的业务结果。
+     */
     private Map<String, Object> providerOutput(String provider, String status, String reason) {
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("providerChannel", "COUPON");
@@ -182,17 +228,43 @@ public class CouponHandler implements NodeHandler {
         return output;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 string 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param fallback fallback 参数，用于 string 流程中的校验、计算或对象转换。
+     * @return 返回 string 生成的文本或业务键。
+     */
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);
         return value == null ? fallback : value.toString();
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param provider provider 参数，用于 normalizeProvider 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeProvider(String provider) {
         return provider == null || provider.isBlank() ? "COUPON" : provider.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 integer 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param fallback fallback 参数，用于 integer 流程中的校验、计算或对象转换。
+     * @return 返回 integer 计算得到的数量、金额或指标值。
+     */
     private int integer(Map<String, Object> config, String key, int fallback) {
+        // 准备本次处理所需的上下文和中间变量。
         Object value = config.get(key);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null) {
             return fallback;
         }
@@ -202,6 +274,7 @@ public class CouponHandler implements NodeHandler {
         try {
             return Integer.parseInt(value.toString());
         } catch (NumberFormatException ignored) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return fallback;
         }
     }

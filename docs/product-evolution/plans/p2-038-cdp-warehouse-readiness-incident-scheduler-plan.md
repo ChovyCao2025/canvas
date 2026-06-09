@@ -1,10 +1,14 @@
 # CDP Warehouse Readiness Incident Scheduler Implementation Plan
 
+Spec: `../specs/p2-038-cdp-warehouse-readiness-incident-scheduler.md`
+
 **Goal:** Add a disabled-by-default scheduler that runs readiness incident scans with the existing warehouse lease and overlap guard pattern.
 
 **Architecture:** Mirror existing warehouse scheduler classes. `CdpWarehouseReadinessIncidentScheduler` owns only scheduling and guards; the scanner remains `CdpWarehouseReadinessIncidentService`.
 
 **Tech Stack:** Java 21, Spring Boot, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

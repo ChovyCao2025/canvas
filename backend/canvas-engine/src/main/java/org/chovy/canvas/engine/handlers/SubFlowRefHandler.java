@@ -50,14 +50,12 @@ public class SubFlowRefHandler implements NodeHandler {
     private final ObjectMapper        objectMapper;
 
     /**
-     * 构造 SubFlowRefHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     * 构造子流程引用节点处理器。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param subFlowLookupService 子流程查询服务
-     * @param configCache configCache 方法执行所需的业务参数
-     * @param dagEngine dagEngine 方法执行所需的业务参数
-     * @param objectMapper objectMapper 方法执行所需的业务参数
+     * @param subFlowLookupService 子流程画布与版本查询服务
+     * @param configCache 画布 DAG 配置缓存，用于加载 WORKFLOW 子流程
+     * @param dagEngine DAG 执行引擎，延迟注入以避免节点处理器循环依赖
+     * @param objectMapper JSON 解析器，用于读取子流程 graph_json
      */
     public SubFlowRefHandler(SubFlowLookupService subFlowLookupService,
                              CanvasConfigCache configCache,
@@ -70,13 +68,16 @@ public class SubFlowRefHandler implements NodeHandler {
     }
 
     /**
-     * 执行当前节点或服务的核心处理流程。
+     * 执行子流程引用节点：解析目标子流程版本、映射父上下文输入，并按子流程类型选择执行路径。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     * <p>STRATEGY_TABLE 和 DATA_TABLE 在当前节点内完成匹配并把结果写入父流程输出；WORKFLOW 会创建隔离的
+     * 子执行上下文并调用 {@link DagEngine} 运行目标 DAG，完成后给子流程输出加 outputPrefix 前缀再回写父流程。
+     * 本方法不直接开启事务；画布读取走查询服务和配置缓存，WORKFLOW 执行可能触发子流程内节点的外部副作用。
+     * 调用栈包含目标子流程时会直接失败，避免递归调用。</p>
      *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param config 节点配置，关键字段包括 subFlowId、subFlowVersion、inputMapping、outputPrefix 和 nextNodeId
+     * @param ctx 父流程执行上下文，提供用户、执行 ID、上下文变量与调用栈
+     * @return 节点结果；表类子流程返回匹配输出，WORKFLOW 返回加前缀后的子流程输出
      */
     @Override
     @SuppressWarnings("unchecked")
@@ -124,6 +125,9 @@ public class SubFlowRefHandler implements NodeHandler {
                 .onErrorResume(e -> Mono.just(NodeResult.fail("SUB_FLOW_REF: " + e.getMessage())));
     }
 
+    /**
+     * 加载并校验子流程画布、版本和 graph_json，同时按 inputMapping 从父上下文抽取子流程输入。
+     */
     private PreparedSubFlow prepareSubFlow(Long subFlowId,
                                            int subFlowVersion,
                                            String outputPrefix,
@@ -153,6 +157,7 @@ public class SubFlowRefHandler implements NodeHandler {
         Map<String, Object> graphRoot;
         try {
             graphRoot = objectMapper.readValue(version.getGraphJson(), Map.class);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             return PreparedSubFlow.failure(NodeResult.fail("子流程 JSON 解析失败: " + e.getMessage()));
         }
@@ -171,6 +176,18 @@ public class SubFlowRefHandler implements NodeHandler {
                 versionId, nextNodeId, outputPrefix);
     }
 
+    /**
+     * 子流程执行前准备结果。
+     *
+     * @param failure 前置失败结果
+     * @param subFlowType 子流程类型
+     * @param graphRoot 子流程图 JSON 根对象
+     * @param inputData 传给子流程的输入数据
+     * @param subFlowId 子流程画布 ID
+     * @param versionId 子流程版本 ID
+     * @param nextNodeId 子流程完成后的下游节点 ID
+     * @param outputPrefix 输出前缀
+     */
     private record PreparedSubFlow(
             NodeResult failure,
             String subFlowType,
@@ -181,6 +198,12 @@ public class SubFlowRefHandler implements NodeHandler {
             String nextNodeId,
             String outputPrefix
     ) {
+        /**
+         * 构造前置失败的子流程准备结果。
+         *
+         * @param failure 失败节点结果
+         * @return 失败准备结果
+         */
         static PreparedSubFlow failure(NodeResult failure) {
             return new PreparedSubFlow(failure, null, null, null, null, null, null, null);
         }
@@ -266,7 +289,9 @@ public class SubFlowRefHandler implements NodeHandler {
 
 // ══ WORKFLOW（设计文档 20.5节）══════════════════════════════
 
-    /** WORKFLOW 子流程执行，返回 Mono（彻底消除 block()） */
+    /**
+     * 执行 WORKFLOW 子流程，使用独立子上下文运行目标 DAG，并把子上下文输出加前缀后返回父流程。
+     */
     private Mono<NodeResult> executeWorkflow(Long subFlowId, Long versionId,
                                               Map<String, Object> inputData,
                                               ExecutionContext ctx,

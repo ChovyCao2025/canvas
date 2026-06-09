@@ -1,10 +1,14 @@
 # CDP Warehouse Table Drift Incident Auto-Resolution Implementation Plan
 
+Spec: `../specs/p2-054-cdp-warehouse-table-drift-incident-auto-resolution.md`
+
 **Goal:** Resolve table drift incidents automatically when later inspection evidence passes.
 
 **Architecture:** Extend the existing incident mapper/service with stable-key table drift resolution. Update `CdpWarehouseTableDriftIncidentService.scan` so PASS reports resolve `TABLE_DRIFT:{TABLE_KEY}` incidents, while WARN/FAIL reports keep opening incidents through the existing path.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis annotations, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

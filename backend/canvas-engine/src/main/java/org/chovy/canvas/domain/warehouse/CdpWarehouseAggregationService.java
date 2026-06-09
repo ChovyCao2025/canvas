@@ -16,6 +16,9 @@ import java.util.List;
 
 @Service
 @Slf4j
+/**
+ * CdpWarehouseAggregationService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpWarehouseAggregationService {
 
     private static final String JOB_TYPE = "AGGREGATE";
@@ -39,6 +42,14 @@ public class CdpWarehouseAggregationService {
     private final ObjectProvider<CdpWarehouseConsumerAvailabilityService> consumerAvailabilityServiceProvider;
 
     @Autowired
+    /**
+     * 初始化 CdpWarehouseAggregationService 实例。
+     *
+     * @param dorisJdbcTemplate doris jdbc template 参数，用于 CdpWarehouseAggregationService 流程中的校验、计算或对象转换。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param watermarkMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param consumerAvailabilityServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpWarehouseAggregationService(
             @Qualifier("dorisJdbcTemplate") ObjectProvider<JdbcTemplate> dorisJdbcTemplate,
             CdpWarehouseSyncRunMapper runMapper,
@@ -50,6 +61,13 @@ public class CdpWarehouseAggregationService {
         this.consumerAvailabilityServiceProvider = consumerAvailabilityServiceProvider;
     }
 
+    /**
+     * 初始化 CdpWarehouseAggregationService 实例。
+     *
+     * @param dorisJdbcTemplate doris jdbc template 参数，用于 CdpWarehouseAggregationService 流程中的校验、计算或对象转换。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param watermarkMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpWarehouseAggregationService(
             @Qualifier("dorisJdbcTemplate") ObjectProvider<JdbcTemplate> dorisJdbcTemplate,
             CdpWarehouseSyncRunMapper runMapper,
@@ -57,9 +75,20 @@ public class CdpWarehouseAggregationService {
         this(dorisJdbcTemplate, runMapper, watermarkMapper, null);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 aggregate 流程生成的业务结果。
+     */
     public AggregationResult aggregate(Long tenantId, LocalDateTime from, LocalDateTime to, String operator) {
         validateWindow(from, to);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         JdbcTemplate doris = dorisJdbcTemplate.getIfAvailable();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (doris == null) {
             return new AggregationResult(STATUS_SKIPPED, 0, 0);
         }
@@ -82,10 +111,16 @@ public class CdpWarehouseAggregationService {
             run.setErrorMessage(limit(ex.getMessage()));
             run.setFinishedAt(LocalDateTime.now());
             runMapper.updateById(run);
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return new AggregationResult(STATUS_FAILED, 0, 0);
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 dwd sql 生成的文本或业务键。
+     */
     private String dwdSql() {
         return """
                 INSERT INTO canvas_dwd.cdp_user_event_fact
@@ -108,6 +143,11 @@ public class CdpWarehouseAggregationService {
                 """;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 dws sql 生成的文本或业务键。
+     */
     private String dwsSql() {
         return """
                 INSERT INTO canvas_dws.user_event_metric_daily
@@ -128,6 +168,15 @@ public class CdpWarehouseAggregationService {
                 """;
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 newRun 流程生成的业务结果。
+     */
     private CdpWarehouseSyncRunDO newRun(Long tenantId, LocalDateTime from, LocalDateTime to, String operator) {
         CdpWarehouseSyncRunDO run = new CdpWarehouseSyncRunDO();
         run.setTenantId(tenantId);
@@ -142,6 +191,12 @@ public class CdpWarehouseAggregationService {
         return run;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param watermarkTime 时间参数，用于计算窗口、过期或审计时间。
+     */
     private void upsertWatermark(Long tenantId, LocalDateTime watermarkTime) {
         CdpWarehouseWatermarkDO watermark = new CdpWarehouseWatermarkDO();
         watermark.setTenantId(tenantId);
@@ -152,18 +207,29 @@ public class CdpWarehouseAggregationService {
         watermarkMapper.upsert(watermark);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param run run 参数，用于 recordOfflineAssetAvailability 流程中的校验、计算或对象转换。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     */
     private void recordOfflineAssetAvailability(Long tenantId,
                                                 CdpWarehouseSyncRunDO run,
                                                 LocalDateTime from,
                                                 LocalDateTime to) {
         CdpWarehouseConsumerAvailabilityService service = consumerAvailabilityService();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (service == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         try {
             LocalDateTime observedAt = run.getFinishedAt() == null ? LocalDateTime.now() : run.getFinishedAt();
             String evidenceRef = "run:" + (run.getId() == null ? "unknown" : run.getId());
             String reason = "offline aggregation completed for window " + from + " to " + to;
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             for (AvailabilityAsset asset : OFFLINE_AGGREGATION_ASSETS) {
                 service.recordAssetAvailability(tenantId,
                         new CdpWarehouseConsumerAvailabilityService.AssetAvailabilityCommand(
@@ -185,10 +251,21 @@ public class CdpWarehouseAggregationService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 consumerAvailabilityService 流程生成的业务结果。
+     */
     private CdpWarehouseConsumerAvailabilityService consumerAvailabilityService() {
         return consumerAvailabilityServiceProvider == null ? null : consumerAvailabilityServiceProvider.getIfAvailable();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     */
     private void validateWindow(LocalDateTime from, LocalDateTime to) {
         if (from == null || to == null) {
             throw new IllegalArgumentException("from and to are required");
@@ -198,10 +275,22 @@ public class CdpWarehouseAggregationService {
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String limit(String message) {
         String value = message == null ? "warehouse aggregation failed" : message;
         if (value.length() <= MAX_ERROR_LENGTH) {
@@ -210,9 +299,15 @@ public class CdpWarehouseAggregationService {
         return value.substring(0, MAX_ERROR_LENGTH);
     }
 
+    /**
+     * AggregationResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record AggregationResult(String status, int dwdRows, int dwsRows) {
     }
 
+    /**
+     * AvailabilityAsset 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private record AvailabilityAsset(String assetType, String assetKey) {
     }
 }

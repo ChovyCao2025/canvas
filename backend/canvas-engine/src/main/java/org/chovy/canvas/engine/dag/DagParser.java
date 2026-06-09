@@ -154,10 +154,18 @@ public class DagParser {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param nodeMap node map 参数，用于 validateMultiInputConvergence 流程中的校验、计算或对象转换。
+     * @param reverse reverse 参数，用于 validateMultiInputConvergence 流程中的校验、计算或对象转换。
+     */
     private void validateMultiInputConvergence(Map<String, CanvasNode> nodeMap,
                                                Map<String, List<String>> reverse) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map.Entry<String, List<String>> entry : reverse.entrySet()) {
             List<String> upstream = entry.getValue();
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (upstream == null || upstream.size() <= 1) {
                 continue;
             }
@@ -171,6 +179,12 @@ public class DagParser {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param type 类型标识，用于选择对应处理分支。
+     * @return 返回布尔判断结果。
+     */
     private boolean isConvergenceNode(String type) {
         return NodeType.HUB.equals(type)
                 || NodeType.AGGREGATE.equals(type)

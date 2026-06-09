@@ -39,11 +39,22 @@ public class KillSwitchSubscriber {
     /** Kill Switch 的 Redis 模式订阅频道。 */
     private static final String KILL_PATTERN = "canvas:kill:*";
 
+    /**
+     * 创建 KillSwitchSubscriber 实例并注入 infrastructure.redis 场景依赖。
+     * @param factory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param registry registry 参数，用于 KillSwitchSubscriber 流程中的校验、计算或对象转换。
+     */
     public KillSwitchSubscriber(ReactiveRedisConnectionFactory factory,
                                 InFlightExecutionRegistry registry) {
         this(factory, registry, new BackgroundSubscriptionRegistry());
     }
 
+    /**
+     * 创建 KillSwitchSubscriber 实例并注入 infrastructure.redis 场景依赖。
+     * @param factory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param registry registry 参数，用于 KillSwitchSubscriber 流程中的校验、计算或对象转换。
+     * @param backgroundSubscriptions background subscriptions 参数，用于 KillSwitchSubscriber 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public KillSwitchSubscriber(ReactiveRedisConnectionFactory factory,
                                 InFlightExecutionRegistry registry,
@@ -51,6 +62,11 @@ public class KillSwitchSubscriber {
         this.factory = factory;
         this.registry = registry;
         this.backgroundSubscriptions = backgroundSubscriptions == null
+                /**
+                 * 执行 BackgroundSubscriptionRegistry 流程，围绕 background subscription registry 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 BackgroundSubscriptionRegistry 流程生成的业务结果。
+                 */
                 ? new BackgroundSubscriptionRegistry()
                 : backgroundSubscriptions;
     }
@@ -88,6 +104,7 @@ public class KillSwitchSubscriber {
                                 // 画布已被标记 status=4(KILLED)，新触发会被前置检查拦截
                                 log.info("[KILL] GRACEFUL 模式，新触发将被拦截 canvasId={}", canvasId);
                             }
+                        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                         } catch (NumberFormatException e) {
                             log.error("[KILL] 解析 canvasId 失败 channel={}", channel);
                         }
@@ -96,6 +113,7 @@ public class KillSwitchSubscriber {
                     e -> log.error("[KILL] Kill Switch 订阅异常: {}", e.getMessage()));
 
             log.info("[KILL] Kill Switch 订阅启动，监听模式: {}", KILL_PATTERN);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[KILL] Kill Switch 订阅失败（Redis 未连接时忽略）: {}", e.getMessage());
         }
@@ -110,6 +128,7 @@ public class KillSwitchSubscriber {
         if (listenerContainer != null) {
             try {
                 listenerContainer.destroy();
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception e) {
                 log.warn("[KILL] Kill Switch 订阅容器关闭失败: {}", e.getMessage());
             }

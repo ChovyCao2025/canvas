@@ -9,9 +9,9 @@ Implementation plan: `../plans/p2-082q-programmatic-dsp-foundation-plan.md`
 
 Add the first production-grade DSP/programmatic advertising foundation: DSP seats, campaign flights, line items, supply-path governance, daily performance evidence, and tenant-scoped pacing summaries.
 
-## Delivery Status
+## Implementation Status
 
-Delivered backend first slice on 2026-06-06:
+Status: Delivered backend first slice on 2026-06-06.
 
 - DSP seat registry with provider identity, advertiser account, currency, timezone, supply-chain enforcement, and connector metadata.
 - Campaign flight registry with objective, budget, date window, currency, and status.

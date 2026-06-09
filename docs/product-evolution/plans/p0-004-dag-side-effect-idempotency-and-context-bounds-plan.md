@@ -18,7 +18,7 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p0-004-dag-side-effect-idempotency-and-context-bounds.md`
-- Optimization sources: `docs/optimization/production-design-gaps.md`, `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/todo/plan-review-findings.md`
+- Optimization sources: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`, `docs/optimization/todo/plan-review-findings.md`
 
 ## File Structure
 
@@ -202,7 +202,8 @@ Expected: PASS.
 
 Note: `GoalCheckHandlerTest` and `CdpTagWriteHandlerTest` are not present in this repository snapshot, so the affected regression run uses the existing DAG, WAIT, and coupon tests.
 
-- [ ] **Step 3: Commit implementation slice**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

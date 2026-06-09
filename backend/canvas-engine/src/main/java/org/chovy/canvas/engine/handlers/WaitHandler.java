@@ -45,12 +45,10 @@ public class WaitHandler implements NodeHandler {
     private final Clock clock;
 
     /**
-     * 构造 WaitHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     * 构造等待节点处理器，使用系统默认时钟计算等待恢复时间。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param waitSubscriptionService waitSubscriptionService 方法执行所需的业务参数
-     * @param objectMapper objectMapper 方法执行所需的业务参数
+     * @param waitSubscriptionService 等待订阅服务，负责持久化事件等待和定时等待
+     * @param objectMapper JSON 序列化器，用于保存恢复载荷
      */
     @Autowired
     public WaitHandler(WaitSubscriptionService waitSubscriptionService, ObjectMapper objectMapper) {
@@ -58,13 +56,11 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 构造 WaitHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     * 构造等待节点处理器，允许测试传入固定时钟以验证恢复时间。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param waitSubscriptionService waitSubscriptionService 方法执行所需的业务参数
-     * @param objectMapper objectMapper 方法执行所需的业务参数
-     * @param clock clock 方法执行所需的业务参数
+     * @param waitSubscriptionService 等待订阅服务，负责持久化事件等待和定时等待
+     * @param objectMapper JSON 序列化器，用于保存恢复载荷
+     * @param clock 恢复时间计算使用的时钟
      */
     WaitHandler(WaitSubscriptionService waitSubscriptionService, ObjectMapper objectMapper, Clock clock) {
         this.waitSubscriptionService = waitSubscriptionService;
@@ -73,13 +69,15 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行当前节点或服务的核心处理流程。
+     * 执行等待节点：首次进入时创建等待订阅并挂起，恢复进入时按恢复状态继续或超时路由。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     * <p>首次进入会根据 waitType 写入事件等待或时间等待订阅，这是本节点的外部副作用；方法本身不声明事务，
+     * 持久化边界由 {@link WaitSubscriptionService} 负责。恢复时由调度器或事件消费链路注入
+     * {@code waitResumeStatus}：completed 走成功下一跳，timeout/expired 走超时分支。</p>
      *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param config 节点配置，包含 waitType、duration、untilDate、timeWindow、eventCode、nextNodeId 和 timeoutNodeId
+     * @param ctx 执行上下文，提供 executionId、canvasId、versionId、userId 等等待订阅所需标识
+     * @return 节点结果；首次进入通常返回 pending，恢复进入返回成功或超时结果
      */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
@@ -110,13 +108,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 wait For Duration 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 方法执行后的业务结果
+     * 处理固定时长等待，计算当前时间加 duration 后的恢复时间并登记定时等待。
      */
     private NodeResult waitForDuration(Map<String, Object> config, ExecutionContext ctx) {
         Duration duration = durationFrom(config.get(MapFieldKeys.DURATION), config);
@@ -127,18 +119,13 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 wait Until Date 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 方法执行后的业务结果
+     * 处理指定日期时间等待；目标时间已过时直接放行，未来时间登记定时等待。
      */
     private NodeResult waitUntilDate(Map<String, Object> config, ExecutionContext ctx) {
         LocalDateTime until;
         try {
             until = parseDateTime(string(config, MapFieldKeys.UNTIL_DATE, null));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DateTimeParseException e) {
             return NodeResult.fail("WAIT UNTIL_DATE 的 untilDate 格式不正确");
         }
@@ -150,18 +137,13 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 wait Until Relative Time 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 方法执行后的业务结果
+     * 处理每天固定时刻等待；当天时间已过则顺延到下一天同一时刻。
      */
     private NodeResult waitUntilRelativeTime(Map<String, Object> config, ExecutionContext ctx) {
         LocalTime targetTime;
         try {
             targetTime = parseTime(string(config, MapFieldKeys.TIME, null), LocalTime.of(9, 0));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DateTimeParseException e) {
             return NodeResult.fail("WAIT RELATIVE_TIME 的 time 格式不正确");
         }
@@ -173,13 +155,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 wait For Time Window 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 方法执行后的业务结果
+     * 处理可执行时间窗口等待；当前位于窗口内则立即继续，否则登记到下一个窗口开始时间恢复。
      */
     @SuppressWarnings("unchecked")
     private NodeResult waitForTimeWindow(Map<String, Object> config, ExecutionContext ctx) {
@@ -191,6 +167,7 @@ public class WaitHandler implements NodeHandler {
         try {
             start = parseTime(string(window, MapFieldKeys.START, string(config, MapFieldKeys.WINDOW_START, null)), LocalTime.of(9, 0));
             end = parseTime(string(window, MapFieldKeys.END, string(config, MapFieldKeys.WINDOW_END, null)), LocalTime.of(20, 0));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DateTimeParseException e) {
             return NodeResult.fail("WAIT TIME_WINDOW 的时间窗口格式不正确");
         }
@@ -210,13 +187,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 wait Until Event 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 方法执行后的业务结果
+     * 处理事件等待，校验事件编码和最大等待时间后创建事件订阅并返回 pending。
      */
     private NodeResult waitUntilEvent(Map<String, Object> config, ExecutionContext ctx) {
         String nodeId = string(config, MapFieldKeys.NODE_ID_INTERNAL, null);
@@ -256,12 +227,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 success 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @return 方法执行后的业务结果
+     * 构造等待完成后的成功结果，优先使用 nextNodeId，兼容旧配置中的 successNodeId。
      */
     private NodeResult success(Map<String, Object> config) {
         String nextNodeId = string(config, MapFieldKeys.NEXT_NODE_ID,
@@ -270,15 +236,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 pending At 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @param waitType waitType 类型标识或分类条件
-     * @param resumeAt resumeAt 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * 创建时间等待订阅并返回挂起结果，恢复载荷只保留恢复所需的节点和分支信息。
      */
     private NodeResult pendingAt(
             Map<String, Object> config,
@@ -305,12 +263,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 pending 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param resumeAt resumeAt 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * 构造统一的 WAIT_PENDING 结果，将本地时间转换为引擎使用的 epoch 毫秒。
      */
     private NodeResult pending(LocalDateTime resumeAt) {
         return NodeResult.pending(
@@ -321,13 +274,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 resume Payload 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param nodeId nodeId 对应的业务主键或标识
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @return 按业务键组织的映射结果
+     * 构造等待恢复载荷，避免把完整节点配置写入订阅表，只保留源节点和成功/超时分支。
      */
     private Map<String, Object> resumePayload(String nodeId, Map<String, Object> config) {
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -339,12 +286,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 wait Type 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @return 转换或查询得到的字符串结果
+     * 解析等待类型，兼容 waitType 与 wait_type 两种配置名并统一为大写。
      */
     private String waitType(Map<String, Object> config) {
         // 同时兼容 waitType 与 wait_type 两种配置名。
@@ -352,13 +294,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 duration From 对应的业务逻辑。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * 从数字、对象或旧版平铺字段中解析等待时长。
      */
     @SuppressWarnings("unchecked")
     private Duration durationFrom(Object value, Map<String, Object> fallback) {
@@ -375,13 +311,11 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 duration 对应的业务逻辑。
+     * 根据数值和单位构造等待时长。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param amount amount 方法执行所需的业务参数
-     * @param unit unit 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param amount 时长数值
+     * @param unit 时长单位
+     * @return Duration 时长
      */
     private Duration duration(long amount, String unit) {
         return switch (unit == null ? "SECONDS" : unit.toUpperCase()) {
@@ -394,14 +328,12 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 inside Window 对应的业务逻辑。
+     * 判断当前时间是否落在业务时间窗口内。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param current current 方法执行所需的业务参数
-     * @param start start 方法执行所需的业务参数
-     * @param end end 方法执行所需的业务参数
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param current 当前时间
+     * @param start 窗口开始时间
+     * @param end 窗口结束时间
+     * @return true 表示当前时间在窗口内
      */
     private boolean insideWindow(LocalTime current, LocalTime start, LocalTime end) {
         if (start.equals(end)) return true;
@@ -426,13 +358,11 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 构建、解析或转换 parse Time 相关的业务数据。
+     * 解析本地时间，空值时返回默认值。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param value 原始时间字符串
+     * @param fallback 默认时间
+     * @return 解析后的 LocalTime
      */
     private LocalTime parseTime(String value, LocalTime fallback) {
         if (value == null || value.isBlank()) return fallback;
@@ -462,20 +392,19 @@ public class WaitHandler implements NodeHandler {
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalArgumentException("WAIT 配置序列化失败", e);
         }
     }
 
     /**
-     * 执行 string 对应的业务逻辑。
+     * 读取字符串配置。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param config 节点配置
+     * @param key 配置 key
+     * @param fallback 默认值
+     * @return 字符串值或默认值
      */
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);
@@ -483,22 +412,18 @@ public class WaitHandler implements NodeHandler {
     }
 
     /**
-     * 执行 now 对应的业务逻辑。
+     * 读取当前时钟时间。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @return 方法执行后的业务结果
+     * @return 当前 LocalDateTime
      */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
     /**
-     * 执行 zone 对应的业务逻辑。
+     * 读取当前时钟时区。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @return 方法执行后的业务结果
+     * @return 当前 ZoneId
      */
     private ZoneId zone() {
         return clock.getZone();

@@ -2,6 +2,12 @@ package org.chovy.canvas.domain.search;
 
 import java.util.Map;
 
+/**
+ * SearchMarketingMutationExecuteCommand 承载 domain.search 场景中的不可变数据快照。
+ * @param dryRun dryRun 字段。
+ * @param partialFailure partialFailure 字段。
+ * @param metadata metadata 字段。
+ */
 public record SearchMarketingMutationExecuteCommand(
         Boolean dryRun,
         Boolean partialFailure,

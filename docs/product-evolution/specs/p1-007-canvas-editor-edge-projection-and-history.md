@@ -2,8 +2,12 @@
 
 Priority: P1
 Sequence: 007
-Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/bmad-product-review-2026-05.md`
+Source: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`
 Implementation plan: `../plans/p1-007-canvas-editor-edge-projection-and-history-plan.md`
+
+## Implementation Status
+
+Implemented on 2026-06-05. The repo already had `editorSnapshot.ts` and history hook scaffolding, so this slice completed the missing projection guard by deriving display edges from node `bizConfig` in `useCanvasGraphState.ts`. Commit step was not executed because the user requested no commit.
 
 ## Goal
 

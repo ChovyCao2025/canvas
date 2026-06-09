@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082h-monitoring-workbench-frontend-plan.md`
 
 Turn the P2-082G monitoring backend into an operator-facing workbench where marketing teams can register monitoring sources, review sentiment and competitor mentions, filter open alerts, and resolve alert workflow rows without using raw API calls.
 
-## Delivery Status
+## Implementation Status
 
 Delivered frontend first slice:
 

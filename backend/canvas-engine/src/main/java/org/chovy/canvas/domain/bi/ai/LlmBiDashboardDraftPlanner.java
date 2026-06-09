@@ -43,6 +43,7 @@ public class LlmBiDashboardDraftPlanner implements BiDashboardDraftPlanner {
                 request.modelKey(),
                 null,
                 variables(context),
+                null,
                 request.params(),
                 request.timeoutMs(),
                 null,

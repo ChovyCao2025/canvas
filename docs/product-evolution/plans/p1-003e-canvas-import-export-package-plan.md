@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Jackson, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Ant Design, Vitest.
 
+**Implementation Status:** Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-003e-canvas-import-export-package-plan.md`.
+
 ---
 
 ## Spec Reference
@@ -471,7 +473,8 @@ Result: TypeScript and Vite build passed.
 - Read: `docs/product-evolution/specs/p1-003e-canvas-import-export-package.md`
 - Read: `docs/product-evolution/plans/p1-003e-canvas-import-export-package-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

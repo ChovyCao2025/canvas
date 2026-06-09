@@ -7,7 +7,7 @@ Implementation plan: `../plans/p1-005-cdp-write-key-management-and-authenticatio
 
 ## Implementation Status
 
-Implemented on 2026-06-05 with the actual migration version `V100__cdp_write_key_management.sql` because `V97` is not the current migration sequence in this workspace. Focused Maven verification is currently blocked by unrelated backend compile errors in parallel BI, warehouse, analytics, and AI changes; P1-005 static checks confirm the write-key table, controller routes, and dedicated test files exist.
+Implemented on 2026-06-05 with the actual migration version `V100__cdp_write_key_management.sql` because `V97` is not the current migration sequence in this workspace. Focused Java 21 verification passed on 2026-06-08 for `CdpWriteKeySchemaTest`, `CdpWriteKeyAuthServiceTest`, and `CdpWriteKeyControllerTest`, covering schema, authentication, and admin API behavior.
 
 ## Goal
 

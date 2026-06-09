@@ -5,6 +5,8 @@ Sequence: 016C
 Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/todo/cdp_gap_analysis.md`
 Implementation plan: `../plans/p2-016c-bounded-analytics-query-apis-plan.md`
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 ## Goal
 
 Add tenant-safe, date-bounded analytics query APIs for event analysis, funnels, user timelines, attribute distribution, alerts, and exports.
@@ -13,11 +15,11 @@ Add tenant-safe, date-bounded analytics query APIs for event analysis, funnels, 
 
 - Existing stats endpoints are execution-counter oriented.
 - P2-016 provides richer event/trace fields.
-- There is no query service that enforces tenant/date bounds across analytics reports.
+- The current workspace now includes a query service and controller enforcing tenant/date bounds across analytics reports.
 
 ## In Scope
 
-- Migration `V129__analytics_query_definitions.sql` for funnel definitions, alert rules, and export jobs.
+- Migration `V134__analytics_query_definitions.sql` for funnel definitions, alert rules, and export jobs. The original plan's `V129` filename was superseded by the current migration sequence.
 - `AnalyticsQueryService` and `AnalyticsController`.
 - Date range, tenant predicate, max range, and row-limit enforcement.
 - Async or row-limited export creation.
@@ -30,3 +32,4 @@ Add tenant-safe, date-bounded analytics query APIs for event analysis, funnels, 
 ## Acceptance Criteria
 
 - Backend tests prove bounded query rejection, event grouping, funnel version lookup, timeline pagination, attribute distribution, alert preview, and export creation.
+- Focused backend verification passed on 2026-06-09 with `AnalyticsQuerySchemaTest`, `AnalyticsQueryGuardTest`, `AnalyticsQueryServiceTest`, and `AnalyticsControllerTest` covering 23 tests with zero failures and zero errors.

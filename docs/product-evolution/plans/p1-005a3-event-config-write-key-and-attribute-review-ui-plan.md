@@ -12,7 +12,7 @@
 
 ## Implementation Status
 
-Status: implemented on 2026-06-05.
+Status: implemented on 2026-06-05; focused backend test execution is blocked by unrelated current workspace test-source compile errors.
 
 Implementation notes:
 
@@ -350,7 +350,8 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-005a3-event-config-write-key-and-attribute-review-ui.md`
 - Read: `docs/product-evolution/plans/p1-005a3-event-config-write-key-and-attribute-review-ui-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

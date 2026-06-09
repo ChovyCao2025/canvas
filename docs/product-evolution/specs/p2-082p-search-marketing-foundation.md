@@ -9,9 +9,9 @@ Implementation plan: `../plans/p2-082p-search-marketing-foundation-plan.md`
 
 Add the first production-grade SEO/SEM management foundation: search sources, keyword portfolio, daily performance evidence, deterministic opportunity detection, and tenant-scoped reporting APIs.
 
-## Delivery Status
+## Implementation Status
 
-Delivered backend first slice on 2026-06-06:
+Status: Delivered backend first slice on 2026-06-06.
 
 - Search source registry for Google Ads, Microsoft Advertising, Google Search Console, or sandbox imports.
 - Keyword portfolio with normalized keyword identity, match type, landing page, intent, labels, and status.

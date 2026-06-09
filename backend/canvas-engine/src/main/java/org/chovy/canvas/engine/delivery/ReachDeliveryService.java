@@ -8,6 +8,7 @@ import org.chovy.canvas.dal.dataobject.MessageSendRecordDO;
 import org.chovy.canvas.dal.mapper.MessageSendRecordMapper;
 import org.chovy.canvas.engine.channel.ChannelConnector;
 import org.chovy.canvas.engine.channel.ChannelConnectorRegistry;
+import org.chovy.canvas.engine.channel.DownstreamBulkheadRegistry;
 import org.chovy.canvas.engine.policy.MarketingPolicyService;
 import org.chovy.canvas.engine.policy.MarketingPolicyService.PolicyDecision;
 import org.chovy.canvas.infrastructure.http.ExternalHttpClient;
@@ -18,6 +19,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -45,6 +47,8 @@ public class ReachDeliveryService {
     private final MarketingPolicyService policyService;
     /** Optional connector registry used by outbox dispatch to call provider-specific connectors. */
     private final ChannelConnectorRegistry connectorRegistry;
+    /** Optional provider bulkhead guard for downstream channel systems. */
+    private final DownstreamBulkheadRegistry bulkheadRegistry;
 
     /** 初始化触达投递依赖，并按配置创建外部触达平台客户端。 */
     @Autowired
@@ -54,7 +58,8 @@ public class ReachDeliveryService {
             ExternalHttpClient externalHttpClient,
             ObjectProvider<DeliveryOutboxService> outboxServiceProvider,
             ObjectProvider<MarketingPolicyService> policyServiceProvider,
-            ObjectProvider<ChannelConnectorRegistry> connectorRegistryProvider
+            ObjectProvider<ChannelConnectorRegistry> connectorRegistryProvider,
+            ObjectProvider<DownstreamBulkheadRegistry> bulkheadRegistryProvider
     ) {
         this.recordMapper = recordMapper;
         this.objectMapper = objectMapper;
@@ -62,6 +67,7 @@ public class ReachDeliveryService {
         this.outboxService = outboxServiceProvider == null ? null : outboxServiceProvider.getIfAvailable();
         this.policyService = policyServiceProvider == null ? null : policyServiceProvider.getIfAvailable();
         this.connectorRegistry = connectorRegistryProvider == null ? null : connectorRegistryProvider.getIfAvailable();
+        this.bulkheadRegistry = bulkheadRegistryProvider == null ? null : bulkheadRegistryProvider.getIfAvailable();
     }
 
     /** 初始化触达投递依赖，并按配置创建外部触达平台客户端。 */
@@ -70,7 +76,7 @@ public class ReachDeliveryService {
             ObjectMapper objectMapper,
             ExternalHttpClient externalHttpClient
     ) {
-        this(recordMapper, objectMapper, externalHttpClient, null, null, null);
+        this(recordMapper, objectMapper, externalHttpClient, null, null, null, null);
     }
 
     /** 初始化触达投递依赖，并显式传入策略服务，便于 focused tests 覆盖直发路径。 */
@@ -86,6 +92,7 @@ public class ReachDeliveryService {
         this.outboxService = null;
         this.policyService = policyService;
         this.connectorRegistry = null;
+        this.bulkheadRegistry = null;
     }
 
     /** 初始化触达投递依赖，并显式传入连接器注册表，便于 outbox 派发 focused tests。 */
@@ -101,6 +108,24 @@ public class ReachDeliveryService {
         this.outboxService = null;
         this.policyService = null;
         this.connectorRegistry = connectorRegistry;
+        this.bulkheadRegistry = null;
+    }
+
+    /** 初始化触达投递依赖，并显式传入 bulkhead registry，便于 focused tests 覆盖 provider 保护。 */
+    public ReachDeliveryService(
+            MessageSendRecordMapper recordMapper,
+            ObjectMapper objectMapper,
+            ExternalHttpClient externalHttpClient,
+            ChannelConnectorRegistry connectorRegistry,
+            DownstreamBulkheadRegistry bulkheadRegistry
+    ) {
+        this.recordMapper = recordMapper;
+        this.objectMapper = objectMapper;
+        this.externalHttpClient = externalHttpClient;
+        this.outboxService = null;
+        this.policyService = null;
+        this.connectorRegistry = connectorRegistry;
+        this.bulkheadRegistry = bulkheadRegistry;
     }
 
     /** 执行触达投递并写入发送记录。 */
@@ -176,6 +201,7 @@ public class ReachDeliveryService {
     /** 调用外部触达平台发送消息并返回渠道响应。 */
     @SuppressWarnings("unchecked")
     public Mono<Map<String, Object>> dispatchToProvider(DeliveryOutboxDO outbox) {
+        assertProviderBulkheadPermits(outbox);
         Map<String, Object> payload = payloadAsMap(outbox);
         ChannelConnector connector = resolveConnector(outbox);
         if (connector != null) {
@@ -185,6 +211,26 @@ public class ReachDeliveryService {
         return callReachPlatform(payload);
     }
 
+    private void assertProviderBulkheadPermits(DeliveryOutboxDO outbox) {
+        if (bulkheadRegistry == null || outbox == null) {
+            return;
+        }
+        DownstreamBulkheadRegistry.Decision decision = bulkheadRegistry.permit(
+                outbox.getTenantId(),
+                outbox.getProvider(),
+                outbox.getChannel(),
+                Instant.now());
+        if (!decision.permitted()) {
+            throw new IllegalStateException("provider bulkhead open: " + decision.reason());
+        }
+    }
+
+    /**
+     * 根据 outbox 中的租户、渠道和供应商解析可用渠道连接器。
+     *
+     * @param outbox 触达 outbox 记录
+     * @return 可用连接器，未配置或禁用时返回 null
+     */
     private ChannelConnector resolveConnector(DeliveryOutboxDO outbox) {
         if (connectorRegistry == null || outbox == null) {
             return null;
@@ -196,15 +242,25 @@ public class ReachDeliveryService {
         return connector;
     }
 
+    /**
+     * 通过渠道连接器执行发送。
+     *
+     * @param outbox 触达 outbox 记录
+     * @param payload 标准化发送载荷
+     * @param connector 渠道连接器
+     * @return 连接器标准响应
+     */
     private Map<String, Object> dispatchToConnector(DeliveryOutboxDO outbox,
                                                     Map<String, Object> payload,
                                                     ChannelConnector connector) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         ChannelConnector.ConnectorSendResult result = connector.send(new ChannelConnector.ConnectorSendRequest(
                 outbox.getTenantId(),
                 outbox.getChannel(),
                 outbox.getProvider(),
                 outbox.getUserId(),
                 payload));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!result.accepted()) {
             String reason = result.reason() == null || result.reason().isBlank()
                     ? "connector send failed: " + result.status()
@@ -222,9 +278,16 @@ public class ReachDeliveryService {
         if (result.reason() != null) {
             response.put("connectorReason", result.reason());
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return response;
     }
 
+    /**
+     * 调用默认触达平台发送消息。
+     *
+     * @param payload 标准化发送载荷
+     * @return 触达平台响应
+     */
     private Mono<Map<String, Object>> callReachPlatform(Map<String, Object> payload) {
         // 渠道、模板、变量和幂等键统一放入 payload，具体渠道差异由触达平台适配。
         return externalHttpClient.postJson(ExternalHttpClient.REACH_PLATFORM, "/send", payload);
@@ -261,25 +324,33 @@ public class ReachDeliveryService {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 按同意、抑制、渠道可达、静默时段和频控顺序评估触达策略。
+     *
+     * @param request 触达请求
+     * @return 策略评估结果
+     */
     private PolicyDecision evaluatePolicy(DeliveryRequest request) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (policyService == null || request.policyOptions() == null) {
             return PolicyDecision.allow();
         }
         PolicyOptions policy = request.policyOptions();
         PolicyDecision decision = policyService.consentAllowed(
-                request.userId(), request.channel(), policy.requireExplicitConsent());
+                request.tenantId(), request.userId(), request.channel(), policy.requireExplicitConsent());
         if (!decision.allowed()) return decision;
 
-        decision = policyService.suppressionAllowed(request.userId(), request.channel());
+        decision = policyService.suppressionAllowed(request.tenantId(), request.userId(), request.channel());
         if (!decision.allowed()) return decision;
 
-        decision = policyService.channelAvailable(request.userId(), request.channel());
+        decision = policyService.channelAvailable(request.tenantId(), request.userId(), request.channel());
         if (!decision.allowed()) return decision;
 
         decision = policyService.quietHoursAllowed(
                 request.userId(), policy.quietStart(), policy.quietEnd(), policy.quietTimezone());
         if (!decision.allowed()) return decision;
 
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return policyService.consumeFrequency(
                 request.userId(),
                 request.canvasId(),
@@ -290,6 +361,13 @@ public class ReachDeliveryService {
                 Duration.ofSeconds(policy.frequencyWindowSeconds()));
     }
 
+    /**
+     * 将发送记录标记为策略跳过。
+     *
+     * @param record 发送记录
+     * @param decision 策略拒绝结果
+     * @return 跳过状态的触达结果
+     */
     private DeliveryResult markSkipped(MessageSendRecordDO record, PolicyDecision decision) {
         String reason = decision.reasonCode() + ": " + decision.reasonMessage();
         record.setStatus(MessageSendRecordDO.STATUS_SKIPPED);
@@ -299,7 +377,24 @@ public class ReachDeliveryService {
         return new DeliveryResult(false, false, record.getId(), null, record.getErrorMessage());
     }
 
-    /** 构造标准化触达投递请求。 */
+    /**
+     * 构造使用默认供应商和默认策略的标准化触达请求。
+     *
+     * <p>该方法只组装 payload 和默认策略，不写发送流水、不写 outbox、也不调用外部渠道；返回对象通常传给
+     * {@link #send(DeliveryRequest)} 执行后续幂等投递。
+     *
+     * @param tenantId 租户 ID
+     * @param executionId 画布执行实例 ID
+     * @param canvasId 画布 ID
+     * @param userId 接收用户 ID
+     * @param nodeId 触达节点 ID
+     * @param channel 触达渠道
+     * @param templateId 模板 ID
+     * @param content 模板内容或已渲染内容
+     * @param variables 渲染变量和上下文变量
+     * @param idempotencyKey 触达幂等键
+     * @return 标准化触达请求
+     */
     public DeliveryRequest request(
             Long tenantId,
             String executionId,
@@ -316,7 +411,24 @@ public class ReachDeliveryService {
                 content, variables, idempotencyKey, PolicyOptions.defaults());
     }
 
-    /** 构造标准化触达投递请求。 */
+    /**
+     * 构造使用默认供应商的标准化触达请求。
+     *
+     * <p>该方法保留调用方传入的营销策略选项，并把供应商默认成 REACH；只返回请求对象，不产生数据库、Redis 或外部调用副作用。
+     *
+     * @param tenantId 租户 ID
+     * @param executionId 画布执行实例 ID
+     * @param canvasId 画布 ID
+     * @param userId 接收用户 ID
+     * @param nodeId 触达节点 ID
+     * @param channel 触达渠道
+     * @param templateId 模板 ID
+     * @param content 内容字段
+     * @param variables 模板变量
+     * @param idempotencyKey 触达幂等键
+     * @param policyOptions 触达前策略选项
+     * @return 标准化触达请求
+     */
     public DeliveryRequest request(
             Long tenantId,
             String executionId,
@@ -334,7 +446,26 @@ public class ReachDeliveryService {
                 templateId, content, variables, idempotencyKey, policyOptions);
     }
 
-    /** 构造标准化触达投递请求，并保留实际渠道供应商，供 outbox、回执和审计使用。 */
+    /**
+     * 构造标准化触达投递请求，并保留实际渠道供应商。
+     *
+     * <p>方法将渠道、模板、用户、内容、变量、幂等键和供应商写入稳定顺序的 payload；该 payload 后续会落入发送流水/outbox，
+     * 并用于渠道连接器调用、回执关联和审计。方法本身只构造对象，不执行外部调用。
+     *
+     * @param tenantId 租户 ID
+     * @param executionId 画布执行实例 ID
+     * @param canvasId 画布 ID
+     * @param userId 接收用户 ID
+     * @param nodeId 触达节点 ID
+     * @param channel 触达渠道
+     * @param provider 实际渠道供应商
+     * @param templateId 模板 ID
+     * @param content 内容字段
+     * @param variables 模板变量
+     * @param idempotencyKey 触达幂等键
+     * @param policyOptions 触达前策略选项
+     * @return 标准化触达请求
+     */
     public DeliveryRequest request(
             Long tenantId,
             String executionId,
@@ -363,6 +494,23 @@ public class ReachDeliveryService {
                 templateId, payload, idempotencyKey, policyOptions);
     }
 
+    /**
+     * 构造不显式传入租户的标准化触达请求。
+     *
+     * <p>该重载使用默认租户语义，并复用完整重载构造 payload；不会写数据库或调用外部渠道，只返回可交给
+     * {@link #send(DeliveryRequest)} 或 outbox 的请求对象。
+     *
+     * @param executionId 画布执行实例 ID
+     * @param canvasId 画布 ID
+     * @param userId 接收用户 ID
+     * @param nodeId 触达节点 ID
+     * @param channel 触达渠道
+     * @param templateId 模板 ID
+     * @param content 模板内容或已渲染内容
+     * @param variables 渲染变量和上下文变量
+     * @param idempotencyKey 触达幂等键
+     * @return 标准化触达请求
+     */
     public DeliveryRequest request(
             String executionId,
             Long canvasId,
@@ -382,11 +530,18 @@ public class ReachDeliveryService {
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalArgumentException("触达请求序列化失败", e);
         }
     }
 
+    /**
+     * 从 outbox 记录读取标准化 payload。
+     *
+     * @param outbox 触达 outbox 记录
+     * @return 解析后的 payload Map
+     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> payloadAsMap(DeliveryOutboxDO outbox) {
         if (outboxService != null) {
@@ -398,21 +553,31 @@ public class ReachDeliveryService {
         try {
             Object value = objectMapper.readValue(outbox.getPayloadJson(), Map.class);
             return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ex) {
             throw new IllegalArgumentException("delivery payload JSON is invalid", ex);
         }
     }
 
+    /**
+     * 规范化渠道供应商。
+     *
+     * @param provider 原始供应商
+     * @return 大写供应商，缺失时返回 REACH
+     */
     private String normalizeProvider(String provider) {
         return provider == null || provider.isBlank() ? "REACH" : provider.trim().toUpperCase(Locale.ROOT);
     }
 
-    /** 发送前记录准备结果，标识本次是否命中幂等重复请求。 */
+    /**
+     * 发送前记录准备结果，标识本次是否命中幂等重复请求。
+     *
+     * @param record 已落库或已命中的发送记录.
+     * @param duplicate 是否命中幂等重复请求.
+     */
     private record PreparedRecord(
-            /** 已落库或已命中的发送记录。 */
-            MessageSendRecordDO record,
-            /** 是否命中幂等重复请求。 */
-            boolean duplicate
+        MessageSendRecordDO record,
+        boolean duplicate
     ) {
     }
 
@@ -453,6 +618,13 @@ public class ReachDeliveryService {
             int frequencyMax,
             int frequencyWindowSeconds
     ) {
+        /**
+         * 返回触达前策略的默认选项。
+         *
+         * <p>默认要求显式同意、启用夜间静默和旅程级频控；用于发送节点未配置策略时保持保守触达语义。
+         *
+         * @return 默认策略选项
+         */
         public static PolicyOptions defaults() {
             return new PolicyOptions(true, "22:00", "08:00", "USER_LOCAL", "JOURNEY", 1, 86400);
         }

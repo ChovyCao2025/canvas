@@ -1,10 +1,14 @@
 # CDP Warehouse Realtime Pipeline Incidents Implementation Plan
 
+Spec: `../specs/p2-033-cdp-warehouse-realtime-pipeline-incidents.md`
+
 **Goal:** Route realtime warehouse pipeline health warnings and failures into the existing warehouse incident lifecycle.
 
 **Architecture:** Reuse `cdp_warehouse_incident`. Add a realtime pipeline incident input to `CdpWarehouseIncidentService`, call it best-effort from checkpoint reporting, and add a scan service/API for stale status derived from runtime evaluation.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

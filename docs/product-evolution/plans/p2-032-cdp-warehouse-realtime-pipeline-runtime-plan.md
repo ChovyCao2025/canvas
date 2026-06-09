@@ -1,10 +1,14 @@
 # CDP Warehouse Realtime Pipeline Runtime Implementation Plan
 
+Spec: `../specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`
+
 **Goal:** Add realtime warehouse runtime evidence for CDC/Flink/Kafka-style jobs without replacing the existing direct Stream Load checkpoint path.
 
 **Architecture:** Persist declarative pipeline contracts and append checkpoint reports from external realtime jobs. Evaluate health in canvas-engine using bounded lag, checkpoint age, failure state, and exactly-once evidence. This slice is a control plane and evidence layer; actual Flink/Kafka deployment is handled by later infrastructure work.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

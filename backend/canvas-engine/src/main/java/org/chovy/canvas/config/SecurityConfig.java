@@ -66,6 +66,7 @@ public class SecurityConfig {
     static final String[] DOCUMENTATION_ROUTES = {
             "/swagger-ui.html",
             "/swagger-ui/**",
+            "/v3/api-docs",
             "/v3/api-docs/**",
             "/webjars/**"
     };
@@ -78,7 +79,10 @@ public class SecurityConfig {
     /** 主安全过滤链。 */
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
-            ServerHttpSecurity http, JwtAuthFilter jwtAuthFilter, InternalApiAuthFilter internalApiAuthFilter) {
+            ServerHttpSecurity http,
+            JwtAuthFilter jwtAuthFilter,
+            InternalApiAuthFilter internalApiAuthFilter,
+            Environment environment) {
 
         return http
                 // API 服务不依赖浏览器表单态，关闭有状态防护入口后统一走 JWT。
@@ -91,18 +95,23 @@ public class SecurityConfig {
                                 ErrorCode.AUTH_002, "未登录或 Token 已过期"))
                         .accessDeniedHandler((exchange, e) -> writeError(exchange, HttpStatus.FORBIDDEN,
                                 ErrorCode.AUTH_003, "无权限执行此操作")))
-                .authorizeExchange(ex -> ex
+                .authorizeExchange(ex -> {
+                    ServerHttpSecurity.AuthorizeExchangeSpec exchanges = ex
                         // 公开接口
                         .pathMatchers("/auth/login").permitAll()
                         .pathMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
-                        .pathMatchers(DOCUMENTATION_ROUTES).permitAll()
+                        ;
+                    if (publicDocumentationEnabled(environment)) {
+                        exchanges = exchanges.pathMatchers(DOCUMENTATION_ROUTES).permitAll();
+                    }
+                    exchanges
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
                         .pathMatchers(HttpMethod.POST, INTERNAL_OPEN_API_ROUTES).permitAll()
                         // CDP SDK ingestion is anonymous at the filter layer and validates write keys in controller.
                         .pathMatchers(HttpMethod.POST, "/cdp/events/track").permitAll()
-                        // OpenAPI：直调执行无需登录，但控制器必须校验 HMAC 签名。
+                        // OpenAPI：直调执行入口。
                         .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/*").permitAll()
-                        // OpenAPI：行为触发无需登录，但控制器必须校验 HMAC 签名。
+                        // OpenAPI：行为触发入口。
                         .pathMatchers(HttpMethod.POST, "/canvas/trigger/behavior").permitAll()
                         // WebSocket 使用一次性票据鉴权；票据接口本身仍要求登录。
                         .pathMatchers("/canvas/ws/notifications").permitAll()
@@ -113,6 +122,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/canvas/bi/embed/query/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/canvas/bi/embed/resources/dashboard").permitAll()
                         .pathMatchers(HttpMethod.POST, "/canvas/bi/embed/resources/dashboard/runtime-state").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/canvas/bi/embed/resources/portal").permitAll()
                         // Public marketing forms are anonymous lead-capture endpoints.
                         .pathMatchers(HttpMethod.GET, "/public/marketing-forms/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/public/marketing-forms/**").permitAll()
@@ -166,6 +176,95 @@ public class SecurityConfig {
                         .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
                         .pathMatchers("/canvas/tag-import-sources/**")
                         .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        // High-impact tenant control-plane writes require tenant-admin level access.
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/bi/permissions/resources",
+                                "/canvas/bi/permissions/rows",
+                                "/canvas/bi/permissions/columns",
+                                "/canvas/bi/permissions/requests/*/review")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.DELETE,
+                                "/canvas/bi/permissions/resources/*",
+                                "/canvas/bi/permissions/rows/*",
+                                "/canvas/bi/permissions/columns/*")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST, "/cdp/write-keys")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.DELETE, "/cdp/write-keys/*")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST, "/cdp/webhooks/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.PUT, "/cdp/webhooks/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.DELETE, "/cdp/webhooks/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST, "/warehouse/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/execution-requests/*/replay",
+                                "/canvas/execution-requests/replay")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST, "/ai/providers")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.PUT, "/ai/providers/*")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST, "/ai/providers/*/disable")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/channels/connectors/*/mode",
+                                "/channels/connectors/*/health-test",
+                                "/channels/connectors/fallback/validate")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/search-marketing/mutations/*/approve",
+                                "/canvas/search-marketing/mutations/*/execute",
+                                "/canvas/search-marketing/mutations/*/reconcile",
+                                "/canvas/search-marketing/sources/*/sync",
+                                "/canvas/search-marketing/sources/sync-due")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/creator-collaboration/mutations/*/approve",
+                                "/canvas/creator-collaboration/mutations/*/execute")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/programmatic-dsp/mutations/*/approve",
+                                "/canvas/programmatic-dsp/mutations/*/execute")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/marketing-monitoring/provider-credentials/**",
+                                "/canvas/marketing-monitoring/sources/*/webhook-secret/rotate",
+                                "/canvas/marketing-monitoring/sources/*/polling",
+                                "/canvas/marketing-monitoring/sources/*/poll")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/paid-media/audience-sync/destinations",
+                                "/canvas/paid-media/audience-sync/runs")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/loyalty/users/*/earn",
+                                "/canvas/loyalty/users/*/redeem")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/growth-activities",
+                                "/canvas/growth-activities/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/ab-experiments",
+                                "/canvas/ab-experiments/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.PUT, "/canvas/ab-experiments/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.DELETE, "/canvas/ab-experiments/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST,
+                                "/canvas/policies/consent",
+                                "/canvas/policies/suppression",
+                                "/canvas/policies/channel")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.POST, "/canvas/marketing-integrations/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        .pathMatchers(HttpMethod.DELETE, "/canvas/marketing-integrations/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
                         // 租户管理：rollout 期间 legacy ADMIN 与新 SUPER_ADMIN 都视为超级管理员。
                         .pathMatchers("/admin/tenants", "/admin/tenants/**")
                         .hasAnyRole(SUPER_ADMIN_ROUTE_ROLES)
@@ -174,14 +273,23 @@ public class SecurityConfig {
                         // 管理员接口
                         .pathMatchers("/admin/**").hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
                         // 其余接口需要登录
-                        .anyExchange().authenticated()
-                )
+                        .anyExchange().authenticated();
+                })
                 // JWT 过滤器必须位于认证阶段，先解析身份再进入后续授权判断。
                 .addFilterAt(internalApiAuthFilter, SecurityWebFiltersOrder.FIRST)
                 .addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }
 
+    /**
+     * 写入统一 JSON 安全错误响应。
+     *
+     * @param exchange 当前请求交换对象
+     * @param status HTTP 状态码
+     * @param errorCode 业务错误码
+     * @param message 错误消息
+     * @return 响应写入完成信号
+     */
     private static Mono<Void> writeError(
             org.springframework.web.server.ServerWebExchange exchange,
             HttpStatus status,
@@ -195,14 +303,26 @@ public class SecurityConfig {
         return response.writeWith(Mono.just(buffer));
     }
 
+    /**
+     * 获取当前 traceId，缺失时生成新的 UUID。
+     *
+     * @return traceId
+     */
     private static String currentTraceId() {
         return CorrelationIdWebFilter.currentTraceId()
                 .orElseGet(() -> UUID.randomUUID().toString());
     }
 
+    /**
+     * 将统一响应体序列化为 JSON 字节，序列化失败时返回手工兜底 JSON。
+     *
+     * @param body 统一响应体
+     * @return JSON 字节数组
+     */
     private static byte[] toJson(R<Void> body) {
         try {
             return OBJECT_MAPPER.writeValueAsBytes(body);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             String fallback = String.format(
                     "{\"code\":%d,\"errorCode\":\"%s\",\"message\":\"%s\",\"data\":null,\"traceId\":\"%s\"}",
@@ -214,10 +334,18 @@ public class SecurityConfig {
         }
     }
 
+    /**
+     * 判断当前环境是否允许公开 Swagger/OpenAPI 文档。
+     *
+     * @param environment Spring 环境配置
+     * @return true 表示非生产类环境允许访问文档
+     */
     static boolean publicDocumentationEnabled(Environment environment) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (environment == null) {
             return true;
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return Arrays.stream(environment.getActiveProfiles())
                 .map(profile -> profile == null ? "" : profile.trim().toLowerCase(java.util.Locale.ROOT))
                 .noneMatch(profile -> profile.equals("prod") || profile.equals("production") || profile.equals("staging"));

@@ -5,6 +5,8 @@ Sequence: 064
 Source: `docs/product-evolution/specs/p2-045-cdp-warehouse-audience-materialization-scheduler-and-rollback.md`, `docs/product-evolution/specs/p2-058-cdp-warehouse-scheduled-audience-availability-gate.md`, `docs/product-evolution/specs/p2-060-cdp-warehouse-consumer-availability-contracts.md`, `docs/product-evolution/specs/p2-061-cdp-warehouse-contract-gated-consumers.md`
 Implementation plan: `../plans/p2-064-cdp-warehouse-scheduled-audience-contract-gates-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Wire P2-060 consumer availability contracts into scheduled OLAP audience refreshes so each due audience is evaluated against its own table, dataset, or metric dependencies before materialization starts.

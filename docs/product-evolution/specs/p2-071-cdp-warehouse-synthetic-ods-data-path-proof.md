@@ -5,6 +5,8 @@ Sequence: 071
 Source: `docs/product-evolution/specs/p2-022-cdp-warehouse-ingestion-and-aggregation.md`, `docs/product-evolution/specs/p2-066-cdp-warehouse-physical-e2e-certification.md`, `docs/product-evolution/specs/p2-069-cdp-warehouse-realtime-physical-e2e-certification.md`
 Implementation plan: `../plans/p2-071-cdp-warehouse-synthetic-ods-data-path-proof-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a tenant-scoped synthetic ODS data-path proof that writes one reserved CDP event through an explicit source mode, reads it back from Doris ODS through JDBC, and persists the proof as auditable warehouse evidence.

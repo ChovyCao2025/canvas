@@ -4,6 +4,15 @@ Priority: P2
 Sequence: 019
 Source: `docs/optimization/todo/2026-05-31-ai-capability-roadmap.md`, `docs/optimization/todo/competitor-analysis-report.md`, `docs/superpowers/specs/todo/2026-05-30-ai-llm-node-design.md`
 Implementation plan: `../plans/p2-019-ai-llm-node-productionization-plan.md`
+Status: Closed in branch `p2-019-ai-llm-production` as of 2026-06-09.
+
+## Closure Evidence
+
+- Provider, model, prompt template, and usage audit runtime paths use the durable `ai_provider`, `ai_model_registry`, `ai_prompt_template`, and `ai_usage_audit` tables through MyBatis data objects and mappers.
+- Provider API keys are encrypted with `SecretCipher`, masked in API responses, and decrypted only for internal LLM calls.
+- OpenAI-compatible calls send bearer authorization, support custom OpenAI-compatible providers, and continue to audit success/fallback outcomes.
+- `AI_LLM` supports safe runtime overrides for `maxTokens` and `schemaOverride`; registry metadata is updated by `V360__ai_llm_registry_safe_overrides.sql`.
+- Focused backend and frontend verification commands are recorded in the implementation plan.
 
 ## Goal
 
@@ -74,7 +83,8 @@ Operators can use AI as an assistive data-producing step without pretending the 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V114__ai_llm_node_productionization.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V164__ai_llm_node_productionization.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V360__ai_llm_registry_safe_overrides.sql`
 - `backend/canvas-engine/src/main/resources/application.yml`
 
 ### Test Touchpoints

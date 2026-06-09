@@ -161,39 +161,39 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     private Counter loaderFailures;
 
     /**
-     * 构造 TieredCacheImpl 实例，并根据入参初始化依赖、配置或内部状态。
+     * 创建完整的分层缓存实现。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>构造阶段会初始化 Caffeine L1、Redis L2/L3 加载链路、失效版本表、响应式视图和可选 Micrometer 指标。
      *
-     * @param name name 方法执行所需的业务参数
-     * @param l1MaxSize l1MaxSize 数量、阈值或分页参数
-     * @param l1RefreshAfterWrite l1RefreshAfterWrite 方法执行所需的业务参数
-     * @param l2KeyPrefix l2KeyPrefix 对应的缓存键、配置键或业务键
-     * @param l2Ttl l2Ttl 时间、过期时间或持续时长参数
-     * @param l2TtlJitter l2TtlJitter 时间、过期时间或持续时长参数
-     * @param keySchemaVersion keySchemaVersion 对应的缓存键、配置键或业务键
-     * @param nullValueTtl nullValueTtl 待写入、比较或转换的业务值
-     * @param emptyValueTtl emptyValueTtl 待写入、比较或转换的业务值
-     * @param lockTtl lockTtl 时间、过期时间或持续时长参数
-     * @param refreshAhead refreshAhead 方法执行所需的业务参数
-     * @param staleTtl staleTtl 时间、过期时间或持续时长参数
-     * @param hotspotProtection hotspotProtection 方法执行所需的业务参数
-     * @param penetration penetration 方法执行所需的业务参数
-     * @param breakdown breakdown 方法执行所需的业务参数
-     * @param avalanche avalanche 方法执行所需的业务参数
-     * @param keyValidator keyValidator 对应的缓存键、配置键或业务键
-     * @param bloomFilter bloomFilter 方法执行所需的业务参数
-     * @param loaderFailure loaderFailure 方法执行所需的业务参数
-     * @param redisReadFailure redisReadFailure 方法执行所需的业务参数
-     * @param redisWriteFailure redisWriteFailure 方法执行所需的业务参数
-     * @param deserializeFailure deserializeFailure 方法执行所需的业务参数
-     * @param loader loader 方法执行所需的业务参数
-     * @param valueJavaType valueJavaType 待写入、比较或转换的业务值
-     * @param objectMapper objectMapper 方法执行所需的业务参数
-     * @param redis redis 方法执行所需的业务参数
-     * @param reactiveRedis reactiveRedis 方法执行所需的业务参数
-     * @param invalidationPublisher invalidationPublisher 方法执行所需的业务参数
-     * @param meterRegistry meterRegistry 方法执行所需的业务参数
+     * @param name 缓存实例名称
+     * @param l1MaxSize L1 本地缓存最大条目数
+     * @param l1RefreshAfterWrite L1 写入后的刷新间隔
+     * @param l2KeyPrefix L2 Redis key 前缀
+     * @param l2Ttl L2 正常值 TTL
+     * @param l2TtlJitter L2 TTL 抖动比例
+     * @param keySchemaVersion 缓存 key 结构版本
+     * @param nullValueTtl null 占位 TTL
+     * @param emptyValueTtl 空结果 TTL
+     * @param lockTtl Redis 分布式加载锁 TTL
+     * @param refreshAhead 提前刷新窗口
+     * @param staleTtl 旧值兜底可用时间
+     * @param hotspotProtection 是否启用热点 key 保护
+     * @param penetration 穿透保护策略
+     * @param breakdown 击穿保护策略
+     * @param avalanche 雪崩保护策略
+     * @param keyValidator 业务 key 校验器
+     * @param bloomFilter 布隆过滤器
+     * @param loaderFailure L3 加载失败策略
+     * @param redisReadFailure Redis 读取失败策略
+     * @param redisWriteFailure Redis 写入失败策略
+     * @param deserializeFailure L2 反序列化失败策略
+     * @param loader 默认 L3 加载器
+     * @param valueJavaType 缓存值反序列化类型
+     * @param objectMapper JSON 序列化组件
+     * @param redis 同步 Redis 模板
+     * @param reactiveRedis 响应式 Redis 模板
+     * @param invalidationPublisher 跨节点本地缓存失效发布器
+     * @param meterRegistry 指标注册表，为 null 时不注册 Micrometer 指标
      */
     TieredCacheImpl(String name,
                     int l1MaxSize,
@@ -255,16 +255,31 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 .maximumSize(l1MaxSize)
                 .expireAfter(new Expiry<K, Optional<V>>() {
                     @Override
+                    /**
+                     * 为新写入 L1 的值计算过期时间。
+                     *
+                     * <p>null/空结果使用短 TTL，正常业务值使用标准 L1 TTL，避免穿透占位长期占用本地缓存。
+                     */
                     public long expireAfterCreate(K key, Optional<V> value, long currentTime) {
                         return l1TtlNanos(value);
                     }
 
                     @Override
+                    /**
+                     * 为 L1 已存在 key 的新值重新计算过期时间。
+                     *
+                     * <p>更新后的空值占位仍保持短 TTL，正常值继续沿用标准 L1 TTL。
+                     */
                     public long expireAfterUpdate(K key, Optional<V> value, long currentTime, long currentDuration) {
                         return l1TtlNanos(value);
                     }
 
                     @Override
+                    /**
+                     * 读取 L1 时保持当前剩余过期时间不变。
+                     *
+                     * <p>缓存命中不会被延长 TTL，避免热点 key 在本地无限续期后绕过跨节点失效版本检查。
+                     */
                     public long expireAfterRead(K key, Optional<V> value, long currentTime, long currentDuration) {
                         return currentDuration;
                     }
@@ -279,11 +294,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 返回 TieredCacheImpl 的 name 配置值。
+     * 返回缓存实例名称。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该名称用于指标标签、失效事件路由和 Redis key 命名。
      *
-     * @return 转换或查询得到的字符串结果
+     * @return 缓存实例名称
      */
     @Override
     public String name() {
@@ -291,12 +306,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 get 相关的业务数据。
+     * 按 L1、L2、L3 顺序读取缓存值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>先做穿透保护和本地版本检查，L1 未命中后由 Caffeine loader 串联 Redis 和 L3 加载器。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @return 缓存值；业务不存在或空值占位命中时为空
      */
     @Override
     public Optional<V> get(K key) {
@@ -318,12 +333,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 get If Present 相关的业务数据。
+     * 只读取 L1/L2 中已经存在的缓存值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该方法不会触发 L3 加载器，适合调用方只想探测缓存状态的场景。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @return 已缓存的值；缓存未命中或空值占位命中时为空
      */
     @Override
     public Optional<V> getIfPresent(K key) {
@@ -342,13 +357,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 get 相关的业务数据。
+     * 使用本次调用提供的加载器读取缓存值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>L1/L2 命中时不会执行 {@code loaderOverride}；未命中时仍会应用击穿保护、Redis 回填和失败策略。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param loaderOverride loaderOverride 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @param loaderOverride 本次 L3 回源加载函数
+     * @return 缓存值；业务不存在或空值占位命中时为空
      */
     @Override
     public Optional<V> get(K key, Supplier<V> loaderOverride) {
@@ -369,12 +384,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 写入或记录 put 相关的业务数据。
+     * 主动写入单个缓存值到 L2 和 L1。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>Redis 写入成功后提升失效版本、更新 L1、保存 stale 兜底值，并广播跨节点本地缓存失效事件。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param value value 待写入、比较或转换的业务值
+     * @param key 业务缓存 key
+     * @param value 待缓存的业务值
      */
     @Override
     public void put(K key, V value) {
@@ -389,13 +404,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 get All 相关的业务数据。
+     * 批量读取缓存并对真正未命中的 key 批量回源。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>每个 key 都先走穿透保护、L1 和 L2；只有未命中的 key 会交给 {@code batchLoader} 并按策略写回两级缓存。
      *
-     * @param keys keys 对应的缓存键、配置键或业务键
-     * @param batchLoader batchLoader 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param keys 需要读取的业务缓存 key 集合
+     * @param batchLoader 未命中 key 的批量加载函数
+     * @return 每个 key 对应的缓存值
      */
     @Override
     public Map<K, Optional<V>> getAll(Collection<K> keys, Function<Collection<K>, Map<K, V>> batchLoader) {
@@ -426,6 +441,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             Map<K, V> loaded;
             try {
                 loaded = batchLoader.apply(List.copyOf(misses));
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception e) {
                 for (K key : misses) {
                     Optional<V> optional = handleLoaderFailure(key, staleFor(key), e);
@@ -450,11 +466,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 删除、清理或失效 invalidate 相关的业务数据。
+     * 失效单个 key 的 L1 和 L2 缓存。
      *
-     * <p>实现会通过持久化层读取或写入数据库记录。
+     * <p>先清理本节点 L1，再删除 Redis L2，并提升版本后广播失效，通知其他节点清理本地缓存。
      *
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param key 需要失效的业务缓存 key
      */
     @Override
     public void invalidate(K key) {
@@ -466,13 +482,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 safe Write 对应的业务逻辑。
+     * 执行业务写入并做延迟双删。
      *
-     * <p>实现会通过持久化层读取或写入数据库记录。
+     * <p>写入动作前先全局失效缓存，写入完成后立即或延迟再次失效，降低并发读写导致脏缓存回填的概率。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param writeAction writeAction 方法执行所需的业务参数
-     * @param delayMs delayMs 方法执行所需的业务参数
+     * @param key 需要保护一致性的业务缓存 key
+     * @param writeAction 实际写入数据库或下游系统的动作
+     * @param delayMs 第二次失效前等待的毫秒数
      */
     @Override
     public void safeWrite(K key, Runnable writeAction, long delayMs) {
@@ -485,6 +501,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
     }
 
+    /**
+     * 同时清理本地 L1、Redis L2 并广播版本化失效事件。
+     *
+     * @param key 需要全局失效的业务缓存 key
+     */
     private void invalidateEverywhere(K key) {
         invalidateLocal(key);
         deleteL2(key);
@@ -492,11 +513,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 更新或刷新 refresh 相关的业务数据。
+     * 强制重新加载并回填缓存。
      *
-     * <p>实现会通过持久化层读取或写入数据库记录。
+     * <p>先删除旧的 L1/L2，再通过 L3 加载器读取新值，最后写入 L1 并广播版本化失效事件。
      *
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param key 需要刷新的业务缓存 key
      */
     @Override
     public void refresh(K key) {
@@ -509,11 +530,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 as Reactive 对应的业务逻辑。
+     * 返回当前缓存的响应式视图。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>响应式视图复用同步缓存的 L1 状态、Redis key 规则、击穿保护和失败策略。
      *
-     * @return 方法执行后的业务结果
+     * @return 响应式缓存接口
      */
     @Override
     public ReactiveTieredCache<K, V> asReactive() {
@@ -521,11 +542,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 stats 对应的业务逻辑。
+     * 生成当前缓存的指标快照。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>快照读取 L1 估算大小和本地计数器，不会重置统计数据。
      *
-     * @return 方法执行后的业务结果
+     * @return 缓存运行指标快照
      */
     @Override
     public TieredCacheStats stats() {
@@ -542,11 +563,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 消费或监听 on Invalidate Broadcast 相关的业务数据。
+     * 处理其他节点广播过来的本地缓存失效事件。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该方法只按原始业务 key 清理本节点 L1 和本地版本，不删除 Redis，也不再次广播事件。
      *
-     * @param rawKey rawKey 对应的缓存键、配置键或业务键
+     * @param rawKey 需要失效的原始业务 key 字符串
      */
     void onInvalidateBroadcast(String rawKey) {
         l1.asMap().keySet().removeIf(key -> {
@@ -560,19 +581,29 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 构建、解析或转换 build Cache Loader 相关的业务数据。
+     * 构建 Caffeine LoadingCache 使用的加载器。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>load 串联 L2 Redis 和 L3 加载器；reload 优先重新读取 L2，只有 L2 未命中或按策略降级时才回源 L3。
      *
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @return L1 本地缓存加载器
      */
     private CacheLoader<K, Optional<V>> buildCacheLoader() {
         return new CacheLoader<>() {
+            /**
+             * L1 未命中时加载缓存值。
+             *
+             * <p>该方法先读取 L2，未命中后按击穿保护策略访问 L3，并把结果交由调用方写回 L1。
+             */
             @Override
             public Optional<V> load(K key) {
                 return loadFromL2ThenL3(key, () -> loader.apply(key));
             }
 
+            /**
+             * L1 refresh 时重新加载缓存值。
+             *
+             * <p>刷新优先相信 L2 的最新值；Redis 读取失败时按 redisReadFailure 决定快速失败或降级回源。
+             */
             @Override
             public Optional<V> reload(K key, Optional<V> oldValue) {
                 try {
@@ -586,6 +617,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                         rememberLocalVersion(key);
                         return value;
                     }
+                // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                 } catch (Exception e) {
                     if (redisReadFailure == RedisFailureStrategy.FAIL_FAST) {
                         throw asRuntime(e);
@@ -600,13 +632,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 load From L2 Then L3 相关的业务数据。
+     * 从 L2 读取，未命中时回源 L3。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该方法是 get 路径的核心分层链路，负责命中计数、击穿保护选择和本地版本记录。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param effectiveLoader effectiveLoader 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @param effectiveLoader 当前调用使用的 L3 加载函数
+     * @return 读取或加载得到的业务值
      */
     private Optional<V> loadFromL2ThenL3(K key, Supplier<V> effectiveLoader) {
         Optional<V> loaded;
@@ -624,13 +656,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 load With Single Flight 相关的业务数据。
+     * 在当前 JVM 内合并相同 key 的并发加载。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>第一个线程负责真实执行 loader，其余线程等待同一个 CompletableFuture，避免本机击穿。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param loaderCall loaderCall 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @param loaderCall 实际加载动作
+     * @return 合并后的加载结果
      */
     private Optional<V> loadWithSingleFlight(K key, Supplier<Optional<V>> loaderCall) {
         CompletableFuture<Optional<V>> created = new CompletableFuture<>();
@@ -643,6 +675,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             Optional<V> result = loaderCall.get();
             created.complete(result);
             return result;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             created.completeExceptionally(e);
             throw e;
@@ -652,18 +685,19 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 read L2 相关的业务数据。
+     * 读取 L2 Redis 缓存。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>Redis 读取失败时按 redisReadFailure 选择快速失败或返回未命中，后者会继续进入 L3。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param cacheInL1 cacheInL1 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param key 业务缓存 key
+     * @param cacheInL1 L2 命中后是否回填 L1
+     * @return L2 查找结果，区分“未命中”和“命中空值占位”
      */
     private L2Lookup<V> readL2(K key, boolean cacheInL1) {
         try {
             String json = redis.opsForValue().get(l2Key(key));
             return handleL2Json(key, json, cacheInL1);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             if (redisReadFailure == RedisFailureStrategy.FAIL_FAST) {
                 throw asRuntime(e);
@@ -674,14 +708,14 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 handle L2 Json 对应的业务逻辑。
+     * 解析 L2 Redis 返回的 JSON 或空值哨兵。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>命中正常值时反序列化并可回填 L1；命中 null 哨兵时返回空 Optional 并计入穿透命中。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param json json 方法执行所需的业务参数
-     * @param cacheInL1 cacheInL1 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param key 业务缓存 key
+     * @param json Redis 中读取到的原始字符串
+     * @param cacheInL1 是否将解析结果回填 L1
+     * @return L2 查找结果
      */
     private L2Lookup<V> handleL2Json(K key, String json, boolean cacheInL1) {
         if (json != null) {
@@ -709,21 +743,24 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         return new L2Lookup<>(false, Optional.empty());
     }
 
+    /**
+     * L2Lookup record.
+     * @param found 是否在二级缓存中读取到原始值.
+     * @param value 二级缓存反序列化后的业务值.
+     */
     private record L2Lookup<T>(
-            /** 是否在二级缓存中读取到原始值。 */
-            boolean found,
-            /** 二级缓存反序列化后的业务值。 */
-            Optional<T> value) {}
+        boolean found,
+        Optional<T> value) {}
 
     /**
-     * 查询或读取 load From L3 相关的业务数据。
+     * 调用 L3 加载器并写回 L2。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>加载成功后写 Redis 并记录 stale 兜底值；加载失败时按 loaderFailure 和 stale 策略决定抛出或返回兜底。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param staleValue staleValue 待写入、比较或转换的业务值
-     * @param effectiveLoader effectiveLoader 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @param staleValue 调用方传入的旧值兜底
+     * @param effectiveLoader 当前调用使用的 L3 加载函数
+     * @return L3 加载结果或失败策略返回值
      */
     private Optional<V> loadFromL3(K key, Optional<V> staleValue, Supplier<V> effectiveLoader) {
         try {
@@ -733,11 +770,22 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             writeL2(key, value);
             rememberStale(key, value);
             return Optional.ofNullable(value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             return handleLoaderFailure(key, staleValue, e);
         }
     }
 
+    /**
+     * 按配置处理 L3 加载失败。
+     *
+     * <p>单 key 和批量回源共用该策略，避免批量 loader 异常绕过 stale/empty 降级语义。
+     *
+     * @param key 业务缓存 key
+     * @param staleValue 调用方传入的旧值兜底
+     * @param e 原始加载异常
+     * @return 失败策略返回值
+     */
     private Optional<V> handleLoaderFailure(K key, Optional<V> staleValue, Exception e) {
         increment(loaderFailures);
         localLoaderFailures.increment();
@@ -754,14 +802,14 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 查询或读取 load From L3 With Lock 相关的业务数据。
+     * 使用 Redis 分布式锁保护 L3 加载。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>拿到锁的节点负责回源并回填 L2，未拿到锁的节点短暂等待 L2；等待失败后再按普通 L3 失败策略处理。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param staleValue staleValue 待写入、比较或转换的业务值
-     * @param effectiveLoader effectiveLoader 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @param staleValue 调用方传入的旧值兜底
+     * @param effectiveLoader 当前调用使用的 L3 加载函数
+     * @return L3 加载结果、等待到的 L2 值或失败策略返回值
      */
     private Optional<V> loadFromL3WithLock(K key, Optional<V> staleValue, Supplier<V> effectiveLoader) {
         String lockKey = "cache:lock:" + l2Key(key);
@@ -780,12 +828,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 release Owned Lock 对应的业务逻辑。
+     * 只释放当前线程持有的 Redis 分布式锁。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>通过 Lua 比较 token 后删除，避免误删其他节点在锁过期后重新获得的新锁。
      *
-     * @param lockKey lockKey 对应的缓存键、配置键或业务键
-     * @param token token 方法执行所需的业务参数
+     * @param lockKey Redis 锁 key
+     * @param token 当前加载请求生成的锁 token
      */
     private void releaseOwnedLock(String lockKey, String token) {
         String script = """
@@ -796,20 +844,21 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 """;
         try {
             redis.execute(RedisScript.of(script, Long.class), List.of(lockKey), token);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[TIERED_CACHE][{}] Redis lock release failed: {}", name, e.getMessage());
         }
     }
 
     /**
-     * 执行 wait And Retry L2 对应的业务逻辑。
+     * 等待持锁节点回填 L2 后重试读取。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>最多短暂轮询 Redis；等待期间读到值则直接返回，超时或异常时由当前请求回源 L3。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param staleValue staleValue 待写入、比较或转换的业务值
-     * @param effectiveLoader effectiveLoader 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @param staleValue 调用方传入的旧值兜底
+     * @param effectiveLoader 当前调用使用的 L3 加载函数
+     * @return 等待到的 L2 值或后续 L3 加载结果
      */
     private Optional<V> waitAndRetryL2(K key, Optional<V> staleValue, Supplier<V> effectiveLoader) {
         increment(hotspotWaits);
@@ -824,9 +873,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                     // 等待期间发现 L2 已由持锁实例回填，直接使用该值结束等待。
                     return Optional.ofNullable(deserializeWithFallback(key, json));
                 }
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception ignored) {
                 break;
             }
@@ -835,13 +886,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 写入或记录 write L2 相关的业务数据。
+     * 写入 L2 Redis 缓存。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>null 值按穿透策略写入空值哨兵，空集合按空结果 TTL 写入，正常值使用带抖动的 L2 TTL。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param value value 待写入、比较或转换的业务值
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param key 业务缓存 key
+     * @param value 待写入的业务值
+     * @return true 表示 Redis 写入成功或按策略无需写入
      */
     private boolean writeL2(K key, V value) {
         try {
@@ -849,12 +900,14 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 if (cacheNullValues()) {
                     redis.opsForValue().set(l2Key(key), NULL_SENTINEL, nullValueTtl);
                 }
+            // 根据前序判断结果进入后续条件分支。
             } else if (isEmptyValue(value) && cacheEmptyValues()) {
                 redis.opsForValue().set(l2Key(key), serialize(value), emptyValueTtl);
             } else {
                 redis.opsForValue().set(l2Key(key), serialize(value), actualL2Ttl());
             }
             return true;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             if (redisWriteFailure == RedisFailureStrategy.FAIL_FAST) {
                 throw asRuntime(e);
@@ -865,15 +918,16 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 删除、清理或失效 delete L2 相关的业务数据。
+     * 删除 L2 Redis 缓存。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>Redis 删除失败时按 redisWriteFailure 决定快速失败或记录告警后继续。
      *
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param key 需要删除的业务缓存 key
      */
     private void deleteL2(K key) {
         try {
             redis.delete(l2Key(key));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             if (redisWriteFailure == RedisFailureStrategy.FAIL_FAST) {
                 throw asRuntime(e);
@@ -883,12 +937,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 bump Invalidation Version 对应的业务逻辑。
+     * 提升指定 key 的失效版本号。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>版本号存放在 Redis 中，用于判断本节点 L1 是否落后；Redis 写失败时按策略快速失败或使用时间戳兜底。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 计算得到的数值结果
+     * @param key 业务缓存 key
+     * @return 新的失效版本号
      */
     private long bumpInvalidationVersion(K key) {
         try {
@@ -896,6 +950,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             Long version = redis.opsForValue().increment(versionKey);
             redis.expire(versionKey, invalidationVersionTtl());
             return version != null ? version : System.currentTimeMillis();
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             if (redisWriteFailure == RedisFailureStrategy.FAIL_FAST) {
                 throw asRuntime(e);
@@ -905,6 +960,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
     }
 
+    /**
+     * 计算失效版本键的 TTL，确保版本至少覆盖所有可能仍可读取旧值的缓存窗口。
+     *
+     * @return 失效版本 Redis 键过期时间
+     */
     private Duration invalidationVersionTtl() {
         Duration max = maxDuration(l2Ttl, staleTtl);
         max = maxDuration(max, nullValueTtl);
@@ -913,6 +973,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         return max.plus(Duration.ofHours(1));
     }
 
+    /**
+     * 在两个可空时间段中取较大值。
+     *
+     * @param first 第一个时间段
+     * @param second 第二个时间段
+     * @return 两者中的较大值，均为空时返回零时长
+     */
     private static Duration maxDuration(Duration first, Duration second) {
         if (first == null) return second == null ? Duration.ZERO : second;
         if (second == null) return first;
@@ -920,20 +987,22 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 current Invalidation Version 对应的业务逻辑。
+     * 读取指定 key 当前的失效版本号。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>版本缺失视为 0；版本值损坏或 Redis 读取降级时返回 null，调用方会避免信任本地 L1 版本。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 计算得到的数值结果
+     * @param key 业务缓存 key
+     * @return 当前失效版本号，无法可靠读取时为 null
      */
     private Long currentInvalidationVersion(K key) {
         try {
             String version = redis.opsForValue().get(invalidationVersionKey(key));
             return version == null || version.isBlank() ? 0L : Long.parseLong(version);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (NumberFormatException e) {
             log.warn("[TIERED_CACHE][{}] invalidation version is invalid key={}: {}", name, key, e.getMessage());
             return null;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             if (redisReadFailure == RedisFailureStrategy.FAIL_FAST) {
                 throw asRuntime(e);
@@ -944,12 +1013,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 fresh L1 If Present 对应的业务逻辑。
+     * 读取仍然新鲜的 L1 本地缓存值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>只有本地记录版本不低于 Redis 当前失效版本时才返回缓存；版本落后会立即清理本地值。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @return 新鲜的 L1 值；本地未命中或版本过期时返回 null
      */
     private Optional<V> freshL1IfPresent(K key) {
         Optional<V> cached = l1.getIfPresent(key);
@@ -966,12 +1035,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 写入或记录 put L1 With Current Version 相关的业务数据。
+     * 使用 Redis 当前失效版本写入 L1。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>当前版本不可读时仍写入 L1，但移除本地版本记录，后续读取不会把该值当作可靠新鲜值。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param value value 待写入、比较或转换的业务值
+     * @param key 业务缓存 key
+     * @param value 待写入 L1 的 Optional 值
      */
     private void putL1WithCurrentVersion(K key, Optional<V> value) {
         Long version = currentInvalidationVersion(key);
@@ -984,13 +1053,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 写入或记录 put L1 相关的业务数据。
+     * 写入 L1 并记录对应失效版本。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>版本记录用于后续 L1 命中时判断是否落后于跨节点失效事件。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param value value 待写入、比较或转换的业务值
-     * @param version version 方法执行所需的业务参数
+     * @param key 业务缓存 key
+     * @param value 待写入 L1 的 Optional 值
+     * @param version 写入时观察到的失效版本
      */
     private void putL1(K key, Optional<V> value, long version) {
         l1.put(key, value);
@@ -999,17 +1068,18 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 l1 Ttl Nanos 对应的业务逻辑。
+     * 计算 L1 的纳秒级 TTL。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>L1 正常值沿用 L2 TTL，null 和空结果使用各自短 TTL，避免穿透占位长期停留在本地。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 计算得到的数值结果
+     * @param value 待写入 L1 的 Optional 值
+     * @return Caffeine Expiry 需要的纳秒 TTL
      */
     private long l1TtlNanos(Optional<V> value) {
         Duration ttl;
         if (value == null || value.isEmpty()) {
             ttl = nullValueTtl;
+        // 根据前序判断结果进入后续条件分支。
         } else if (isEmptyValue(value.get())) {
             ttl = emptyValueTtl;
         } else {
@@ -1019,11 +1089,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 remember Local Version 对应的业务逻辑。
+     * 记录当前 key 的本地 L1 版本。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>Redis 版本可读时保存版本；不可读时移除本地版本，后续 L1 命中会被视为不可靠。
      *
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param key 业务缓存 key
      */
     private void rememberLocalVersion(K key) {
         Long version = currentInvalidationVersion(key);
@@ -1035,11 +1105,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 删除、清理或失效 invalidate Local 相关的业务数据。
+     * 清理本节点 L1 缓存和本地版本记录。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该方法不删除 Redis，也不发布跨节点事件，适合内部局部清理或广播消费。
      *
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param key 业务缓存 key
      */
     private void invalidateLocal(K key) {
         l1.invalidate(key);
@@ -1047,9 +1117,9 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 删除、清理或失效 cleanup Detached Local Versions 相关的业务数据。
+     * 清理已经没有 L1 条目的本地版本记录。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>版本表超过 L1 最大容量两倍时触发压缩，避免 Caffeine 淘汰后版本记录长期增长。
      */
     private void cleanupDetachedLocalVersions() {
         if (l1Versions.size() <= l1MaxSize * 2L) {
@@ -1059,12 +1129,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 发布或发送 publish Invalidate 相关的业务数据。
+     * 发布版本化缓存失效事件。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>事件携带 cacheName、rawKey 和版本号，由 manager 或外部通道传播给其他节点清理 L1。
      *
-     * @param rawKey rawKey 对应的缓存键、配置键或业务键
-     * @param version version 方法执行所需的业务参数
+     * @param rawKey 原始业务 key 字符串
+     * @param version 失效版本号
      */
     private void publishInvalidate(String rawKey, long version) {
         if (invalidationPublisher != null) {
@@ -1073,58 +1143,58 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 删除、清理或失效 invalidate Channel 相关的业务数据。
+     * 返回当前缓存的 Redis 失效频道名。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>频道名由缓存名称派生，用于同 Redis 集群内广播 L1 失效消息。
      *
-     * @return 转换或查询得到的字符串结果
+     * @return Redis Pub/Sub 失效频道名
      */
     String invalidateChannel() {
         return "tiered-cache:" + name + ":invalidate";
     }
 
     /**
-     * 执行 l2 Key 对应的业务逻辑。
+     * 生成 L2 Redis 数据 key。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>key 包含前缀、schema 版本和业务 key 字符串，便于版本升级时隔离旧缓存。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 转换或查询得到的字符串结果
+     * @param key 业务缓存 key
+     * @return Redis 数据 key
      */
     String l2Key(K key) {
         return l2KeyPrefix + "v" + keySchemaVersion + ":" + keyToString(key);
     }
 
     /**
-     * 执行 invalidation Version Key 对应的业务逻辑。
+     * 生成 Redis 失效版本 key。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>版本 key 与数据 key 使用同一 schema 版本，确保缓存规则升级后版本空间也同步隔离。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 转换或查询得到的字符串结果
+     * @param key 业务缓存 key
+     * @return Redis 失效版本 key
      */
     String invalidationVersionKey(K key) {
         return l2KeyPrefix + "v" + keySchemaVersion + ":__invalidate__:" + keyToString(key);
     }
 
     /**
-     * 执行 key To String 对应的业务逻辑。
+     * 将业务 key 转换为 Redis key 片段。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>当前实现使用 {@link String#valueOf(Object)}，调用方应保证业务 key 的字符串表达稳定。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 转换或查询得到的字符串结果
+     * @param key 业务缓存 key
+     * @return 业务 key 字符串
      */
     private String keyToString(K key) {
         return String.valueOf(key);
     }
 
     /**
-     * 执行 actual L2 Ttl 对应的业务逻辑。
+     * 计算本次写入 L2 的实际 TTL。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>开启 TTL 抖动时会在基础 TTL 上增加随机延迟，用于分散缓存过期时间。
      *
-     * @return 方法执行后的业务结果
+     * @return 实际 L2 TTL
      */
     private Duration actualL2Ttl() {
         if (l2TtlJitter <= 0 || !useTtlJitter()) {
@@ -1136,49 +1206,52 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 serialize 对应的业务逻辑。
+     * 将业务值序列化为 L2 JSON。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>序列化失败表示缓存值类型或 ObjectMapper 配置异常，会直接抛出以暴露配置问题。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 转换或查询得到的字符串结果
+     * @param value 待写入 Redis 的业务值
+     * @return JSON 字符串
      */
     private String serialize(V value) {
         try {
             return objectMapper.writeValueAsString(value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalStateException("Cache serialize failed", e);
         }
     }
 
     /**
-     * 执行 deserialize 对应的业务逻辑。
+     * 将 L2 JSON 反序列化为业务值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该方法用于明确要求成功解析的路径，失败时直接抛出运行时异常。
      *
-     * @param json json 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param json Redis 中保存的 JSON
+     * @return 业务值
      */
     private V deserialize(String json) {
         try {
             return objectMapper.readValue(json, valueJavaType);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalStateException("Cache deserialize failed", e);
         }
     }
 
     /**
-     * 执行 deserialize With Fallback 对应的业务逻辑。
+     * 反序列化 L2 JSON，并按策略处理失败。
      *
-     * <p>实现会通过持久化层读取或写入数据库记录。
+     * <p>配置为 THROW 时直接抛出；默认策略会删除损坏的 L2 数据并返回 null，让调用链路继续回源。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param json json 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param key 业务缓存 key
+     * @param json Redis 中保存的 JSON
+     * @return 业务值，解析失败且允许降级时为 null
      */
     private V deserializeWithFallback(K key, String json) {
         try {
             return objectMapper.readValue(json, valueJavaType);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             if (deserializeFailure == DeserializeFailureStrategy.THROW) {
                 throw new IllegalStateException("Cache deserialize failed", e);
@@ -1190,23 +1263,23 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 as Runtime 对应的业务逻辑。
+     * 将异常统一转换为 RuntimeException。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>已有运行时异常会原样返回，受检异常包装后用于缓存失败策略的快速失败路径。
      *
-     * @param e e 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param e 原始异常
+     * @return 运行时异常
      */
     private RuntimeException asRuntime(Exception e) {
         return e instanceof RuntimeException runtime ? runtime : new RuntimeException(e);
     }
 
     /**
-     * 注册、调度或初始化 register Metrics 相关的业务数据。
+     * 注册 Micrometer 缓存指标。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>指标按 cache name 和层级打标签，覆盖 L1/L2/L3 命中、未命中、加载耗时、穿透和热点等待等维度。
      *
-     * @param registry registry 方法执行所需的业务参数
+     * @param registry 指标注册表
      */
     private void registerMetrics(MeterRegistry registry) {
         Tags tags = Tags.of("cache", name);
@@ -1222,24 +1295,25 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 计算或统计 count Hit 相关的业务数据。
+     * 记录指定缓存层级的命中。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>同时更新 Micrometer counter 和本地 LongAdder，后者用于 stats 快照。
      *
-     * @param level level 方法执行所需的业务参数
+     * @param level 缓存层级，支持 L1、L2、L3
      */
     private void countHit(String level) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if ("L1".equals(level)) { increment(l1Hits); localL1Hits.increment(); }
         if ("L2".equals(level)) { increment(l2Hits); localL2Hits.increment(); }
         if ("L3".equals(level)) { increment(l3Hits); localL3Loads.increment(); }
     }
 
     /**
-     * 计算或统计 count Miss 相关的业务数据。
+     * 记录指定缓存层级的未命中。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>当前只统计 L1 和 L2 未命中，L3 通过加载命中计数表达回源次数。
      *
-     * @param level level 方法执行所需的业务参数
+     * @param level 缓存层级，支持 L1、L2
      */
     private void countMiss(String level) {
         if ("L1".equals(level)) { increment(l1Misses); localL1Misses.increment(); }
@@ -1247,11 +1321,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 increment 对应的业务逻辑。
+     * 安全递增可选 Micrometer counter。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>指标未启用时 counter 为 null，此方法会直接跳过。
      *
-     * @param counter counter 数量、阈值或分页参数
+     * @param counter 待递增的指标计数器
      */
     private void increment(Counter counter) {
         if (counter != null) {
@@ -1260,12 +1334,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 判断 is Rejected By Penetration Protection 相关的业务数据。
+     * 判断 key 是否应被穿透保护拦截。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>根据策略组合执行 keyValidator 和 bloomFilter，命中拦截时增加穿透拒绝计数并跳过 L2/L3。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param key 业务缓存 key
+     * @return true 表示本次请求应直接返回空结果
      */
     private boolean isRejectedByPenetrationProtection(K key) {
         boolean useValidator = penetration == PenetrationProtectionStrategy.KEY_VALIDATOR
@@ -1285,11 +1359,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 cache Null Values 对应的业务逻辑。
+     * 判断是否缓存 null 占位。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>由穿透保护策略决定，开启后 null 会写入 L2 哨兵并使用 nullValueTtl。
      *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @return true 表示缓存 null 占位
      */
     private boolean cacheNullValues() {
         return penetration == PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL
@@ -1298,11 +1372,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 cache Empty Values 对应的业务逻辑。
+     * 判断是否缓存空集合或空 Optional。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>由穿透保护策略决定，开启后空结果会使用 emptyValueTtl 写入 L2。
      *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @return true 表示缓存空结果
      */
     private boolean cacheEmptyValues() {
         return penetration == PenetrationProtectionStrategy.CACHE_EMPTY_SHORT_TTL
@@ -1310,11 +1384,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 use Local Single Flight 对应的业务逻辑。
+     * 判断是否启用本地 single-flight。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>开启后同一 JVM 内相同 key 的并发回源会合并为一次加载。
      *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @return true 表示启用本地并发合并
      */
     private boolean useLocalSingleFlight() {
         return breakdown == BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT
@@ -1323,11 +1397,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 use Distributed Lock 对应的业务逻辑。
+     * 判断是否启用 Redis 分布式加载锁。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>热点保护或分布式击穿策略开启时使用，用于收敛多节点同时回源。
      *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @return true 表示启用分布式加载锁
      */
     private boolean useDistributedLock() {
         return hotspotProtection
@@ -1337,11 +1411,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 use Stale On Error 对应的业务逻辑。
+     * 判断加载失败时是否允许返回旧值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>雪崩 stale 策略或 stale-while-revalidate 击穿策略开启时，本地 staleValues 可作为可用性兜底。
      *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @return true 表示允许旧值兜底
      */
     private boolean useStaleOnError() {
         return avalanche == AvalancheProtectionStrategy.STALE_ON_ERROR
@@ -1351,11 +1425,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 use Ttl Jitter 对应的业务逻辑。
+     * 判断是否启用 L2 TTL 抖动。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>TTL 抖动用于分散 Redis key 过期时间，降低缓存雪崩风险。
      *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @return true 表示写 L2 时应用 TTL 抖动
      */
     private boolean useTtlJitter() {
         return avalanche == AvalancheProtectionStrategy.TTL_JITTER
@@ -1363,12 +1437,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 判断 is Empty Value 相关的业务数据。
+     * 判断业务值是否为空结果。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>支持空 Collection、空 Map 和 Optional.empty，用于决定是否使用 emptyValueTtl。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param value 业务值
+     * @return true 表示业务值语义为空
      */
     private boolean isEmptyValue(V value) {
         return value instanceof Collection<?> collection && collection.isEmpty()
@@ -1377,12 +1451,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 remember Stale 对应的业务逻辑。
+     * 保存最近一次成功加载的旧值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>旧值用于加载器异常时兜底；同时把 key 登记到布隆过滤器，降低后续穿透误拦截。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param value value 待写入、比较或转换的业务值
+     * @param key 业务缓存 key
+     * @param value 最近一次成功加载的非 null 值
      */
     private void rememberStale(K key, V value) {
         if (value != null) {
@@ -1394,12 +1468,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * 执行 stale For 对应的业务逻辑。
+     * 获取仍在可用窗口内的旧值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>超过 staleTtl 的旧值会被移除并视为不可用，避免长期返回过期数据。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param key 业务缓存 key
+     * @return 可用旧值
      */
     private Optional<V> staleFor(K key) {
         StaleValue<V> stale = staleValues.get(key);
@@ -1446,6 +1520,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                         : loadFromL3(key, staleFor(key), () -> loader.apply(key)));
                 putL1WithCurrentVersion(key, refreshed);
                 marker.complete(refreshed);
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException e) {
                 marker.completeExceptionally(e);
                 log.warn("[TIERED_CACHE][{}] refreshAhead failed key={}: {}", name, key, e.getMessage());
@@ -1455,38 +1530,45 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         });
     }
 
+    /**
+     * StaleValue record.
+     * @param value 可用于异常兜底或提前刷新的旧值.
+     * @param createdAt 旧值写入本地兜底区的时间.
+     */
     private record StaleValue<T>(
-            /** 可用于异常兜底或提前刷新的旧值。 */
-            T value,
-            /** 旧值写入本地兜底区的时间。 */
-            Instant createdAt) {}
+        T value,
+        Instant createdAt) {}
 
+    /**
+     * ReactiveTieredCacheView 封装本模块的核心职责、输入输出结构和协作边界。
+     */
     private static class ReactiveTieredCacheView<K, V> implements ReactiveTieredCache<K, V> {
         /** 被包装为响应式接口的同步缓存实现。 */
         private final TieredCacheImpl<K, V> delegate;
 
         /**
-         * 构造 ReactiveTieredCacheView 实例，并根据入参初始化依赖、配置或内部状态。
+         * 创建同步缓存的响应式包装视图。
          *
-         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         * <p>包装视图共享 delegate 的 L1 状态、Redis key 规则和失败策略，不维护独立缓存副本。
          *
-         * @param delegate delegate 方法执行所需的业务参数
+         * @param delegate 被包装的分层缓存实现
          */
         ReactiveTieredCacheView(TieredCacheImpl<K, V> delegate) {
             this.delegate = delegate;
         }
 
         /**
-         * 查询或读取 get 相关的业务数据。
+         * 响应式读取单个 key。
          *
-         * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+         * <p>先同步检查 L1；存在 reactive Redis 时异步读取 L2，未配置时退到 boundedElastic 执行同步 get。
          *
-         * @param key key 对应的缓存键、配置键或业务键
-         * @return 异步执行结果，订阅后产生节点结果或业务响应
+         * @param key 业务缓存 key
+         * @return 订阅后产生的缓存读取结果
          */
         @Override
         public Mono<Optional<V>> get(K key) {
             Optional<V> cached = delegate.freshL1IfPresent(key);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (cached != null) {
                 delegate.countHit("L1");
                 return Mono.just(cached);
@@ -1500,8 +1582,10 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 return Mono.fromCallable(() -> delegate.get(key)).subscribeOn(Schedulers.boundedElastic());
             }
             return redisGet
+                    // 遍历候选数据并按业务规则筛选、转换或聚合。
                     .flatMap(json -> {
                         L2Lookup<V> l2Value = delegate.handleL2Json(key, json, true);
+                        // 汇总前面计算出的状态和明细，返回给调用方。
                         return Mono.just(l2Value.value());
                     })
                     .switchIfEmpty(Mono.fromCallable(() -> delegate.hotspotProtection
@@ -1511,16 +1595,17 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
 
         /**
-         * 查询或读取 get If Present 相关的业务数据。
+         * 响应式读取已存在的缓存值。
          *
-         * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+         * <p>该路径不触发 L3 加载器；未配置 reactive Redis 时退到 boundedElastic 执行同步 getIfPresent。
          *
-         * @param key key 对应的缓存键、配置键或业务键
-         * @return 异步执行结果，订阅后产生节点结果或业务响应
+         * @param key 业务缓存 key
+         * @return 订阅后产生的已缓存值
          */
         @Override
         public Mono<Optional<V>> getIfPresent(K key) {
             Optional<V> cached = delegate.freshL1IfPresent(key);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (cached != null) {
                 delegate.countHit("L1");
                 return Mono.just(cached);
@@ -1533,19 +1618,21 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             if (redisGet == null) {
                 return Mono.fromCallable(() -> delegate.getIfPresent(key)).subscribeOn(Schedulers.boundedElastic());
             }
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             return redisGet
+                    // 遍历候选数据并按业务规则筛选、转换或聚合。
                     .map(json -> delegate.handleL2Json(key, json, true).value())
                     .defaultIfEmpty(Optional.empty());
         }
 
         /**
-         * 写入或记录 put 相关的业务数据。
+         * 响应式写入缓存值。
          *
-         * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+         * <p>写入复用同步 put 的 L1/L2 更新和失效广播语义，并放到 boundedElastic 避免阻塞响应式调用线程。
          *
-         * @param key key 对应的缓存键、配置键或业务键
-         * @param value value 待写入、比较或转换的业务值
-         * @return 异步执行结果，订阅后产生节点结果或业务响应
+         * @param key 业务缓存 key
+         * @param value 待缓存的业务值
+         * @return 写入完成信号
          */
         @Override
         public Mono<Void> put(K key, V value) {
@@ -1553,12 +1640,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
 
         /**
-         * 删除、清理或失效 invalidate 相关的业务数据。
+         * 响应式失效缓存 key。
          *
-         * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+         * <p>失效复用同步 invalidate 的本地清理、Redis 删除和跨节点广播，并放到 boundedElastic 执行。
          *
-         * @param key key 对应的缓存键、配置键或业务键
-         * @return 异步执行结果，订阅后产生节点结果或业务响应
+         * @param key 需要失效的业务缓存 key
+         * @return 失效完成信号
          */
         @Override
         public Mono<Void> invalidate(K key) {
@@ -1566,12 +1653,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
 
         /**
-         * 更新或刷新 refresh 相关的业务数据。
+         * 响应式刷新缓存 key。
          *
-         * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+         * <p>刷新复用同步 refresh 的删除旧值、回源加载和广播逻辑，并放到 boundedElastic 执行。
          *
-         * @param key key 对应的缓存键、配置键或业务键
-         * @return 异步执行结果，订阅后产生节点结果或业务响应
+         * @param key 需要刷新的业务缓存 key
+         * @return 刷新完成信号
          */
         @Override
         public Mono<Void> refresh(K key) {

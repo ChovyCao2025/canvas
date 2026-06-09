@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Locale;
 
 @Service
+/**
+ * AudienceMaterializationOperationsService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class AudienceMaterializationOperationsService {
 
     private static final int MAX_LIMIT = 100;
@@ -30,6 +33,12 @@ public class AudienceMaterializationOperationsService {
     private final CdpWarehouseAvailabilityService availabilityService;
     private final CdpWarehouseConsumerAvailabilityService consumerAvailabilityService;
 
+    /**
+     * 初始化 AudienceMaterializationOperationsService 实例。
+     *
+     * @param materializationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public AudienceMaterializationOperationsService(AudienceMaterializationService materializationService,
                                                     AudienceMaterializationRunMapper runMapper) {
         this(materializationService, runMapper, null, null,
@@ -37,6 +46,14 @@ public class AudienceMaterializationOperationsService {
                 (CdpWarehouseConsumerAvailabilityService) null);
     }
 
+    /**
+     * 初始化 AudienceMaterializationOperationsService 实例。
+     *
+     * @param materializationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bitmapStore bitmap store 参数，用于 AudienceMaterializationOperationsService 流程中的校验、计算或对象转换。
+     * @param rollbackMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public AudienceMaterializationOperationsService(AudienceMaterializationService materializationService,
                                                     AudienceMaterializationRunMapper runMapper,
                                                     VersionedAudienceBitmapStore bitmapStore,
@@ -47,6 +64,16 @@ public class AudienceMaterializationOperationsService {
     }
 
     @Autowired
+    /**
+     * 初始化 AudienceMaterializationOperationsService 实例。
+     *
+     * @param materializationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bitmapStore bitmap store 参数，用于 AudienceMaterializationOperationsService 流程中的校验、计算或对象转换。
+     * @param rollbackMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param availabilityServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param consumerAvailabilityServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public AudienceMaterializationOperationsService(AudienceMaterializationService materializationService,
                                                     AudienceMaterializationRunMapper runMapper,
                                                     VersionedAudienceBitmapStore bitmapStore,
@@ -65,6 +92,15 @@ public class AudienceMaterializationOperationsService {
                         : consumerAvailabilityServiceProvider.getIfAvailable());
     }
 
+    /**
+     * 初始化 AudienceMaterializationOperationsService 实例。
+     *
+     * @param materializationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bitmapStore bitmap store 参数，用于 AudienceMaterializationOperationsService 流程中的校验、计算或对象转换。
+     * @param rollbackMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param availabilityService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     AudienceMaterializationOperationsService(AudienceMaterializationService materializationService,
                                              AudienceMaterializationRunMapper runMapper,
                                              VersionedAudienceBitmapStore bitmapStore,
@@ -73,6 +109,16 @@ public class AudienceMaterializationOperationsService {
         this(materializationService, runMapper, bitmapStore, rollbackMapper, availabilityService, null);
     }
 
+    /**
+     * 初始化 AudienceMaterializationOperationsService 实例。
+     *
+     * @param materializationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bitmapStore bitmap store 参数，用于 AudienceMaterializationOperationsService 流程中的校验、计算或对象转换。
+     * @param rollbackMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param availabilityService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param consumerAvailabilityService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     AudienceMaterializationOperationsService(AudienceMaterializationService materializationService,
                                              AudienceMaterializationRunMapper runMapper,
                                              VersionedAudienceBitmapStore bitmapStore,
@@ -87,6 +133,14 @@ public class AudienceMaterializationOperationsService {
         this.consumerAvailabilityService = consumerAvailabilityService;
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param audienceId 业务对象 ID，用于定位具体记录。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 materialize 流程生成的业务结果。
+     */
     public AudienceMaterializationService.MaterializationResult materialize(Long tenantId,
                                                                            Long audienceId,
                                                                            String operator) {
@@ -96,6 +150,18 @@ public class AudienceMaterializationOperationsService {
         return materializationService.materialize(normalizeTenant(tenantId), audienceId, normalizeOperator(operator));
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param audienceId 业务对象 ID，用于定位具体记录。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @param mode mode 参数，用于 materializeWithAvailabilityGate 流程中的校验、计算或对象转换。
+     * @param allowWarn allow warn 参数，用于 materializeWithAvailabilityGate 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 materializeWithAvailabilityGate 流程生成的业务结果。
+     */
     public GatedMaterializationResult materializeWithAvailabilityGate(Long tenantId,
                                                                       Long audienceId,
                                                                       LocalDateTime from,
@@ -103,6 +169,7 @@ public class AudienceMaterializationOperationsService {
                                                                       String mode,
                                                                       boolean allowWarn,
                                                                       String operator) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (audienceId == null || audienceId <= 0) {
             throw new IllegalArgumentException("audienceId must be positive");
         }
@@ -136,6 +203,7 @@ public class AudienceMaterializationOperationsService {
         String reason = "WARN".equalsIgnoreCase(availabilityStatus)
                 ? "warehouse availability WARN accepted by operator"
                 : "warehouse availability PASS";
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new GatedMaterializationResult(
                 scopedTenantId,
                 audienceId,
@@ -145,6 +213,17 @@ public class AudienceMaterializationOperationsService {
                 materialization);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param audienceId 业务对象 ID，用于定位具体记录。
+     * @param contractKey 业务键，用于在同一租户下定位资源。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 materializeWithConsumerAvailabilityContract 流程生成的业务结果。
+     */
     public ContractGatedMaterializationResult materializeWithConsumerAvailabilityContract(
             Long tenantId,
             Long audienceId,
@@ -152,6 +231,7 @@ public class AudienceMaterializationOperationsService {
             LocalDateTime from,
             LocalDateTime to,
             String operator) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (audienceId == null || audienceId <= 0) {
             throw new IllegalArgumentException("audienceId must be positive");
         }
@@ -178,6 +258,7 @@ public class AudienceMaterializationOperationsService {
         }
         AudienceMaterializationService.MaterializationResult materialization =
                 materializationService.materialize(scopedTenantId, audienceId, normalizeOperator(operator));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ContractGatedMaterializationResult(
                 scopedTenantId,
                 audienceId,
@@ -188,12 +269,23 @@ public class AudienceMaterializationOperationsService {
                 materialization);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param audienceId 业务对象 ID，用于定位具体记录。
+     * @param targetVersion target version 参数，用于 rollback 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @return 返回 rollback 流程生成的业务结果。
+     */
     public RollbackView rollback(Long tenantId,
                                  Long audienceId,
                                  Long targetVersion,
                                  String operator,
                                  String reason) {
         Long scopedTenantId = normalizeTenant(tenantId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (audienceId == null || audienceId <= 0) {
             throw new IllegalArgumentException("audienceId must be positive");
         }
@@ -223,8 +315,10 @@ public class AudienceMaterializationOperationsService {
         row.setReason(normalizedReason);
         row.setOperator(normalizedOperator);
         row.setCreatedAt(createdAt);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         rollbackMapper.insert(row);
 
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new RollbackView(
                 row.getId(),
                 scopedTenantId,
@@ -238,6 +332,15 @@ public class AudienceMaterializationOperationsService {
                 createdAt);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param audienceId 业务对象 ID，用于定位具体记录。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<RunView> recentRuns(Long tenantId, Long audienceId, String status, int limit) {
         LambdaQueryWrapper<AudienceMaterializationRunDO> query =
                 new LambdaQueryWrapper<AudienceMaterializationRunDO>()
@@ -245,16 +348,25 @@ public class AudienceMaterializationOperationsService {
                         .orderByDesc(AudienceMaterializationRunDO::getStartedAt)
                         .orderByDesc(AudienceMaterializationRunDO::getId)
                         .last("LIMIT " + boundLimit(limit));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (audienceId != null) {
             query.eq(AudienceMaterializationRunDO::getAudienceId, audienceId);
         }
         if (hasText(status)) {
             query.eq(AudienceMaterializationRunDO::getStatus, status.trim().toUpperCase(Locale.ROOT));
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<AudienceMaterializationRunDO> rows = runMapper.selectList(query);
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return rows == null ? List.of() : rows.stream().map(this::toView).toList();
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private RunView toView(AudienceMaterializationRunDO row) {
         return new RunView(
                 row.getId(),
@@ -270,14 +382,32 @@ public class AudienceMaterializationOperationsService {
                 row.getCreatedBy());
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOperator(String operator) {
         return hasText(operator) ? operator.trim() : DEFAULT_OPERATOR;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundLimit(int limit) {
         if (limit <= 0) {
             return 20;
@@ -285,14 +415,32 @@ public class AudienceMaterializationOperationsService {
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 null to zero 计算得到的数量、金额或指标值。
+     */
     private long nullToZero(Long value) {
         return value == null ? 0L : value;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String limitReason(String reason) {
         String value = reason.trim();
         if (value.length() <= MAX_REASON_LENGTH) {
@@ -301,6 +449,9 @@ public class AudienceMaterializationOperationsService {
         return value.substring(0, MAX_REASON_LENGTH);
     }
 
+    /**
+     * RollbackView 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record RollbackView(
             Long id,
             Long tenantId,
@@ -314,6 +465,9 @@ public class AudienceMaterializationOperationsService {
             LocalDateTime createdAt) {
     }
 
+    /**
+     * RunView 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record RunView(
             Long id,
             Long tenantId,
@@ -328,6 +482,9 @@ public class AudienceMaterializationOperationsService {
             String createdBy) {
     }
 
+    /**
+     * GatedMaterializationResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record GatedMaterializationResult(
             Long tenantId,
             Long audienceId,
@@ -337,6 +494,9 @@ public class AudienceMaterializationOperationsService {
             AudienceMaterializationService.MaterializationResult materialization) {
     }
 
+    /**
+     * ContractGatedMaterializationResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ContractGatedMaterializationResult(
             Long tenantId,
             Long audienceId,

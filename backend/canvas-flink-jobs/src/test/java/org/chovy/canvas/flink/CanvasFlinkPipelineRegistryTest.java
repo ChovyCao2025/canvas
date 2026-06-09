@@ -23,7 +23,9 @@ class CanvasFlinkPipelineRegistryTest {
                         "sql/doris_ods_cdp_event_to_dwd_fact.sql")
                 .containsEntry("doris_dwd_user_fact_to_dws_metric_daily",
                         "sql/doris_dwd_user_fact_to_dws_metric_daily.sql")
-                .hasSize(4);
+                .containsEntry("risk_realtime_features",
+                        "sql/risk_realtime_features.sql")
+                .hasSize(5);
     }
 
     @Test
@@ -39,7 +41,8 @@ class CanvasFlinkPipelineRegistryTest {
                 "mysql_cdp_event_log_to_doris_ods", "canvas_ods.cdp_event_log",
                 "mysql_canvas_trace_to_doris_ods", "canvas_ods.canvas_execution_trace",
                 "doris_ods_cdp_event_to_dwd_fact", "canvas_dwd.cdp_user_event_fact",
-                "doris_dwd_user_fact_to_dws_metric_daily", "canvas_dws.user_event_metric_daily");
+                "doris_dwd_user_fact_to_dws_metric_daily", "canvas_dws.user_event_metric_daily",
+                "risk_realtime_features", "canvas_dws.risk_realtime_feature_snapshot");
 
         for (Map.Entry<String, String> entry : CanvasFlinkPipelineRegistry.all().entrySet()) {
             String sql = readResource(entry.getValue());

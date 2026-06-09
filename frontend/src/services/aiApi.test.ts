@@ -48,6 +48,7 @@ describe('aiApi', () => {
     await api.disableAiProvider(7)
     await api.listAiPromptTemplates()
     await api.saveAiPromptTemplate(templatePayload)
+    await api.saveAiPromptTemplate(templatePayload, 9)
     await api.disableAiPromptTemplate(9)
 
     expect(http.get).toHaveBeenCalledWith('/ai/providers')
@@ -56,6 +57,7 @@ describe('aiApi', () => {
     expect(http.post).toHaveBeenCalledWith('/ai/providers/7/disable')
     expect(http.get).toHaveBeenCalledWith('/ai/prompt-templates')
     expect(http.post).toHaveBeenCalledWith('/ai/prompt-templates', templatePayload)
+    expect(http.put).toHaveBeenCalledWith('/ai/prompt-templates/9', templatePayload)
     expect(http.post).toHaveBeenCalledWith('/ai/prompt-templates/9/disable')
   })
 })

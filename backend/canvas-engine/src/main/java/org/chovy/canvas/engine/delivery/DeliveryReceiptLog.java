@@ -5,6 +5,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * DeliveryReceiptLog 参与 engine.delivery 场景的画布执行引擎处理。
+ */
 @Data
 @Builder
 public class DeliveryReceiptLog {

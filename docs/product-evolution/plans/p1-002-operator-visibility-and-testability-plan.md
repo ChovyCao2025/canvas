@@ -11,6 +11,7 @@
 ## Implementation Status
 
 - Status: implemented and focused-verified on 2026-06-05.
+- Full module regression status: not recorded as run/passing in this plan; see Verification Evidence for focused coverage.
 - Actual migration: `backend/canvas-engine/src/main/resources/db/migration/V250__operator_visibility_and_testability.sql`; `V95` and `V249` were already occupied in the migration sequence.
 - Commit status: not committed in this session because the worktree contains many unrelated and parallel product-evolution changes that need scope confirmation before staging.
 
@@ -625,7 +626,7 @@ cd frontend && npm test -- dryRunVisualization.test.ts operatorTables.test.ts
 
 Expected: PASS for the P1-002 frontend helpers.
 
-- [ ] **Step 3: Run module regressions**
+**Residual verification gap: Module regressions were not recorded as run/passing**
 
 Run:
 
@@ -633,7 +634,7 @@ Run:
 cd backend && mvn -pl canvas-engine test && cd ../frontend && npm test && npm run build
 ```
 
-Expected: PASS for backend tests, frontend tests, and production build.
+Expected before production signoff: PASS for backend tests, frontend tests, and production build.
 
 - [x] **Step 4: Add rollout notes to the implementation PR**
 
@@ -673,7 +674,8 @@ cd frontend && npm run build
 
 Result: passed.
 
-- [ ] **Step 5: Commit the implementation slice**
+- [x] **Step 5: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

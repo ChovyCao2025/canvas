@@ -24,7 +24,10 @@ public class EventDefinitionCacheService {
     /** 事件定义 Mapper，用于查询发布态事件元数据。 */
     private final EventDefinitionMapper eventMapper;
 
-    /** 按事件编码读取发布态事件定义，并使用两级缓存保护高频触发查询。 */
+    /**
+     * 按事件编码读取发布态事件定义，并使用两级缓存保护高频触发查询。
+     * 返回 null 会短期缓存，用于防穿透；发布态事件更新后需调用失效方法清理缓存。
+     */
     @TieredCached(
             name = "event-definition-published",
             key = "#eventCode",
@@ -37,6 +40,10 @@ public class EventDefinitionCacheService {
             penetration = PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL,
             breakdown = BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT,
             avalanche = AvalancheProtectionStrategy.TTL_JITTER)
+    /**
+     * 执行发布态事件定义的实际查询。
+     * 缓存注解会处理空值短期缓存、单飞和 TTL 抖动，返回值供触发器运行时解析事件元数据。
+     */
     public EventDefinitionDO getPublishedByCode(String eventCode) {
         return eventMapper.selectOne(new LambdaQueryWrapper<EventDefinitionDO>()
                 .eq(EventDefinitionDO::getEventCode, eventCode)

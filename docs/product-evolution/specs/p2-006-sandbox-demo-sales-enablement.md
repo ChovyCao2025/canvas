@@ -66,7 +66,7 @@ This converts a filtered opportunity into a bounded medium-term implementation c
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05.
 
 - Added `V269__sandbox_demo_sales_enablement.sql` for sandbox lifecycle rows, `DEMO_TENANT_*` markers, expiry metadata, reset audit fields, and cleanup indexes. The plan originally named `V165`, but the current workspace already uses later migration versions through `V268`.
 - Added `DemoSandboxService` and `JdbcDemoSandboxRepository` for install, reset, and expired-sandbox lookup with bounded TTL validation.

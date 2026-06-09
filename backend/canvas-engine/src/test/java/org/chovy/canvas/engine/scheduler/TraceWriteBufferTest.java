@@ -71,6 +71,38 @@ class TraceWriteBufferTest {
         assertThat(buffer.pendingCount()).isZero();
     }
 
+    @Test
+    void exposesAsyncWriterPressureMetrics() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper, null, 1, 1);
+
+        buffer.offer(trace("exec-4", "node-1"));
+        buffer.offer(trace("exec-4", "node-2"));
+        assertThat(buffer.metrics().droppedCount()).isEqualTo(1);
+        assertThat(buffer.metrics().pendingCount()).isEqualTo(1);
+
+        buffer.flush();
+
+        assertThat(buffer.metrics().writtenCount()).isEqualTo(1);
+        assertThat(buffer.metrics().failedCount()).isZero();
+        assertThat(buffer.metrics().pendingCount()).isZero();
+        assertThat(buffer.metrics().lastFlushDurationMs()).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void countsMysqlWriteFailuresWithoutBlockingExecution() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        doThrow(new IllegalStateException("mysql unavailable")).when(mapper).insertBatch(anyList());
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper, null, 10, 1);
+
+        buffer.offer(trace("exec-5", "node-1"));
+        buffer.flush();
+
+        assertThat(buffer.metrics().writtenCount()).isZero();
+        assertThat(buffer.metrics().failedCount()).isEqualTo(1);
+        assertThat(buffer.metrics().pendingCount()).isZero();
+    }
+
     private CanvasExecutionTraceDO trace(String executionId, String nodeId) {
         return CanvasExecutionTraceDO.builder()
                 .executionId(executionId)

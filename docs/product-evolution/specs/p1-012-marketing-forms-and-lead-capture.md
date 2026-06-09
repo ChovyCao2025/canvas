@@ -83,10 +83,10 @@ Add public marketing forms that operators can create, publish, and use to captur
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05 with focused backend/frontend verification and frontend build evidence. Full backend regression is not recorded as run/passing in the implementation plan.
 
 - `MarketingFormService` implements tenant-scoped operator CRUD, anonymous public metadata, public submit, idempotent submission capture, CDP enrichment, channel/consent upsert, and optional behavior trigger publishing.
 - `MarketingFormController` exposes authenticated `/canvas/marketing-forms` endpoints plus anonymous `/public/marketing-forms/{publicKey}` GET and submit endpoints.
 - `SecurityConfig` permits anonymous public marketing form GET/POST routes while keeping the operator workbench authenticated.
 - Frontend `marketingFormsApi`, presentation helpers, authenticated `表单中心`, anonymous `/public/forms/:publicKey` page, route, navigation, and route announcements are wired.
-- This session reverified focused backend tests, focused frontend tests, plugin candidate registration, and the frontend production build.
+- This session reverified focused backend tests, focused frontend tests, plugin candidate registration, and the frontend production build; full backend regression remains a residual verification gap.

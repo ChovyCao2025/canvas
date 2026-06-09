@@ -5,6 +5,8 @@ Sequence: 046
 Source: `docs/product-evolution/specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`, `docs/product-evolution/specs/p2-033-cdp-warehouse-realtime-pipeline-incidents.md`, `docs/product-evolution/specs/p2-031-cdp-warehouse-physical-table-governance.md`
 Implementation plan: `../plans/p2-046-cdp-warehouse-realtime-schema-evolution-guard-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add realtime warehouse schema-version registration and compatibility guards so CDC/Flink/Kafka-style pipelines cannot silently push breaking source or sink schema changes into CDP warehouse tables.

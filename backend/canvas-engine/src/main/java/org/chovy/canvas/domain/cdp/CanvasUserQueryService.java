@@ -33,12 +33,14 @@ public class CanvasUserQueryService {
 
     /** 查询用户列表或指定画布下的用户聚合视图。 */
     public List<CanvasUserRowDTO> listUsers(Long canvasId) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<CanvasExecutionDO> executions = executionMapper.selectList(
                 new LambdaQueryWrapper<CanvasExecutionDO>()
                         .eq(CanvasExecutionDO::getCanvasId, canvasId)
                         .isNotNull(CanvasExecutionDO::getUserId)
                         .orderByDesc(CanvasExecutionDO::getCreatedAt));
         Map<String, List<CanvasExecutionDO>> byUser = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CanvasExecutionDO execution : executions) {
             byUser.computeIfAbsent(execution.getUserId(), ignored -> new java.util.ArrayList<>()).add(execution);
         }
@@ -73,6 +75,7 @@ public class CanvasUserQueryService {
 
     /** 将同一用户的执行记录汇总为管理端列表行数据。 */
     private CanvasUserRowDTO toRow(String userId, List<CanvasExecutionDO> executions) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         executions.forEach(e -> userService.ensureUser(userId, "CANVAS_EXECUTION", e.getId()));
         LocalDateTime first = executions.stream().map(CanvasExecutionDO::getCreatedAt)
                 .min(Comparator.naturalOrder()).orElse(null);
@@ -83,6 +86,7 @@ public class CanvasUserQueryService {
                 .orElse(null);
         long success = executions.stream().filter(e -> e.getStatus() != null && e.getStatus() == ExecutionStatus.SUCCESS.getCode()).count();
         long failed = executions.stream().filter(e -> e.getStatus() != null && e.getStatus() == ExecutionStatus.FAILED.getCode()).count();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new CanvasUserRowDTO(
                 userId,
                 userId,
@@ -98,6 +102,7 @@ public class CanvasUserQueryService {
 
     /** 将执行状态码转换为前端展示使用的状态文本。 */
     private String statusLabel(Integer status) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (status != null && status == ExecutionStatus.SUCCESS.getCode()) {
             return "SUCCESS";
         }
@@ -110,6 +115,7 @@ public class CanvasUserQueryService {
         if (status != null && status == ExecutionStatus.RUNNING.getCode()) {
             return "RUNNING";
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return String.valueOf(status);
     }
 }

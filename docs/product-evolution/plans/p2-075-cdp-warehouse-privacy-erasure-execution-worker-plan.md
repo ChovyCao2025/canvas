@@ -1,5 +1,9 @@
 # CDP Warehouse Privacy Erasure Execution Worker Implementation Plan
 
+Spec: `../specs/p2-075-cdp-warehouse-privacy-erasure-execution-worker.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Execute P2-073 privacy erasure requests against CDP operational state, event logs, retry buffers, and Doris warehouse assets without persisting raw subject values.

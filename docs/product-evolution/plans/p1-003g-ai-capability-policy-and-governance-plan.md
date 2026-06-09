@@ -10,6 +10,8 @@
 
 **Tech Stack:** Markdown, Java 21, JUnit 5, AssertJ.
 
+**Implementation Status:** Implemented and focused-verified on 2026-06-05. The original "hide `AI_LLM` until P2-019" assumption is superseded by the current codebase, where P2-019 runtime artifacts exist; governance now permits `AI_LLM` only with backing runtime, audit, tenant, and UI controls, and continues to block `AI_NEXT_BEST_ACTION`.
+
 ---
 
 ## Spec Reference
@@ -133,7 +135,8 @@ Result: 3 tests, 0 failures, 0 errors, 0 skipped.
 - Read: `docs/product-evolution/specs/p1-003g-ai-capability-policy-and-governance.md`
 - Read: `docs/product-evolution/plans/p1-003g-ai-capability-policy-and-governance-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

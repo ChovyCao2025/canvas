@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Runs the focused conversation/SCRM verification suite.
+#
+# The script selects backend domain/controller tests and frontend presentation tests
+# that cover provider adapters, routing, work items, AI replies, and operator UI.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

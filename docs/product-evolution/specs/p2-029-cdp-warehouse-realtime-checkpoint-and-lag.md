@@ -5,6 +5,8 @@ Sequence: 029
 Source: `docs/product-evolution/specs/p2-022-cdp-warehouse-ingestion-and-aggregation.md`, `docs/product-evolution/specs/p2-025-cdp-warehouse-realtime-retry-buffer.md`, `docs/product-evolution/specs/p2-026-cdp-warehouse-quality-and-reconciliation.md`
 Implementation plan: `../plans/p2-029-cdp-warehouse-realtime-checkpoint-and-lag-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a durable realtime warehouse checkpoint so operators can see the latest CDP event successfully delivered to the warehouse ODS path, recent failures, and retry backlog.

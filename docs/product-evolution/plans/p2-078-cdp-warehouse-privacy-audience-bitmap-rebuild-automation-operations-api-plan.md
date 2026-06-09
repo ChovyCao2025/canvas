@@ -1,5 +1,9 @@
 # CDP Warehouse Privacy Audience Bitmap Rebuild Automation Operations API Implementation Plan
 
+Spec: `../specs/p2-078-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-operations-api.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a manual operations API that runs the existing P2-077 privacy audience bitmap rebuild automation cycle and returns its summary.

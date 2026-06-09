@@ -1,4 +1,5 @@
 {{- if .Values.backend.enabled }}
+# Backend Deployment runs the Spring Boot canvas-engine with ConfigMap/Secret-driven runtime wiring.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,6 +19,7 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
+      # Keep at least the current serving capacity during backend rollouts.
       maxSurge: {{ .Values.backend.strategy.maxSurge }}
       maxUnavailable: {{ .Values.backend.strategy.maxUnavailable }}
   template:
@@ -40,6 +42,7 @@ spec:
             - name: http
               containerPort: {{ .Values.backend.containerPort }}
           env:
+            # Profile and JVM options are non-secret release controls from values.yaml.
             - name: SPRING_PROFILES_ACTIVE
               value: {{ .Values.backend.profile | quote }}
             - name: JAVA_OPTS
@@ -125,6 +128,7 @@ spec:
                   name: {{ .Values.backend.secretName }}
                   key: {{ .Values.backend.secretKeys.canvasSecretCipherKey }}
           readinessProbe:
+            # Readiness gates traffic until Spring, Flyway, Redis, and MQ health checks are ready.
             httpGet:
               path: {{ .Values.backend.probes.readinessPath }}
               port: http
@@ -141,6 +145,7 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
           startupProbe:
+            # Startup probe prevents slow migrations or cache warmup from triggering liveness restarts.
             httpGet:
               path: {{ .Values.backend.probes.startupPath }}
               port: http
@@ -157,6 +162,7 @@ spec:
 {{- end }}
 ---
 {{- if .Values.frontend.enabled }}
+# Frontend Deployment serves the Vite build through nginx and proxies API paths upstream.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -176,6 +182,7 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
+      # Keep frontend ingress available while nginx pods roll.
       maxSurge: 1
       maxUnavailable: 0
   template:
@@ -198,12 +205,14 @@ spec:
             - name: http
               containerPort: {{ .Values.frontend.containerPort }}
           env:
+            # nginx reads this upstream when proxying backend API paths from the SPA container.
             - name: CANVAS_API_UPSTREAM
               valueFrom:
                 configMapKeyRef:
                   name: {{ include "canvas.frontendName" . }}
                   key: canvas-api-upstream
           readinessProbe:
+            # Static frontend readiness only checks nginx/root document availability.
             httpGet:
               path: {{ .Values.frontend.probes.readinessPath }}
               port: http

@@ -5,6 +5,8 @@ Sequence: 039
 Source: `docs/product-evolution/specs/p2-036-cdp-warehouse-readiness-and-slo-summary.md`, `docs/product-evolution/specs/p2-027-cdp-warehouse-catalog-and-lineage.md`, `docs/product-evolution/specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`
 Implementation plan: `../plans/p2-039-cdp-warehouse-slo-policy-gates-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Make warehouse readiness freshness thresholds explicit and tenant-governed instead of relying only on fixed readiness heuristics.

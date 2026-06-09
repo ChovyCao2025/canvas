@@ -49,6 +49,9 @@ public class CanvasVersionCleanupJob {
     @Value("${canvas.version.max-keep-count:10}")
     private int maxKeepCount;
 
+    /**
+     * cleanup 删除或清理 domain.canvas 场景的业务数据。
+     */
     @Scheduled(cron = "0 0 3 * * *")  // 每天凌晨3点
     public void cleanup() {
         log.info("[VERSION_CLEANUP] 开始执行版本清理，maxKeepCount={}", maxKeepCount);
@@ -60,6 +63,7 @@ public class CanvasVersionCleanupJob {
             try {
                 int cleaned = cleanupCanvas(canvas.getId());
                 totalCleaned += cleaned;
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception e) {
                 log.error("[VERSION_CLEANUP] 清理失败 canvasId={}: {}", canvas.getId(), e.getMessage());
             }
@@ -107,15 +111,25 @@ public class CanvasVersionCleanupJob {
         return count;
     }
 
+    /**
+     * 执行 referencedVersionIds 流程，围绕 referenced version ids 完成校验、计算或结果组装。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param candidates 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 referenced version ids 汇总后的集合、分页或映射视图。
+     */
     private Set<Long> referencedVersionIds(Long canvasId, List<CanvasVersionDO> candidates) {
         Set<Long> referenced = new HashSet<>();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CanvasDO canvas = canvasMapper.selectById(canvasId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (canvas != null) {
             addIfPresent(referenced, canvas.getPublishedVersionId());
             addIfPresent(referenced, canvas.getPreviousVersionId());
             addIfPresent(referenced, canvas.getCanaryVersionId());
         }
 
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         List<Long> candidateIds = candidates.stream()
                 .map(CanvasVersionDO::getId)
                 .filter(Objects::nonNull)
@@ -128,31 +142,55 @@ public class CanvasVersionCleanupJob {
         return referenced;
     }
 
+    /**
+     * 执行 activeExecutionVersionIds 流程，围绕 active execution version ids 完成校验、计算或结果组装。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param candidateIds 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 active execution version ids 汇总后的集合、分页或映射视图。
+     */
     private Set<Long> activeExecutionVersionIds(Long canvasId, List<Long> candidateIds) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return canvasExecutionMapper.selectList(
                         new LambdaQueryWrapper<CanvasExecutionDO>()
                                 .eq(CanvasExecutionDO::getCanvasId, canvasId)
                                 .in(CanvasExecutionDO::getVersionId, candidateIds)
                                 .in(CanvasExecutionDO::getStatus,
                                         List.of(ExecutionStatus.RUNNING.getCode(), ExecutionStatus.PAUSED.getCode()))
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 ).stream()
                 .map(CanvasExecutionDO::getVersionId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * 执行 activeWaitVersionIds 流程，围绕 active wait version ids 完成校验、计算或结果组装。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param candidateIds 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 active wait version ids 汇总后的集合、分页或映射视图。
+     */
     private Set<Long> activeWaitVersionIds(Long canvasId, List<Long> candidateIds) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return waitSubscriptionMapper.selectList(
                         new LambdaQueryWrapper<CanvasWaitSubscriptionDO>()
                                 .eq(CanvasWaitSubscriptionDO::getCanvasId, canvasId)
                                 .in(CanvasWaitSubscriptionDO::getVersionId, candidateIds)
                                 .eq(CanvasWaitSubscriptionDO::getStatus, WaitSubscriptionService.STATUS_ACTIVE)
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 ).stream()
                 .map(CanvasWaitSubscriptionDO::getVersionId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * 处理集合、映射或字段拷贝逻辑。
+     *
+     * @param values values 参数，用于 addIfPresent 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     */
     private static void addIfPresent(Set<Long> values, Long value) {
         if (value != null) values.add(value);
     }

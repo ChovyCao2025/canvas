@@ -1,6 +1,10 @@
+-- Local Doris bootstrap schema for canvas execution trace analytics.
+-- ODS keeps raw trace rows, while DWS tables aggregate canvas/node daily metrics
+-- for dashboards and realtime warehouse smoke tests.
 CREATE DATABASE IF NOT EXISTS canvas_ods;
 CREATE DATABASE IF NOT EXISTS canvas_dws;
 
+-- Raw execution trace sink populated from MySQL/Flink pipeline outputs.
 CREATE TABLE IF NOT EXISTS canvas_ods.canvas_execution_trace (
     trace_id BIGINT NOT NULL,
     tenant_id BIGINT,
@@ -21,6 +25,7 @@ DUPLICATE KEY(trace_id, tenant_id, execution_id)
 DISTRIBUTED BY HASH(execution_id) BUCKETS 8
 PROPERTIES ("replication_num" = "1");
 
+-- Canvas-level daily aggregate used by operations dashboards.
 CREATE TABLE IF NOT EXISTS canvas_dws.canvas_daily_stats (
     stat_date DATE NOT NULL,
     canvas_id BIGINT NOT NULL,
@@ -37,6 +42,7 @@ AGGREGATE KEY(stat_date, canvas_id, canvas_name, trigger_type)
 DISTRIBUTED BY HASH(canvas_id) BUCKETS 8
 PROPERTIES ("replication_num" = "1");
 
+-- Node-level daily aggregate used to identify slow or failing journey nodes.
 CREATE TABLE IF NOT EXISTS canvas_dws.node_daily_stats (
     stat_date DATE NOT NULL,
     canvas_id BIGINT NOT NULL,

@@ -28,10 +28,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.chovy.canvas.dal.dataobject.NotificationDO;
 
 /**
- * 通知实时推送 通知领域组件。
+ * 通知实时推送服务。
  *
- * <p>负责站内通知的创建、收件人解析、未读状态和实时推送封装。
- * <p>该组件连接异步任务、WebSocket 和通知持久化模型，保证消息中心口径一致。
+ * <p>维护本机 WebSocket 会话，并通过 Redis Pub/Sub 分发跨实例通知事件。
  */
 @Slf4j
 @Service
@@ -69,9 +68,24 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
             @Value("${canvas.notifications.websocket.max-sessions-per-user:5}") int maxSessionsPerUser,
             @Value("${canvas.notifications.websocket.max-total-sessions:1000}") int maxTotalSessions) {
         this(objectMapper, redis, reactiveRedisConnectionFactory, keys,
+                /**
+                 * 执行 BackgroundSubscriptionRegistry 流程，围绕 background subscription registry 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 BackgroundSubscriptionRegistry 流程生成的业务结果。
+                 */
                 maxSessionsPerUser, maxTotalSessions, new BackgroundSubscriptionRegistry());
     }
 
+    /**
+     * 创建 NotificationRealtimeService 实例并注入 domain.notification 场景依赖。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param redis redis 参数，用于 NotificationRealtimeService 流程中的校验、计算或对象转换。
+     * @param reactiveRedisConnectionFactory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param keys keys 参数，用于 NotificationRealtimeService 流程中的校验、计算或对象转换。
+     * @param maxSessionsPerUser max sessions per user 参数，用于 NotificationRealtimeService 流程中的校验、计算或对象转换。
+     * @param maxTotalSessions max total sessions 参数，用于 NotificationRealtimeService 流程中的校验、计算或对象转换。
+     * @param backgroundSubscriptions background subscriptions 参数，用于 NotificationRealtimeService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public NotificationRealtimeService(
             ObjectMapper objectMapper,
@@ -88,6 +102,11 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         this.maxSessionsPerUser = Math.max(1, maxSessionsPerUser);
         this.maxTotalSessions = Math.max(1, maxTotalSessions);
         this.backgroundSubscriptions = backgroundSubscriptions == null
+                /**
+                 * 执行 BackgroundSubscriptionRegistry 流程，围绕 background subscription registry 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 BackgroundSubscriptionRegistry 流程生成的业务结果。
+                 */
                 ? new BackgroundSubscriptionRegistry()
                 : backgroundSubscriptions;
     }
@@ -102,6 +121,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
                     listenerContainer.receive(ChannelTopic.of(keys.notificationChannel()))
                             .doOnNext(message -> handleRemote(message.getMessage())),
                     e -> log.error("[NOTIFICATION_WS] Redis 订阅异常: {}", e.getMessage(), e));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[NOTIFICATION_WS] Redis 订阅启动失败，降级为单实例本地推送: {}", e.getMessage());
         }
@@ -116,6 +136,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         if (listenerContainer != null) {
             try {
                 listenerContainer.destroy();
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception e) {
                 log.warn("[NOTIFICATION_WS] Redis 订阅容器关闭失败: {}", e.getMessage());
             }
@@ -137,6 +158,12 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
         if (!registerSession(sessionKey, sessionId, sink)) {
             log.warn("[NOTIFICATION_WS] 拒绝连接 tenantId={} userId={} sessionId={} activeUser={} activeTotal={}",
+                    /**
+                     * 执行 activeSessionCount 流程，围绕 active session count 完成校验、计算或结果组装。
+                     *
+                     * @param tenantId 租户 ID，用于限定数据隔离范围。
+                     * @return 返回 activeSessionCount 流程生成的业务结果。
+                     */
                     tenantId, userId, sessionId, activeSessionCount(tenantId, userId), totalActiveSessionCount());
             return session.close(CloseStatus.POLICY_VIOLATION);
         }
@@ -176,6 +203,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         try {
             // 先本机投递再广播 Redis，当前实例即使 Redis 短暂不可用也能收到实时通知。
             redis.convertAndSend(keys.notificationChannel(), objectMapper.writeValueAsString(envelope));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[NOTIFICATION_WS] Redis 广播失败，已完成本实例推送 userId={}: {}", userId, e.getMessage());
         }
@@ -203,6 +231,12 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     private boolean registerSession(String sessionKey, String sessionId, Sinks.Many<String> sink) {
         synchronized (sessionsByUser) {
             if (activeSessionCountByKey(sessionKey) >= maxSessionsPerUser
+                    /**
+                     * 转换为接口返回或领域视图。
+                     *
+                     * @param maxTotalSessions max total sessions 参数，用于 totalActiveSessionCount 流程中的校验、计算或对象转换。
+                     * @return 返回统计数量。
+                     */
                     || totalActiveSessionCount() >= maxTotalSessions) {
                 return false;
             }
@@ -221,6 +255,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
                 return;
             }
             deliverLocal(envelope);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[NOTIFICATION_WS] 忽略无法解析的通知广播: {}", e.getMessage());
         }
@@ -243,6 +278,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     private void emit(Sinks.Many<String> sink, NotificationRealtimePayload payload) {
         try {
             sink.tryEmitNext(objectMapper.writeValueAsString(payload));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[NOTIFICATION_WS] 消息序列化失败: {}", e.getMessage());
         }
@@ -252,11 +288,14 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     private void unregister(String sessionKey, String sessionId) {
         synchronized (sessionsByUser) {
             Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(sessionKey);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (sessions == null) {
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return;
             }
             Sinks.Many<String> sink = sessions.remove(sessionId);
             if (sink != null) {
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 sink.tryEmitComplete();
             }
             if (sessions.isEmpty()) {
@@ -265,11 +304,24 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         }
     }
 
+    /**
+     * 执行 activeSessionCountByKey 流程，围绕 active session count by key 完成校验、计算或结果组装。
+     *
+     * @param sessionKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 active session count by key 计算得到的数量、金额或指标值。
+     */
     private int activeSessionCountByKey(String sessionKey) {
         Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(sessionKey);
         return sessions == null ? 0 : sessions.size();
     }
 
+    /**
+     * 执行 sessionKey 流程，围绕 session key 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @return 返回 session key 生成的文本或业务键。
+     */
     private String sessionKey(Long tenantId, String userId) {
         return (tenantId == null ? "global" : tenantId) + ":" + userId;
     }

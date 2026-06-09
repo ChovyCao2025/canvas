@@ -8,7 +8,9 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, WebClient, MyBatis-Plus, Jackson, JUnit 5, Mockito, AssertJ.
 
-**Implementation Status:** Implemented and merged into `main` on 2026-06-05. The actual package is `org.chovy.canvas.domain.cdp` rather than the originally planned `org.chovy.canvas.domain.webhook` package. `WebhookDispatcherService` now uses exact event-type matching and the canonical outbound headers `X-Canvas-Event`, `X-Canvas-Delivery`, `X-Canvas-Timestamp`, and `X-Canvas-Signature`.
+**Implementation Status:** Implemented in the current workspace record on 2026-06-05. The actual package is `org.chovy.canvas.domain.cdp` rather than the originally planned `org.chovy.canvas.domain.webhook` package. `WebhookDispatcherService` now uses exact event-type matching and the canonical outbound headers `X-Canvas-Event`, `X-Canvas-Delivery`, `X-Canvas-Timestamp`, and `X-Canvas-Signature`. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
+
+Status: Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 
 **Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused webhook tests pass in an isolated runner for `WebhookSubscriptionSchemaTest`, `WebhookSignatureServiceTest`, `WebhookSubscriptionValidatorTest`, `WebhookDispatcherServiceTest`, and `WebhookRetryPolicyTest`; Maven `testCompile` remains blocked by unrelated existing test-source errors.
 
@@ -30,10 +32,10 @@
 ### Task 1: Retry Policy
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicyTest.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicy.java`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicyTest.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicy.java`
 
-- [ ] **Step 1: Write retry policy tests**
+- [x] **Step 1: Write retry policy tests**
 
 Create `WebhookRetryPolicyTest.java`:
 
@@ -68,7 +70,7 @@ class WebhookRetryPolicyTest {
 }
 ```
 
-- [ ] **Step 2: Run policy tests and confirm red state**
+- [x] **Step 2: Run policy tests and confirm red state**
 
 Run:
 
@@ -78,7 +80,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=WebhookRetryPolicyTest
 
 Expected: FAIL because policy does not exist.
 
-- [ ] **Step 3: Add retry policy**
+- [x] **Step 3: Add retry policy**
 
 Create `WebhookRetryPolicy.java`:
 
@@ -108,7 +110,7 @@ public class WebhookRetryPolicy {
 }
 ```
 
-- [ ] **Step 4: Run policy tests**
+- [x] **Step 4: Run policy tests**
 
 Run:
 
@@ -121,11 +123,11 @@ Expected: PASS.
 ### Task 2: Dispatcher Service
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookDispatcherServiceTest.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDeliveryPayload.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDispatcherService.java`
+- Existing: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookDispatcherServiceTest.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDeliveryPayload.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDispatcherService.java`
 
-- [ ] **Step 1: Write dispatcher tests**
+- [x] **Step 1: Write dispatcher tests**
 
 Create `WebhookDispatcherServiceTest.java` with these tests:
 
@@ -183,7 +185,7 @@ void dispatchMarksNon429Http4xxAsFailed() {
 
 Use local mocks for `WebhookSubscriptionMapper`, `WebhookDeliveryLogMapper`, `WebhookSignatureService`, `ObjectMapper`, `WebClient.Builder`, and `WebhookRetryPolicy`. `stubHttpStatus(int)` should configure the mocked WebClient chain to return a `ResponseEntity<Void>` with that status.
 
-- [ ] **Step 2: Run dispatcher tests and confirm red state**
+- [x] **Step 2: Run dispatcher tests and confirm red state**
 
 Run:
 
@@ -193,7 +195,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=WebhookDispatcherServiceTest
 
 Expected: FAIL because dispatcher does not exist.
 
-- [ ] **Step 3: Add payload record**
+- [x] **Step 3: Add payload record**
 
 Create `WebhookDeliveryPayload.java`:
 
@@ -210,7 +212,7 @@ public record WebhookDeliveryPayload(
 }
 ```
 
-- [ ] **Step 4: Add dispatcher**
+- [x] **Step 4: Add dispatcher**
 
 Create `WebhookDispatcherService.java`:
 
@@ -271,7 +273,7 @@ public class WebhookDispatcherService {
 
 Add private helpers `applyDecision`, `newLog`, `matches`, `writeJson`, and `resolveSecret`. `applyDecision` copies `status`, `nextRetryAt`, and `terminalReason` from the policy decision and sets `httpStatus` before calling it when HTTP status is known.
 
-- [ ] **Step 5: Run dispatcher tests**
+- [x] **Step 5: Run dispatcher tests**
 
 Run:
 
@@ -287,16 +289,17 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-005b2-webhook-dispatch-retry-and-delivery-log.md`
 - Read: `docs/product-evolution/plans/p1-005b2-webhook-dispatch-retry-and-delivery-log-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicy.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDeliveryPayload.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDispatcherService.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicyTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookDispatcherServiceTest.java \
+git add backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicy.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDeliveryPayload.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDispatcherService.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicyTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookDispatcherServiceTest.java \
   docs/product-evolution/specs/p1-005b2-webhook-dispatch-retry-and-delivery-log.md \
   docs/product-evolution/plans/p1-005b2-webhook-dispatch-retry-and-delivery-log-plan.md
 git commit -m "feat: add webhook dispatch retry logging"

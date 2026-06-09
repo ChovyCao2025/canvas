@@ -5,15 +5,19 @@ import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.mapper.MessageSendRecordMapper;
 import org.chovy.canvas.engine.channel.ChannelConnector;
 import org.chovy.canvas.engine.channel.ChannelConnectorRegistry;
+import org.chovy.canvas.engine.channel.DownstreamBulkheadRegistry;
 import org.chovy.canvas.infrastructure.http.ExternalHttpClient;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -63,6 +67,34 @@ class ReachDeliveryServiceConnectorDispatchTest {
         assertThat(connector.request.get().userId()).isEqualTo("whatsapp:+15551234567");
         assertThat(connector.request.get().payload()).containsEntry(MapFieldKeys.TEMPLATE_ID, "welcome_template");
         assertThat(httpClient.calls).hasValue(0);
+    }
+
+    @Test
+    void dispatchToProviderRejectsWhenProviderBulkheadIsOpen() {
+        RecordingConnector connector = new RecordingConnector(new ChannelConnector.ConnectorSendResult(
+                true, "wamid-1", "ACCEPTED", null));
+        ChannelConnectorRegistry registry = mock(ChannelConnectorRegistry.class);
+        when(registry.resolve(7L, "WHATSAPP", "CLOUD_API")).thenReturn(connector);
+        DownstreamBulkheadRegistry bulkheadRegistry = DownstreamBulkheadRegistry.available();
+        bulkheadRegistry.open(7L, "CLOUD_API", "WHATSAPP", Duration.ofMinutes(1),
+                "provider timeout", Instant.now());
+        ReachDeliveryService service = new ReachDeliveryService(
+                mock(MessageSendRecordMapper.class),
+                new ObjectMapper(),
+                new RecordingExternalHttpClient(),
+                registry,
+                bulkheadRegistry);
+        DeliveryOutboxDO outbox = DeliveryOutboxDO.builder()
+                .id(100L)
+                .tenantId(7L)
+                .channel("WHATSAPP")
+                .provider("CLOUD_API")
+                .payloadJson(json(Map.of(MapFieldKeys.CHANNEL, "WHATSAPP")))
+                .build();
+
+        assertThatThrownBy(() -> service.dispatchToProvider(outbox).block())
+                .hasMessageContaining("bulkhead");
+        assertThat(connector.request.get()).isNull();
     }
 
     private String json(Map<String, Object> payload) {

@@ -20,29 +20,29 @@ public class SpelKeyEvaluator {
     private final DefaultParameterNameDiscoverer nameDiscoverer = new DefaultParameterNameDiscoverer();
 
     /**
-     * 执行 evaluate 对应的业务逻辑。
+     * 解析不依赖返回值的 SpEL 表达式。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>常用于缓存 key 和 condition 前置表达式，变量上下文包含真实参数名、{@code #pN} 和 {@code #aN}。
      *
-     * @param expression expression 方法执行所需的业务参数
-     * @param method method 方法执行所需的业务参数
-     * @param args args 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param expression SpEL 表达式
+     * @param method 被拦截的方法
+     * @param args 方法实参数组
+     * @return 表达式解析结果
      */
     public Object evaluate(String expression, Method method, Object[] args) {
         return evaluate(expression, method, args, null);
     }
 
     /**
-     * 执行 evaluate 对应的业务逻辑。
+     * 解析可引用返回值的 SpEL 表达式。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>后置 unless、put key 等场景可通过 {@code #result} 访问目标方法返回值。
      *
-     * @param expression expression 方法执行所需的业务参数
-     * @param method method 方法执行所需的业务参数
-     * @param args args 方法执行所需的业务参数
-     * @param result result 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param expression SpEL 表达式
+     * @param method 被拦截的方法
+     * @param args 方法实参数组
+     * @param result 目标方法返回值，前置表达式可传 null
+     * @return 表达式解析结果
      */
     public Object evaluate(String expression, Method method, Object[] args, Object result) {
         StandardEvaluationContext context = new StandardEvaluationContext();
@@ -61,16 +61,16 @@ public class SpelKeyEvaluator {
     }
 
     /**
-     * 执行 evaluate Boolean 对应的业务逻辑。
+     * 解析布尔型 SpEL 表达式。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>表达式为空时返回默认值；表达式结果只有精确等于 {@link Boolean#TRUE} 才视为 true。
      *
-     * @param expression expression 方法执行所需的业务参数
-     * @param method method 方法执行所需的业务参数
-     * @param args args 方法执行所需的业务参数
-     * @param result result 方法执行所需的业务参数
-     * @param defaultValue defaultValue 待写入、比较或转换的业务值
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param expression SpEL 表达式
+     * @param method 被拦截的方法
+     * @param args 方法实参数组
+     * @param result 目标方法返回值
+     * @param defaultValue 表达式为空时使用的默认值
+     * @return 布尔表达式结果
      */
     public boolean evaluateBoolean(String expression, Method method, Object[] args, Object result, boolean defaultValue) {
         if (expression == null || expression.isBlank()) {

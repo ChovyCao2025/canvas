@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
@@ -100,6 +101,20 @@ class ChurnPredictionServiceTest {
     }
 
     @Test
+    void recomputeRequiresPredictionFlagEnabled() {
+        Fixture fixture = fixture(false);
+        when(fixture.featureSnapshotService.candidateUserIds(anyInt())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> fixture.service.recompute(
+                7L,
+                new ChurnPredictionService.RecomputeRequest(true, LocalDate.of(2026, 6, 4), 10)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("canvas.ai.prediction.enabled");
+
+        verify(fixture.runMapper, never()).insert(any(AiPredictionRunDO.class));
+    }
+
+    @Test
     void recomputePersistsSnapshotsAndWritesProfileFields() {
         Fixture fixture = fixture();
         when(fixture.runMapper.selectOne(any(Wrapper.class))).thenReturn(null);
@@ -165,12 +180,17 @@ class ChurnPredictionServiceTest {
     }
 
     private static Fixture fixture() {
+        return fixture(true);
+    }
+
+    private static Fixture fixture(boolean enabled) {
         ChurnFeatureSnapshotService featureSnapshotService = mock(ChurnFeatureSnapshotService.class);
         SmartTimingService smartTimingService = mock(SmartTimingService.class);
         PredictionProfileWriter profileWriter = mock(PredictionProfileWriter.class);
         AiPredictionRunMapper runMapper = mock(AiPredictionRunMapper.class);
         AiUserPredictionSnapshotMapper snapshotMapper = mock(AiUserPredictionSnapshotMapper.class);
         AiPredictionProperties properties = new AiPredictionProperties();
+        properties.setEnabled(enabled);
         properties.setModelVersion("baseline_v1");
         properties.setBatchSize(500);
         ChurnPredictionService service = new ChurnPredictionService(

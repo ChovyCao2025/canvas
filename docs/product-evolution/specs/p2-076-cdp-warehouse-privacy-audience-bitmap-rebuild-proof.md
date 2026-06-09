@@ -5,6 +5,8 @@ Sequence: 076
 Source: `docs/product-evolution/specs/p2-073-cdp-warehouse-privacy-erasure-propagation-proof.md`, `docs/product-evolution/specs/p2-075-cdp-warehouse-privacy-erasure-execution-worker.md`
 Implementation plan: `../plans/p2-076-cdp-warehouse-privacy-audience-bitmap-rebuild-proof-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Close the remaining privacy erasure gap for CDP warehouse audience materialization by rebuilding affected offline and hybrid audience bitmap versions after upstream erasure assets pass, then recording `AUDIENCE_BITMAP_VERSION` proof through the existing P2-073 ledger.

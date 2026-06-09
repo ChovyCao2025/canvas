@@ -24,6 +24,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * CanvasAttributionService 编排 domain.canvas 场景的领域业务规则。
+ */
 @Service
 public class CanvasAttributionService {
 
@@ -40,6 +43,12 @@ public class CanvasAttributionService {
     private final CanvasConversionAttributionMapper attributionMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 创建 CanvasAttributionService 实例并注入 domain.canvas 场景依赖。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param sendRecordMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param attributionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CanvasAttributionService(CanvasMapper canvasMapper,
                                     MessageSendRecordMapper sendRecordMapper,
                                     CanvasConversionAttributionMapper attributionMapper) {
@@ -48,16 +57,23 @@ public class CanvasAttributionService {
         this.attributionMapper = attributionMapper;
     }
 
+    /**
+     * 根据转化事件为匹配的 Canvas 生成触点归因记录。
+     * 方法会按事件编码查找配置了转化目标的画布，读取用户在归因窗口内的已发送消息，并按画布归因模型写入归因行；事件不完整或无匹配画布时直接跳过。
+     */
     public void attribute(EventLogDO eventLog) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (eventLog == null || eventLog.getEventCode() == null || eventLog.getEventCode().isBlank()
                 || eventLog.getUserId() == null || eventLog.getUserId().isBlank()) {
             return;
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<CanvasDO> canvases = canvasMapper.selectList(new LambdaQueryWrapper<CanvasDO>()
                 .eq(CanvasDO::getConversionEventCode, eventLog.getEventCode()));
         if (canvases == null || canvases.isEmpty()) {
             return;
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CanvasDO canvas : canvases) {
             List<MessageSendRecordDO> touches = eligibleTouches(canvas, eventLog);
             for (CanvasConversionAttributionDO row : attributionRows(canvas, eventLog, touches)) {
@@ -66,19 +82,32 @@ public class CanvasAttributionService {
         }
     }
 
+    /**
+     * 写入单条转化归因记录。
+     * 依赖唯一键保证重放事件幂等，重复插入会被吞掉而不影响上游事件处理。
+     */
     public void insertAttribution(CanvasConversionAttributionDO row) {
         try {
             attributionMapper.insert(row);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DuplicateKeyException ignored) {
             // Idempotent by (canvas_id, event_log_id, attribution_model, send_record_id).
         }
     }
 
+    /**
+     * 执行 eligibleTouches 流程，围绕 eligible touches 完成校验、计算或结果组装。
+     *
+     * @param canvas canvas 参数，用于 eligibleTouches 流程中的校验、计算或对象转换。
+     * @param eventLog event log 参数，用于 eligibleTouches 流程中的校验、计算或对象转换。
+     * @return 返回 eligible touches 汇总后的集合、分页或映射视图。
+     */
     private List<MessageSendRecordDO> eligibleTouches(CanvasDO canvas, EventLogDO eventLog) {
         LocalDateTime eventTime = eventLog.getCreatedAt() == null ? LocalDateTime.now() : eventLog.getCreatedAt();
         int windowDays = canvas.getAttributionWindowDays() == null || canvas.getAttributionWindowDays() <= 0
                 ? 7
                 : canvas.getAttributionWindowDays();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<MessageSendRecordDO> rows = sendRecordMapper.selectList(new LambdaQueryWrapper<MessageSendRecordDO>()
                 .eq(MessageSendRecordDO::getCanvasId, canvas.getId())
                 .eq(MessageSendRecordDO::getUserId, eventLog.getUserId())
@@ -86,9 +115,11 @@ public class CanvasAttributionService {
                 .le(MessageSendRecordDO::getCreatedAt, eventTime)
                 .ge(MessageSendRecordDO::getCreatedAt, eventTime.minusDays(windowDays))
                 .orderByAsc(MessageSendRecordDO::getCreatedAt));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return rows.stream()
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(row -> row.getCreatedAt() == null
@@ -97,6 +128,14 @@ public class CanvasAttributionService {
                 .toList();
     }
 
+    /**
+     * 执行 attributionRows 流程，围绕 attribution rows 完成校验、计算或结果组装。
+     *
+     * @param canvas canvas 参数，用于 attributionRows 流程中的校验、计算或对象转换。
+     * @param eventLog event log 参数，用于 attributionRows 流程中的校验、计算或对象转换。
+     * @param touches touches 参数，用于 attributionRows 流程中的校验、计算或对象转换。
+     * @return 返回 attribution rows 汇总后的集合、分页或映射视图。
+     */
     private List<CanvasConversionAttributionDO> attributionRows(CanvasDO canvas,
                                                                 EventLogDO eventLog,
                                                                 List<MessageSendRecordDO> touches) {
@@ -113,6 +152,16 @@ public class CanvasAttributionService {
         };
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param canvas canvas 参数，用于 rowsWithWeights 流程中的校验、计算或对象转换。
+     * @param eventLog event log 参数，用于 rowsWithWeights 流程中的校验、计算或对象转换。
+     * @param touches touches 参数，用于 rowsWithWeights 流程中的校验、计算或对象转换。
+     * @param model model 参数，用于 rowsWithWeights 流程中的校验、计算或对象转换。
+     * @param scores scores 参数，用于 rowsWithWeights 流程中的校验、计算或对象转换。
+     * @return 返回 rows with weights 汇总后的集合、分页或映射视图。
+     */
     private List<CanvasConversionAttributionDO> rowsWithWeights(CanvasDO canvas,
                                                                EventLogDO eventLog,
                                                                List<MessageSendRecordDO> touches,
@@ -126,6 +175,12 @@ public class CanvasAttributionService {
         return rows;
     }
 
+    /**
+     * 执行 equalScores 流程，围绕 equal scores 完成校验、计算或结果组装。
+     *
+     * @param count 分页、数量或序号参数，用于控制处理规模。
+     * @return 返回 equal scores 汇总后的集合、分页或映射视图。
+     */
     private List<BigDecimal> equalScores(int count) {
         List<BigDecimal> scores = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
@@ -134,6 +189,13 @@ public class CanvasAttributionService {
         return scores;
     }
 
+    /**
+     * 执行 timeDecayScores 流程，围绕 time decay scores 完成校验、计算或结果组装。
+     *
+     * @param eventLog event log 参数，用于 timeDecayScores 流程中的校验、计算或对象转换。
+     * @param touches touches 参数，用于 timeDecayScores 流程中的校验、计算或对象转换。
+     * @return 返回 time decay scores 汇总后的集合、分页或映射视图。
+     */
     private List<BigDecimal> timeDecayScores(EventLogDO eventLog, List<MessageSendRecordDO> touches) {
         LocalDateTime eventTime = eventLog.getCreatedAt() == null ? LocalDateTime.now() : eventLog.getCreatedAt();
         List<BigDecimal> scores = new ArrayList<>(touches.size());
@@ -147,10 +209,18 @@ public class CanvasAttributionService {
         return scores;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param scores scores 参数，用于 normalizedWeights 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private List<BigDecimal> normalizedWeights(List<BigDecimal> scores) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (scores == null || scores.isEmpty()) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         BigDecimal totalScore = scores.stream()
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -167,9 +237,20 @@ public class CanvasAttributionService {
             weights.add(weight);
             assigned = assigned.add(weight);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return weights;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param canvas canvas 参数，用于 from 流程中的校验、计算或对象转换。
+     * @param eventLog event log 参数，用于 from 流程中的校验、计算或对象转换。
+     * @param touch touch 参数，用于 from 流程中的校验、计算或对象转换。
+     * @param model model 参数，用于 from 流程中的校验、计算或对象转换。
+     * @param weight weight 参数，用于 from 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CanvasConversionAttributionDO from(CanvasDO canvas,
                                                EventLogDO eventLog,
                                                MessageSendRecordDO touch,
@@ -189,6 +270,12 @@ public class CanvasAttributionService {
         return row;
     }
 
+    /**
+     * 执行 attributionModel 流程，围绕 attribution model 完成校验、计算或结果组装。
+     *
+     * @param canvas canvas 参数，用于 attributionModel 流程中的校验、计算或对象转换。
+     * @return 返回 attribution model 生成的文本或业务键。
+     */
     private String attributionModel(CanvasDO canvas) {
         String model = canvas.getAttributionModel();
         if (model == null || model.isBlank()) {
@@ -201,6 +288,12 @@ public class CanvasAttributionService {
         };
     }
 
+    /**
+     * 执行 conversionAmount 流程，围绕 conversion amount 完成校验、计算或结果组装。
+     *
+     * @param attributes attributes 参数，用于 conversionAmount 流程中的校验、计算或对象转换。
+     * @return 返回 conversion amount 计算得到的数量、金额或指标值。
+     */
     private BigDecimal conversionAmount(String attributes) {
         if (attributes == null || attributes.isBlank()) {
             return null;
@@ -217,6 +310,7 @@ public class CanvasAttributionService {
             if (amount instanceof String text && !text.isBlank()) {
                 return new BigDecimal(text.trim());
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ignored) {
             return null;
         }

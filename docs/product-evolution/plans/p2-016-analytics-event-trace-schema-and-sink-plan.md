@@ -1,12 +1,14 @@
 # Analytics Event Trace Schema And Sink Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add additive analytics event/trace fields and an OLAP-ready sink boundary while preserving MySQL compatibility.
+**Goal:** Add analytics event/trace storage and an OLAP-ready sink boundary while preserving existing MySQL trace compatibility.
 
-**Architecture:** Extend `event_log` and `canvas_execution_trace` with nullable analytics fields, introduce `TraceEventSink`, and route `TraceWriteBuffer` through `MySqlTraceEventSink` with explicit metrics for written, failed, dropped, and backlog counts.
+**Architecture:** Use `V132__analytics_event_trace_schema_and_sink.sql` as the canonical schema for `analytics_event` and `analytics_event_trace`. `TraceWriteBuffer` writes through `TraceEventSink`, `MySqlTraceEventSink` preserves the existing `canvas_execution_trace` batch insert path, mirrors traces into `analytics_event_trace` when that mapper is available, and exposes written, failed, dropped, and backlog metrics.
 
-**Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, MySQL, Micrometer, JUnit 5, Mockito, AssertJ.
+**Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, MySQL, JUnit 5, Mockito, AssertJ.
 
 ---
 
@@ -16,175 +18,94 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V112__analytics_event_trace_schema_and_sink.sql`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventLogDO.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasExecutionTraceDO.java`
+- Existing schema: `backend/canvas-engine/src/main/resources/db/migration/V132__analytics_event_trace_schema_and_sink.sql`
+- Existing data objects: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsEventDO.java`, `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsEventTraceDO.java`
+- Existing mappers: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsEventMapper.java`, `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsEventTraceMapper.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/TraceEventSink.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/MySqlTraceEventSink.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/TraceWriteBuffer.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceSinkTest.java`
 
-### Task 1: Additive Schema
+### Task 1: Analytics Schema Contract
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceSinkTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V112__analytics_event_trace_schema_and_sink.sql`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V132__analytics_event_trace_schema_and_sink.sql`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsEventDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsEventTraceDO.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceSinkTest.java`
 
-- [ ] **Step 1: Write schema contract test**
+- [x] **Step 1: Write schema contract test**
 
-Create `TraceSinkTest.java` with a schema assertion:
+`TraceSinkTest#migrationProvidesAnalyticsSinkAndRetentionFields` verifies that `V132__analytics_event_trace_schema_and_sink.sql` creates `analytics_event` and `analytics_event_trace` with tenant, session, platform, device, event-time, received-time, schema-version, business-value, retention, archive, and legal-hold fields, and does not contain `DROP TABLE`.
 
-```java
-@Test
-void migrationAddsAnalyticsFieldsWithoutDroppingExistingTables() throws Exception {
-    String sql = Files.readString(Path.of("src/main/resources/db/migration/V112__analytics_event_trace_schema_and_sink.sql"));
-
-    assertThat(sql)
-            .contains("ALTER TABLE event_log")
-            .contains("tenant_id")
-            .contains("session_id")
-            .contains("platform")
-            .contains("device_type")
-            .contains("event_time")
-            .contains("received_at")
-            .contains("schema_version")
-            .contains("business_value")
-            .contains("ALTER TABLE canvas_execution_trace")
-            .contains("retention_class")
-            .contains("archive_status")
-            .contains("legal_hold")
-            .doesNotContain("DROP TABLE");
-}
-```
-
-- [ ] **Step 2: Run schema test and confirm red state**
+- [x] **Step 2: Verify schema test**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=TraceSinkTest#migrationAddsAnalyticsFieldsWithoutDroppingExistingTables
+cd backend
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=TraceSinkTest
 ```
 
-Expected: FAIL because the migration file does not exist.
-
-- [ ] **Step 3: Add additive migration**
-
-Create `V112__analytics_event_trace_schema_and_sink.sql` with guarded `ALTER TABLE` statements for `event_log` and `canvas_execution_trace`. Add nullable fields only, plus indexes for `(tenant_id, event_time)`, `(tenant_id, user_id, event_time)`, `(tenant_id, archive_status)`, and `(tenant_id, retention_class)`.
-
-- [ ] **Step 4: Update data objects**
-
-Add matching Java fields to `EventLogDO` and `CanvasExecutionTraceDO`: `tenantId`, `sessionId`, `platform`, `deviceType`, `source`, `eventTime`, `receivedAt`, `schemaVersion`, `businessValue`, `retentionClass`, `archiveStatus`, `archivedAt`, and `legalHold` where applicable.
-
-- [ ] **Step 5: Run schema test**
-
-Run:
-
-```bash
-cd backend && mvn -pl canvas-engine test -Dtest=TraceSinkTest#migrationAddsAnalyticsFieldsWithoutDroppingExistingTables
-```
-
-Expected: PASS.
+Result on 2026-06-09: PASS as part of `TraceSinkTest` with 5 tests, 0 failures, 0 errors.
 
 ### Task 2: Sink Abstraction And Metrics
 
 **Files:**
-- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceSinkTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/TraceEventSink.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/MySqlTraceEventSink.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/TraceWriteBuffer.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceSinkTest.java`
+- Regression test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceWriteBufferTest.java`
 
-- [ ] **Step 1: Add sink behavior tests**
+- [x] **Step 1: Write sink behavior tests**
 
-Append tests:
+`TraceSinkTest` covers:
+- `mysqlSinkWritesTraceBatchAndExposesCounters`
+- `mysqlSinkCountsFailuresWithoutThrowing`
+- `mysqlSinkWritesAnalyticsEvents`
+- `traceWriteBufferUsesSinkAndCountsDroppedRowsWhenFull`
 
-```java
-@Test
-void mysqlSinkWritesTraceBatchAndExposesCounters() {
-    CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
-    MySqlTraceEventSink sink = new MySqlTraceEventSink(mapper, mock(EventLogMapper.class));
+- [x] **Step 2: Confirm red state**
 
-    sink.writeTraces(List.of(CanvasExecutionTraceDO.builder().executionId("exec-1").nodeId("n1").build()));
+Initial red state on 2026-06-09: `TraceSinkTest` failed to compile because `TraceEventSink` and `MySqlTraceEventSink` did not exist.
 
-    verify(mapper).insertBatch(argThat(list -> list.size() == 1));
-    assertThat(sink.metrics().writtenCount()).isEqualTo(1);
-    assertThat(sink.metrics().failedCount()).isZero();
-}
+- [x] **Step 3: Implement sink interface**
 
-@Test
-void traceWriteBufferCountsDroppedRowsWhenFull() {
-    TraceEventSink sink = mock(TraceEventSink.class);
-    TraceWriteBuffer buffer = new TraceWriteBuffer(sink, 1, 1);
+`TraceEventSink` defines `writeTraces`, `writeEvents`, and `SinkMetrics`. `MySqlTraceEventSink` writes existing trace batches through `CanvasExecutionTraceMapper`, mirrors to `analytics_event_trace` when configured, writes `analytics_event`, and counts written/failed rows without propagating sink failures back to runtime execution.
 
-    buffer.offer(CanvasExecutionTraceDO.builder().executionId("exec-1").nodeId("n1").build());
-    buffer.offer(CanvasExecutionTraceDO.builder().executionId("exec-2").nodeId("n2").build());
+- [x] **Step 4: Wire TraceWriteBuffer through sink**
 
-    assertThat(buffer.metrics().droppedCount()).isEqualTo(1);
-    assertThat(buffer.metrics().backlog()).isEqualTo(1);
-}
-```
+`TraceWriteBuffer` now calls `sink.writeTraces(batch)`, preserves Doris side-load behavior, keeps old constructors compatible, adds a package-visible test constructor `(TraceEventSink sink, int maxCapacity, int batchSize)`, and exposes dropped/backlog metrics through `metrics()`.
 
-- [ ] **Step 2: Run sink tests and confirm red state**
+- [x] **Step 5: Run focused sink tests**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=TraceSinkTest
+cd backend
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=TraceSinkTest
 ```
 
-Expected: FAIL because sink classes and buffer constructor are missing.
+Result on 2026-06-09: PASS, 5 tests, 0 failures, 0 errors.
 
-- [ ] **Step 3: Implement sink interface**
-
-Create:
-
-```java
-public interface TraceEventSink {
-    void writeTraces(List<CanvasExecutionTraceDO> traces);
-    void writeEvents(List<EventLogDO> events);
-    SinkMetrics metrics();
-    record SinkMetrics(long writtenCount, long failedCount, long droppedCount, long backlog) {}
-}
-```
-
-Implement `MySqlTraceEventSink` by calling existing MyBatis mappers and incrementing counters.
-
-- [ ] **Step 4: Wire TraceWriteBuffer through sink**
-
-Keep the existing Spring constructor for production wiring, add a package-visible test constructor `(TraceEventSink sink, int capacity, int batchSize)`, increment dropped/backlog metrics, and call `sink.writeTraces(batch)`.
-
-- [ ] **Step 5: Run focused tests**
-
-Run:
-
-```bash
-cd backend && mvn -pl canvas-engine test -Dtest=TraceSinkTest
-```
-
-Expected: PASS.
-
-### Task 3: Verification And Commit
+### Task 3: Verification
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-016-analytics-event-trace-schema-and-sink.md`
 - Modify: `docs/product-evolution/plans/p2-016-analytics-event-trace-schema-and-sink-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused regression verification**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=TraceSinkTest
+cd backend
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=TraceSinkTest,TraceWriteBufferTest
 ```
 
-Expected: PASS.
+Result on 2026-06-09: PASS, 8 tests, 0 failures, 0 errors.
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Commit and merge**
 
-Run:
-
-```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V112__analytics_event_trace_schema_and_sink.sql backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventLogDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasExecutionTraceDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/TraceWriteBuffer.java backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceSinkTest.java docs/product-evolution/specs/p2-016-analytics-event-trace-schema-and-sink.md docs/product-evolution/plans/p2-016-analytics-event-trace-schema-and-sink-plan.md
-git commit -m "feat: add analytics trace sink foundation"
-```
-
-Expected: commit contains only additive analytics schema, sink abstraction, trace buffer metrics, tests, and related docs.
+Commit and merge status are intentionally not claimed by this document. Treat this as an implementation and focused-verification record until the branch is committed and integrated.

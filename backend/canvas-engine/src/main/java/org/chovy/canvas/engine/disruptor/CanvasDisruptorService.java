@@ -8,6 +8,7 @@ import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
 import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleGate;
 import org.chovy.canvas.engine.lane.ExecutionLane;
+import org.chovy.canvas.engine.lane.ExecutionLaneWorkerRegistry;
 import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import jakarta.annotation.PreDestroy;
@@ -54,6 +55,7 @@ public class CanvasDisruptorService {
     private final CanvasMetrics metrics;
     private final BackgroundSubscriptionRegistry backgroundSubscriptions;
     private final ExecutionLifecycleGate lifecycleGate;
+    private final ExecutionLaneWorkerRegistry requestLaneRegistry;
     /** 已订阅但尚未完成的 Reactor 执行数。 */
     private final AtomicInteger inFlight = new AtomicInteger();
     /** shutdown 后拒绝继续发布新事件。 */
@@ -66,10 +68,11 @@ public class CanvasDisruptorService {
             @Lazy CanvasExecutionRequestExecutor requestExecutor,
             CanvasMetrics metrics,
             @Value("${canvas.disruptor.ring-buffer-size:65536}") int ringBufferSize,
-            @Value("${canvas.disruptor.consumers:0}") int configuredConsumers
+            @Value("${canvas.disruptor.consumers:0}") int configuredConsumers,
+            ExecutionLaneWorkerRegistry requestLaneRegistry
     ) {
         this(executionService, requestExecutor, metrics, ringBufferSize, configuredConsumers,
-                new BackgroundSubscriptionRegistry(), new ExecutionLifecycleGate());
+                new BackgroundSubscriptionRegistry(), new ExecutionLifecycleGate(), requestLaneRegistry);
     }
 
     public CanvasDisruptorService(
@@ -80,7 +83,18 @@ public class CanvasDisruptorService {
             int configuredConsumers,
             BackgroundSubscriptionRegistry backgroundSubscriptions) {
         this(executionService, requestExecutor, metrics, ringBufferSize, configuredConsumers,
-                backgroundSubscriptions, new ExecutionLifecycleGate());
+                backgroundSubscriptions, new ExecutionLifecycleGate(), null);
+    }
+
+    public CanvasDisruptorService(
+            @Lazy CanvasExecutionService executionService,
+            @Lazy CanvasExecutionRequestExecutor requestExecutor,
+            CanvasMetrics metrics,
+            int ringBufferSize,
+            int configuredConsumers
+    ) {
+        this(executionService, requestExecutor, metrics, ringBufferSize, configuredConsumers,
+                new BackgroundSubscriptionRegistry(), new ExecutionLifecycleGate(), null);
     }
 
     public CanvasDisruptorService(
@@ -92,11 +106,26 @@ public class CanvasDisruptorService {
             BackgroundSubscriptionRegistry backgroundSubscriptions,
             ExecutionLifecycleGate lifecycleGate
     ) {
+        this(executionService, requestExecutor, metrics, ringBufferSize, configuredConsumers,
+                backgroundSubscriptions, lifecycleGate, null);
+    }
+
+    public CanvasDisruptorService(
+            @Lazy CanvasExecutionService executionService,
+            @Lazy CanvasExecutionRequestExecutor requestExecutor,
+            CanvasMetrics metrics,
+            int ringBufferSize,
+            int configuredConsumers,
+            BackgroundSubscriptionRegistry backgroundSubscriptions,
+            ExecutionLifecycleGate lifecycleGate,
+            ExecutionLaneWorkerRegistry requestLaneRegistry
+    ) {
         this.metrics = metrics;
         this.backgroundSubscriptions = backgroundSubscriptions == null
                 ? new BackgroundSubscriptionRegistry()
                 : backgroundSubscriptions;
         this.lifecycleGate = lifecycleGate == null ? new ExecutionLifecycleGate() : lifecycleGate;
+        this.requestLaneRegistry = requestLaneRegistry;
 
         // consumers=0 时自动使用 CPU 核数
         int consumers = determineConsumerCount(configuredConsumers);
@@ -199,9 +228,18 @@ public class CanvasDisruptorService {
     /** 处理已入库执行请求的 Disruptor 事件。 */
     private void handleRequestEvent(CanvasExecutionRequestExecutor requestExecutor, CanvasExecutionEvent event) {
         String requestId = event.requestId;
+        ExecutionLane executionLane = event.executionLane;
         // 已入库请求由 executor 接管状态迁移和失败重试，不在这里重复实现。
+        Mono<Void> execution = requestExecutor.execute(requestId, executionLane);
+        if (requestLaneRegistry != null) {
+            execution = requestLaneRegistry.guard(executionLane, execution)
+                    .onErrorResume(ExecutionLaneWorkerRegistry.LaneCapacityExceededException.class, e -> {
+                        metrics.recordExecutionRequestSkipped("UNKNOWN", "lane_worker_capacity:" + e.lane().name());
+                        return Mono.empty();
+                    });
+        }
         subscribeTracked(
-                requestExecutor.execute(requestId),
+                execution,
                 e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
                         requestId, e.getMessage())
         );
@@ -325,6 +363,11 @@ public class CanvasDisruptorService {
 
     /** 发布已入库的执行请求 ID 事件。 */
     public void publishRequest(String requestId) {
+        publishRequest(requestId, null);
+    }
+
+    /** 发布已入库的执行请求 ID 事件，并携带派发阶段预解析 lane。 */
+    public void publishRequest(String requestId, ExecutionLane executionLane) {
         assertAccepting();
         lifecycleGate.ensureAccepting("disruptor:REQUEST");
         long sequence;
@@ -338,6 +381,7 @@ public class CanvasDisruptorService {
         try {
             CanvasExecutionEvent event = ringBuffer.get(sequence);
             event.requestId = requestId;
+            event.executionLane = executionLane;
         } finally {
             ringBuffer.publish(sequence);
         }

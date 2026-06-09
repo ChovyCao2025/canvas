@@ -5,6 +5,8 @@ Sequence: 031
 Source: `docs/product-evolution/specs/p2-022-cdp-warehouse-ingestion-and-aggregation.md`, `docs/product-evolution/specs/p2-027-cdp-warehouse-catalog-and-lineage.md`
 Implementation plan: `../plans/p2-031-cdp-warehouse-physical-table-governance-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add physical table governance for the CDP warehouse so Doris ODS/DWD/DWS tables have explicit production contracts for partitioning, retention, bucket count, replica count, distribution keys, and DDL asset drift checks.

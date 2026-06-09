@@ -62,8 +62,19 @@ class FlywayMigrationPolicyTest {
                 .as("renumbered after merge conflict with V92__execution_context_cold_backup.sql")
                 .doesNotExist();
         assertThat(migrationDir.resolve("V272__sanitize_demo_datasource_credentials.sql"))
+                .as("tracked migration files must not be deleted and reintroduced under a new version")
                 .exists();
         assertThat(migrationDir.resolve("V273__enforce_core_tenant_not_null.sql"))
+                .as("tracked migration files must not be deleted and reintroduced under a new version")
+                .exists();
+        assertThat(migrationDir.resolve("V354__sanitize_demo_datasource_credentials.sql"))
+                .as("do not renumber an already tracked migration; keep V272 in place")
+                .doesNotExist();
+        assertThat(migrationDir.resolve("V355__enforce_core_tenant_not_null.sql"))
+                .as("V355 is already tracked by a different migration; core tenant NOT NULL repair must use V356")
+                .doesNotExist();
+        assertThat(migrationDir.resolve("V356__enforce_core_tenant_not_null.sql"))
+                .as("current core tenant NOT NULL repair migration version")
                 .exists();
 
         String v93 = Files.readString(migrationDir.resolve("V93__tenant_scope_datasources_and_execution_requests.sql"));

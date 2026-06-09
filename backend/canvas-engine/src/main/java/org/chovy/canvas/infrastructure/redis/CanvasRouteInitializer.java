@@ -54,6 +54,15 @@ public class CanvasRouteInitializer {
     /** 启动路由重建的分布式锁 key。 */
     private static final String REBUILD_LOCK = "canvas:route-init:lock";
 
+    /**
+     * 创建 CanvasRouteInitializer 实例并注入 infrastructure.redis 场景依赖。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasVersionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dagParser dag parser 参数，用于 CanvasRouteInitializer 流程中的校验、计算或对象转换。
+     * @param triggerRouteService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param mqTriggerHandler mq trigger handler 参数，用于 CanvasRouteInitializer 流程中的校验、计算或对象转换。
+     * @param redis redis 参数，用于 CanvasRouteInitializer 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public CanvasRouteInitializer(CanvasMapper canvasMapper,
                                   CanvasVersionMapper canvasVersionMapper,
@@ -65,6 +74,17 @@ public class CanvasRouteInitializer {
                 delay -> LockSupport.parkNanos(delay.toNanos()));
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasVersionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dagParser dag parser 参数，用于 CanvasRouteInitializer 流程中的校验、计算或对象转换。
+     * @param triggerRouteService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param mqTriggerHandler mq trigger handler 参数，用于 CanvasRouteInitializer 流程中的校验、计算或对象转换。
+     * @param redis redis 参数，用于 CanvasRouteInitializer 流程中的校验、计算或对象转换。
+     * @param rebuildWaiter rebuild waiter 参数，用于 CanvasRouteInitializer 流程中的校验、计算或对象转换。
+     */
     CanvasRouteInitializer(CanvasMapper canvasMapper,
                            CanvasVersionMapper canvasVersionMapper,
                            DagParser dagParser,
@@ -141,6 +161,7 @@ public class CanvasRouteInitializer {
                     DagGraph graph = dagParser.parse(version.getGraphJson());
                     registerRoutes(canvas.getId(), graph);
                     count++;
+                // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                 } catch (Exception e) {
                     log.error("[ROUTE_INIT] 重建失败 canvasId={}: {}", canvas.getId(), e.getMessage());
                 }

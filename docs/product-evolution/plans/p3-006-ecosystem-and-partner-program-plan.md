@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, shell validation with `rg`, repository documentation review.
 
+**Implementation Status:** Discovery and governance artifacts are complete in the current workspace record. Reverified on 2026-06-08 by checking the P3-006 discovery, partner checklist, and governance-gate headings plus the `split` gate outcome. Commit and merge status was not verified in this docs-only audit; the commit boundaries are documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -32,7 +34,7 @@
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-006-partner-program-discovery.md`
 
-- [ ] **Step 1: Write discovery artifact**
+- [x] **Step 1: Write discovery artifact**
 
 Create `docs/product-evolution/evidence/p3-006-partner-program-discovery.md`:
 
@@ -66,7 +68,7 @@ Create `docs/product-evolution/evidence/p3-006-partner-program-discovery.md`:
 Recommended gate input: split partner review governance from public portal build. Portal work requires a child spec after security and support sign-off.
 ```
 
-- [ ] **Step 2: Verify discovery headings**
+- [x] **Step 2: Verify discovery headings**
 
 Run:
 
@@ -76,7 +78,8 @@ rg -n "^## (Owners|Target Partner Segment|Evidence Register|Discovery Conclusion
 
 Expected: finds all four headings.
 
-- [ ] **Step 3: Commit discovery artifact**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -92,7 +95,7 @@ Expected: commit contains only the discovery artifact and this plan.
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md`
 
-- [ ] **Step 1: Write tier and review checklist**
+- [x] **Step 1: Write tier and review checklist**
 
 Create `docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md`:
 
@@ -119,7 +122,7 @@ Create `docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist
 - Sample must not include production secrets or real tenant data.
 ```
 
-- [ ] **Step 2: Verify checklist headings**
+- [x] **Step 2: Verify checklist headings**
 
 Run:
 
@@ -129,7 +132,8 @@ rg -n "^## (Tier Model|Security Review|SDK Sample Requirements)$" docs/product-e
 
 Expected: finds all three headings.
 
-- [ ] **Step 3: Commit checklist**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -145,7 +149,7 @@ Expected: commit contains only the checklist and this plan.
 **Files:**
 - Create: `docs/product-evolution/governance/p3-006-partner-program-gate.md`
 
-- [ ] **Step 1: Write governance gate**
+- [x] **Step 1: Write governance gate**
 
 Create `docs/product-evolution/governance/p3-006-partner-program-gate.md`:
 
@@ -177,7 +181,7 @@ If fewer than three partner-demand sources remain active by 2026-08-20, park por
 | Support | Partner Support Lead | Required |
 ```
 
-- [ ] **Step 2: Verify governance gate**
+- [x] **Step 2: Verify governance gate**
 
 Run:
 
@@ -187,7 +191,7 @@ rg -n "^- Outcome: (proceed|park|split)$|^## (Decision|Next Child Spec|Revisit T
 
 Expected: finds the split outcome and four headings.
 
-- [ ] **Step 3: Final validation**
+- [x] **Step 3: Final validation**
 
 Run:
 
@@ -198,7 +202,8 @@ git diff --check docs/product-evolution/specs/p3-006-ecosystem-and-partner-progr
 
 Expected: first command finds three document titles; `git diff --check` exits 0.
 
-- [ ] **Step 4: Commit governance gate**
+- [x] **Step 4: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

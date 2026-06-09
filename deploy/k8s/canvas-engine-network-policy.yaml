@@ -1,3 +1,4 @@
+# Canvas Engine 的网络边界，仅开放入口、监控和必需数据平台依赖。
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -7,6 +8,7 @@ metadata:
     app.kubernetes.io/name: canvas-engine
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 只约束后端 Pod，避免误影响同命名空间内的 Flink 或前端组件。
   podSelector:
     matchLabels:
       app.kubernetes.io/name: canvas-engine
@@ -14,6 +16,7 @@ spec:
     - Ingress
     - Egress
   ingress:
+    # 入口控制器负责用户/API 流量，监控命名空间负责抓取健康与指标。
     - from:
         - namespaceSelector:
             matchLabels:
@@ -25,6 +28,7 @@ spec:
         - protocol: TCP
           port: 8080
   egress:
+    # 保留 DNS 解析能力，后端需要解析数据库、Redis、RocketMQ 等服务名。
     - to:
         - namespaceSelector:
             matchLabels:
@@ -34,6 +38,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # 允许访问数据平台中的 MySQL、Redis 和 RocketMQ NameServer。
     - to:
         - namespaceSelector:
             matchLabels:
@@ -45,6 +50,7 @@ spec:
           port: 6379
         - protocol: TCP
           port: 9876
+    # 允许向监控系统暴露或推送必要观测数据。
     - to:
         - namespaceSelector:
             matchLabels:

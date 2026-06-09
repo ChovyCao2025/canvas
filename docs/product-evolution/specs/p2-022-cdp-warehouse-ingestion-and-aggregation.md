@@ -2,6 +2,7 @@
 
 Priority: P2
 Sequence: 022
+Status: Implemented; focused backend verification passed on 2026-06-09. Commit and merge status were not verified in this closeout.
 Source: `docs/product-evolution/specs/p2-021-cdp-olap-audience-materialization.md`, `docs/architecture/archive/evolution/data-platform-architecture.md`
 Implementation plan: `../plans/p2-022-cdp-warehouse-ingestion-and-aggregation-plan.md`
 
@@ -111,7 +112,7 @@ This spec extends their operational use rather than replacing their DDL.
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V190__cdp_warehouse_runs_and_watermarks.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V215__cdp_warehouse_runs_and_watermarks.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWarehouseSyncRunDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWarehouseWatermarkDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpWarehouseSyncRunMapper.java`
@@ -131,6 +132,14 @@ This spec extends their operational use rather than replacing their DDL.
 - Unit tests prove backfill pages accepted rows by id and uses the shared sink.
 - Unit tests prove aggregation rejects invalid windows, no-ops without Doris, and executes bounded DWD/DWS SQL with tenant scope.
 - Focused backend test command passes for all P2-022 tests and touched P2-021 regression tests.
+
+Focused verification on 2026-06-09 passed with Java 21:
+
+```bash
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=CdpWarehouseSchemaTest,DorisCdpEventStreamLoaderTest,CdpEventIngestionWarehouseSinkTest,CdpWarehouseBackfillServiceTest,CdpWarehouseAggregationServiceTest,CdpOlapAudienceSchemaTest,AudienceMaterializationServiceTest
+```
+
+Result: 18 tests run, 0 failures, 0 errors, 0 skipped.
 
 ## Rollout
 

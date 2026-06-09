@@ -33,7 +33,16 @@ public class TagImportSourceController {
 
     /** 标签导入来源服务，用于管理来源配置。 */
     private final TagImportSourceService tagImportSourceService;
-
+    /**
+     * 查询标签导入源列表接口，对应 GET 请求。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 主要委托 tagImportSourceService.list 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param enabled 请求参数，可选。
+     * @return 异步返回统一响应，包含分页结果。
+     */
     @GetMapping
     public Mono<R<PageResult<TagImportSourceDO>>> list(@RequestParam(required = false) Integer enabled) {
         return Mono.fromCallable(() -> {

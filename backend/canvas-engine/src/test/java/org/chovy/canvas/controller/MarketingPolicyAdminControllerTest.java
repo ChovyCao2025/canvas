@@ -9,15 +9,19 @@ import org.chovy.canvas.dal.dataobject.MarketingSuppressionDO;
 import org.chovy.canvas.dal.mapper.CustomerChannelMapper;
 import org.chovy.canvas.dal.mapper.MarketingConsentMapper;
 import org.chovy.canvas.dal.mapper.MarketingSuppressionMapper;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.web.MarketingPolicyAdminController;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class MarketingPolicyAdminControllerTest {
 
@@ -42,6 +46,7 @@ class MarketingPolicyAdminControllerTest {
         verify(consentMapper).insert(captor.capture());
         assertThat(captor.getValue().getChannel()).isEqualTo("SMS");
         assertThat(captor.getValue().getConsentStatus()).isEqualTo("OPT_OUT");
+        assertThat(captor.getValue().getTenantId()).isEqualTo(7L);
     }
 
     @Test
@@ -50,7 +55,7 @@ class MarketingPolicyAdminControllerTest {
         MarketingSuppressionMapper suppressionMapper = mock(MarketingSuppressionMapper.class);
         CustomerChannelMapper channelMapper = mock(CustomerChannelMapper.class);
         MarketingPolicyAdminController controller =
-                new MarketingPolicyAdminController(consentMapper, suppressionMapper, channelMapper);
+                new MarketingPolicyAdminController(consentMapper, suppressionMapper, channelMapper, tenantResolver());
 
         MarketingPolicyAdminController.PolicyState state = controller.policyState("user-1", "email").block().getData();
 
@@ -65,6 +70,13 @@ class MarketingPolicyAdminControllerTest {
         return new MarketingPolicyAdminController(
                 consentMapper,
                 mock(MarketingSuppressionMapper.class),
-                mock(CustomerChannelMapper.class));
+                mock(CustomerChannelMapper.class),
+                tenantResolver());
+    }
+
+    private TenantContextResolver tenantResolver() {
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.currentOrError()).thenReturn(Mono.just(new TenantContext(7L, "TENANT_ADMIN", "alice")));
+        return resolver;
     }
 }

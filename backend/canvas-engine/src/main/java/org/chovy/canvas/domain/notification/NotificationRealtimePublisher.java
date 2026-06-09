@@ -11,25 +11,25 @@ import org.chovy.canvas.dal.dataobject.NotificationDO;
 public interface NotificationRealtimePublisher {
 
     /**
-     * 发布或发送 publish 相关的业务数据。
+     * 向旧版全局实时通道发布用户通知事件。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>未显式传入租户时由实现类按兼容逻辑处理，适用于尚未携带租户上下文的调用方。
      *
-     * @param eventType eventType 类型标识或分类条件
-     * @param userId userId 对应的业务主键或标识
-     * @param notification notification 方法执行所需的业务参数
-     * @param unreadCount unreadCount 数量、阈值或分页参数
+     * @param eventType 实时事件类型，如 CREATED、UPDATED、READ
+     * @param userId 目标用户 ID
+     * @param notification 事件关联的通知实体
+     * @param unreadCount 目标用户当前未读通知数
      */
     void publish(String eventType, String userId, NotificationDO notification, Long unreadCount);
 
     /**
      * 发布指定租户内用户的实时通知。
      *
-     * @param eventType eventType 类型标识或分类条件
-     * @param tenantId tenantId 所属租户，null 表示旧版全局通道
-     * @param userId userId 对应的业务主键或标识
-     * @param notification notification 方法执行所需的业务参数
-     * @param unreadCount unreadCount 数量、阈值或分页参数
+     * @param eventType 实时事件类型，如 CREATED、UPDATED、READ
+     * @param tenantId 所属租户，null 表示旧版全局通道
+     * @param userId 目标用户 ID
+     * @param notification 事件关联的通知实体
+     * @param unreadCount 目标用户当前未读通知数
      */
     default void publish(String eventType, Long tenantId, String userId, NotificationDO notification, Long unreadCount) {
         publish(eventType, userId, notification, unreadCount);

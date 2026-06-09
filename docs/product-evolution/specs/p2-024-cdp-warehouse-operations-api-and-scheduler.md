@@ -5,6 +5,8 @@ Sequence: 024
 Source: `docs/product-evolution/specs/p2-022-cdp-warehouse-ingestion-and-aggregation.md`
 Implementation plan: `../plans/p2-024-cdp-warehouse-operations-api-and-scheduler-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn the P2-022 CDP warehouse jobs into an operable production surface: operators and schedulers must be able to inspect watermarks, inspect recent runs, manually trigger bounded backfill or aggregation, and let the service advance warehouse jobs without duplicate overlapping executions.

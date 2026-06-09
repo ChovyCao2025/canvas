@@ -1,3 +1,4 @@
+# 部署 Canvas Engine 后端服务，承载画布编排、营销域服务和对外 API。
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,7 +8,9 @@ metadata:
     app.kubernetes.io/name: canvas-engine
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 生产环境默认保持 3 个副本，配合 HPA 在流量升高时继续横向扩容。
   replicas: 3
+  # 保留最近 10 个 ReplicaSet，便于出现发布问题时快速回滚。
   revisionHistoryLimit: 10
   selector:
     matchLabels:
@@ -15,7 +18,9 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
+      # 允许滚动发布时多起一个 Pod，加快新版本预热。
       maxSurge: 1
+      # 发布期间不主动降低可用副本数，避免营销任务 API 出现容量空窗。
       maxUnavailable: 0
   template:
     metadata:
@@ -23,7 +28,9 @@ spec:
         app.kubernetes.io/name: canvas-engine
         app.kubernetes.io/part-of: marketing-canvas
     spec:
+      # 使用独立 ServiceAccount 便于后续最小权限绑定和审计。
       serviceAccountName: canvas-engine
+      # 给 Spring Boot、Disruptor 消费和数据库连接池留出关闭窗口。
       terminationGracePeriodSeconds: 60
       containers:
         - name: canvas-engine
@@ -33,14 +40,17 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            # 固定加载生产配置，环境差异通过 ConfigMap/Secret 注入。
             - name: SPRING_PROFILES_ACTIVE
               value: prod
+            # ZGC 与内存百分比让 JVM 在容器限制内稳定运行，减少 Full GC 抖动。
             - name: JAVA_OPTS
               value: >-
                 -XX:+UseZGC
                 -XX:+ZGenerational
                 -XX:MaxRAMPercentage=70
                 -Djava.security.egd=file:/dev/./urandom
+            # 数据库连接串和凭据从 Secret 读取，避免明文写入部署清单。
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 secretKeyRef:
@@ -56,6 +66,7 @@ spec:
                 secretKeyRef:
                   name: canvas-engine-prod
                   key: spring-datasource-password
+            # Redis 地址使用 ConfigMap，密码仍放在 Secret 中分离管理。
             - name: SPRING_DATA_REDIS_HOST
               valueFrom:
                 configMapKeyRef:
@@ -71,6 +82,7 @@ spec:
                 secretKeyRef:
                   name: canvas-engine-prod
                   key: spring-data-redis-password
+            # CORS 白名单随环境变化，保持在 ConfigMap 中便于发布外调整。
             - name: CANVAS_CORS_ALLOWED_ORIGINS
               valueFrom:
                 configMapKeyRef:
@@ -81,6 +93,7 @@ spec:
                 secretKeyRef:
                   name: canvas-engine-prod
                   key: canvas-event-report-secret
+            # 内部 API、公域触发、JWT 和字段加密密钥全部来自 Secret。
             - name: CANVAS_INTERNAL_API_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -106,6 +119,7 @@ spec:
                 configMapKeyRef:
                   name: canvas-engine-prod
                   key: rocketmq-name-server
+          # 就绪探针控制 Service 摘挂，只有 Actuator 健康后才接收流量。
           readinessProbe:
             httpGet:
               path: /actuator/health
@@ -114,6 +128,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
+          # 存活探针用于发现进程卡死或健康端点长期不可达的实例。
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -122,6 +137,7 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 3
+          # 启动探针给 Flyway、连接池预热和缓存加载留出更长启动时间。
           startupProbe:
             httpGet:
               path: /actuator/health
@@ -129,6 +145,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 18
+          # 资源请求支撑调度容量，限制值防止单实例挤占节点资源。
           resources:
             requests:
               cpu: "1"
@@ -136,6 +153,7 @@ spec:
             limits:
               cpu: "4"
               memory: 6Gi
+          # 禁止提权并丢弃 Linux capabilities，降低容器逃逸面。
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false

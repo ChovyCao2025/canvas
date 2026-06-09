@@ -5,6 +5,8 @@ Sequence: 042
 Source: `docs/product-evolution/specs/p2-040-cdp-warehouse-semantic-metric-contracts.md`, `docs/product-evolution/specs/p2-041-cdp-warehouse-metric-lineage-and-impact.md`
 Implementation plan: `../plans/p2-042-cdp-warehouse-metric-change-review-guard-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a production guard for semantic metric changes so operators can propose expression and allowed-dimension edits, capture impact evidence, require reviewer approval, and only then apply the change to the persisted BI metric.

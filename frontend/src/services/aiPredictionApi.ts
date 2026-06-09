@@ -22,6 +22,13 @@ export interface PredictionRunView {
   errorMessage?: string | null
 }
 
+export interface PredictionReadinessView {
+  recomputeEnabled: boolean
+  disabledReason?: string | null
+  modelVersion: string
+  batchSize: number
+}
+
 export interface RiskDistributionItem {
   band: RiskBand
   count: number
@@ -45,6 +52,8 @@ export function createAiPredictionApi(client = http) {
   return {
     latestRun: () =>
       client.get<R<PredictionRunView | null>, R<PredictionRunView | null>>('/ai/predictions/latest-run'),
+    readiness: () =>
+      client.get<R<PredictionReadinessView>, R<PredictionReadinessView>>('/ai/predictions/readiness'),
     churnDistribution: () =>
       client.get<R<RiskDistributionItem[]>, R<RiskDistributionItem[]>>('/ai/predictions/churn-distribution'),
     topRiskUsers: (limit = 100) =>

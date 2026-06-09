@@ -1,10 +1,14 @@
 # CDP Warehouse Transitive Lineage Impact Implementation Plan
 
+Spec: `../specs/p2-043-cdp-warehouse-transitive-lineage-impact.md`
+
 **Goal:** Add bounded multi-hop lineage traversal on top of the existing warehouse catalog and lineage tables.
 
 **Architecture:** Keep direct lineage unchanged. Add `transitiveLineage` to `CdpWarehouseCatalogService`, loading active lineage edges once, applying tenant override semantics, then running a bounded breadth-first traversal with cycle detection and path output.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

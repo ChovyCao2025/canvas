@@ -49,6 +49,12 @@ public class TriggerRouteService {
     /** 等待路由变更锁的最大毫秒数。 */
     private static final long ROUTE_MUTATION_LOCK_WAIT_MS = 5_000L;
 
+    /**
+     * 创建 TriggerRouteService 实例并注入 infrastructure.redis 场景依赖。
+     * @param redis redis 参数，用于 TriggerRouteService 流程中的校验、计算或对象转换。
+     * @param keys keys 参数，用于 TriggerRouteService 流程中的校验、计算或对象转换。
+     * @param reactiveFactory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     @Autowired
     public TriggerRouteService(StringRedisTemplate redis,
                                RedisKeyUtil keys,
@@ -59,6 +65,14 @@ public class TriggerRouteService {
         });
     }
 
+    /**
+     * 执行 TriggerRouteService 流程，围绕 trigger route service 完成校验、计算或结果组装。
+     *
+     * @param redis redis 参数，用于 TriggerRouteService 流程中的校验、计算或对象转换。
+     * @param keys keys 参数，用于 TriggerRouteService 流程中的校验、计算或对象转换。
+     * @param reactiveFactory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param routeMutationWaiter route mutation waiter 参数，用于 TriggerRouteService 流程中的校验、计算或对象转换。
+     */
     TriggerRouteService(StringRedisTemplate redis,
                         RedisKeyUtil keys,
                         ReactiveRedisConnectionFactory reactiveFactory,
@@ -135,6 +149,15 @@ public class TriggerRouteService {
             List<String> oldKeys = scanMqRouteKeys();
 
             redis.execute(new SessionCallback<List<Object>>() {
+                /**
+                 * 在 Redis 会话内原子替换 MQ 触发路由。
+                 *
+                 * <p>该回调由 {@code RedisTemplate.execute} 调用，负责开启事务、删除旧 MQ 路由 key、
+                 * 写入新的 topic 到画布 ID 集合，并返回 {@code EXEC} 的结果列表；不负责 ready 标记切换。</p>
+                 *
+                 * @param operations 当前 Redis 会话操作对象
+                 * @return Redis 事务执行结果
+                 */
                 @Override
                 @SuppressWarnings("unchecked")
                 public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
@@ -162,13 +185,25 @@ public class TriggerRouteService {
             List<String> oldKeys = scanAllRouteKeys();
 
             redis.execute(new SessionCallback<List<Object>>() {
+                /**
+                 * 在 Redis 会话内原子替换全部触发路由。
+                 *
+                 * <p>该回调由 {@code RedisTemplate.execute} 调用，负责在一个事务中删除旧路由 key，
+                 * 并重建 MQ、行为事件和标签触发三类 Set；返回值是 Redis {@code EXEC} 的原始结果列表。</p>
+                 *
+                 * @param operations 当前 Redis 会话操作对象
+                 * @return Redis 事务执行结果
+                 */
                 @Override
                 @SuppressWarnings("unchecked")
                 public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
                     operations.multi();
+                    // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                     if (!oldKeys.isEmpty()) {
+                        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                         operations.delete((Collection<K>) oldKeys);
                     }
+                    // 遍历候选数据并按业务规则筛选、转换或聚合。
                     snapshot.mqRoutes().forEach((topicKey, canvasIds) -> operations.opsForSet().add(
                             (K) keys.triggerMq(topicKey),
                             (V[]) canvasIds.toArray(String[]::new)));
@@ -218,6 +253,7 @@ public class TriggerRouteService {
             try (Cursor<String> cursor = redis.scan(options)) {
                 return !cursor.hasNext();
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             // Redis 不可用时保守返回 true，由上层触发重建路由流程
             return true;
@@ -318,9 +354,11 @@ public class TriggerRouteService {
 
     /** 清洗单类路由快照。 */
     private Map<String, Set<String>> sanitizeRouteMap(Map<String, Set<String>> routes) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (routes == null || routes.isEmpty()) {
             return Map.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return routes.entrySet().stream()
                 .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
                 .map(entry -> Map.entry(entry.getKey().trim(), sanitizeCanvasIds(entry.getValue())))
@@ -330,9 +368,11 @@ public class TriggerRouteService {
 
     /** 过滤空值、空白值和非正整数，得到可写入 Redis 的画布 ID 集合。 */
     private Set<String> sanitizeCanvasIds(Set<String> canvasIds) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (canvasIds == null || canvasIds.isEmpty()) {
             return Set.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return canvasIds.stream()
                 .filter(Objects::nonNull)
                 .filter(id -> !id.isBlank())
@@ -345,6 +385,7 @@ public class TriggerRouteService {
     private boolean isPositiveLong(String value) {
         try {
             return Long.parseLong(value) > 0;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (NumberFormatException e) {
             return false;
         }

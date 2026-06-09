@@ -5,6 +5,8 @@ Sequence: 037
 Source: `docs/product-evolution/specs/p2-036-cdp-warehouse-readiness-and-slo-summary.md`, `docs/product-evolution/specs/p2-030-cdp-warehouse-quality-incident-loop.md`, `docs/product-evolution/specs/p2-033-cdp-warehouse-realtime-pipeline-incidents.md`
 Implementation plan: `../plans/p2-037-cdp-warehouse-readiness-incident-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn the tenant-scoped warehouse readiness summary into an actionable incident loop so operators do not need to manually inspect every readiness section after a WARN or FAIL result.

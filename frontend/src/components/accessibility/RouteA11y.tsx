@@ -8,6 +8,7 @@ export function buildRouteAnnouncement(pathname: string): string {
   if (pathname === '/' || pathname === '/home') return '已进入首页'
   if (pathname.startsWith('/mautic-insights')) return '已进入营销解释台'
   if (pathname.startsWith('/marketing-platform')) return '已进入营销中台'
+  if (pathname.startsWith('/risk')) return '已进入风控策略工作台'
   if (pathname.startsWith('/marketing-preferences')) return '已进入偏好中心'
   if (pathname.startsWith('/marketing-forms')) return '已进入表单中心'
   if (pathname.startsWith('/growth-activities')) return '已进入增长活动中心'

@@ -1,10 +1,14 @@
 # CDP Warehouse Audience Materialization Availability Gate Implementation Plan
 
+Spec: `../specs/p2-056-cdp-warehouse-audience-materialization-availability-gate.md`
+
 **Goal:** Add an availability-gated audience materialization path without changing the existing manual materialization endpoint.
 
 **Architecture:** Reuse `CdpWarehouseAvailabilityService` from P2-055 inside `AudienceMaterializationOperationsService`. Return a combined response that carries the availability decision and, only when allowed, the materialization result.
 
 **Tech Stack:** Java 21, Spring Boot, existing warehouse availability service, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

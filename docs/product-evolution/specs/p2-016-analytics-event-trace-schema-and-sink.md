@@ -2,23 +2,25 @@
 
 Priority: P2
 Sequence: 016
-Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/production-readiness-checklist.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/todo/cdp_gap_analysis.md`
+Source: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/archive/production-readiness-checklist.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/todo/cdp_gap_analysis.md`
 Implementation plan: `../plans/p2-016-analytics-event-trace-schema-and-sink-plan.md`
+
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
 
 ## Goal
 
-Add additive event/trace fields and route trace/event writes through an OLAP-ready sink abstraction while keeping MySQL compatibility.
+Add analytics event/trace storage and route trace/event writes through an OLAP-ready sink abstraction while keeping MySQL compatibility.
 
 ## Current Baseline
 
-- `event_log` and `canvas_execution_trace` exist.
-- `TraceWriteBuffer` writes batches to MySQL and can drop data when full.
-- Event and trace rows lack enough tenant/session/platform/device/version fields for later analytics.
+- `event_log` and `canvas_execution_trace` remain the compatibility tables for existing workflows.
+- `V132__analytics_event_trace_schema_and_sink.sql` creates `analytics_event` and `analytics_event_trace` with tenant, session, platform, device, event-time, schema-version, retention, archive, and legal-hold fields.
+- `TraceWriteBuffer` writes batches through `TraceEventSink`, keeps the existing MySQL trace write path, and can drop data when full.
 
 ## In Scope
 
-- Additive migration `V112__analytics_event_trace_schema_and_sink.sql`.
-- Data object updates for event and trace fields.
+- Canonical analytics tables `analytics_event` and `analytics_event_trace` from `V132__analytics_event_trace_schema_and_sink.sql`.
+- Data objects and mappers for `AnalyticsEventDO` and `AnalyticsEventTraceDO`.
 - `TraceEventSink` and `MySqlTraceEventSink`.
 - Metrics for written, failed, dropped, and backlog counts.
 
@@ -30,6 +32,10 @@ Add additive event/trace fields and route trace/event writes through an OLAP-rea
 
 ## Acceptance Criteria
 
-- Migration is additive and backfill-safe.
-- Existing event/trace reads keep working when new fields are null.
-- Sink tests prove tenant-scoped writes, MySQL compatibility, and metrics exposure.
+- Migration is additive and backfill-safe through separate analytics tables.
+- Existing event/trace reads keep working because `canvas_execution_trace` writes are preserved.
+- Sink tests prove tenant-scoped analytics writes, MySQL compatibility, failure isolation, and metrics exposure.
+
+## Verification Evidence
+
+- 2026-06-09: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=TraceSinkTest,TraceWriteBufferTest` passed with 8 tests, 0 failures, 0 errors.

@@ -72,14 +72,32 @@ public class DirectReturnHandler implements NodeHandler {
     @Override
     public boolean isBenefitNode() { return false; }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 string 生成的文本或业务键。
+     */
     private static String string(Object value) {
         return value == null ? null : value.toString();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean isContextTemplate(String value) {
         return value != null && value.startsWith("${") && value.endsWith("}");
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeContextKey(String value) {
         if (value == null) {
             return null;

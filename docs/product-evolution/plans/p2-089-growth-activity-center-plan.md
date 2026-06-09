@@ -1,5 +1,9 @@
 # Growth Activity Center Implementation Plan
 
+Spec: `../specs/p2-089-growth-activity-center.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add a tenant-scoped Growth Activity Center that manages promotion, referral, task, loyalty, retention, and private-domain growth activities as closed-loop business objects on top of the existing marketing middle-platform capabilities.
 
 **Architecture:** Add additive persistence, MyBatis DOs/mappers, domain services, tenant-context controllers, marketing-platform evidence integration, and a focused frontend activity center. The activity center owns activity metadata, reward pools, participants, grants, referral relations, task progress, readiness, reconciliation, and reports while reusing campaign master ledger, journey canvas, `COMMIT_ACTION`, loyalty, content, delivery, BI, attribution, risk, and integration contract modules.

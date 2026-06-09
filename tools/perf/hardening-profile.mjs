@@ -6,6 +6,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_PROFILE_FILE = path.join(SCRIPT_DIR, '3000-hardening-profiles.json')
+const READINESS_4000_PROFILE_FILE = path.join(SCRIPT_DIR, '4000-readiness-profiles.json')
+const READINESS_4000_ALIAS = '4000-readiness'
+const READINESS_4000_DEFAULT_PROFILE = 'readiness-mixed-4000'
 
 function positiveInteger(label, value) {
   if (!Number.isInteger(value) || value <= 0) {
@@ -190,6 +193,16 @@ export function buildEvidenceManifest(config, profile, options = {}) {
   }
 }
 
+export function buildValidationSummary(config, profile) {
+  return {
+    profile: profile.name,
+    totalConcurrency: config.targetConcurrency,
+    laneBudgets: config.lanes,
+    stopGates: config.stopGates,
+    blockedUntil: config.blockedUntil || null,
+  }
+}
+
 export function loadProfileFile(filePath = DEFAULT_PROFILE_FILE) {
   return validateHardeningProfiles(JSON.parse(readFileSync(filePath, 'utf8')))
 }
@@ -198,25 +211,49 @@ function parseCliArgs(argv) {
   const args = {
     profile: 'default-mixed-3000',
     profileFile: DEFAULT_PROFILE_FILE,
+    profileFileProvided: false,
     baseUrl: 'http://localhost:8080',
     outDir: 'tmp/perf-3000-hardening',
     runIdPrefix: '',
     writeEvidence: false,
+    validateOnly: false,
   }
 
-  for (let index = 0; index < argv.length; index += 2) {
+  for (let index = 0; index < argv.length;) {
     const flag = argv[index]
+    if (flag === '--validate-only') {
+      const maybeValue = argv[index + 1]
+      if (maybeValue && !maybeValue.startsWith('--')) {
+        args.validateOnly = maybeValue === 'true'
+        index += 2
+      } else {
+        args.validateOnly = true
+        index += 1
+      }
+      continue
+    }
     const value = argv[index + 1]
     if (!value || value.startsWith('--')) {
       throw new Error(`missing value for ${flag}`)
     }
     if (flag === '--profile') args.profile = value
-    else if (flag === '--profile-file') args.profileFile = value
+    else if (flag === '--profile-file') {
+      args.profileFile = value
+      args.profileFileProvided = true
+    }
     else if (flag === '--base-url') args.baseUrl = value
     else if (flag === '--out-dir') args.outDir = value
     else if (flag === '--run-id-prefix') args.runIdPrefix = value
     else if (flag === '--write-evidence') args.writeEvidence = value === 'true'
     else throw new Error(`unknown flag ${flag}`)
+    index += 2
+  }
+
+  if (args.profile === READINESS_4000_ALIAS) {
+    args.profile = READINESS_4000_DEFAULT_PROFILE
+    if (!args.profileFileProvided) {
+      args.profileFile = READINESS_4000_PROFILE_FILE
+    }
   }
 
   return args
@@ -226,6 +263,10 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = parseCliArgs(process.argv.slice(2))
   const config = loadProfileFile(args.profileFile)
   const profile = selectProfile(config, args.profile)
+  if (args.validateOnly) {
+    console.log(JSON.stringify(buildValidationSummary(config, profile)))
+    process.exit(0)
+  }
   const command = renderThresholdCommand(profile, args)
   if (args.writeEvidence) {
     const manifest = buildEvidenceManifest(config, profile, args)

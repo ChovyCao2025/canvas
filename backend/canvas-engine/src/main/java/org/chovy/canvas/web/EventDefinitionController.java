@@ -53,7 +53,17 @@ public class EventDefinitionController {
 
 
     // ── 事件定义 CRUD ────────────────────────────────────────────
-
+    /**
+     * 查询Event Definition列表接口，对应 GET /event-definitions。
+     * 接口在控制器或服务层执行资源权限校验后再处理请求。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param page 请求参数，默认值为 1。
+     * @param size 请求参数，默认值为 20。
+     * @param enabled 请求参数，可选。
+     * @return 异步返回统一响应，包含分页结果。
+     */
     @GetMapping("/event-definitions")
     public Mono<R<PageResult<EventDefinitionDO>>> list(
             @RequestParam(defaultValue = "1") int page,
@@ -155,14 +165,26 @@ public class EventDefinitionController {
                 .map(R::ok);
     }
 
+    /**
+     * 解析并校验输入数据。
+     *
+     * @param body 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private EventReportReq parseAndValidateEventReport(String body) {
         try {
             return ApiRequestValidation.validate(objectMapper.readValue(body, EventReportReq.class));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请求体 JSON 不合法", e);
         }
     }
 
+    /**
+     * 执行 invalidateEventCode 流程，围绕 invalidate event code 完成校验、计算或结果组装。
+     *
+     * @param eventCode 业务编码，用于匹配对应类型或状态。
+     */
     private void invalidateEventCode(String eventCode) {
         if (eventCode != null && !eventCode.isBlank()) {
             eventDefinitionCacheService.invalidatePublishedByCode(eventCode);

@@ -5,6 +5,8 @@ Sequence: 036
 Source: `docs/product-evolution/specs/p2-024-cdp-warehouse-operations-api-and-scheduler.md`, `docs/product-evolution/specs/p2-026-cdp-warehouse-quality-and-reconciliation.md`, `docs/product-evolution/specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`, `docs/product-evolution/specs/p2-035-cdp-warehouse-audience-materialization-operations.md`
 Implementation plan: `../plans/p2-036-cdp-warehouse-readiness-and-slo-summary-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a tenant-scoped warehouse readiness summary that combines existing offline, realtime, incident, BI datasource, and audience materialization facts into one production operations view.

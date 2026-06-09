@@ -5,6 +5,10 @@ Sequence: 003
 Source: `todo/p3/long-term-architecture-evolution.md`
 Implementation plan: `../plans/p3-003-long-term-architecture-evolution-plan.md`
 
+## Implementation Status
+
+Status: discovery package and validator are complete in the current workspace record. Commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn long-term architecture ideas into measurable architecture decision records and proof gates before service split, React Flow replacement, Flink CEP, multi-cloud, serverless, edge, or data-residency work begins.

@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082m-monitoring-polling-and-trends-plan.md`
 
 Make the marketing monitoring data plane production-ready for social/search/review listening by adding source polling configuration, provider polling runs, cursor tracking, ingestion evidence, and trend snapshots on top of the existing mention, sentiment, competitor, alert, webhook, and fanout layers.
 
-## Delivery Status
+## Implementation Status
 
 Delivered backend first slice:
 

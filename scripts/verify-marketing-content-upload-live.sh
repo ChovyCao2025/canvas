@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Verifies the live marketing content upload path against a running backend.
+#
+# The flow uploads a file, checks DAM status transitions, and leaves evidence that
+# later release-loop verifiers can reference through ASSET_KEY.
 set -euo pipefail
 
 API_BASE="${API_BASE:-http://localhost:8080}"

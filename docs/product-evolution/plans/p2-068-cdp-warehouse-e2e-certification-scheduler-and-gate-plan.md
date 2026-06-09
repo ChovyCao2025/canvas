@@ -1,5 +1,9 @@
 # CDP Warehouse E2E Certification Scheduler And Gate Implementation Plan
 
+Spec: `../specs/p2-068-cdp-warehouse-e2e-certification-scheduler-and-gate.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add scheduled warehouse E2E certification refresh and a production gate that evaluates recent persisted PASS evidence.

@@ -1,10 +1,14 @@
 # CDP Warehouse Offline Cycle Orchestration Implementation Plan
 
+Spec: `../specs/p2-049-cdp-warehouse-offline-cycle-orchestration.md`
+
 **Goal:** Add a dependency-aware offline warehouse cycle so backfill and aggregation can be planned, run, audited, and scheduled through one production-safe entrypoint.
 
 **Architecture:** Reuse the existing `cdp_warehouse_sync_run` and `cdp_warehouse_watermark` tables. `CdpWarehouseOperationsService` owns planning and execution, direct backfill/aggregation services remain unchanged, and `CdpWarehouseScheduler` delegates to the orchestration entrypoint behind the existing lease.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

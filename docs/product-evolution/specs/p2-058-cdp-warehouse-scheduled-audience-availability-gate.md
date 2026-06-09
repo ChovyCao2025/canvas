@@ -5,6 +5,8 @@ Sequence: 058
 Source: `docs/product-evolution/specs/p2-045-cdp-warehouse-audience-materialization-scheduler-and-rollback.md`, `docs/product-evolution/specs/p2-055-cdp-warehouse-data-availability-gates.md`, `docs/product-evolution/specs/p2-056-cdp-warehouse-audience-materialization-availability-gate.md`
 Implementation plan: `../plans/p2-058-cdp-warehouse-scheduled-audience-availability-gate-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Wire warehouse data availability gates into scheduled audience materialization so unattended OLAP audience refreshes do not consume stale or unavailable offline/realtime warehouse windows.

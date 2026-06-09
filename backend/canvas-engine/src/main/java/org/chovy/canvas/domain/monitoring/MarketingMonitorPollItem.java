@@ -5,6 +5,17 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * MarketingMonitorPollItem 承载 domain.monitoring 场景中的不可变数据快照。
+ * @param externalItemId externalItemId 字段。
+ * @param sourceUrl sourceUrl 字段。
+ * @param authorKey authorKey 字段。
+ * @param brandKey brandKey 字段。
+ * @param text text 字段。
+ * @param language language 字段。
+ * @param publishedAt publishedAt 字段。
+ * @param rawPayload rawPayload 字段。
+ */
 public record MarketingMonitorPollItem(
         String externalItemId,
         String sourceUrl,

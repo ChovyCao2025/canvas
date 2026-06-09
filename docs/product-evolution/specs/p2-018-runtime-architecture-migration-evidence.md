@@ -2,8 +2,10 @@
 
 Priority: P2
 Sequence: 018
-Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/todo/plan-review-findings.md`, `docs/optimization/todo/specs`, `docs/optimization/todo/plans`
+Source: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/todo/plan-review-findings.md`, `docs/optimization/todo/specs`, `docs/optimization/todo/plans`
 Implementation plan: `../plans/p2-018-runtime-architecture-migration-evidence-plan.md`
+
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
 
 ## Goal
 

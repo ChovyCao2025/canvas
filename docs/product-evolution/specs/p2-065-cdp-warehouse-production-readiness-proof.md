@@ -5,6 +5,8 @@ Sequence: 065
 Source: `docs/product-evolution/specs/p2-036-cdp-warehouse-readiness-and-slo-summary.md`, `docs/product-evolution/specs/p2-055-cdp-warehouse-data-availability-gates.md`, `docs/product-evolution/specs/p2-060-cdp-warehouse-consumer-availability-contracts.md`, `docs/product-evolution/specs/p2-061-cdp-warehouse-contract-gated-consumers.md`, `docs/product-evolution/specs/p2-064-cdp-warehouse-scheduled-audience-contract-gates.md`
 Implementation plan: `../plans/p2-065-cdp-warehouse-production-readiness-proof-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a tenant-scoped production readiness proof that combines warehouse readiness, offline/realtime window availability, and critical consumer availability contract evaluations into one operator-facing verdict before production OLAP/CDP use.

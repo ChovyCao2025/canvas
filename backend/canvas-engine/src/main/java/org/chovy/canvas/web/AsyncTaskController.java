@@ -54,7 +54,21 @@ public class AsyncTaskController {
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }
-
+    /**
+     * 查询异步任务列表接口，对应 GET 请求。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 主要委托 taskService.list 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param taskType 请求参数，可选。
+     * @param bizType 请求参数，可选。
+     * @param bizIds 请求参数，可选。
+     * @param statuses 请求参数，可选。
+     * @param page 请求参数，默认值为 1。
+     * @param size 请求参数，默认值为 100。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping
     public Mono<R<List<AsyncTaskDTO>>> list(
             @RequestParam(required = false) String taskType,
@@ -87,11 +101,9 @@ public class AsyncTaskController {
     }
 
     /**
-     * 执行 current User 对应的业务逻辑。
+     * 获取当前请求的登录上下文或租户信息。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @return 返回 currentUser 流程生成的业务结果。
      */
     private Mono<CurrentUser> currentUser() {
         return ReactiveSecurityContextHolder.getContext()
@@ -105,17 +117,17 @@ public class AsyncTaskController {
     }
 
     /**
-     * 构建、解析或转换 parse Csv 相关的业务数据。
+     * 解析并校验输入数据。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 查询、转换或计算得到的结果集合
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
      */
     private List<String> parseCsv(String value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null || value.isBlank()) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return Arrays.stream(value.split(","))
                 .map(String::trim)
                 .filter(item -> !item.isBlank())
@@ -123,40 +135,34 @@ public class AsyncTaskController {
     }
 
     /**
-     * 执行 clamp 对应的业务逻辑。
+     * 按安全边界裁剪或保护输入值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param min min 方法执行所需的业务参数
-     * @param max max 方法执行所需的业务参数
-     * @return 计算得到的数值结果
+     * @param value 待处理值，用于规则计算或转换。
+     * @param min min 参数，用于 clamp 流程中的校验、计算或对象转换。
+     * @param max max 参数，用于 clamp 流程中的校验、计算或对象转换。
+     * @return 返回 clamp 计算得到的数量、金额或指标值。
      */
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
 
     /**
-     * 执行 default If Blank 对应的业务逻辑。
+     * 按默认值规则处理输入值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultIfBlank 流程中的校验、计算或对象转换。
+     * @return 返回 default if blank 生成的文本或业务键。
      */
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }
 
     /**
-     * 判断 can View 相关的业务数据。
+     * 转换为接口返回或领域视图。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param task task 方法执行所需的业务参数
-     * @param user user 用户或客户相关标识/数据
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param task task 参数，用于 canView 流程中的校验、计算或对象转换。
+     * @param user 操作人标识，用于审计和权限判断。
+     * @return 返回布尔判断结果。
      */
     private boolean canView(AsyncTaskDO task, CurrentUser user) {
         if ("ADMIN".equals(user.role())) {
@@ -169,11 +175,14 @@ public class AsyncTaskController {
         return taskService.subscribers(task.getTaskId()).contains(user.username());
     }
 
+    /**
+     * CurrentUser record.
+     * @param username 用户名.
+     * @param role 角色编码.
+     */
     private record CurrentUser(
-            /** 用户名。 */
-            String username,
-            /** 角色编码。 */
-            String role
+        String username,
+        String role
     ) {
     }
 }

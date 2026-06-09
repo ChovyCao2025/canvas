@@ -42,6 +42,9 @@ import java.util.Set;
         messageModel = MessageModel.CLUSTERING,
         consumeThreadNumber = 20
 )
+/**
+ * MqTriggerConsumer 封装本模块的核心职责、输入输出结构和协作边界。
+ */
 public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
 
     /** 系统告警内容最大长度，避免异常消息体过长。 */
@@ -188,6 +191,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
      * @param message 已反序列化的 MQ 触发消息
      */
     private void validateMessage(MqTriggerMessage message) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (message.getUserId() == null || message.getUserId().isBlank()) {
             throw new IllegalArgumentException("Invalid MQ trigger message body: userId is required");
         }

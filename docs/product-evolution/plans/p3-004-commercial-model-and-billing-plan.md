@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, JSON, Node.js 18 `node:test`, existing Git workflow.
 
+**Implementation Status:** Discovery package and validator are complete in the current workspace record. Reverified on 2026-06-08 with `node --test tools/strategy/commercial-billing-evidence.test.mjs` (4 tests passing) and `node tools/strategy/commercial-billing-evidence.mjs`. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -34,7 +36,7 @@ No migration is created. Billing ledgers, entitlements, invoices, payments, and 
 **Files:**
 - Create: `tools/strategy/commercial-billing-evidence.test.mjs`
 
-- [ ] **Step 1: Write failing validator tests**
+- [x] **Step 1: Write failing validator tests**
 
 Create `tools/strategy/commercial-billing-evidence.test.mjs`:
 
@@ -92,7 +94,7 @@ test('rejects accepted billing capabilities without finance gate', () => {
 })
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -108,7 +110,7 @@ Expected: FAIL because the validator script and evidence package do not exist.
 - Create: `tools/strategy/commercial-billing-evidence.mjs`
 - Test: `tools/strategy/commercial-billing-evidence.test.mjs`
 
-- [ ] **Step 1: Create the validator script**
+- [x] **Step 1: Create the validator script**
 
 Create `tools/strategy/commercial-billing-evidence.mjs`:
 
@@ -148,7 +150,7 @@ if (errors.length > 0) {
 console.log(JSON.stringify({ ok: true, package: payload.package, capabilityKeys: payload.capabilities.map((capability) => capability.key) }, null, 2))
 ```
 
-- [ ] **Step 2: Run tests and confirm evidence still missing**
+- [x] **Step 2: Run tests and confirm evidence still missing**
 
 Run:
 
@@ -166,7 +168,7 @@ Expected: FAIL because `docs/product-evolution/discovery/p3-004-commercial-billi
 - Create: `docs/product-evolution/discovery/p3-004-commercial-billing/governance-policy.md`
 - Create: `docs/product-evolution/discovery/p3-004-commercial-billing/decision-log.md`
 
-- [ ] **Step 1: Create evidence JSON**
+- [x] **Step 1: Create evidence JSON**
 
 Create `docs/product-evolution/discovery/p3-004-commercial-billing/evidence.json`:
 
@@ -268,7 +270,7 @@ Create `docs/product-evolution/discovery/p3-004-commercial-billing/evidence.json
 }
 ```
 
-- [ ] **Step 2: Create README and governance docs**
+- [x] **Step 2: Create README and governance docs**
 
 Create `docs/product-evolution/discovery/p3-004-commercial-billing/README.md`:
 
@@ -300,7 +302,7 @@ Create `docs/product-evolution/discovery/p3-004-commercial-billing/governance-po
 - This slice has no Flyway migration; rollback is reverting or amending the discovery package.
 ```
 
-- [ ] **Step 3: Create decision log**
+- [x] **Step 3: Create decision log**
 
 Create `docs/product-evolution/discovery/p3-004-commercial-billing/decision-log.md`:
 
@@ -318,7 +320,7 @@ Create `docs/product-evolution/discovery/p3-004-commercial-billing/decision-log.
 | Upgrade recommendations | Deferred | Depends on accepted plan tiers and customer language review. |
 ```
 
-- [ ] **Step 4: Run validator tests**
+- [x] **Step 4: Run validator tests**
 
 Run:
 
@@ -335,7 +337,7 @@ Expected: PASS, and the validator prints all seven commercial capability keys.
 - Modify: `docs/product-evolution/specs/p3-004-commercial-model-and-billing.md`
 - Modify: `docs/product-evolution/plans/p3-004-commercial-model-and-billing-plan.md`
 
-- [ ] **Step 1: Confirm no migration references remain**
+- [x] **Step 1: Confirm no migration references remain**
 
 Run:
 
@@ -346,7 +348,7 @@ rg -n "$pattern" docs/product-evolution/specs/p3-004-commercial-model-and-billin
 
 Expected: no output.
 
-- [ ] **Step 2: Scan for implementation-deferral wording**
+- [x] **Step 2: Scan for implementation-deferral wording**
 
 Run:
 
@@ -382,7 +384,8 @@ EOF
 
 Expected: no output.
 
-- [ ] **Step 3: Commit the discovery slice**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

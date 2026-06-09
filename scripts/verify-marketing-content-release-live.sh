@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Runs a live end-to-end check for the marketing content release loop.
+#
+# The flow verifies a READY DAM asset, creates/updates a content template,
+# validates variables, publishes twice, resolves runtime content, rolls back,
+# and checks audit evidence against a running backend.
 set -euo pipefail
 
 API_BASE="${API_BASE:-http://localhost:8080}"
@@ -31,6 +36,7 @@ Example:
 USAGE
 }
 
+# Ensure required CLI tools are available before creating remote state.
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing required command: $1" >&2
@@ -56,6 +62,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 auth_headers=(-H "Authorization: Bearer $JWT_TOKEN")
 
+# POST a JSON file with the configured bearer token and capture the response body.
 post_json() {
   local body="$1"
   local path="$2"
@@ -68,6 +75,7 @@ post_json() {
     "$API_BASE$path"
 }
 
+# GET an authenticated JSON endpoint and capture the response body.
 get_json() {
   local path="$1"
   local output="$2"
@@ -95,6 +103,7 @@ resolve_after_rollback="$tmpdir/resolve-after-rollback.json"
 audit_response="$tmpdir/audit-response.json"
 
 echo "Verifying existing READY DAM asset $ASSET_KEY"
+# Asset readiness is the release precondition; publishing must not reference a missing DAM asset.
 asset_query="$(node - "$ASSET_KEY" <<'NODE'
 const [assetKey] = process.argv.slice(2)
 const params = new URLSearchParams({ keyword: assetKey, status: 'READY' })
@@ -135,6 +144,7 @@ fs.writeFileSync(path, JSON.stringify({
 NODE
 
 echo "Creating draft template $TEMPLATE_KEY"
+# The draft includes both a DAM asset reference and a runtime variable for later validation.
 post_json "$template_draft" "/marketing/content/templates" "$tmpdir/template-create-response.json"
 
 node - "$template_status" "$OPERATOR" <<'NODE'
@@ -147,6 +157,7 @@ fs.writeFileSync(path, JSON.stringify({
 NODE
 
 echo "Approving template $TEMPLATE_KEY"
+# Approval status is required before the release validation and publish gates can pass.
 post_json "$template_status" "/marketing/content/templates/$TEMPLATE_KEY/status" "$tmpdir/template-approve-response.json"
 
 node - "$validation_request" "$TEMPLATE_KEY" <<'NODE'
@@ -156,6 +167,7 @@ fs.writeFileSync(path, JSON.stringify({ sourceType: 'TEMPLATE', sourceKey: templ
 NODE
 
 echo "Validating release gate"
+# Validation checks readiness without creating or changing an active release.
 post_json "$validation_request" "/marketing/content/releases/validate" "$validation_response"
 node - "$validation_response" "$ASSET_KEY" <<'NODE'
 const fs = require('fs')
@@ -182,6 +194,7 @@ fs.writeFileSync(path, JSON.stringify({
 NODE
 
 echo "Publishing first active release"
+# First publish creates the active release that downstream resolve calls should serve.
 post_json "$publish_request" "/marketing/content/releases/publish" "$publish_response"
 release_key="$(node - "$publish_response" "$TEMPLATE_KEY" <<'NODE'
 const fs = require('fs')
@@ -205,6 +218,7 @@ fs.writeFileSync(path, JSON.stringify({ firstName }))
 NODE
 
 echo "Resolving first release $release_key"
+# Resolve proves runtime merge values and DAM asset expansion work on the active release.
 post_json "$resolve_request" "/marketing/content/releases/$release_key/resolve" "$resolve_response"
 node - "$resolve_response" "$FIRST_NAME" "$ASSET_KEY" <<'NODE'
 const fs = require('fs')
@@ -244,6 +258,7 @@ fs.writeFileSync(path, JSON.stringify({
 NODE
 
 echo "Publishing second release version"
+# Second publish verifies supersede behavior: only the newest release should remain ACTIVE.
 post_json "$template_update" "/marketing/content/templates" "$tmpdir/template-update-response.json"
 post_json "$template_status" "/marketing/content/templates/$TEMPLATE_KEY/status" "$tmpdir/template-approve2-response.json"
 post_json "$publish_request" "/marketing/content/releases/publish" "$publish2_response"
@@ -260,6 +275,7 @@ if (!release.checksumSha256) {
 NODE
 
 echo "Verifying exactly one ACTIVE release"
+# Active release cardinality guards against split-brain content serving.
 active_query="$(node - "$TEMPLATE_KEY" <<'NODE'
 const [templateKey] = process.argv.slice(2)
 const params = new URLSearchParams({ sourceType: 'TEMPLATE', sourceKey: templateKey, status: 'ACTIVE' })
@@ -291,6 +307,7 @@ fs.writeFileSync(path, JSON.stringify({
 NODE
 
 echo "Rolling back to previous release"
+# Rollback verifies operational recovery and restores the previous release body.
 post_json "$rollback_request" "/marketing/content/releases/$release_key/rollback" "$rollback_response"
 node - "$rollback_response" <<'NODE'
 const fs = require('fs')
@@ -316,6 +333,7 @@ if (!String(resolved.renderedBody || '').includes(`Stable body for ${firstName}`
 NODE
 
 echo "Verifying release audit events"
+# Audit evidence closes the release loop for publish, supersede, rollback, and restore actions.
 audit_query="$(node - "$release_key" <<'NODE'
 const [releaseKey] = process.argv.slice(2)
 const params = new URLSearchParams({ targetType: 'RELEASE', targetKey: releaseKey, limit: '20' })

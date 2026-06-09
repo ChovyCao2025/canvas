@@ -5,6 +5,18 @@ import org.chovy.canvas.domain.providerwrite.ProviderWriteEvidenceSanitizer;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * SearchMarketingProviderSyncResult 承载 domain.search 场景中的不可变数据快照。
+ * @param success success 字段。
+ * @param providerRequestId providerRequestId 字段。
+ * @param errorCode errorCode 字段。
+ * @param errorMessage errorMessage 字段。
+ * @param retryable retryable 字段。
+ * @param requestedCount requestedCount 字段。
+ * @param performanceRows performanceRows 字段。
+ * @param urlInspectionRows urlInspectionRows 字段。
+ * @param evidence evidence 字段。
+ */
 public record SearchMarketingProviderSyncResult(
         boolean success,
         String providerRequestId,
@@ -22,6 +34,14 @@ public record SearchMarketingProviderSyncResult(
         evidence = ProviderWriteEvidenceSanitizer.sanitizeMap(evidence);
     }
 
+    /**
+     * success 处理 domain.search 场景的业务逻辑。
+     * @param providerRequestId 业务对象 ID，用于定位具体记录。
+     * @param performanceRows performance rows 参数，用于 success 流程中的校验、计算或对象转换。
+     * @param urlInspectionRows url inspection rows 参数，用于 success 流程中的校验、计算或对象转换。
+     * @param evidence evidence 参数，用于 success 流程中的校验、计算或对象转换。
+     * @return 返回 success 流程生成的业务结果。
+     */
     public static SearchMarketingProviderSyncResult success(String providerRequestId,
                                                             List<SearchMarketingPerformanceRow> performanceRows,
                                                             List<SearchMarketingUrlInspectionRow> urlInspectionRows,
@@ -32,6 +52,14 @@ public record SearchMarketingProviderSyncResult(
                 performanceRows, urlInspectionRows, evidence);
     }
 
+    /**
+     * failure 处理 domain.search 场景的业务逻辑。
+     * @param errorCode 业务编码，用于匹配对应类型或状态。
+     * @param errorMessage error message 参数，用于 failure 流程中的校验、计算或对象转换。
+     * @param retryable retryable 参数，用于 failure 流程中的校验、计算或对象转换。
+     * @param evidence evidence 参数，用于 failure 流程中的校验、计算或对象转换。
+     * @return 返回 failure 流程生成的业务结果。
+     */
     public static SearchMarketingProviderSyncResult failure(String errorCode,
                                                             String errorMessage,
                                                             boolean retryable,

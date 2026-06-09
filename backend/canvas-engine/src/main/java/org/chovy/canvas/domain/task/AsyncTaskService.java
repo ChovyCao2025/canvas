@@ -152,12 +152,15 @@ public class AsyncTaskService {
 
     /** 查询订阅指定任务通知的用户列表。 */
     public List<String> subscribers(String taskId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!hasText(taskId)) {
             return List.of();
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscriptionDO>()
                         .eq(AsyncTaskSubscriptionDO::getTaskId, taskId)
                         .orderByAsc(AsyncTaskSubscriptionDO::getCreatedAt))
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .stream()
                 .map(AsyncTaskSubscriptionDO::getUserId)
                 .filter(this::hasText)
@@ -223,11 +226,14 @@ public class AsyncTaskService {
 
     /** 查询用户订阅过的任务 ID，用于非管理员列表可见范围过滤。 */
     private List<String> subscribedTaskIds(String userId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!hasText(userId)) {
             return List.of();
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscriptionDO>()
                         .eq(AsyncTaskSubscriptionDO::getUserId, userId))
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .stream()
                 .map(AsyncTaskSubscriptionDO::getTaskId)
                 .filter(this::hasText)

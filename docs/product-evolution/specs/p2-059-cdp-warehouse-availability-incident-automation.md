@@ -5,6 +5,8 @@ Sequence: 059
 Source: `docs/product-evolution/specs/p2-030-cdp-warehouse-quality-incident-loop.md`, `docs/product-evolution/specs/p2-055-cdp-warehouse-data-availability-gates.md`, `docs/product-evolution/specs/p2-057-cdp-warehouse-bi-query-availability-gate.md`, `docs/product-evolution/specs/p2-058-cdp-warehouse-scheduled-audience-availability-gate.md`
 Implementation plan: `../plans/p2-059-cdp-warehouse-availability-incident-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Route warehouse availability gate WARN/FAIL evidence into the existing warehouse incident loop, and automatically resolve matching availability incidents when later scans pass.

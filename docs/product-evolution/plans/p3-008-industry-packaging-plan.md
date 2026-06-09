@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, shell validation with `rg`, repository documentation review.
 
+**Implementation Status:** Discovery and governance artifacts are complete in the current workspace record. Reverified on 2026-06-08 by checking the P3-008 discovery, vertical scorecard, and governance-gate headings plus the `split` gate outcome. Commit and merge status was not verified in this docs-only audit; the commit boundaries are documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -32,7 +34,7 @@
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md`
 
-- [ ] **Step 1: Write discovery artifact**
+- [x] **Step 1: Write discovery artifact**
 
 Create `docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md`:
 
@@ -75,7 +77,7 @@ Create `docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md`:
 - Support must confirm runbook coverage for each vertical.
 ```
 
-- [ ] **Step 2: Verify discovery headings**
+- [x] **Step 2: Verify discovery headings**
 
 Run:
 
@@ -85,7 +87,8 @@ rg -n "^## (Owners|Candidate Verticals|Buyer And User Profile|Evidence Sources|L
 
 Expected: finds all five headings.
 
-- [ ] **Step 3: Commit discovery artifact**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -101,7 +104,7 @@ Expected: commit contains only the discovery artifact and this plan.
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md`
 
-- [ ] **Step 1: Write scorecard**
+- [x] **Step 1: Write scorecard**
 
 Create `docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md`:
 
@@ -126,7 +129,7 @@ Create `docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md`:
 - Maintenance trigger: template failure, compliance rule change, or support escalation trend
 ```
 
-- [ ] **Step 2: Verify scorecard headings**
+- [x] **Step 2: Verify scorecard headings**
 
 Run:
 
@@ -136,7 +139,8 @@ rg -n "^## (Scorecard|Packaging Governance Brief)$" docs/product-evolution/evide
 
 Expected: finds both headings.
 
-- [ ] **Step 3: Commit scorecard**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -152,7 +156,7 @@ Expected: commit contains only the scorecard and this plan.
 **Files:**
 - Create: `docs/product-evolution/governance/p3-008-industry-packaging-gate.md`
 
-- [ ] **Step 1: Write governance gate**
+- [x] **Step 1: Write governance gate**
 
 Create `docs/product-evolution/governance/p3-008-industry-packaging-gate.md`:
 
@@ -186,7 +190,7 @@ If retail package evidence cannot produce three reusable templates by 2026-08-30
 | Support | Support Operations Lead | Required |
 ```
 
-- [ ] **Step 2: Verify governance gate**
+- [x] **Step 2: Verify governance gate**
 
 Run:
 
@@ -196,7 +200,7 @@ rg -n "^- Outcome: (proceed|park|split)$|^## (Decision|Next Child Spec|Revisit T
 
 Expected: finds the split outcome and four headings.
 
-- [ ] **Step 3: Final validation**
+- [x] **Step 3: Final validation**
 
 Run:
 
@@ -207,7 +211,8 @@ git diff --check docs/product-evolution/specs/p3-008-industry-packaging.md docs/
 
 Expected: first command finds three document titles; `git diff --check` exits 0.
 
-- [ ] **Step 4: Commit governance gate**
+- [x] **Step 4: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

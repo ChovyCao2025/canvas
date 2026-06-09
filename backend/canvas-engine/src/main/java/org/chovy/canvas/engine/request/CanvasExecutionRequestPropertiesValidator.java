@@ -34,6 +34,19 @@ public class CanvasExecutionRequestPropertiesValidator {
     /** 批量重放请求每分钟限额，0 表示不限制。 */
     private final int replayBatchRequestsPerMinute;
 
+    /**
+     * 创建 CanvasExecutionRequestPropertiesValidator 实例并注入 engine.request 场景依赖。
+     * @param dispatchBatchSize dispatch batch size 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param dispatchFixedDelayMs dispatch fixed delay ms 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param retryDelayMs retry delay ms 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param maxAttempts max attempts 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param runningStaleSeconds running stale seconds 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param maxRetryDelayMs max retry delay ms 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param heartbeatIntervalMs heartbeat interval ms 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param perCanvasBatchLimit per canvas batch limit 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param replaySinglePerMinute replay single per minute 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     * @param replayBatchRequestsPerMinute replay batch requests per minute 参数，用于 CanvasExecutionRequestPropertiesValidator 流程中的校验、计算或对象转换。
+     */
     public CanvasExecutionRequestPropertiesValidator(
             @Value("${canvas.execution-request.dispatch-batch-size:200}") int dispatchBatchSize,
             @Value("${canvas.execution-request.dispatch-fixed-delay-ms:1000}") long dispatchFixedDelayMs,

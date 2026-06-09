@@ -1,8 +1,13 @@
 # P2-082W - Monitoring Provider OAuth Refresh And Revocation Spec
 
+Priority: P2
+Sequence: 082W
 Parent spec: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082w-monitoring-provider-oauth-refresh-revocation-plan.md`
-Status: Delivered backend first slice
+
+## Implementation Status
+
+Delivered backend first slice. Verification results are recorded in `../plans/p2-082w-monitoring-provider-oauth-refresh-revocation-plan.md`.
 
 ## Problem
 

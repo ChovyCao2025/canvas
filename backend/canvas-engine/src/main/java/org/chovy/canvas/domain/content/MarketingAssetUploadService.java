@@ -27,6 +27,9 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Service
+/**
+ * MarketingAssetUploadService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class MarketingAssetUploadService {
 
     private static final Set<String> PROVIDERS = Set.of("CLOUDINARY", "MUX", "S3", "EXTERNAL");
@@ -62,6 +65,15 @@ public class MarketingAssetUploadService {
     private final MarketingAssetUploadHandoffService handoffService;
 
     @Autowired
+    /**
+     * 初始化 MarketingAssetUploadService 实例。
+     *
+     * @param intentMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param assetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param handoffService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public MarketingAssetUploadService(MarketingAssetUploadIntentMapper intentMapper,
                                        MarketingAssetMapper assetMapper,
                                        MarketingContentAuditEventMapper auditMapper,
@@ -75,6 +87,14 @@ public class MarketingAssetUploadService {
         this.handoffService = handoffService == null ? MarketingAssetUploadHandoffService.contractOnly() : handoffService;
     }
 
+    /**
+     * 初始化 MarketingAssetUploadService 实例。
+     *
+     * @param intentMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param assetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     MarketingAssetUploadService(MarketingAssetUploadIntentMapper intentMapper,
                                 MarketingAssetMapper assetMapper,
                                 MarketingContentAuditEventMapper auditMapper,
@@ -83,6 +103,15 @@ public class MarketingAssetUploadService {
                 MarketingAssetUploadHandoffService.contractOnly());
     }
 
+    /**
+     * 初始化 MarketingAssetUploadService 实例。
+     *
+     * @param intentMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param assetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingAssetUploadService(MarketingAssetUploadIntentMapper intentMapper,
                                 MarketingAssetMapper assetMapper,
                                 MarketingContentAuditEventMapper auditMapper,
@@ -92,6 +121,16 @@ public class MarketingAssetUploadService {
                 MarketingAssetUploadHandoffService.contractOnly());
     }
 
+    /**
+     * 初始化 MarketingAssetUploadService 实例。
+     *
+     * @param intentMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param assetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param handoffService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     MarketingAssetUploadService(MarketingAssetUploadIntentMapper intentMapper,
                                 MarketingAssetMapper assetMapper,
                                 MarketingContentAuditEventMapper auditMapper,
@@ -107,7 +146,15 @@ public class MarketingAssetUploadService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param tenant tenant 参数，用于 createIntent 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public UploadIntentView createIntent(TenantContext tenant, UploadIntentCommand command) {
+        // 准备本次处理所需的上下文和中间变量。
         Long tenantId = MarketingContentSupport.requireTenantId(tenant);
         String assetKey = MarketingContentSupport.normalizeKey(command.assetKey(), "assetKey");
         String provider = MarketingContentSupport.normalizeUpper(command.provider(), "S3", PROVIDERS, "asset upload provider");
@@ -167,19 +214,29 @@ public class MarketingAssetUploadService {
         row.setStatus("PENDING");
         row.setExpiresAt(now().plusSeconds(DIRECT_UPLOAD_TTL_SECONDS));
         row.setCreatedBy(MarketingContentSupport.operator(tenant, command.createdBy()));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         intentMapper.insert(row);
 
         writeAudit(tenantId, "ASSET_UPLOAD_INTENT_CREATED", "ASSET", assetKey, row.getCreatedBy(), null,
                 Map.of("intentKey", intentKey, "provider", provider, "status", "PENDING"), null);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row);
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenant tenant 参数，用于 handleCallback 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回 handleCallback 流程生成的业务结果。
+     */
     public UploadIntentView handleCallback(TenantContext tenant, ProviderCallbackCommand command) {
         Long tenantId = MarketingContentSupport.requireTenantId(tenant);
         String provider = MarketingContentSupport.normalizeUpper(command.provider(), "S3", PROVIDERS, "asset upload provider");
         MarketingAssetUploadIntentDO intent = requireIntent(tenantId, provider, command);
         String status = MarketingContentSupport.normalizeUpper(command.status(), "PENDING", CALLBACK_STATUSES, "provider upload status");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (isTerminal(intent.getStatus())) {
             return toView(intent);
         }
@@ -199,6 +256,7 @@ public class MarketingAssetUploadService {
             default -> "PENDING";
         });
         intent.setErrorMessage("FAILED".equals(status) ? "provider upload failed" : null);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         intentMapper.updateById(intent);
 
         if ("READY".equals(status)) {
@@ -212,14 +270,23 @@ public class MarketingAssetUploadService {
                 null,
                 Map.of("intentKey", intent.getIntentKey(), "provider", provider, "status", intent.getStatus()),
                 null);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(intent);
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param tenant tenant 参数，用于 expireStalePendingUploads 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回 expireStalePendingUploads 流程生成的业务结果。
+     */
     public UploadIntentCleanupResult expireStalePendingUploads(TenantContext tenant, UploadIntentCleanupCommand command) {
         Long tenantId = MarketingContentSupport.requireTenantId(tenant);
         int limit = cleanupLimit(command == null ? null : command.limit());
         LocalDateTime cutoff = now();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<MarketingAssetUploadIntentDO> rows = intentMapper.selectList(
                 new LambdaQueryWrapper<MarketingAssetUploadIntentDO>()
                         .eq(MarketingAssetUploadIntentDO::getTenantId, tenantId)
@@ -230,6 +297,7 @@ public class MarketingAssetUploadService {
                         .last("LIMIT " + limit));
         int expired = 0;
         String actor = MarketingContentSupport.operator(tenant, command == null ? null : command.actor());
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (MarketingAssetUploadIntentDO row : rows) {
             row.setStatus("FAILED");
             row.setErrorMessage("asset upload intent expired without callback");
@@ -244,19 +312,39 @@ public class MarketingAssetUploadService {
                     Map.of("intentKey", row.getIntentKey(), "provider", row.getProvider(), "status", row.getStatus()),
                     "asset upload intent expired without callback");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new UploadIntentCleanupResult(rows.size(), expired, cutoff);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回布尔判断结果。
+     */
     private boolean isTerminal(String status) {
         return "COMPLETED".equals(status) || "FAILED".equals(status);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param intent intent 参数，用于 assertIntentNotExpired 流程中的校验、计算或对象转换。
+     */
     private void assertIntentNotExpired(MarketingAssetUploadIntentDO intent) {
         if (intent.getExpiresAt() != null && intent.getExpiresAt().isBefore(now())) {
             throw new IllegalStateException("asset upload intent has expired");
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param provider provider 参数，用于 requireIntent 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回 requireIntent 流程生成的业务结果。
+     */
     private MarketingAssetUploadIntentDO requireIntent(Long tenantId, String provider, ProviderCallbackCommand command) {
         LambdaQueryWrapper<MarketingAssetUploadIntentDO> query = new LambdaQueryWrapper<MarketingAssetUploadIntentDO>()
                 .eq(MarketingAssetUploadIntentDO::getTenantId, tenantId)
@@ -276,11 +364,21 @@ public class MarketingAssetUploadService {
         return row;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenant tenant 参数，用于 upsertAsset 流程中的校验、计算或对象转换。
+     * @param intent intent 参数，用于 upsertAsset 流程中的校验、计算或对象转换。
+     * @param assetKey 业务键，用于在同一租户下定位资源。
+     * @param providerStatus 业务状态，用于筛选或推进状态流转。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     */
     private void upsertAsset(TenantContext tenant,
                              MarketingAssetUploadIntentDO intent,
                              String assetKey,
                              String providerStatus,
                              ProviderCallbackCommand command) {
+        // 准备本次处理所需的上下文和中间变量。
         String assetType = MarketingContentSupport.normalizeUpper(
                 MarketingContentSupport.hasText(command.assetType()) ? command.assetType() : intent.getAssetType(),
                 "FILE",
@@ -296,6 +394,7 @@ public class MarketingAssetUploadService {
                 "asset sizeBytes");
         validateMimeType(assetType, mimeType);
 
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         MarketingAssetDO row = assetMapper.selectOne(new LambdaQueryWrapper<MarketingAssetDO>()
                 .eq(MarketingAssetDO::getTenantId, intent.getTenantId())
                 .eq(MarketingAssetDO::getAssetKey, assetKey)
@@ -332,9 +431,17 @@ public class MarketingAssetUploadService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param intent intent 参数，用于 validateReadyCallback 流程中的校验、计算或对象转换。
+     * @param assetKey 业务键，用于在同一租户下定位资源。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     */
     private void validateReadyCallback(MarketingAssetUploadIntentDO intent,
                                        String assetKey,
                                        ProviderCallbackCommand command) {
+        // 准备本次处理所需的上下文和中间变量。
         String assetType = MarketingContentSupport.normalizeUpper(
                 MarketingContentSupport.hasText(command.assetType()) ? command.assetType() : intent.getAssetType(),
                 "FILE",
@@ -342,6 +449,7 @@ public class MarketingAssetUploadService {
                 "asset type");
         String mimeType = MarketingContentSupport.hasText(command.mimeType()) ? command.mimeType() : intent.getMimeType();
         validateMimeType(assetType, mimeType);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!assetType.equals(intent.getAssetType())) {
             throw new IllegalArgumentException("provider asset type does not match upload intent");
         }
@@ -371,12 +479,21 @@ public class MarketingAssetUploadService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param intent intent 参数，用于 validateStorageBinding 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     */
     private void validateStorageBinding(MarketingAssetUploadIntentDO intent, ProviderCallbackCommand command) {
+        // 准备本次处理所需的上下文和中间变量。
         String storageUrl = MarketingContentSupport.requireText(command.storageUrl(), "asset storageUrl");
         MarketingContentSupport.validateHttpUrl(storageUrl, "asset storageUrl");
         Map<String, Object> uploadParams = readMap(intent.getUploadParamsJson());
         String handoffMode = stringParam(uploadParams, "handoffMode");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!"S3".equals(intent.getProvider()) || !"PRESIGNED_PUT".equals(handoffMode)) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         String expectedStorageUrl = stringParam(uploadParams, "storageUrl");
@@ -388,11 +505,26 @@ public class MarketingAssetUploadService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 stringParam 流程中的校验、计算或对象转换。
+     * @param values values 参数，用于 stringParam 流程中的校验、计算或对象转换。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @return 返回 string param 生成的文本或业务键。
+     */
     private String stringParam(Map<String, Object> values, String key) {
         Object value = values == null ? null : values.get(key);
         return value == null ? null : value.toString();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param provider provider 参数，用于 requiredUploadHeaders 流程中的校验、计算或对象转换。
+     * @param mimeType 类型标识，用于选择对应处理分支。
+     * @return 返回 required upload headers 生成的文本或业务键。
+     */
     private Map<String, String> requiredUploadHeaders(String provider, String mimeType) {
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Content-Type", mimeType);
@@ -402,12 +534,27 @@ public class MarketingAssetUploadService {
         return headers;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param assetKey 业务键，用于在同一租户下定位资源。
+     * @param intentKey 业务键，用于在同一租户下定位资源。
+     * @param fileName 名称文本，用于展示或唯一性校验。
+     * @return 返回 storage object key 生成的文本或业务键。
+     */
     private String storageObjectKey(Long tenantId, String assetKey, String intentKey, String fileName) {
         String extension = fileExtension(fileName);
         String suffix = extension == null ? "" : "." + extension;
         return "tenants/" + tenantId + "/marketing-assets/" + assetKey + "/" + intentKey + suffix;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param assetType 类型标识，用于选择对应处理分支。
+     * @param mimeType 类型标识，用于选择对应处理分支。
+     */
     private void validateMimeType(String assetType, String mimeType) {
         String normalized = MarketingContentSupport.requireText(mimeType, "asset mimeType").toLowerCase(Locale.ROOT);
         if (!MIME_TYPES.getOrDefault(assetType, Set.of()).contains(normalized)) {
@@ -415,8 +562,16 @@ public class MarketingAssetUploadService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param fileName 名称文本，用于展示或唯一性校验。
+     * @param assetType 类型标识，用于选择对应处理分支。
+     */
     private void validateFileName(String fileName, String assetType) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!MarketingContentSupport.hasText(fileName)) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         String text = fileName.trim();
@@ -429,6 +584,12 @@ public class MarketingAssetUploadService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param fileName 名称文本，用于展示或唯一性校验。
+     * @return 返回 file extension 生成的文本或业务键。
+     */
     private String fileExtension(String fileName) {
         if (!MarketingContentSupport.hasText(fileName)) {
             return null;
@@ -441,6 +602,14 @@ public class MarketingAssetUploadService {
         return text.substring(index + 1).toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param sizeBytes size bytes 参数，用于 requireSize 流程中的校验、计算或对象转换。
+     * @param assetType 类型标识，用于选择对应处理分支。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 require size 计算得到的数量、金额或指标值。
+     */
     private long requireSize(Long sizeBytes, String assetType, String field) {
         if (sizeBytes == null || sizeBytes <= 0) {
             throw new IllegalArgumentException(field + " must be positive");
@@ -452,6 +621,12 @@ public class MarketingAssetUploadService {
         return sizeBytes;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param assetType 类型标识，用于选择对应处理分支。
+     * @return 返回 max size 计算得到的数量、金额或指标值。
+     */
     private long maxSize(String assetType) {
         Long max = MAX_SIZE_BYTES.get(assetType);
         if (max == null) {
@@ -460,6 +635,12 @@ public class MarketingAssetUploadService {
         return max;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 cleanup limit 计算得到的数量、金额或指标值。
+     */
     private int cleanupLimit(Integer value) {
         if (value == null || value <= 0) {
             return 100;
@@ -467,7 +648,15 @@ public class MarketingAssetUploadService {
         return Math.min(value, 500);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param checksum checksum 参数，用于 normalizeChecksum 流程中的校验、计算或对象转换。
+     * @param provider provider 参数，用于 normalizeChecksum 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeChecksum(String checksum, String provider) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!MarketingContentSupport.hasText(checksum)) {
             if (requiresChecksum(provider)) {
                 throw new IllegalArgumentException("asset checksumSha256 is required for " + provider + " uploads");
@@ -478,15 +667,32 @@ public class MarketingAssetUploadService {
         if (!SHA256_PATTERN.matcher(normalized).matches()) {
             throw new IllegalArgumentException("asset checksumSha256 must be a 64 character hex SHA-256");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return normalized;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param provider provider 参数，用于 requiresChecksum 流程中的校验、计算或对象转换。
+     * @return 返回 requires checksum 的布尔判断结果。
+     */
     private boolean requiresChecksum(String provider) {
         return "S3".equals(provider) || "EXTERNAL".equals(provider);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param scanStatus 业务状态，用于筛选或推进状态流转。
+     * @param provider provider 参数，用于 normalizeScanStatus 流程中的校验、计算或对象转换。
+     * @param assetType 类型标识，用于选择对应处理分支。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeScanStatus(String scanStatus, String provider, String assetType) {
+        // 准备本次处理所需的上下文和中间变量。
         String status = MarketingContentSupport.normalizeUpper(scanStatus, "PENDING", SCAN_STATUSES, "asset scan status");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if ("NOT_REQUIRED".equals(status) && ("S3".equals(provider) || "EXTERNAL".equals(provider))) {
             throw new IllegalArgumentException("asset scanStatus cannot be NOT_REQUIRED for direct uploads");
         }
@@ -496,9 +702,19 @@ public class MarketingAssetUploadService {
         if ("VIDEO".equals(assetType) && "NOT_REQUIRED".equals(status)) {
             throw new IllegalArgumentException("asset scanStatus is required for video uploads");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return status;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param metadata metadata 参数，用于 providerMetadata 流程中的校验、计算或对象转换。
+     * @param intent intent 参数，用于 providerMetadata 流程中的校验、计算或对象转换。
+     * @param checksum checksum 参数，用于 providerMetadata 流程中的校验、计算或对象转换。
+     * @param scanStatus 业务状态，用于筛选或推进状态流转。
+     * @return 返回 providerMetadata 流程生成的业务结果。
+     */
     private Map<String, Object> providerMetadata(Map<String, Object> metadata,
                                                  MarketingAssetUploadIntentDO intent,
                                                  String checksum,
@@ -517,6 +733,12 @@ public class MarketingAssetUploadService {
         return values;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param providerStatus 业务状态，用于筛选或推进状态流转。
+     * @return 返回 asset status 生成的文本或业务键。
+     */
     private String assetStatus(String providerStatus) {
         return switch (providerStatus) {
             case "READY" -> "READY";
@@ -525,6 +747,14 @@ public class MarketingAssetUploadService {
         };
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param assetType 类型标识，用于选择对应处理分支。
+     * @param providerStatus 业务状态，用于筛选或推进状态流转。
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 transcode status 生成的文本或业务键。
+     */
     private String transcodeStatus(String assetType, String providerStatus, String value) {
         if (!"VIDEO".equals(assetType) && !MarketingContentSupport.hasText(value)) {
             return null;
@@ -535,6 +765,12 @@ public class MarketingAssetUploadService {
         return "READY".equals(providerStatus) ? "READY" : "PENDING";
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private UploadIntentView toView(MarketingAssetUploadIntentDO row) {
         return new UploadIntentView(
                 row.getIntentKey(),
@@ -549,6 +785,18 @@ public class MarketingAssetUploadService {
                 row.getExpiresAt());
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param eventType 类型标识，用于选择对应处理分支。
+     * @param targetType 类型标识，用于选择对应处理分支。
+     * @param targetKey 业务键，用于在同一租户下定位资源。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param oldValue 待处理值，用于规则计算或转换。
+     * @param newValue 待处理值，用于规则计算或转换。
+     * @param note note 参数，用于 writeAudit 流程中的校验、计算或对象转换。
+     */
     private void writeAudit(Long tenantId,
                             String eventType,
                             String targetType,
@@ -569,6 +817,12 @@ public class MarketingAssetUploadService {
         auditMapper.insert(row);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 readMap 流程生成的业务结果。
+     */
     private Map<String, Object> readMap(String json) {
         try {
             return objectMapper.readValue(json, MAP_TYPE);
@@ -577,6 +831,13 @@ public class MarketingAssetUploadService {
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 write json 生成的文本或业务键。
+     */
     private String writeJson(Object value, String field) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -585,10 +846,18 @@ public class MarketingAssetUploadService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * UploadIntentCommand 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record UploadIntentCommand(
             String assetKey,
             String assetType,
@@ -599,6 +868,9 @@ public class MarketingAssetUploadService {
             String createdBy) {
     }
 
+    /**
+     * ProviderCallbackCommand 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ProviderCallbackCommand(
             String provider,
             String uploadToken,
@@ -619,6 +891,9 @@ public class MarketingAssetUploadService {
             Map<String, Object> metadata) {
     }
 
+    /**
+     * UploadIntentView 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record UploadIntentView(
             String intentKey,
             String assetKey,
@@ -632,9 +907,15 @@ public class MarketingAssetUploadService {
             LocalDateTime expiresAt) {
     }
 
+    /**
+     * UploadIntentCleanupCommand 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record UploadIntentCleanupCommand(Integer limit, String actor) {
     }
 
+    /**
+     * UploadIntentCleanupResult 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record UploadIntentCleanupResult(int scanned, int expired, LocalDateTime cutoff) {
     }
 }

@@ -5,6 +5,8 @@ Sequence: 082F
 Parent: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082f-ai-decision-models-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a governed AI decisioning layer for daily marketing operations: LTV scoring, next-best-action, next-best-offer, channel affinity, and budget-aware ranking. The first slice must be deterministic, explainable, tenant-scoped, and auditable so operators can trust and review recommendations before later model integrations.

@@ -147,19 +147,35 @@ function normalizeCanvasSettingsFromDetail(detail: CanvasDetail): CanvasSettings
 
 /** 一次保存所需的完整快照，用于自动保存期间避免读取过期闭包状态。 */
 interface SaveSnapshot {
+  /** 保存时刻的真实画布节点。 */
   nodes: Node<CanvasNodeData>[]
+
+  /** 保存时刻的画布名称。 */
   canvasName: string
+
+  /** 保存时刻的画布级设置。 */
   canvasSettings: CanvasSettingsLike
+
+  /** 画布描述。 */
   description?: string
 }
 
+/** 用于保存前后比较的轻量快照。 */
 interface SaveSnapshotComparable {
+  /** 序列化后的 graphJson。 */
   graphJson: string
+
+  /** 画布名称。 */
   canvasName: string
+
+  /** 画布级设置。 */
   canvasSettings: CanvasSettingsLike
+
+  /** 画布描述。 */
   description?: string
 }
 
+/** 将完整保存快照转换成可比较结构。 */
 function buildSaveSnapshotComparable(snapshot: SaveSnapshot): SaveSnapshotComparable {
   return {
     graphJson: buildSaveGraphJson(snapshot.nodes),
@@ -169,6 +185,7 @@ function buildSaveSnapshotComparable(snapshot: SaveSnapshot): SaveSnapshotCompar
   }
 }
 
+/** 把编辑器保存快照转换成后端 update 接口请求体。 */
 function buildCanvasSaveBody(snapshot: SaveSnapshot, editVersion: number) {
   const settings = snapshot.canvasSettings
   return {
@@ -386,6 +403,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     save: async (payload, signal) => {
       const usedEditVersion = editVersion.current
       const comparable = buildSaveSnapshotComparable(payload)
+      // update 成功后才递增本地 editVersion，失败时保留原版本用于冲突判断。
       await canvasApi.update(canvasId, buildCanvasSaveBody(payload, usedEditVersion), { signal })
       editVersion.current = usedEditVersion + 1
       savedCanvasName.current = payload.canvasName.trim()
@@ -463,6 +481,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const statusTagGap = getCanvasNameStatusGap(isEditingCanvasName && !readonly)
 
   useEffect(() => {
+    // 将 React Flow 派生出的真实节点/边同步到 store，供撤销历史和工具栏读取。
     editorStore.getState().syncGraph(realNodes as Node<CanvasNodeData>[], edges)
   }, [editorStore, edges, realNodes])
 
@@ -494,12 +513,25 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         ],
       }
     }
+    if (nodeType === 'RISK_DECISION') {
+      return {
+        sceneKey: '',
+        subjectMapping: { userId: '$.profile.userId' },
+        eventMapping: {},
+        contextMapping: { caller: 'CANVAS_NODE' },
+        actionRoutes: { ALLOW: undefined },
+        failPolicy: 'FAIL_REVIEW',
+        timeoutMs: 50,
+        includeTrace: false,
+      }
+    }
     return {}
   }, [])
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
     if (!isDirty) return
+    // 快速连续编辑只重置定时器，真正保存由 saveQueue 合并。
     autoSaveTimer.current = scheduleCanvasEditorAutosave(isDirty, handleSave, autoSaveTimer.current)
     return () => clearCanvasEditorAutosave(autoSaveTimer.current)
   })
@@ -516,6 +548,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     editVersion?: number
   }) => {
     const snapshot = latestSaveSnapshotRef.current
+    // 本地草稿存 graphJson 和画布设置，刷新或保存失败后可完整恢复编辑状态。
     writeCanvasLocalDraft({
       canvasId,
       name: (overrides?.name ?? snapshot.canvasName).trim(),
@@ -594,6 +627,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     const loadCanvasDraft = async () => {
       let nodeTypes: NodeTypeRegistry[] = []
       try {
+        // nodeTypes 用来给历史 graphJson 补 outletSchema，避免旧数据缺少出口定义。
         nodeTypes = (await metaApi.getNodeTypes()).data
       } catch {
         nodeTypes = []
@@ -613,6 +647,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         return
       }
       if (readonly) {
+        // 只读模式不恢复本地草稿，避免把查看行为变成未保存编辑。
         setIsDirty(false)
         localDraftReadyRef.current = true
         return
@@ -634,6 +669,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         cancelText: '保持当前内容',
         onOk: () => {
           try {
+            // 恢复本地草稿后标记 dirty，提醒用户仍需显式保存到服务端。
             applyCanvasDraft(
               localDraft.graphJson,
               localDraft.name,
@@ -793,6 +829,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       setNodes(current => current.map(node => {
         const data = node.data as CanvasNodeData
         if (node.id === selectedEdge.source) {
+          // 源节点出口改为指向新插入节点。
           return {
             ...node,
             data: {
@@ -802,6 +839,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           }
         }
         if (node.id === expansion.exitNodeId) {
+          // 新节点的出口继续指向原连线目标。
           return {
             ...node,
             data: {
@@ -895,6 +933,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       }
       if (n.id !== ph.sourceId) return n
       const nd = n.data as CanvasNodeData
+      // 将命中的占位 handle 写回源节点 bizConfig，真实边由配置推导。
       return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id, nd.outletSchema) } }
     }))
     setEdges(prev => replaceOutletEdge(prev, buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id)))
@@ -915,6 +954,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     setNodes(prev => prev.map(n => {
       if (n.id !== source) return n
       const d = n.data as CanvasNodeData
+      // START/DIRECT_CALL 默认出口支持多目标，其它出口保持一对一覆盖。
       const bizConfig = isSingleOutletFanOut
         ? appendDirectCallBranch(d.bizConfig, target, targetNode?.name)
         : patchBizConfig(d.bizConfig, sourceHandle, target, d.outletSchema)
@@ -933,7 +973,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
   // 节点删除时清理引用
   const onNodesChangeWrapped = useCallback((changes: NodeChange[]) => {
-    // Protect START node from deletion
+    // START 是流程唯一入口，不允许通过 React Flow 删除事件移除。
     const safeChanges = changes.filter(c => {
       if (c.type !== 'remove') return true
       const node = nodes.find(n => n.id === (c as { id: string }).id)
@@ -947,6 +987,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     if (deleted.length) {
       snapshot('删除节点')
       const ids = new Set(deleted)
+      // 删除节点后同步清理其它节点 bizConfig 中指向它们的出口引用。
       setNodes(prev => prev
         .filter(n => !ids.has(n.id))
         .map(n => {
@@ -984,6 +1025,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             ...node,
             data: {
               ...data,
+              // 删除边时清空源节点对应出口字段，避免保存后又推导出旧边。
               bizConfig: outgoing.reduce((cfg, edge) => clearEdgeRef(cfg, edge, data.outletSchema), data.bizConfig ?? {}),
             },
           }
@@ -1018,6 +1060,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       if (result.status === 'saved') {
         const savedSnapshot = buildSaveSnapshotComparable(result.payload)
         const latestSnapshot = buildSaveSnapshotComparable(latestSaveSnapshotRef.current)
+        // 保存返回后再次比较快照；若期间有新编辑，仍保持 dirty 等待下一轮保存。
         if (sameSaveSnapshot(savedSnapshot, latestSnapshot)) {
           clearCanvasLocalDraft(canvasId)
           setIsDirty(false)
@@ -1037,6 +1080,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       setIsDirty(true)
 
       if (result.status === 'conflict') {
+        // 冲突时不覆盖服务端，保留本地快照并提示用户处理。
         setConflict({
           serverVersion: result.serverVersion,
           localVersion: editVersion.current,
@@ -1192,6 +1236,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const saveSettings = async () => {
     const vals = await settingsForm.validateFields()
     const validRange = vals.validRange as [dayjs.Dayjs | null | undefined, dayjs.Dayjs | null | undefined] | undefined
+    // 表单中的空值统一转换为 null/undefined，保持后端字段清除语义稳定。
     const payload = {
       name: canvasName,
       description: detail.canvas.description,
@@ -1241,6 +1286,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   /** 右侧配置面板回传节点 data patch 后，写回 React Flow 节点列表。 */
   const onNodeDataChange = useCallback((nid: string, patch: Partial<CanvasNodeData>) => {
     setNodes(prev => prev.map(n =>
+      // 配置面板只提交增量 patch，这里保持原 data 其它字段不变。
       n.id === nid ? { ...n, data: { ...n.data as CanvasNodeData, ...patch } } : n
     ))
     setIsDirty(true)
@@ -1264,6 +1310,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const deleteNodeById = (nodeId: string) => {
     snapshot('删除节点')
     const ids = new Set([nodeId])
+    // 悬浮工具条删除同样要清理所有引用，保持 graphJson 无悬空后继。
     setNodes(prev => prev
       .filter(n => !ids.has(n.id))
       .map(n => ({

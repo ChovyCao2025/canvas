@@ -27,6 +27,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * CreatorCollaborationService 编排 domain.creator 场景的领域业务规则。
+ */
 @Service
 public class CreatorCollaborationService {
 
@@ -45,6 +48,14 @@ public class CreatorCollaborationService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    /**
+     * 创建 CreatorCollaborationService 实例并注入 domain.creator 场景依赖。
+     * @param profileMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param campaignMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param collaborationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param deliverableMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public CreatorCollaborationService(CreatorProfileMapper profileMapper,
                                        CreatorCampaignMapper campaignMapper,
@@ -55,6 +66,16 @@ public class CreatorCollaborationService {
                 Clock.systemDefaultZone());
     }
 
+    /**
+     * 执行 CreatorCollaborationService 流程，围绕 creator collaboration service 完成校验、计算或结果组装。
+     *
+     * @param profileMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param campaignMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param collaborationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param deliverableMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     CreatorCollaborationService(CreatorProfileMapper profileMapper,
                                 CreatorCampaignMapper campaignMapper,
                                 CreatorCollaborationMapper collaborationMapper,
@@ -69,7 +90,12 @@ public class CreatorCollaborationService {
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
+    /**
+     * 新增或更新租户内达人档案。
+     * 以 Provider 和 handleKey 唯一定位，写入粉丝、互动率、标签、风险状态和元数据，返回最新档案视图。
+     */
     public CreatorProfileView upsertCreator(Long tenantId, CreatorProfileCommand command, String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("creator profile command is required");
         }
@@ -78,6 +104,7 @@ public class CreatorCollaborationService {
         String handle = normalizeHandle(command.handle());
         String handleKey = handleKey(handle);
         LocalDateTime changedAt = now();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CreatorProfileDO row = profileMapper.selectOne(new LambdaQueryWrapper<CreatorProfileDO>()
                 .eq(CreatorProfileDO::getTenantId, scopedTenantId)
                 .eq(CreatorProfileDO::getProvider, provider)
@@ -107,16 +134,23 @@ public class CreatorCollaborationService {
         } else {
             profileMapper.updateById(row);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toProfileView(row);
     }
 
+    /**
+     * 新增或更新租户内达人营销活动。
+     * 以 campaignKey 唯一定位，保存目标、预算、币种、周期和状态，不触发外部达人平台操作。
+     */
     public CreatorCampaignView upsertCampaign(Long tenantId, CreatorCampaignCommand command, String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("creator campaign command is required");
         }
         Long scopedTenantId = normalizeTenant(tenantId);
         String campaignKey = required(command.campaignKey(), "campaignKey");
         LocalDateTime changedAt = now();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CreatorCampaignDO row = campaignMapper.selectOne(new LambdaQueryWrapper<CreatorCampaignDO>()
                 .eq(CreatorCampaignDO::getTenantId, scopedTenantId)
                 .eq(CreatorCampaignDO::getCampaignKey, campaignKey)
@@ -142,16 +176,23 @@ public class CreatorCollaborationService {
         } else {
             campaignMapper.updateById(row);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toCampaignView(row);
     }
 
+    /**
+     * 新增或更新活动与达人的合作关系。
+     * 会校验活动和达人都属于当前租户，保存报价、佣金、追踪链接、折扣码、权限和状态。
+     */
     public CreatorCollaborationView upsertCollaboration(Long tenantId,
                                                         CreatorCollaborationCommand command,
                                                         String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("creator collaboration command is required");
         }
         Long scopedTenantId = normalizeTenant(tenantId);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CreatorCampaignDO campaign = campaignMapper.selectById(requiredId(command.campaignId(), "campaignId"));
         validateTenant(scopedTenantId, campaign == null ? null : campaign.getTenantId(), "campaign");
         CreatorProfileDO creator = profileMapper.selectById(requiredId(command.creatorId(), "creatorId"));
@@ -184,14 +225,21 @@ public class CreatorCollaborationService {
         } else {
             collaborationMapper.updateById(row);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toCollaborationView(row);
     }
 
+    /**
+     * 新增或更新达人合作交付物。
+     * 会校验合作归属租户，保存内容平台、发布时间、内容链接和曝光/互动/转化/收入指标。
+     */
     public CreatorDeliverableView upsertDeliverable(Long tenantId, CreatorDeliverableCommand command, String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("creator deliverable command is required");
         }
         Long scopedTenantId = normalizeTenant(tenantId);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CreatorCollaborationDO collaboration = collaborationMapper.selectById(requiredId(
                 command.collaborationId(), "collaborationId"));
         validateTenant(scopedTenantId, collaboration == null ? null : collaboration.getTenantId(), "collaboration");
@@ -233,9 +281,14 @@ public class CreatorCollaborationService {
         } else {
             deliverableMapper.updateById(row);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toDeliverableView(row);
     }
 
+    /**
+     * 汇总租户内达人合作表现。
+     * 可按活动、达人或合作过滤，聚合交付物指标并计算完成度、成本和转化表现。
+     */
     public CreatorPerformanceSummaryView summary(Long tenantId, CreatorPerformanceSummaryQuery query) {
         if (query == null) {
             throw new IllegalArgumentException("creator performance summary query is required");
@@ -263,6 +316,11 @@ public class CreatorCollaborationService {
                 .collect(Collectors.toMap(CreatorCollaborationDO::getId, Function.identity(), (left, right) -> left));
         List<CreatorDeliverableDO> deliverables = collaborationIds.isEmpty()
                 ? List.of()
+                /**
+                 * 按安全边界裁剪或保护输入值。
+                 *
+                 * @return 返回 safeList 流程生成的业务结果。
+                 */
                 : safeList(deliverableMapper.selectList(new LambdaQueryWrapper<CreatorDeliverableDO>()
                 .eq(CreatorDeliverableDO::getTenantId, scopedTenantId)
                 .eq(query.campaignId() != null, CreatorDeliverableDO::getCampaignId, query.campaignId())
@@ -294,8 +352,23 @@ public class CreatorCollaborationService {
                     collaboration == null ? null : collaboration.getCommissionRate())));
             impressions += nonNegative(deliverable.getImpressionCount());
             engagement += nonNegative(deliverable.getLikeCount())
+                    /**
+                     * 执行 nonNegative 流程，围绕 non negative 完成校验、计算或结果组装。
+                     *
+                     * @return 返回 nonNegative 流程生成的业务结果。
+                     */
                     + nonNegative(deliverable.getCommentCount())
+                    /**
+                     * 执行 nonNegative 流程，围绕 non negative 完成校验、计算或结果组装。
+                     *
+                     * @return 返回 nonNegative 流程生成的业务结果。
+                     */
                     + nonNegative(deliverable.getShareCount())
+                    /**
+                     * 执行 nonNegative 流程，围绕 non negative 完成校验、计算或结果组装。
+                     *
+                     * @return 返回 nonNegative 流程生成的业务结果。
+                     */
                     + nonNegative(deliverable.getSaveCount());
             clicks += nonNegative(deliverable.getClickCount());
             conversions += nonNegative(deliverable.getConversionCount());
@@ -337,7 +410,14 @@ public class CreatorCollaborationService {
                 evaluatedAt);
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CreatorProfileView toProfileView(CreatorProfileDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new CreatorProfileView(
                 row.getId(),
                 row.getTenantId(),
@@ -355,9 +435,16 @@ public class CreatorCollaborationService {
                 map(row.getMetadataJson()),
                 row.getCreatedBy(),
                 row.getCreatedAt(),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CreatorCampaignView toCampaignView(CreatorCampaignDO row) {
         return new CreatorCampaignView(
                 row.getId(),
@@ -376,6 +463,12 @@ public class CreatorCollaborationService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CreatorCollaborationView toCollaborationView(CreatorCollaborationDO row) {
         return new CreatorCollaborationView(
                 row.getId(),
@@ -395,7 +488,14 @@ public class CreatorCollaborationService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CreatorDeliverableView toDeliverableView(CreatorDeliverableDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new CreatorDeliverableView(
                 row.getId(),
                 row.getTenantId(),
@@ -413,6 +513,7 @@ public class CreatorCollaborationService {
                 nonNegative(row.getLikeCount()),
                 nonNegative(row.getCommentCount()),
                 nonNegative(row.getShareCount()),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 nonNegative(row.getSaveCount()),
                 nonNegative(row.getClickCount()),
                 nonNegative(row.getConversionCount()),
@@ -423,12 +524,25 @@ public class CreatorCollaborationService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param expectedTenantId 业务对象 ID，用于定位具体记录。
+     * @param actualTenantId 业务对象 ID，用于定位具体记录。
+     * @param resource resource 参数，用于 validateTenant 流程中的校验、计算或对象转换。
+     */
     private void validateTenant(Long expectedTenantId, Long actualTenantId, String resource) {
         if (!expectedTenantId.equals(actualTenantId)) {
             throw new IllegalArgumentException(resource + " does not belong to current tenant");
         }
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         if (tenantId == null || tenantId < 0) {
             return 0L;
@@ -436,6 +550,13 @@ public class CreatorCollaborationService {
         return tenantId;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required id 计算得到的数量、金额或指标值。
+     */
     private Long requiredId(Long value, String field) {
         if (value == null || value <= 0) {
             throw new IllegalArgumentException(field + " is required");
@@ -443,6 +564,13 @@ public class CreatorCollaborationService {
         return value;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String field) {
         String trimmed = trimToNull(value);
         if (trimmed == null) {
@@ -451,19 +579,44 @@ public class CreatorCollaborationService {
         return trimmed;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeUpper(String value, String field) {
         return required(value, field).toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOptionalUpper(String value) {
         String trimmed = trimToNull(value);
         return trimmed == null ? null : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeHandle(String value) {
         return required(value, "handle");
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param handle handle 参数，用于 handleKey 流程中的校验、计算或对象转换。
+     * @return 返回 handle key 生成的文本或业务键。
+     */
     private String handleKey(String handle) {
         String value = handle.startsWith("@") ? handle.substring(1) : handle;
         String key = value.trim().toLowerCase(Locale.ROOT);
@@ -473,11 +626,24 @@ public class CreatorCollaborationService {
         return key;
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private String defaultString(String value, String fallback) {
         String trimmed = trimToNull(value);
         return trimmed == null ? fallback : trimmed;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -486,30 +652,66 @@ public class CreatorCollaborationService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    /**
+     * 执行 nonNegative 流程，围绕 non negative 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 non negative 计算得到的数量、金额或指标值。
+     */
     private Long nonNegative(Long value) {
         return value == null || value < 0 ? 0L : value;
     }
 
+    /**
+     * 执行 money 流程，围绕 money 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 money 计算得到的数量、金额或指标值。
+     */
     private BigDecimal money(BigDecimal value) {
         return value == null || value.compareTo(BigDecimal.ZERO) < 0 ? ZERO_MONEY : value;
     }
 
+    /**
+     * 执行 rate 流程，围绕 rate 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 rate 计算得到的数量、金额或指标值。
+     */
     private BigDecimal rate(BigDecimal value) {
         return value == null || value.compareTo(BigDecimal.ZERO) < 0 ? ZERO_RATE : value;
     }
 
+    /**
+     * 执行 now 流程，围绕 now 完成校验、计算或结果组装。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("creator collaboration metadata is not JSON serializable", ex);
         }
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private List<String> list(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
@@ -517,11 +719,18 @@ public class CreatorCollaborationService {
         try {
             List<String> values = objectMapper.readValue(json, STRING_LIST);
             return values == null ? List.of() : values;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return List.of();
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
@@ -529,11 +738,18 @@ public class CreatorCollaborationService {
         try {
             Map<String, Object> values = objectMapper.readValue(json, OBJECT_MAP);
             return values == null ? Map.of() : values;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return Map.of();
         }
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }

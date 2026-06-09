@@ -11,7 +11,7 @@ Publish a minimal TypeScript browser analytics SDK that sends governed batches t
 
 ## Current Baseline
 
-- Implemented and merged into `main` on 2026-06-05.
+- Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - The repository now has a self-contained `sdk/analytics-web` package.
 - P1-005 defines write-key authentication and P1-005A defines the server-side batch ingestion protocol.
 - The full SDK design describes plugin pipeline, auto-track, visual tracking, mobile SDKs, and heatmap capabilities; this slice intentionally starts with the smallest reliable Web SDK.
@@ -80,6 +80,6 @@ Frontend teams can integrate a supported client library instead of hand-coding H
 
 ## Implementation Status
 
-- Status: implemented and merged into `main` on 2026-06-05.
+- Status: implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - Added `CanvasAnalytics` and `createAnalytics` with load, track, identify, page, group, alias, opt-in, opt-out, flush, reset, queue inspection helpers, Basic Auth batch sending, stable `messageId`/`idempotencyKey`, consent gating, and optional persistence.
 - SDK verification: `cd sdk/analytics-web && npm test` passed; `cd sdk/analytics-web && npm run build` passed.

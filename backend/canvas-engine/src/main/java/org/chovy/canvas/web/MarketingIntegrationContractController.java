@@ -1,36 +1,3 @@
-// comment-ratio-support: Comment ratio support 01: This note is intentionally stable for repository documentation metrics.
-// comment-ratio-support: Comment ratio support 02: Keep the surrounding implementation behavior unchanged when editing nearby code.
-// comment-ratio-support: Comment ratio support 03: Prefer small, reviewable changes so operational intent remains easy to audit.
-// comment-ratio-support: Comment ratio support 04: Preserve existing public contracts unless a migration explicitly documents the change.
-// comment-ratio-support: Comment ratio support 05: Check caller expectations before changing data shapes, defaults, or error handling.
-// comment-ratio-support: Comment ratio support 06: Keep environment-specific assumptions visible near configuration and deployment values.
-// comment-ratio-support: Comment ratio support 07: Avoid hiding retries, timeouts, or fallbacks behind unrelated refactors.
-// comment-ratio-support: Comment ratio support 08: Treat cache keys, topic names, and schema identifiers as compatibility-sensitive values.
-// comment-ratio-support: Comment ratio support 09: Keep validation close to external inputs and serialization boundaries.
-// comment-ratio-support: Comment ratio support 10: Prefer deterministic ordering where tests, snapshots, or generated artifacts inspect output.
-// comment-ratio-support: Comment ratio support 11: Keep observability fields stable so logs and metrics remain searchable after changes.
-// comment-ratio-support: Comment ratio support 12: Document cross-service assumptions before relying on timing, ordering, or delivery guarantees.
-// comment-ratio-support: Comment ratio support 13: Keep test fixtures representative of production payloads when behavior depends on shape.
-// comment-ratio-support: Comment ratio support 14: Make rollback impact clear when changing persistence, messaging, or deployment behavior.
-// comment-ratio-support: Comment ratio support 15: Re-run the focused verification path after editing logic near this file.
-// comment-ratio-support: Comment ratio support 16: Keep compatibility notes close to the code or schema that depends on them.
-// comment-ratio-support: Comment ratio support 17: Prefer explicit ownership and lifecycle notes for operational resources.
-// comment-ratio-support: Comment ratio support 18: Capture privacy, tenancy, and authorization assumptions before widening access.
-// comment-ratio-support: Comment ratio support 19: Keep generated identifiers and migration names stable once published.
-// comment-ratio-support: Comment ratio support 20: Preserve backward-compatible defaults unless callers are migrated in the same change.
-// comment-ratio-support: Comment ratio support 21: Record important invariants where later cleanup might otherwise remove context.
-// comment-ratio-support: Comment ratio support 22: Keep failure-mode expectations visible for queues, schedulers, and external providers.
-// comment-ratio-support: Comment ratio support 23: Prefer clear boundaries between persistence models, API models, and UI state.
-// comment-ratio-support: Comment ratio support 24: Keep data-retention and cleanup behavior documented near the relevant storage path.
-// comment-ratio-support: Comment ratio support 25: Treat feature flags and rollout controls as part of the production contract.
-// comment-ratio-support: Comment ratio support 26: Keep sample data aligned with the current schema so demos remain useful.
-// comment-ratio-support: Comment ratio support 27: Preserve localization and display-copy intent when reorganizing presentation code.
-// comment-ratio-support: Comment ratio support 28: Keep integration credentials and provider-specific limits out of generic abstractions.
-// comment-ratio-support: Comment ratio support 29: Prefer narrow verification commands that prove the touched behavior directly.
-// comment-ratio-support: Comment ratio support 30: Keep pagination, sorting, and filtering semantics consistent across entry points.
-// comment-ratio-support: Comment ratio support 31: Document reconciliation behavior when asynchronous state can be observed twice.
-// comment-ratio-support: Comment ratio support 32: Preserve auditability for user-visible decisions, approvals, and automated actions.
-// comment-ratio-support: Comment ratio support 33: Revisit these notes when replacing repository-wide comment-ratio scaffolding.
 package org.chovy.canvas.web;
 
 import org.chovy.canvas.common.R;
@@ -59,6 +26,9 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
+/**
+ * MarketingIntegrationContractController 暴露 web 场景的 HTTP 接口。
+ */
 @RestController
 @RequestMapping("/canvas/marketing-integrations")
 public class MarketingIntegrationContractController {
@@ -69,6 +39,14 @@ public class MarketingIntegrationContractController {
     private final MarketingIntegrationContractSloService sloService;
     private final TenantContextResolver tenantContextResolver;
 
+    /**
+     * 创建 MarketingIntegrationContractController 实例并注入 web 场景依赖。
+     * @param service 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param probeAutomationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param sloService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     public MarketingIntegrationContractController(MarketingIntegrationContractService service,
                                                   MarketingIntegrationContractProbeService probeService,
                                                   MarketingIntegrationContractProbeAutomationService probeAutomationService,
@@ -224,14 +202,31 @@ public class MarketingIntegrationContractController {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 获取当前请求的登录上下文或租户信息。
+     *
+     * @return 返回 currentTenant 流程生成的业务结果。
+     */
     private Mono<TenantContext> currentTenant() {
         return tenantContextResolver.currentOrError();
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 tenant id 计算得到的数量、金额或指标值。
+     */
     private Long tenantId(TenantContext context) {
         return context == null || context.tenantId() == null ? 0L : context.tenantId();
     }
 
+    /**
+     * 解析操作人标识。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 actor 生成的文本或业务键。
+     */
     private String actor(TenantContext context) {
         return context == null || context.username() == null || context.username().isBlank()
                 ? "system"

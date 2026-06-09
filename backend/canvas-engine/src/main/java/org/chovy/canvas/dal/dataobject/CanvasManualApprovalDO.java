@@ -25,6 +25,10 @@ public class CanvasManualApprovalDO {
     /** 所属执行记录 ID */
     private String executionId;
 
+    /** 所属租户 ID；历史记录可能为空，接口层会通过执行上下文兜底校验。 */
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 所属画布 ID */
     private Long canvasId;
 

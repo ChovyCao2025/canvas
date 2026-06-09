@@ -169,9 +169,9 @@ Returns the work item, contact profile, conversation session, messages, SOP task
 - Frontend page tests prove the SCRM inbox loads, opens a customer timeline, and renders assignment, status, SOP task, and task-completion controls.
 - App shell tests prove `/conversations` has route announcement coverage and a visible navigation entry.
 
-## Delivery Status
+## Implementation Status
 
-Implemented and verified backend first slice:
+Status: Implemented and verified backend first slice.
 
 - Migration `V305__scrm_operator_workspace.sql`.
 - Contact profile, work item, SOP task, and audit data objects/mappers.

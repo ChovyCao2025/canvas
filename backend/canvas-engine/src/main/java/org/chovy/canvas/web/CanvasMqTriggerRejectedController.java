@@ -51,7 +51,18 @@ public class CanvasMqTriggerRejectedController {
     private final CanvasDisruptorService disruptorService;
     /** JSON 转换器，用于解析拒绝消息 payload。 */
     private final ObjectMapper objectMapper;
-
+    /**
+     * 查询画布 MQ 触发拒绝记录列表接口，对应 GET 请求。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param tag 请求参数，可选。
+     * @param reason 请求参数，可选。
+     * @param page 请求参数，默认值为 1。
+     * @param size 请求参数，默认值为 20。
+     * @return 异步返回统一响应，包含分页结果。
+     */
     @GetMapping
     public Mono<R<PageResult<CanvasMqTriggerRejectedDO>>> list(
             @RequestParam(required = false) String tag,
@@ -150,6 +161,7 @@ public class CanvasMqTriggerRejectedController {
         try {
             // rejected.body 存的是消费失败时的原始消息体，必须可反序列化后才允许重放。
             return objectMapper.readValue(rejected.getBody(), MqTriggerMessage.class);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalArgumentException("无法重放 rejected 消息，消息体不是合法 MQ 触发 JSON", e);
         }
@@ -183,6 +195,7 @@ public class CanvasMqTriggerRejectedController {
             long canvasId = Long.parseLong(raw);
             // 路由表里可能存在脏数据，非正数 ID 直接跳过。
             return canvasId > 0 ? java.util.Optional.of(canvasId) : java.util.Optional.empty();
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             log.warn("[MQ_REJECTED] replay skip invalid route canvasId={}", raw);
             return java.util.Optional.empty();
@@ -201,6 +214,7 @@ public class CanvasMqTriggerRejectedController {
         try {
             disruptorService.publishRequest(requestId);
             return true;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             log.warn("[MQ_REJECTED] replay immediate dispatch failed requestId={} reason={}",
                     requestId, e.getMessage());

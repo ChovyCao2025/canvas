@@ -159,6 +159,7 @@ public class AudienceBatchComputeService {
 
     /** 删除人群定义、统计和已持久化的 Bitmap 结果。 */
     public void delete(Long audienceId) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         definitionMapper.deleteById(audienceId);
         statMapper.deleteById(audienceId);
         bitmapStore.delete(audienceId);
@@ -201,6 +202,11 @@ public class AudienceBatchComputeService {
         }
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param dataSource data source 参数，用于 closeDataSource 流程中的校验、计算或对象转换。
+     */
     private void closeDataSource(DataSource dataSource) {
         if (dataSource instanceof AutoCloseable closeable) {
             try {
@@ -277,22 +283,27 @@ public class AudienceBatchComputeService {
     /** 从 Tagger API 响应中安全提取用户 ID 列表。 */
     private List<String> extractUserIds(Map<String, Object> response) {
         Object raw = response == null ? null : response.get("userIds");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!(raw instanceof List<?> list)) {
             return List.of();
         }
         List<String> userIds = new ArrayList<>(list.size());
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Object item : list) {
             if (item != null) {
                 userIds.add(String.valueOf(item));
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return userIds;
     }
 
     /** 更新或创建人群计算状态统计记录。 */
     private void updateStat(Long audienceId, String status, Long size, Integer sizeKb, String errorMsg) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         AudienceStatDO stat = statMapper.selectById(audienceId);
         boolean exists = stat != null;
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!exists) {
             stat = new AudienceStatDO();
             stat.setAudienceId(audienceId);

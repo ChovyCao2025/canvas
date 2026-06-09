@@ -1,5 +1,9 @@
 # CDP Warehouse Asset Availability Automation Implementation Plan
 
+Spec: `../specs/p2-062-cdp-warehouse-asset-availability-automation.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Publish P2-060 asset availability observations from offline aggregation and realtime pipeline checkpoint evidence.
 
 **Architecture:** Inject `CdpWarehouseConsumerAvailabilityService` as an optional dependency into offline aggregation and realtime pipeline services. On successful aggregation or checkpoint reporting, call `recordAssetAvailability` with deterministic table/dataset assets. Treat this as a best-effort side effect so core warehouse job recording remains authoritative.

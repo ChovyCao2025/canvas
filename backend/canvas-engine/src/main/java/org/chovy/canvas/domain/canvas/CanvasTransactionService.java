@@ -30,6 +30,11 @@ public class CanvasTransactionService {
     /** 画布状态机，集中约束生命周期转换。 */
     private CanvasStateTransitionPolicy stateTransitionPolicy = new CanvasStateTransitionPolicy();
 
+    /**
+     * 执行 setStateTransitionPolicy 流程，围绕 set state transition policy 完成校验、计算或结果组装。
+     *
+     * @param stateTransitionPolicy state transition policy 参数，用于 setStateTransitionPolicy 流程中的校验、计算或对象转换。
+     */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     void setStateTransitionPolicy(CanvasStateTransitionPolicy stateTransitionPolicy) {
         this.stateTransitionPolicy = stateTransitionPolicy;
@@ -76,12 +81,12 @@ public class CanvasTransactionService {
         return new PublishResult(published, oldPublishedVersionId);
     }
 
-    /** 发布操作的结果载体，供事务外清理旧路由和注册新路由使用。 */
+    /** 发布操作的结果载体，供事务外清理旧路由和注册新路由使用。      * @param publishedVersion 本次发布创建的版本快照.
+     * @param oldPublishedVersionId 发布前旧版本 ID，用于事务外清理旧路由和调度.
+     */
     public record PublishResult(
-            /** 本次发布创建的版本快照。 */
-            CanvasVersionDO publishedVersion,
-            /** 发布前旧版本 ID，用于事务外清理旧路由和调度。 */
-            Long oldPublishedVersionId
+        CanvasVersionDO publishedVersion,
+        Long oldPublishedVersionId
     ) {}
 
     /**

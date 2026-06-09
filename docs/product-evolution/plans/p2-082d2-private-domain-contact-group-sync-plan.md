@@ -1,5 +1,7 @@
 # Private-Domain Contact And Group Sync Implementation Plan
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add tenant-scoped private-domain contact, owner, customer group, group member, and sync-run persistence plus API access for SCRM provider collectors.

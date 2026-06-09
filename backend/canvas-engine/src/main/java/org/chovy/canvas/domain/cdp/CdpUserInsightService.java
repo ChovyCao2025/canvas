@@ -49,12 +49,21 @@ public class CdpUserInsightService {
         return buildUserInsight(tenantId, userService.getRequiredProfile(tenantId, userId));
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param profile profile 参数，用于 buildUserInsight 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private CanvasUserDetailDTO buildUserInsight(Long tenantId, CdpUserProfileDO profile) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<CanvasExecutionDO> executions = executionMapper.selectList(executionQuery(tenantId)
                 .eq(CanvasExecutionDO::getUserId, profile.getUserId())
                 .isNotNull(CanvasExecutionDO::getCanvasId)
                 .orderByDesc(CanvasExecutionDO::getCreatedAt));
         Map<Long, List<CanvasExecutionDO>> byCanvas = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CanvasExecutionDO execution : executions) {
             byCanvas.computeIfAbsent(execution.getCanvasId(), ignored -> new java.util.ArrayList<>()).add(execution);
         }
@@ -71,6 +80,7 @@ public class CdpUserInsightService {
                 .sorted(Comparator.comparing(CdpUserCanvasSummaryDTO::lastEnteredAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
 
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new CanvasUserDetailDTO(
                 profile.getUserId(),
                 userService.toDetail(profile),
@@ -81,6 +91,7 @@ public class CdpUserInsightService {
 
     /** 汇总用户在单个画布中的进入次数、成功失败数和最近状态。 */
     private CdpUserCanvasSummaryDTO toCanvasSummary(Long canvasId, CanvasDO canvas, List<CanvasExecutionDO> executions) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         long successCount = executions.stream()
                 .filter(item -> item.getStatus() != null && item.getStatus() == ExecutionStatus.SUCCESS.getCode())
                 .count();
@@ -96,6 +107,7 @@ public class CdpUserInsightService {
         CanvasExecutionDO latest = executions.stream()
                 .max(Comparator.comparing(CanvasExecutionDO::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElse(null);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new CdpUserCanvasSummaryDTO(
                 canvasId,
                 canvas == null ? "画布#" + canvasId : canvas.getName(),
@@ -110,6 +122,7 @@ public class CdpUserInsightService {
 
     /** 将执行状态码转换为用户洞察页展示文案。 */
     private String statusLabel(Integer status) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (status != null && status == ExecutionStatus.SUCCESS.getCode()) {
             return "SUCCESS";
         }
@@ -122,9 +135,16 @@ public class CdpUserInsightService {
         if (status != null && status == ExecutionStatus.RUNNING.getCode()) {
             return "RUNNING";
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return status == null ? "-" : String.valueOf(status);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 executionQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<CanvasExecutionDO> executionQuery(Long tenantId) {
         LambdaQueryWrapper<CanvasExecutionDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {
@@ -133,6 +153,12 @@ public class CdpUserInsightService {
         return query;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回布尔判断结果。
+     */
     private LambdaQueryWrapper<CanvasDO> canvasQuery(Long tenantId) {
         LambdaQueryWrapper<CanvasDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {

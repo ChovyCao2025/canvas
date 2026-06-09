@@ -2,7 +2,6 @@ package org.chovy.canvas.engine.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -28,7 +27,9 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     @Override
     public boolean supports(String providerType) {
         String normalized = providerType == null ? "" : providerType.trim().toUpperCase(Locale.ROOT);
-        return LlmProviderType.OPENAI_COMPATIBLE.equals(normalized) || "OPENAI".equals(normalized);
+        return LlmProviderType.OPENAI_COMPATIBLE.equals(normalized)
+                || LlmProviderType.CUSTOM_OPENAI_COMPATIBLE.equals(normalized)
+                || "OPENAI".equals(normalized);
     }
 
     @Override
@@ -42,8 +43,10 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         body.put("response_format", Map.of("type", "json_object"));
         if (request.params() != null) {
             request.params().forEach((key, value) -> {
-                if (value != null && !body.containsKey(key)) {
-                    body.put(key, value);
+                String bodyKey = bodyParamKey(key);
+                Object bodyValue = bodyParamValue(bodyKey, value);
+                if (bodyKey != null && bodyValue != null && !body.containsKey(bodyKey)) {
+                    body.put(bodyKey, bodyValue);
                 }
             });
         }
@@ -51,6 +54,11 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         return webClientBuilder.build()
                 .post()
                 .uri(chatCompletionsEndpoint(request.endpoint()))
+                .headers(headers -> {
+                    if (request.apiKey() != null && !request.apiKey().isBlank()) {
+                        headers.setBearerAuth(request.apiKey().trim());
+                    }
+                })
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(String.class)
@@ -69,8 +77,10 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                     output,
                     usage.path("prompt_tokens").isNumber() ? usage.path("prompt_tokens").asInt() : null,
                     usage.path("completion_tokens").isNumber() ? usage.path("completion_tokens").asInt() : null);
+        } catch (LlmInvalidJsonException e) {
+            throw e;
         } catch (Exception e) {
-            throw new IllegalArgumentException("AI_LLM: provider response is not valid JSON", e);
+            throw new LlmInvalidJsonException("AI_LLM: provider response is not valid JSON", e);
         }
     }
 
@@ -78,14 +88,65 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         try {
             JsonNode parsed = objectMapper.readTree(content == null || content.isBlank() ? "{}" : content);
             if (!parsed.isObject()) {
-                throw new IllegalArgumentException("AI_LLM: provider content must be a JSON object");
+                throw new LlmInvalidJsonException("AI_LLM: provider content must be a JSON object");
             }
             return parsed;
+        } catch (LlmInvalidJsonException e) {
+            throw e;
         } catch (Exception e) {
-            ObjectNode node = objectMapper.createObjectNode();
-            node.put("rawContent", content == null ? "" : content);
-            return node;
+            throw new LlmInvalidJsonException("AI_LLM: provider content is not valid JSON", e);
         }
+    }
+
+    private static String bodyParamKey(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        String trimmed = key.trim();
+        return "maxTokens".equals(trimmed) ? "max_tokens" : trimmed;
+    }
+
+    private static Object bodyParamValue(String key, Object value) {
+        if (value == null) {
+            return null;
+        }
+        if ("max_tokens".equals(key)) {
+            Integer maxTokens = intParam(value);
+            return maxTokens == null ? null : Math.max(1, Math.min(maxTokens, 8_000));
+        }
+        if ("temperature".equals(key)) {
+            Double temperature = doubleParam(value);
+            return temperature == null ? null : Math.max(0.0, Math.min(temperature, 2.0));
+        }
+        return value;
+    }
+
+    private static Integer intParam(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Double doubleParam(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Double.parseDouble(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static String chatCompletionsEndpoint(String endpoint) {

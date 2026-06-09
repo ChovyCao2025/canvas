@@ -5,6 +5,8 @@ Sequence: 088
 Source: user-requested marketing middle-platform glue-layer gap
 Implementation plan: `../plans/p2-088-marketing-integration-contract-registry-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a tenant-scoped marketing integration contract registry so the marketing middle platform can govern API glue across provider-write gateways, monitoring connectors, credential onboarding, and internal marketing capabilities. The registry is not a provider adapter; it is the declared contract and ownership layer that makes external platform connections visible, queryable, and readiness-gated.

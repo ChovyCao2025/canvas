@@ -5,6 +5,8 @@ Sequence: 044
 Source: `docs/product-evolution/specs/p2-041-cdp-warehouse-metric-lineage-and-impact.md`, `docs/product-evolution/specs/p2-042-cdp-warehouse-metric-change-review-guard.md`, `docs/product-evolution/specs/p2-043-cdp-warehouse-transitive-lineage-impact.md`
 Implementation plan: `../plans/p2-044-cdp-warehouse-metric-impact-transitive-lineage-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Connect semantic metric impact analysis and metric-change review to bounded transitive warehouse lineage, so metric owners can see multi-hop upstream sources and downstream warehouse blast radius before approving a metric contract change.

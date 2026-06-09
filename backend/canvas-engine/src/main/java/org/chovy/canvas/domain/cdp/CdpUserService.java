@@ -39,16 +39,34 @@ public class CdpUserService {
     /** JSON 转换器，用于属性 JSON 脱敏。 */
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 创建 CdpUserService 实例并注入 domain.cdp 场景依赖。
+     * @param profileMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param identityMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpUserService(CdpUserProfileMapper profileMapper, CdpUserIdentityMapper identityMapper) {
         this(profileMapper, identityMapper, new PiiMaskingService(), null);
     }
 
+    /**
+     * 创建 CdpUserService 实例并注入 domain.cdp 场景依赖。
+     * @param profileMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param identityMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param maskingService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpUserService(CdpUserProfileMapper profileMapper,
                           CdpUserIdentityMapper identityMapper,
                           PiiMaskingService maskingService) {
         this(profileMapper, identityMapper, maskingService, null);
     }
 
+    /**
+     * 创建 CdpUserService 实例并注入 domain.cdp 场景依赖。
+     * @param profileMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param identityMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param maskingService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param privacyTombstoneService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public CdpUserService(CdpUserProfileMapper profileMapper,
                           CdpUserIdentityMapper identityMapper,
@@ -141,6 +159,7 @@ public class CdpUserService {
         identity.setVerified(0);
         try {
             identityMapper.insert(identity);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DuplicateKeyException duplicate) {
             // 并发导入同一外部身份时，以已成功插入的身份映射为准重新归并用户。
             CdpUserIdentityDO raced = identityMapper.selectOne(identityQuery(tenantId)
@@ -200,6 +219,12 @@ public class CdpUserService {
         return identityType.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param propertiesJson JSON 字符串，承载结构化配置或明细。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String maskProperties(String propertiesJson) {
         if (propertiesJson == null || propertiesJson.isBlank()) {
             return propertiesJson;
@@ -208,11 +233,18 @@ public class CdpUserService {
             Map<String, Object> properties = objectMapper.readValue(
                     propertiesJson, new TypeReference<Map<String, Object>>() {});
             return objectMapper.writeValueAsString(maskingService.maskMetadata(properties));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ignored) {
             return maskingService.maskText(propertiesJson);
         }
     }
 
+    /**
+     * 执行 profileQuery 流程，围绕 profile query 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 profileQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<CdpUserProfileDO> profileQuery(Long tenantId) {
         LambdaQueryWrapper<CdpUserProfileDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {
@@ -221,6 +253,12 @@ public class CdpUserService {
         return query;
     }
 
+    /**
+     * 执行 identityQuery 流程，围绕 identity query 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 identityQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<CdpUserIdentityDO> identityQuery(Long tenantId) {
         LambdaQueryWrapper<CdpUserIdentityDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {
@@ -229,6 +267,14 @@ public class CdpUserService {
         return query;
     }
 
+    /**
+     * 执行 enforcePrivacyTombstone 流程，围绕 enforce privacy tombstone 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param subjectType 类型标识，用于选择对应处理分支。
+     * @param subjectValue 待处理值，用于规则计算或转换。
+     * @param source source 参数，用于 enforcePrivacyTombstone 流程中的校验、计算或对象转换。
+     */
     private void enforcePrivacyTombstone(Long tenantId, String subjectType, String subjectValue, String source) {
         CdpWarehousePrivacyTombstoneService service =
                 privacyTombstoneService == null ? null : privacyTombstoneService.getIfAvailable();

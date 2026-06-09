@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Fails fast when a production-like profile still uses local security defaults.
+ * 生产类环境安全配置校验器，发现本地默认密钥或不安全暴露配置时快速失败。
  */
 @Component
 public class ProductionSecurityValidator implements SmartInitializingSingleton {
@@ -23,10 +23,17 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
 
     private final Environment environment;
 
+    /**
+     * 创建 ProductionSecurityValidator 实例并注入 config 场景依赖。
+     * @param environment environment 参数，用于 ProductionSecurityValidator 流程中的校验、计算或对象转换。
+     */
     public ProductionSecurityValidator(Environment environment) {
         this.environment = environment;
     }
 
+    /**
+     * afterSingletonsInstantiated 处理 config 场景的业务逻辑。
+     */
     @Override
     public void afterSingletonsInstantiated() {
         if (!isProductionLike(environment)) {
@@ -46,6 +53,12 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 判断当前激活 profile 是否属于生产类环境。
+     *
+     * @param environment Spring 环境配置
+     * @return true 表示 prod、production、staging 或 uat
+     */
     static boolean isProductionLike(Environment environment) {
         return Arrays.stream(environment.getActiveProfiles())
                 .map(profile -> profile.toLowerCase(Locale.ROOT))
@@ -55,6 +68,11 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
                         || profile.equals("uat"));
     }
 
+    /**
+     * 校验数据库账号密码未使用 root。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateDatasource(List<String> failures) {
         String username = value("spring.datasource.username");
         String password = value("spring.datasource.password");
@@ -66,10 +84,18 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 校验数据源凭据加密密钥已配置且不是默认值。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateDataSourceCredentialSecret(List<String> failures) {
+        // 准备本次处理所需的上下文和中间变量。
         String secret = value("canvas.datasource.credential-secret");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (secret == null || secret.isBlank()) {
             failures.add("canvas.datasource.credential-secret 必须配置");
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (DataSourceCredentialCipher.DEFAULT_SECRET.equals(secret)) {
@@ -80,10 +106,18 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 校验 JWT 密钥已配置、足够长且不是示例默认值。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateJwt(List<String> failures) {
+        // 准备本次处理所需的上下文和中间变量。
         String secret = value("canvas.jwt.secret");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (secret == null || secret.isBlank()) {
             failures.add("canvas.jwt.secret 必须配置");
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (secret.startsWith(LEGACY_JWT_SECRET_PREFIX)) {
@@ -94,10 +128,18 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 校验事件上报共享密钥已配置、足够长且不是默认值。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateEventSecret(List<String> failures) {
+        // 准备本次处理所需的上下文和中间变量。
         String secret = value("canvas.events.report-secret");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (secret == null || secret.isBlank()) {
             failures.add("canvas.events.report-secret 必须配置");
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (LEGACY_EVENT_SECRET.equals(secret)) {
@@ -108,6 +150,11 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 校验营销资产上传回调密钥长度满足生产要求。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateAssetUploadWebhookSecret(List<String> failures) {
         String secret = value("canvas.marketing.content.asset-upload.webhook-secret");
         if (secret == null || secret.isBlank()) {
@@ -119,6 +166,11 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 校验生产环境 CORS 来源不包含通配符。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateCors(List<String> failures) {
         String origins = value("canvas.cors.allowed-origins");
         if (origins != null && Arrays.stream(origins.split(","))
@@ -128,6 +180,11 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 校验健康检查详情不会在生产环境始终暴露。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateHealthDetails(List<String> failures) {
         String showDetails = value("management.endpoint.health.show-details");
         if ("always".equalsIgnoreCase(showDetails)) {
@@ -135,6 +192,11 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 校验生产环境未开启公开 API 文档。
+     *
+     * @param failures 失败原因收集列表
+     */
     private void validateApiDocs(List<String> failures) {
         if ("true".equalsIgnoreCase(value("springdoc.api-docs.enabled"))) {
             failures.add("springdoc.api-docs.enabled 生产环境不能为 true");
@@ -144,6 +206,12 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
     }
 
+    /**
+     * 从环境中读取配置值。
+     *
+     * @param key 配置键
+     * @return 配置值，缺失时为 null
+     */
     private String value(String key) {
         return environment.getProperty(key);
     }

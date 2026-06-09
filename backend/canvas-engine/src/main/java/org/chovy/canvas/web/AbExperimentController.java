@@ -98,7 +98,17 @@ public class AbExperimentController {
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(R.<Void>ok());
     }
-
+    /**
+     * 查询 A/B 实验列表接口，对应 GET /{id}/groups。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 主要委托 abExperimentGroupService.list 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @param includeDisabled 请求参数，默认值为 false。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/{id}/groups")
     public Mono<R<List<AbExperimentGroupDO>>> listGroups(
             @PathVariable Long id,

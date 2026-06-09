@@ -5,9 +5,9 @@ Sequence: 005A2
 Source: `docs/optimization/todo/cdp_gap_analysis.md`, `docs/optimization/todo/2026-05-30-cdp-roadmap.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`
 Implementation plan: `../plans/p1-005a2-event-attribute-discovery-and-internal-cdp-event-plan.md`
 
-Implementation status: implemented on 2026-06-05. The actual Flyway migration is
-`backend/canvas-engine/src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql`;
-the original `V97_2` filename was superseded by existing migration ordering.
+## Implementation Status
+
+Implemented on 2026-06-05. The actual Flyway migration is `backend/canvas-engine/src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql`; the original `V97_2` filename was superseded by existing migration ordering.
 
 ## Goal
 

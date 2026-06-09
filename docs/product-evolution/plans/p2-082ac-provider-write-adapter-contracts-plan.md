@@ -6,6 +6,8 @@ Spec: `../specs/p2-082ac-provider-write-adapter-contracts.md`
 
 Add the backend adapter contract layer needed before real SEM, creator, and DSP provider write integrations: dry-run delegation, sandbox live-apply clients, and credential-safe evidence.
 
+**Implementation Status:** Current workspace record: delivered backend first slice. Verification results are recorded below.
+
 ## Tasks
 
 ### Task 1: Index P2-082AC Docs

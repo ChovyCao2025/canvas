@@ -43,6 +43,16 @@ public class NotificationController {
     /** 租户上下文解析器，用于隔离通知查询和状态更新。 */
     private final TenantContextResolver tenantContextResolver;
 
+    /**
+     * 查询当前用户的通知列表。
+     *
+     * @param unreadOnly 是否只返回未读通知
+     * @param category 通知分类，可为空
+     * @param archived 是否只返回已归档通知
+     * @param page 页码，从 1 开始
+     * @param size 每页数量，最大 100
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping
     public Mono<R<List<NotificationDTO>>> list(
             @RequestParam(defaultValue = "false") boolean unreadOnly,
@@ -71,11 +81,9 @@ public class NotificationController {
     }
 
     /**
-     * 处理 unread Count 对应的 HTTP 接口请求。
+     * 查询当前用户的未读通知数量。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @return 异步返回统一响应，包含 count 字段。
      */
     @GetMapping("/unread-count")
     public Mono<R<Map<String, Long>>> unreadCount() {
@@ -87,12 +95,10 @@ public class NotificationController {
     }
 
     /**
-     * 处理 mark Read 对应的 HTTP 接口请求。
+     * 将当前用户的一条通知标记为已读。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @param notificationId notificationId 对应的业务主键或标识
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param notificationId 通知 ID
+     * @return 异步返回统一响应。
      */
     @PutMapping("/{notificationId}/read")
     public Mono<R<Void>> markRead(@PathVariable String notificationId) {
@@ -104,11 +110,9 @@ public class NotificationController {
     }
 
     /**
-     * 处理 mark All Read 对应的 HTTP 接口请求。
+     * 将当前用户的全部通知标记为已读。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @return 异步返回统一响应。
      */
     @PutMapping("/read-all")
     public Mono<R<Void>> markAllRead() {
@@ -119,12 +123,10 @@ public class NotificationController {
     }
 
     /**
-     * 处理 archive 对应的 HTTP 接口请求。
+     * 归档当前用户的一条通知。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @param notificationId notificationId 对应的业务主键或标识
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param notificationId 通知 ID
+     * @return 异步返回统一响应。
      */
     @PutMapping("/{notificationId}/archive")
     public Mono<R<Void>> archive(@PathVariable String notificationId) {
@@ -136,11 +138,9 @@ public class NotificationController {
     }
 
     /**
-     * 处理 create Ws Ticket 对应的 HTTP 接口请求。
+     * 为通知 WebSocket 握手签发一次性票据。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @return 异步返回票据和剩余有效期。
      */
     @PostMapping("/ws-ticket")
     public Mono<R<NotificationWebSocketTicketDTO>> createWsTicket() {
@@ -154,11 +154,9 @@ public class NotificationController {
     }
 
     /**
-     * 执行 current User 对应的业务逻辑。
+     * 获取当前请求的登录上下文或租户信息。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @return 返回 current user 生成的文本或业务键。
      */
     private Mono<String> currentUser() {
         return ReactiveSecurityContextHolder.getContext()
@@ -170,32 +168,34 @@ public class NotificationController {
     }
 
     /**
-     * 执行 clamp 对应的业务逻辑。
+     * 按安全边界裁剪或保护输入值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param min min 方法执行所需的业务参数
-     * @param max max 方法执行所需的业务参数
-     * @return 计算得到的数值结果
+     * @param value 待处理值，用于规则计算或转换。
+     * @param min min 参数，用于 clamp 流程中的校验、计算或对象转换。
+     * @param max max 参数，用于 clamp 流程中的校验、计算或对象转换。
+     * @return 返回 clamp 计算得到的数量、金额或指标值。
      */
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
 
     /**
-     * 执行 default If Blank 对应的业务逻辑。
+     * 按默认值规则处理输入值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultIfBlank 流程中的校验、计算或对象转换。
+     * @return 返回 default if blank 生成的文本或业务键。
      */
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 tenant id 计算得到的数量、金额或指标值。
+     */
     private Long tenantId(TenantContext context) {
         if (context.tenantId() == null && RoleNames.ADMIN.equals(context.role())) {
             return null;

@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ, React, TypeScript, Vitest.
 
+**Implementation Status:** Current workspace record: P2-082A through P2-082AC and listed supporting foundations are done as first slices; P2-082AD remains in progress.
+
 ---
 
 ## Scope

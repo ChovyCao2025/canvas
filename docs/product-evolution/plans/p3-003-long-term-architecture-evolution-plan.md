@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, JSON, Node.js 18 `node:test`, existing Git workflow.
 
+**Implementation Status:** Discovery package and validator are complete in the current workspace record. Reverified on 2026-06-08 with `node --test tools/strategy/architecture-evolution-evidence.test.mjs` (3 tests passing) and `node tools/strategy/architecture-evolution-evidence.mjs`. Commit and merge status was not verified in this docs-only audit; the commit boundary is documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -34,7 +36,7 @@ No migration is created. This slice does not change runtime topology, persistenc
 **Files:**
 - Create: `tools/strategy/architecture-evolution-evidence.test.mjs`
 
-- [ ] **Step 1: Write failing validator tests**
+- [x] **Step 1: Write failing validator tests**
 
 Create `tools/strategy/architecture-evolution-evidence.test.mjs`:
 
@@ -91,7 +93,7 @@ test('rejects accepted architecture candidates without current code evidence', (
 })
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -107,7 +109,7 @@ Expected: FAIL because the validator script and evidence package do not exist.
 - Create: `tools/strategy/architecture-evolution-evidence.mjs`
 - Test: `tools/strategy/architecture-evolution-evidence.test.mjs`
 
-- [ ] **Step 1: Create the validator script**
+- [x] **Step 1: Create the validator script**
 
 Create `tools/strategy/architecture-evolution-evidence.mjs`:
 
@@ -146,7 +148,7 @@ if (errors.length > 0) {
 console.log(JSON.stringify({ ok: true, package: payload.package, candidateKeys: payload.candidates.map((candidate) => candidate.key) }, null, 2))
 ```
 
-- [ ] **Step 2: Run tests and confirm evidence still missing**
+- [x] **Step 2: Run tests and confirm evidence still missing**
 
 Run:
 
@@ -164,7 +166,7 @@ Expected: FAIL because `docs/product-evolution/discovery/p3-003-architecture-evo
 - Create: `docs/product-evolution/discovery/p3-003-architecture-evolution/decision-log.md`
 - Create: `docs/product-evolution/discovery/p3-003-architecture-evolution/proof-matrix.md`
 
-- [ ] **Step 1: Create evidence JSON**
+- [x] **Step 1: Create evidence JSON**
 
 Create `docs/product-evolution/discovery/p3-003-architecture-evolution/evidence.json`:
 
@@ -258,7 +260,7 @@ Create `docs/product-evolution/discovery/p3-003-architecture-evolution/evidence.
 }
 ```
 
-- [ ] **Step 2: Create README and proof matrix**
+- [x] **Step 2: Create README and proof matrix**
 
 Create `docs/product-evolution/discovery/p3-003-architecture-evolution/README.md`:
 
@@ -295,7 +297,7 @@ Create `docs/product-evolution/discovery/p3-003-architecture-evolution/proof-mat
 | Data residency | Tenant routing, backup, analytics, and support-access proof. |
 ```
 
-- [ ] **Step 3: Create decision log**
+- [x] **Step 3: Create decision log**
 
 Create `docs/product-evolution/discovery/p3-003-architecture-evolution/decision-log.md`:
 
@@ -313,7 +315,7 @@ Create `docs/product-evolution/discovery/p3-003-architecture-evolution/decision-
 | Data residency | Needs Evidence | Privacy and legal owners must define requirements. |
 ```
 
-- [ ] **Step 4: Run validator tests**
+- [x] **Step 4: Run validator tests**
 
 Run:
 
@@ -330,7 +332,7 @@ Expected: PASS, and the validator prints all seven architecture candidate keys.
 - Modify: `docs/product-evolution/specs/p3-003-long-term-architecture-evolution.md`
 - Modify: `docs/product-evolution/plans/p3-003-long-term-architecture-evolution-plan.md`
 
-- [ ] **Step 1: Confirm no migration references remain**
+- [x] **Step 1: Confirm no migration references remain**
 
 Run:
 
@@ -341,7 +343,7 @@ rg -n "$pattern" docs/product-evolution/specs/p3-003-long-term-architecture-evol
 
 Expected: no output.
 
-- [ ] **Step 2: Scan for implementation-deferral wording**
+- [x] **Step 2: Scan for implementation-deferral wording**
 
 Run:
 
@@ -377,7 +379,8 @@ EOF
 
 Expected: no output.
 
-- [ ] **Step 3: Commit the discovery slice**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

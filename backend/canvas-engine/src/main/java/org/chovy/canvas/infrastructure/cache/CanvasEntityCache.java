@@ -16,6 +16,10 @@ public class CanvasEntityCache {
     /** 画布实体的分层缓存入口。 */
     private final TieredCache<Long, CanvasDO> cache;
 
+    /**
+     * 创建 CanvasEntityCache 实例并注入 infrastructure.cache 场景依赖。
+     * @param cache 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     public CanvasEntityCache(@Qualifier("canvasEntityTieredCache") TieredCache<Long, CanvasDO> cache) {
         this.cache = cache;
     }

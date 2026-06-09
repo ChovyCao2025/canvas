@@ -113,7 +113,7 @@ export function resolveContextValueListFieldKey(fieldKey: string): string {
   return fieldKey
 }
 
-/** Returns a visible warning when a send node points at a non-real connector. */
+/** SEND_MESSAGE 指向非真实连接器时返回可见告警文案。 */
 export function resolveConnectorWarning(input: {
   nodeType: string
   bizConfig: Record<string, unknown>

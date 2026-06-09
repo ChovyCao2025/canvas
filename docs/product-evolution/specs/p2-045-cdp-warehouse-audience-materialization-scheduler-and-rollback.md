@@ -5,6 +5,8 @@ Sequence: 045
 Source: `docs/product-evolution/specs/p2-021-cdp-olap-audience-materialization.md`, `docs/product-evolution/specs/p2-028-cdp-warehouse-scheduler-lease.md`, `docs/product-evolution/specs/p2-035-cdp-warehouse-audience-materialization-operations.md`
 Implementation plan: `../plans/p2-045-cdp-warehouse-audience-materialization-scheduler-and-rollback-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Close the production loop for CDP OLAP audience materialization by adding lease-protected scheduled refreshes and guarded bitmap version rollback, so offline and hybrid audiences can stay fresh and operators can safely recover from bad materialized versions.

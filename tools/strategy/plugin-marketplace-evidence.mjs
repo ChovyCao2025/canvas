@@ -4,6 +4,11 @@ import path from 'node:path'
 export function validatePluginMarketplaceEvidence(payload) {
   const required = ['key', 'owner', 'status', 'evidence', 'proofCommand', 'launchGate', 'rollback', 'dependencies']
   const allowed = new Set(['Accepted For Child Spec', 'Needs Evidence', 'Deferred', 'Rejected'])
+  const launchGateTopics = {
+    'security-review': 'security',
+    'partner-support': 'support',
+    'plugin-takedown': 'security',
+  }
   const errors = []
 
   if (payload?.package !== 'p3-001-plugin-marketplace') {
@@ -29,6 +34,10 @@ export function validatePluginMarketplaceEvidence(payload) {
     }
     if (!allowed.has(candidate.status)) {
       errors.push(`${key}: unsupported status ${candidate.status}`)
+    }
+    const launchGateTopic = launchGateTopics[key]
+    if (launchGateTopic && !String(candidate.launchGate || '').toLowerCase().includes(launchGateTopic)) {
+      errors.push(`${key} launchGate must mention ${launchGateTopic}`)
     }
     if (candidate.status === 'Accepted For Child Spec') {
       if (!candidate.childSpecPath) {

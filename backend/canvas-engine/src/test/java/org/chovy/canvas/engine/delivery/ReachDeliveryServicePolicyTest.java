@@ -50,7 +50,7 @@ class ReachDeliveryServicePolicyTest {
 
     @Test
     void optOutCreatesSkippedRecordAndDoesNotCallReachPlatform() {
-        when(policyService.consentAllowed("user-1", "SMS", true))
+        when(policyService.consentAllowed(1L, "user-1", "SMS", true))
                 .thenReturn(PolicyDecision.blocked("MARKETING_OPT_OUT", "opted out"));
 
         ReachDeliveryService.DeliveryResult result = service.send(requestWithPolicy("SMS")).block();
@@ -91,9 +91,9 @@ class ReachDeliveryServicePolicyTest {
     }
 
     private void allowAllPolicyChecks(String channel) {
-        when(policyService.consentAllowed("user-1", channel, true)).thenReturn(PolicyDecision.allow());
-        when(policyService.suppressionAllowed("user-1", channel)).thenReturn(PolicyDecision.allow());
-        when(policyService.channelAvailable("user-1", channel)).thenReturn(PolicyDecision.allow());
+        when(policyService.consentAllowed(1L, "user-1", channel, true)).thenReturn(PolicyDecision.allow());
+        when(policyService.suppressionAllowed(1L, "user-1", channel)).thenReturn(PolicyDecision.allow());
+        when(policyService.channelAvailable(1L, "user-1", channel)).thenReturn(PolicyDecision.allow());
         when(policyService.quietHoursAllowed("user-1", "22:00", "08:00", "USER_LOCAL"))
                 .thenReturn(PolicyDecision.allow());
         when(policyService.consumeFrequency(

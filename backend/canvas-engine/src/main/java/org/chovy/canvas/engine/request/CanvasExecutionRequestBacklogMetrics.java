@@ -36,6 +36,9 @@ public class CanvasExecutionRequestBacklogMetrics {
     /** 画布指标埋点器，用于写入 backlog gauge。 */
     private final CanvasMetrics metrics;
 
+    /**
+     * refresh 更新 engine.request 场景的业务状态。
+     */
     @Scheduled(fixedDelayString = "${canvas.execution-request.backlog-metrics-delay-ms:10000}")
     public void refresh() {
         try {
@@ -51,6 +54,7 @@ public class CanvasExecutionRequestBacklogMetrics {
                 // 只刷新执行请求的核心 backlog 状态，给调度和告警消费。
                 metrics.setExecutionRequestBacklog(status, counts.getOrDefault(status, 0L));
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             log.warn("[EXEC_REQUEST] refresh backlog metrics failed: {}", e.getMessage());
         }

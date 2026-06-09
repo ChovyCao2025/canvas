@@ -1,5 +1,6 @@
 -- pipeline: mysql_canvas_trace_to_doris_ods
 -- sink: canvas_ods.canvas_execution_trace
+-- Purpose: mirror node execution traces from MySQL into Doris ODS for runtime analytics.
 CREATE TABLE mysql_canvas_execution_trace_source (
     id BIGINT,
     tenant_id BIGINT,
@@ -27,6 +28,7 @@ CREATE TABLE mysql_canvas_execution_trace_source (
     'scan.startup.mode' = 'initial'
 );
 
+-- Doris ODS trace table keeps input/output/error payloads for drill-down and replay evidence.
 CREATE TABLE doris_canvas_execution_trace_ods_sink (
     trace_id BIGINT,
     tenant_id BIGINT,
@@ -69,5 +71,6 @@ SELECT
     started_at,
     finished_at,
     duration_ms,
+    -- Prefer finished_at when available so completed nodes order by finalization time.
     COALESCE(finished_at, started_at) AS created_at
 FROM mysql_canvas_execution_trace_source;

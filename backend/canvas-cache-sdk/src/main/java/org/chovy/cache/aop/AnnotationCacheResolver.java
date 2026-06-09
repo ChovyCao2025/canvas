@@ -26,12 +26,12 @@ public class AnnotationCacheResolver {
     private final Map<String, TieredCache<Object, Object>> caches = new ConcurrentHashMap<>();
 
     /**
-     * 构造 AnnotationCacheResolver 实例，并根据入参初始化依赖、配置或内部状态。
+     * 创建注解缓存解析器。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>解析器复用应用级 ObjectMapper 构建缓存值 JavaType，保证注解缓存与业务 JSON 配置一致。
      *
-     * @param manager manager 方法执行所需的业务参数
-     * @param objectMapper objectMapper 方法执行所需的业务参数
+     * @param manager 缓存注册中心
+     * @param objectMapper 注解缓存使用的序列化组件
      */
     public AnnotationCacheResolver(TieredCacheManager manager, ObjectMapper objectMapper) {
         this.manager = manager;
@@ -39,12 +39,12 @@ public class AnnotationCacheResolver {
     }
 
     /**
-     * 构建、解析或转换 resolve 相关的业务数据。
+     * 根据 {@link TieredCached} 注解解析或创建缓存实例。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>创建出的缓存没有固定 L3 loader，未命中加载由切面通过原方法返回值提供，因此直接调用默认 loader 会失败。
      *
-     * @param annotation annotation 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param annotation 声明式缓存读取注解
+     * @return 可供切面读写的缓存实例
      */
     public TieredCache<Object, Object> resolve(TieredCached annotation) {
         return caches.computeIfAbsent(annotation.name(), ignored ->
@@ -77,12 +77,13 @@ public class AnnotationCacheResolver {
     }
 
     /**
-     * 查询或读取 get Existing 相关的业务数据。
+     * 查找已存在的注解缓存或手工注册缓存。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>{@code @TieredCachePut} 和 {@code @TieredCacheEvict} 不负责创建缓存，只能操作已经解析或注册过的缓存。
      *
-     * @param name name 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param name 缓存实例名称
+     * @return 已存在的缓存实例
+     * @throws IllegalStateException 缓存名称未注册时抛出
      */
     @SuppressWarnings("unchecked")
     public TieredCache<Object, Object> getExisting(String name) {
@@ -96,12 +97,12 @@ public class AnnotationCacheResolver {
     }
 
     /**
-     * 删除、清理或失效 evict If Present 相关的业务数据。
+     * 在缓存存在时失效指定 key。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该方法允许失效注解在缓存尚未创建时静默跳过，避免只写路径强制初始化读取缓存。
      *
-     * @param name name 方法执行所需的业务参数
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param name 缓存实例名称
+     * @param key 需要失效的业务缓存 key
      */
     @SuppressWarnings("unchecked")
     public void evictIfPresent(String name, Object key) {
@@ -115,12 +116,12 @@ public class AnnotationCacheResolver {
     }
 
     /**
-     * 构建、解析或转换 parse Duration 相关的业务数据。
+     * 解析注解中的 Duration 字符串。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>支持 ISO-8601 Duration，以及 ms/s/m/h/d 后缀的简写；无后缀时按毫秒处理。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 方法执行后的业务结果
+     * @param value 注解中的时间配置字符串
+     * @return 解析后的 Duration
      */
     private Duration parseDuration(String value) {
         String normalized = value.trim().toLowerCase(Locale.ROOT);

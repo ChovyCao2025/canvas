@@ -49,6 +49,16 @@ public class ExecutionLaneResolver {
                                  boolean overflowRetry,
                                  boolean persistentRequest,
                                  int priorAttemptCount) {
+        return resolve(triggerType, triggerNodeType, payload, overflowRetry, persistentRequest, priorAttemptCount, null);
+    }
+
+    public ExecutionLane resolve(String triggerType,
+                                 String triggerNodeType,
+                                 Map<String, Object> payload,
+                                 boolean overflowRetry,
+                                 boolean persistentRequest,
+                                 int priorAttemptCount,
+                                 DagCostProfiler.CostProfile costProfile) {
         if (overflowRetry || (persistentRequest && priorAttemptCount > 0)) {
             return ExecutionLane.RETRY;
         }
@@ -57,6 +67,9 @@ public class ExecutionLaneResolver {
         }
         if (HEAVY_TRIGGER_TYPES.contains(triggerType) || HEAVY_NODE_TYPES.contains(triggerNodeType)) {
             return ExecutionLane.HEAVY;
+        }
+        if (costProfile != null && costProfile.recommendedLane() != null) {
+            return costProfile.recommendedLane();
         }
         return ExecutionLane.STANDARD;
     }

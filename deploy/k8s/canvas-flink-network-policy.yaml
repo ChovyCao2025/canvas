@@ -1,3 +1,4 @@
+# Flink 集群网络策略，限制调度入口、数据平台依赖和回调后端的访问范围。
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -7,6 +8,7 @@ metadata:
     app.kubernetes.io/name: canvas-flink
     app.kubernetes.io/part-of: marketing-canvas
 spec:
+  # 约束所有带 canvas-flink 标签的 JobManager、TaskManager 和提交 Job。
   podSelector:
     matchLabels:
       app.kubernetes.io/name: canvas-flink
@@ -14,6 +16,7 @@ spec:
     - Ingress
     - Egress
   ingress:
+    # 仅允许 Canvas Engine 和监控系统访问 REST/RPC 端口。
     - from:
         - podSelector:
             matchLabels:
@@ -27,6 +30,7 @@ spec:
         - protocol: TCP
           port: 6123
   egress:
+    # DNS 解析是连接 Doris、MySQL、Engine Service 的前置能力。
     - to:
         - namespaceSelector:
             matchLabels:
@@ -36,6 +40,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # 允许 Flink 读取 MySQL CDC 并写入 Doris FE/BE/JDBC 端口。
     - to:
         - namespaceSelector:
             matchLabels:
@@ -49,6 +54,7 @@ spec:
           port: 8040
         - protocol: TCP
           port: 9030
+    # checkpoint reporter 通过内部 API 将运行状态回写给 Canvas Engine。
     - to:
         - podSelector:
             matchLabels:

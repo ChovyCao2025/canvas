@@ -384,7 +384,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=BiSelfServiceExportServiceTest,B
 
 Result: 9 tests, 0 failures, 0 errors, 0 skipped.
 
-- [ ] **Step 2: Commit this slice**
+- [x] **Step 2: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

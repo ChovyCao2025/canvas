@@ -15,32 +15,32 @@ import java.util.Optional;
  */
 public interface ReactiveTieredCache<K, V> {
     /**
-     * 查询或读取 get 相关的业务数据。
+     * 响应式读取单个 key，并在订阅时执行完整 L1/L2/L3 缓存链路。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     * <p>返回的 {@link Mono} 以 {@link Optional} 表达业务空值，缓存失败和加载失败通过响应式错误信号传递。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param key 业务缓存 key
+     * @return 订阅后产生的缓存读取结果
      */
     Mono<Optional<V>> get(K key);
 
     /**
-     * 查询或读取 get If Present 相关的业务数据。
+     * 响应式读取已存在的缓存值，不触发 L3 回源加载。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     * <p>适合在响应式链路中做非侵入式缓存探测；缓存未命中会返回 {@link Optional#empty()}。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param key 业务缓存 key
+     * @return 订阅后产生的已缓存值
      */
     Mono<Optional<V>> getIfPresent(K key);
 
     /**
-     * 查询或读取 get All 相关的业务数据。
+     * 响应式批量读取多个 key。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     * <p>默认实现按输入顺序串联每个 key 的 {@link #get(Object)}，便于保持返回 Map 的稳定顺序。
      *
-     * @param keys keys 对应的缓存键、配置键或业务键
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param keys 需要读取的业务缓存 key 集合
+     * @return 订阅后产生的 key 到缓存值映射
      */
     default Mono<Map<K, Optional<V>>> getAll(Collection<K> keys) {
         Map<K, Optional<V>> result = new LinkedHashMap<>();
@@ -56,33 +56,33 @@ public interface ReactiveTieredCache<K, V> {
     }
 
     /**
-     * 写入或记录 put 相关的业务数据。
+     * 响应式写入单个缓存值。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     * <p>订阅后才执行写入；实现应保持与同步 put 相同的 L1/L2 更新和本地缓存失效广播语义。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param value value 待写入、比较或转换的业务值
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param key 业务缓存 key
+     * @param value 待缓存的业务值
+     * @return 写入完成信号
      */
     Mono<Void> put(K key, V value);
 
     /**
-     * 删除、清理或失效 invalidate 相关的业务数据。
+     * 响应式失效单个缓存 key。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     * <p>订阅后执行 L1 清理、L2 删除和跨节点失效通知；失败通过错误信号返回给调用方。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param key 需要失效的业务缓存 key
+     * @return 失效完成信号
      */
     Mono<Void> invalidate(K key);
 
     /**
-     * 更新或刷新 refresh 相关的业务数据。
+     * 响应式刷新单个 key 的缓存值。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     * <p>订阅后重新进入加载和回填流程；加载失败时按底层缓存实现的失败策略转换为完成或错误信号。
      *
-     * @param key key 对应的缓存键、配置键或业务键
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param key 需要刷新的业务缓存 key
+     * @return 刷新完成信号
      */
     Mono<Void> refresh(K key);
 }

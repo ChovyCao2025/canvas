@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082i-monitoring-webhook-ingestion-plan.md`
 
 Turn the P2-082G/P2-082H monitoring data plane into a real inbound integration surface by adding signed public webhook ingestion for monitored mentions, with source-scoped secrets, replay protection, payload normalization, and idempotent item creation.
 
-## Delivery Status
+## Implementation Status
 
 Delivered backend first slice:
 

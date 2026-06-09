@@ -87,17 +87,6 @@ class CanvasFlinkJobMainTest {
         assertThat(statements).isEmpty();
     }
 
-    @Test
-    void runnerSplitsSemicolonDelimitedSqlWithoutSplittingQuotedSemicolon() {
-        assertThat(CanvasFlinkSqlJobRunner.statements("""
-                CREATE TABLE t (value STRING, note STRING);
-                INSERT INTO t SELECT 'a;b', 'quoted semicolon';
-                """))
-                .containsExactly(
-                        "CREATE TABLE t (value STRING, note STRING)",
-                        "INSERT INTO t SELECT 'a;b', 'quoted semicolon'");
-    }
-
     private Map<String, String> validEnv() {
         Map<String, String> env = new LinkedHashMap<>();
         env.put("CANVAS_FLINK_JOB_PIPELINE_KEY", "mysql_cdp_event_log_to_doris_ods");

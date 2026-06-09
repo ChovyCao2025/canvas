@@ -1,5 +1,7 @@
 # Bounded Analytics Query APIs Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add tenant-safe, date-bounded analytics query APIs and export job creation.
@@ -15,31 +17,50 @@
 - `docs/product-evolution/specs/p2-016c-bounded-analytics-query-apis.md`
 - Depends on P2-016 event/trace schema fields.
 
+## Current Status Note
+
+The implementation files are present in the current worktree and fresh focused
+verification passed on 2026-06-09:
+
+- `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=AnalyticsQuerySchemaTest,AnalyticsQueryGuardTest,AnalyticsQueryServiceTest,AnalyticsControllerTest` passed with 23 tests, zero failures, and zero errors.
+
+The actual migration is `V134__analytics_query_definitions.sql`; the original
+plan's `V129` filename was superseded by the current migration sequence.
+Historical RED-state checks were not reproduced because the current worktree
+already contains implementation files for the schema, mappers, query guard, and
+baseline analytics APIs. No commit or merge was created in this audit, so commit
+and merge status remain unverified.
+
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V129__analytics_query_definitions.sql`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsFunnelDefinitionDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsAlertRuleDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsExportJobDO.java`
-- Create matching mappers under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AnalyticsQueryService.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/AnalyticsController.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQueryServiceTest.java`
+- Present: `backend/canvas-engine/src/main/resources/db/migration/V134__analytics_query_definitions.sql`
+- Present: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsFunnelDefinitionDO.java`
+- Present: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsAlertRuleDO.java`
+- Present: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsExportJobDO.java`
+- Present matching mappers under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/`
+- Present: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AnalyticsQueryService.java`
+- Present: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AnalyticsQueryGuard.java`
+- Present: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/AnalyticsController.java`
+- Present: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQuerySchemaTest.java`
+- Present: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQueryGuardTest.java`
+- Present: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQueryServiceTest.java`
+- Present: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/AnalyticsControllerTest.java`
 
 ### Task 1: Query Definition Schema
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQueryServiceTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V129__analytics_query_definitions.sql`
+- Present: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQuerySchemaTest.java`
+- Present: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQueryGuardTest.java`
+- Present: `backend/canvas-engine/src/main/resources/db/migration/V134__analytics_query_definitions.sql`
 
-- [ ] **Step 1: Write schema and guard tests**
+- [x] **Step 1: Write schema and guard tests**
 
-Create tests:
+Current tests include:
 
 ```java
 @Test
 void migrationCreatesFunnelAlertAndExportTables() throws Exception {
-    String sql = Files.readString(Path.of("src/main/resources/db/migration/V129__analytics_query_definitions.sql"));
+    String sql = Files.readString(Path.of("src/main/resources/db/migration/V134__analytics_query_definitions.sql"));
 
     assertThat(sql)
             .contains("CREATE TABLE IF NOT EXISTS analytics_funnel_definition")
@@ -54,16 +75,20 @@ void migrationCreatesFunnelAlertAndExportTables() throws Exception {
 
 @Test
 void rejectsMissingTenantOrUnboundedDateRange() {
-    AnalyticsQueryService service = new AnalyticsQueryService(mock(AnalyticsQueryService.Repository.class), 31, 100_000);
+    AnalyticsQueryService service = new AnalyticsQueryService(mock(AnalyticsEventMapper.class), new AnalyticsQueryGuard());
 
-    assertThatThrownBy(() -> service.eventAnalysis(new AnalyticsQueryService.QueryScope(null, "2026-06-01", "2026-06-03")))
-            .hasMessageContaining("tenantId is required");
-    assertThatThrownBy(() -> service.eventAnalysis(new AnalyticsQueryService.QueryScope(0L, null, "2026-06-03")))
-            .hasMessageContaining("date range is required");
+    assertThatThrownBy(() -> service.eventCounts(null, "2026-06-01", "2026-06-03"))
+            .hasMessageContaining("tenantId");
+    assertThatThrownBy(() -> service.eventCounts(0L, null, "2026-06-03"))
+            .hasMessageContaining("startDate and endDate are required");
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
+
+Historical RED-state boundary: not reproduced in this audit because the current
+worktree already contains the schema, mapper, guard, and baseline query API
+implementation files.
 
 Run:
 
@@ -71,11 +96,12 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=AnalyticsQueryServiceTest
 ```
 
-Expected: FAIL because migration and service do not exist.
+Historical expected result before implementation: FAIL because migration and
+service did not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `V129__analytics_query_definitions.sql` with tables:
+Create `V134__analytics_query_definitions.sql` with tables:
 
 ```sql
 CREATE TABLE IF NOT EXISTS analytics_funnel_definition (
@@ -118,19 +144,20 @@ CREATE TABLE IF NOT EXISTS analytics_export_job (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Implement query guard model**
+- [x] **Step 4: Implement query guard model**
 
-Create `AnalyticsQueryService.QueryScope(Long tenantId, String startDate, String endDate)` and `validateScope` that rejects missing tenant, missing dates, invalid ranges, and ranges longer than configured `maxRangeDays`.
+Create `AnalyticsQueryGuard` date, tenant, event-code, attribute-path, and
+pagination guards. Service methods call the guard before mapper access.
 
-- [ ] **Step 5: Run schema and guard tests**
+- [x] **Step 5: Run schema and guard tests**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=AnalyticsQueryServiceTest#migrationCreatesFunnelAlertAndExportTables,AnalyticsQueryServiceTest#rejectsMissingTenantOrUnboundedDateRange
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=AnalyticsQuerySchemaTest,AnalyticsQueryGuardTest
 ```
 
-Expected: PASS.
+Expected: PASS with zero failures and zero errors.
 
 ### Task 2: Query Methods And Controller
 
@@ -139,38 +166,41 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AnalyticsQueryService.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/AnalyticsController.java`
 
-- [ ] **Step 1: Add query behavior tests**
+- [x] **Step 1: Add query behavior tests**
 
-Append tests:
+Current tests include:
 
 ```java
 @Test
-void eventAnalysisGroupsByEventCodeAndUserTimelineIsPaged() {
-    AnalyticsQueryService.Repository repo = mock(AnalyticsQueryService.Repository.class);
-    when(repo.groupEvents(0L, "2026-06-01", "2026-06-03")).thenReturn(List.of(new AnalyticsQueryService.EventCount("OrderPaid", 12)));
-    when(repo.userTimeline(0L, "u1", "2026-06-01", "2026-06-03", 1, 20)).thenReturn(List.of(new AnalyticsQueryService.TimelineRow("OrderPaid", "2026-06-02T10:00:00")));
-    AnalyticsQueryService service = new AnalyticsQueryService(repo, 31, 100_000);
+void eventCountsGroupByEventCode() {
+    AnalyticsEventMapper mapper = mock(AnalyticsEventMapper.class);
+    when(mapper.selectEventCounts(0L, "2026-06-01", "2026-06-03"))
+            .thenReturn(List.of(Map.of("eventCode", "OrderPaid", "count", 12L)));
+    AnalyticsQueryService service = new AnalyticsQueryService(mapper, new AnalyticsQueryGuard());
 
-    assertThat(service.eventAnalysis(new AnalyticsQueryService.QueryScope(0L, "2026-06-01", "2026-06-03"))).extracting("eventCode").contains("OrderPaid");
-    assertThat(service.userTimeline(0L, "u1", "2026-06-01", "2026-06-03", 1, 20)).hasSize(1);
+    assertThat(service.eventCounts(0L, "2026-06-01", "2026-06-03"))
+            .extracting("eventCode")
+            .contains("OrderPaid");
 }
 
 @Test
 void exportCreationRejectsRowsAboveLimit() {
-    AnalyticsQueryService.Repository repo = mock(AnalyticsQueryService.Repository.class);
-    when(repo.estimateRows(any())).thenReturn(100_001L);
-    AnalyticsQueryService service = new AnalyticsQueryService(repo, 31, 100_000);
+    AnalyticsEventMapper eventMapper = mock(AnalyticsEventMapper.class);
+    when(eventMapper.countEvents(0L, "2026-06-01", "2026-06-03")).thenReturn(100_001L);
+    AnalyticsQueryService service = service(eventMapper, null, null, mock(AnalyticsExportJobMapper.class), 100_000);
 
-    assertThatThrownBy(() -> service.createExport(new AnalyticsQueryService.ExportRequest(0L, "EVENT_ANALYSIS", "2026-06-01", "2026-06-03", 100_000)))
+    assertThatThrownBy(() -> service.createExport(0L, new AnalyticsQueryService.ExportRequest("EVENT_ANALYSIS", "2026-06-01", "2026-06-03", null, 100_000, "alice")))
             .hasMessageContaining("export row limit exceeded");
 }
 ```
 
-- [ ] **Step 2: Implement query methods**
+- [x] **Step 2: Implement query methods**
 
-Add methods: `eventAnalysis`, `funnelResult`, `userTimeline`, `attributeDistribution`, `alertPreview`, `createExport`, and `exportStatus`. Every method must call `validateScope` or equivalent tenant/date checks before repository access.
+Add methods: `eventCounts`, `countEvents`, `funnelResult`, `userTimeline`,
+`attributeDistribution`, `alertPreview`, `createExport`, and `exportStatus`.
+Every method calls tenant/date guards before mapper access.
 
-- [ ] **Step 3: Add controller endpoints**
+- [x] **Step 3: Add controller endpoints**
 
 Expose:
 
@@ -184,15 +214,15 @@ POST /analytics/exports
 GET /analytics/exports/{id}
 ```
 
-- [ ] **Step 4: Run analytics service tests**
+- [x] **Step 4: Run analytics service tests**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=AnalyticsQueryServiceTest
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=AnalyticsQuerySchemaTest,AnalyticsQueryGuardTest,AnalyticsQueryServiceTest,AnalyticsControllerTest
 ```
 
-Expected: PASS.
+Expected: PASS with zero failures and zero errors.
 
 ### Task 3: Verification And Commit
 
@@ -200,23 +230,20 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p2-016c-bounded-analytics-query-apis.md`
 - Modify: `docs/product-evolution/plans/p2-016c-bounded-analytics-query-apis-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=AnalyticsQueryServiceTest
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test -Dtest=AnalyticsQuerySchemaTest,AnalyticsQueryGuardTest,AnalyticsQueryServiceTest,AnalyticsControllerTest
 ```
 
-Expected: PASS.
+Expected: PASS with zero failures and zero errors.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Document commit and merge boundary**
 
-Run:
+No commit or merge was created in this audit because the broader
+product-evolution goal is still incomplete and the current worktree contains
+unrelated dirty changes. Commit and merge status remain unverified.
 
-```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V129__analytics_query_definitions.sql backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AnalyticsQueryService.java backend/canvas-engine/src/main/java/org/chovy/canvas/web/AnalyticsController.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsFunnelDefinitionDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsAlertRuleDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsExportJobDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsFunnelDefinitionMapper.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsAlertRuleMapper.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsExportJobMapper.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AnalyticsQueryServiceTest.java docs/product-evolution/specs/p2-016c-bounded-analytics-query-apis.md docs/product-evolution/plans/p2-016c-bounded-analytics-query-apis-plan.md
-git commit -m "feat: add bounded analytics query APIs"
-```
-
-Expected: commit contains only analytics query definitions, service, controller, tests, migration, and related docs.
+Commit commands were not run in this audit.

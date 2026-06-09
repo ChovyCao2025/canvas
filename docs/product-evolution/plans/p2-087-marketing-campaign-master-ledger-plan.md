@@ -1,5 +1,9 @@
 # Marketing Campaign Master Ledger Implementation Plan
 
+Spec: `../specs/p2-087-marketing-campaign-master-ledger.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add a tenant-scoped campaign master-data ledger and resource-link operations so the marketing middle platform can govern cross-domain launch dependencies instead of only reporting static readiness gaps.
 
 **Architecture:** Add an additive Flyway migration, MyBatis DOs/mappers, a focused domain service, a tenant-context controller, control-plane evidence aggregation, and a compact operator section in `/marketing-platform`. Existing journey, content, paid-media, SEM, creator, DSP, and BI modules remain independent but can now be referenced by stable campaign resource links.

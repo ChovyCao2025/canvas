@@ -5,6 +5,8 @@ Sequence: 086
 Source: user-requested marketing middle-platform confirmation and local capability audit
 Implementation plan: `../plans/p2-086-marketing-platform-control-plane-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn the implemented marketing-platform slices into an operator-visible middle-platform control plane. The first slice must make the existing domains discoverable as one production capability map, expose integration glue lanes, and highlight configuration gaps without pretending the full marketing middle platform is complete.

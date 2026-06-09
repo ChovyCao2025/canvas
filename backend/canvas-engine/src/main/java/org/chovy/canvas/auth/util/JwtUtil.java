@@ -42,7 +42,13 @@ public class JwtUtil {
         this.expiry = Duration.ofHours(expiryHours);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param secret secret 参数，用于 validateSecret 流程中的校验、计算或对象转换。
+     */
     private static void validateSecret(String secret) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("canvas.jwt.secret 未配置，请设置 CANVAS_JWT_SECRET");
         }

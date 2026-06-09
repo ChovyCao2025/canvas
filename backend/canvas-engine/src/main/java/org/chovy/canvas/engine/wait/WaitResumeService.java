@@ -57,6 +57,13 @@ public class WaitResumeService {
     /** 跟踪恢复触发的 fire-and-forget 执行，支持关闭时释放。 */
     private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
 
+    /**
+     * 创建 WaitResumeService 实例并注入 engine.wait 场景依赖。
+     * @param waitSubscriptionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param executionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param reactiveTaskRegistry reactive task registry 参数，用于 WaitResumeService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public WaitResumeService(WaitSubscriptionService waitSubscriptionService,
                              CanvasExecutionService executionService,
@@ -68,6 +75,13 @@ public class WaitResumeService {
         this.reactiveTaskRegistry = reactiveTaskRegistry;
     }
 
+    /**
+     * 使用直接任务注册器创建等待恢复服务，供测试使用。
+     *
+     * @param waitSubscriptionService WAIT 订阅服务
+     * @param executionService 画布执行服务
+     * @param objectMapper JSON 解析器
+     */
     WaitResumeService(WaitSubscriptionService waitSubscriptionService,
                       CanvasExecutionService executionService,
                       ObjectMapper objectMapper) {
@@ -85,7 +99,9 @@ public class WaitResumeService {
     public int resumeEventWaits(String eventCode, String userId, Map<String, Object> eventAttributes, String eventId) {
         List<CanvasWaitSubscriptionDO> waits = waitSubscriptionService.findActiveEventWaits(eventCode, userId);
         int resumed = 0;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (CanvasWaitSubscriptionDO wait : waits) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (!matchesEventFilters(wait, eventAttributes == null ? Map.of() : eventAttributes)) {
                 continue;
             }
@@ -93,6 +109,7 @@ public class WaitResumeService {
                 resumed++;
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return resumed;
     }
 
@@ -171,11 +188,13 @@ public class WaitResumeService {
                     if (!matchesOperators(actual, (Map<String, Object>) operators)) {
                         return false;
                     }
+                // 根据前序判断结果进入后续条件分支。
                 } else if (!Objects.equals(String.valueOf(actual), String.valueOf(expected))) {
                     return false;
                 }
             }
             return true;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[WAIT] eventFilters 解析失败 waitId={} reason={}", wait.getId(), e.getMessage());
             return false;
@@ -184,6 +203,7 @@ public class WaitResumeService {
 
     /** 逐个计算过滤条件操作符，支持等值、比较和集合包含。 */
     private boolean matchesOperators(Object actual, Map<String, Object> operators) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map.Entry<String, Object> operator : operators.entrySet()) {
             String op = operator.getKey();
             Object expected = operator.getValue();
@@ -202,6 +222,7 @@ public class WaitResumeService {
                 return false;
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return true;
     }
 
@@ -255,6 +276,7 @@ public class WaitResumeService {
         }
         try {
             return objectMapper.readValue(wait.getResumePayload(), new TypeReference<>() {});
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[WAIT] resume_payload 解析失败 waitId={} reason={}", wait.getId(), e.getMessage());
             return Map.of();
@@ -276,6 +298,7 @@ public class WaitResumeService {
      * 能更新为 COMPLETED/EXPIRED，因此幂等保护此处退化为防守性措施）。
      */
     private void trigger(CanvasWaitSubscriptionDO wait, String status, Map<String, Object> payload) {
+        // 准备本次处理所需的上下文和中间变量。
         boolean expired = WaitSubscriptionService.STATUS_EXPIRED.equals(status);
         String nodeType = NodeType.WAIT;
         String triggerType = expired ? TriggerType.WAIT_TIMEOUT : TriggerType.WAIT_RESUME;
@@ -301,6 +324,7 @@ public class WaitResumeService {
     private String toJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalArgumentException("等待恢复 payload 序列化失败", e);
         }

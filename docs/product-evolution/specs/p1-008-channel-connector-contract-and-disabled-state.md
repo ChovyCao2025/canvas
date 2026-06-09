@@ -2,8 +2,10 @@
 
 Priority: P1
 Sequence: 008
-Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/bmad-product-review-2026-05.md`
+Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`
 Implementation plan: `../plans/p1-008-channel-connector-contract-and-disabled-state-plan.md`
+
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
 
 ## Goal
 

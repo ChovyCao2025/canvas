@@ -5,6 +5,8 @@ Sequence: 063
 Source: `docs/product-evolution/specs/p2-060-cdp-warehouse-consumer-availability-contracts.md`, `docs/product-evolution/specs/p2-059-cdp-warehouse-availability-incident-automation.md`, `docs/product-evolution/specs/p2-062-cdp-warehouse-asset-availability-automation.md`
 Implementation plan: `../plans/p2-063-cdp-warehouse-consumer-availability-incident-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Route P2-060 consumer availability contract WARN/FAIL evidence into the existing warehouse incident loop, and automatically resolve matching contract incidents when later contract evaluations pass.

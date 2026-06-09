@@ -5,6 +5,8 @@ Sequence: 027
 Source: `docs/product-evolution/specs/p2-023-bi-dataset-query-compiler-foundation.md`, `docs/product-evolution/specs/p2-026-cdp-warehouse-quality-and-reconciliation.md`, `docs/product-evolution/archive/2026-06-03/product-evolution-directions-2026-05-31.md`
 Implementation plan: `../plans/p2-027-cdp-warehouse-catalog-and-lineage-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a warehouse catalog and lineage foundation so CDP, audience, and BI datasets are discoverable, governable, and traceable across ODS, DWD, DWS, ADS, and BI layers.

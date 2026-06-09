@@ -149,6 +149,7 @@ const OAUTH_STATUS_OPTIONS = ['PENDING', 'EXCHANGED', 'FAILED', 'EXPIRED'].map(v
   label: oauthAuthorizationStatusView(value).text,
 }))
 
+/** 营销监控工作台，集中处理品牌提及、竞品命中、异常告警和 Provider 凭据。 */
 export default function MarketingMonitoringPage() {
   const [sourceForm] = Form.useForm<SourceFormValues>()
   const [ingestForm] = Form.useForm<IngestFormValues>()
@@ -195,9 +196,12 @@ export default function MarketingMonitoringPage() {
   const [resolvingId, setResolvingId] = useState<number>()
   const [error, setError] = useState<string | null>(null)
 
+  // 从当前内容列表和告警列表派生顶部 KPI。
   const kpis = useMemo(() => calculateMonitoringKpis(items, alerts), [items, alerts])
 
+  /** 加载监控内容列表，并把筛选条件归一化回填表单。 */
   const loadItems = async (nextFilters = itemFilters) => {
+    // 归一化情绪、竞品 key 和 limit，避免无效筛选传给后端。
     const params = normalizeItemQuery(nextFilters)
     const response = await marketingMonitoringApi.listItems(params)
     setItems(response.data)
@@ -205,7 +209,9 @@ export default function MarketingMonitoringPage() {
     itemFilterForm.setFieldsValue(params)
   }
 
+  /** 加载告警列表，并同步当前告警筛选状态。 */
   const loadAlerts = async (nextFilters = alertFilters) => {
+    // 告警状态统一转大写，limit 限制在后端允许范围内。
     const params = normalizeAlertQuery(nextFilters)
     const response = await marketingMonitoringApi.listAlerts(params)
     setAlerts(response.data)
@@ -213,7 +219,9 @@ export default function MarketingMonitoringPage() {
     alertFilterForm.setFieldsValue(params)
   }
 
+  /** 加载趋势快照列表。 */
   const loadTrends = async (nextFilters = trendFilters) => {
+    // 趋势查询会过滤非法 sourceId，并规整品牌/竞品 key。
     const params = normalizeTrendQuery(nextFilters)
     const response = await marketingMonitoringApi.listTrendSnapshots(params)
     setTrends(response.data)
@@ -221,7 +229,9 @@ export default function MarketingMonitoringPage() {
     trendFilterForm.setFieldsValue(params)
   }
 
+  /** 加载 Provider 凭据列表。 */
   const loadCredentials = async (nextFilters = credentialFilters) => {
+    // 凭据筛选统一按 Provider、认证类型和状态大写查询。
     const params = normalizeCredentialQuery(nextFilters)
     const response = await marketingMonitoringApi.listProviderCredentials(params)
     setCredentials(response.data)
@@ -229,7 +239,9 @@ export default function MarketingMonitoringPage() {
     credentialFilterForm.setFieldsValue(params)
   }
 
+  /** 加载 Provider 凭据事件列表。 */
   const loadCredentialEvents = async (nextFilters = credentialEventFilters) => {
+    // 事件查询按凭据 key、事件类型、状态归一化。
     const params = normalizeCredentialEventQuery(nextFilters)
     const response = await marketingMonitoringApi.listProviderCredentialEvents(params)
     setCredentialEvents(response.data)
@@ -237,7 +249,9 @@ export default function MarketingMonitoringPage() {
     credentialEventFilterForm.setFieldsValue(params)
   }
 
+  /** 加载 OAuth 授权会话列表。 */
   const loadOAuthAuthorizations = async (nextFilters = oauthAuthorizationFilters) => {
+    // 授权查询按凭据 key、Provider 和状态归一化。
     const params = normalizeOAuthAuthorizationQuery(nextFilters)
     const response = await marketingMonitoringApi.listProviderOAuthAuthorizations(params)
     setOAuthAuthorizations(response.data)
@@ -245,6 +259,7 @@ export default function MarketingMonitoringPage() {
     oauthAuthorizationFilterForm.setFieldsValue(params)
   }
 
+  /** 刷新 Provider 凭据工作区的凭据、事件和授权会话。 */
   const loadCredentialWorkspace = async () => {
     setCredentialLoading(true)
     try {
@@ -260,6 +275,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 并行加载监控工作台首屏数据。 */
   const loadAll = async () => {
     setLoading(true)
     setError(null)
@@ -276,9 +292,11 @@ export default function MarketingMonitoringPage() {
     loadAll()
   }, [])
 
+  /** 保存监控来源配置。 */
   const submitSource = async (values: SourceFormValues) => {
     setSourceSaving(true)
     try {
+      // 组装来源载荷，metadata JSON 用于承载 provider 扩展配置。
       const payload: MarketingMonitorSourcePayload = {
         sourceKey: values.sourceKey.trim(),
         sourceType: values.sourceType,
@@ -295,9 +313,11 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 手工入库一条监控内容，并刷新内容和告警列表。 */
   const submitIngest = async (values: IngestFormValues) => {
     setIngesting(true)
     try {
+      // 组装入库载荷，竞品词表会驱动命中识别和后续告警。
       const payload: MarketingMonitorItemIngestPayload = {
         sourceId: values.sourceId,
         externalItemId: values.externalItemId.trim(),
@@ -320,6 +340,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 将 OPEN 告警标记为已处理。 */
   const resolveAlert = async (alert: MarketingMonitorAlert) => {
     setResolvingId(alert.id)
     try {
@@ -331,6 +352,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 按趋势筛选条件查询聚合快照。 */
   const searchTrends = async (values: MarketingMonitorTrendSnapshotQuery) => {
     setTrendLoading(true)
     try {
@@ -342,9 +364,11 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 生成指定窗口的趋势快照。 */
   const submitTrendBuild = async (values: TrendBuildFormValues) => {
     setTrendBuilding(true)
     try {
+      // 组装趋势窗口载荷，品牌和竞品为空时表示来源级聚合。
       const payload: MarketingMonitorTrendSnapshotPayload = {
         sourceId: values.sourceId,
         bucketGrain: values.bucketGrain,
@@ -364,9 +388,11 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 发起 Provider OAuth 授权，并把 state 回填到回调表单。 */
   const submitOAuthStart = async (values: OAuthStartFormValues) => {
     setOAuthStarting(true)
     try {
+      // 组装 OAuth 授权载荷，scope 去重后提交给后端生成授权 URL。
       const payload: MarketingMonitorProviderOAuthAuthorizationCommand = {
         credentialKey: values.credentialKey.trim(),
         providerType: values.providerType.trim(),
@@ -389,6 +415,7 @@ export default function MarketingMonitoringPage() {
         state: response.data.authState,
         metadataJson: '{"source":"monitoring-workbench"}',
       })
+      // 有授权 URL 时打开新窗口，让运营完成 Provider 授权。
       if (response.data.authorizationUrl) {
         window.open(response.data.authorizationUrl, '_blank', 'noopener,noreferrer')
       }
@@ -401,11 +428,13 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 完成 OAuth 回调，成功后刷新凭据、事件和授权会话。 */
   const submitOAuthCallback = async (values: OAuthCallbackFormValues) => {
     if (!values.code?.trim() && !values.error?.trim()) {
       message.error('授权 Code 或 Provider Error 必填其一')
       return
     }
+    // 回调必须携带授权 code 或 provider error，便于后端记录完整状态。
     setOAuthCompleting(true)
     try {
       await marketingMonitoringApi.completeProviderOAuthAuthorization({
@@ -429,6 +458,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 刷新单个 Provider 凭据。 */
   const refreshCredential = async (credential: MarketingMonitorProviderCredential) => {
     setRefreshingCredentialKey(credential.credentialKey)
     try {
@@ -442,6 +472,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 批量刷新即将到期的 Provider 凭据。 */
   const refreshDueCredentials = async () => {
     setDueRefreshing(true)
     try {
@@ -458,6 +489,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 撤销 Provider 凭据并按配置停用本地凭据。 */
   const revokeCredential = async (credential: MarketingMonitorProviderCredential) => {
     setRevokingCredentialKey(credential.credentialKey)
     try {
@@ -476,6 +508,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 停用本地 Provider 凭据，不触发 Provider revoke。 */
   const disableCredential = async (credential: MarketingMonitorProviderCredential) => {
     setDisablingCredentialKey(credential.credentialKey)
     try {
@@ -489,6 +522,7 @@ export default function MarketingMonitoringPage() {
     }
   }
 
+  /** 复制当前 OAuth 授权链接。 */
   const copyAuthorizationUrl = async () => {
     if (!authorizationUrl) return
     try {

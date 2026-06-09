@@ -42,6 +42,13 @@ public class AiPredictionController {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @GetMapping("/readiness")
+    public Mono<R<ChurnPredictionService.PredictionReadinessView>> readiness() {
+        return currentAdmin().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(churnPredictionService.readiness(tenantId(context))))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
     @GetMapping("/churn-distribution")
     public Mono<R<List<ChurnPredictionService.RiskDistributionItem>>> distribution() {
         return currentAdmin().flatMap(context -> Mono.fromCallable(() ->

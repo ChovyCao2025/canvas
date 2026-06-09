@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown, shell validation with `rg`, repository documentation review.
 
+**Implementation Status:** Discovery and governance artifacts are complete in the current workspace record. Reverified on 2026-06-08 by checking the P3-005 discovery, health-score input, and governance-gate headings plus the `split` gate outcome. Commit and merge status was not verified in this docs-only audit; the commit boundaries are documented because no commit was requested.
+
 ---
 
 ## Spec Reference
@@ -32,7 +34,7 @@
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-005-customer-success-discovery.md`
 
-- [ ] **Step 1: Write the discovery brief**
+- [x] **Step 1: Write the discovery brief**
 
 Create `docs/product-evolution/evidence/p3-005-customer-success-discovery.md`:
 
@@ -74,7 +76,7 @@ Create `docs/product-evolution/evidence/p3-005-customer-success-discovery.md`:
 Recommended gate input: split managed-service playbooks from health-score automation. Health-score automation needs a child spec after signal validation.
 ```
 
-- [ ] **Step 2: Verify discovery brief sections**
+- [x] **Step 2: Verify discovery brief sections**
 
 Run:
 
@@ -84,7 +86,8 @@ rg -n "^## (Owners|Target Segment|Evidence Sources|Service Catalog MVP Proposal|
 
 Expected: finds all five section headings.
 
-- [ ] **Step 3: Commit discovery brief**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -100,7 +103,7 @@ Expected: commit contains only the discovery brief and this plan.
 **Files:**
 - Create: `docs/product-evolution/evidence/p3-005-health-score-inputs.md`
 
-- [ ] **Step 1: Write health-score inventory**
+- [x] **Step 1: Write health-score inventory**
 
 Create `docs/product-evolution/evidence/p3-005-health-score-inputs.md`:
 
@@ -129,7 +132,7 @@ Create `docs/product-evolution/evidence/p3-005-health-score-inputs.md`:
 - Customer Success Lead signs off before any runtime health-score implementation spec is created.
 ```
 
-- [ ] **Step 2: Verify inventory sections**
+- [x] **Step 2: Verify inventory sections**
 
 Run:
 
@@ -139,7 +142,8 @@ rg -n "^## (Signal Inventory|Data Access Risk|Validation Exit Criteria)$" docs/p
 
 Expected: finds all three section headings.
 
-- [ ] **Step 3: Commit health-score inventory**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 
@@ -155,7 +159,7 @@ Expected: commit contains only the health-score inventory and this plan.
 **Files:**
 - Create: `docs/product-evolution/governance/p3-005-customer-success-gate.md`
 
-- [ ] **Step 1: Write governance gate**
+- [x] **Step 1: Write governance gate**
 
 Create `docs/product-evolution/governance/p3-005-customer-success-gate.md`:
 
@@ -187,7 +191,7 @@ If fewer than eight enterprise tenants can provide validated signal data by 2026
 | Support | Support Operations Lead | Required |
 ```
 
-- [ ] **Step 2: Verify governance gate**
+- [x] **Step 2: Verify governance gate**
 
 Run:
 
@@ -197,7 +201,7 @@ rg -n "^- Outcome: (proceed|park|split)$|^## (Decision|Next Child Spec|Revisit T
 
 Expected: finds the split outcome and four section headings.
 
-- [ ] **Step 3: Run final validation**
+- [x] **Step 3: Run final validation**
 
 Run:
 
@@ -208,7 +212,8 @@ git diff --check docs/product-evolution/specs/p3-005-value-added-services-and-cu
 
 Expected: first command finds three document titles; `git diff --check` exits 0.
 
-- [ ] **Step 4: Commit governance gate**
+- [x] **Step 4: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

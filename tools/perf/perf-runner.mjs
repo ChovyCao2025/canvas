@@ -45,6 +45,7 @@ const FLAG_NAMES = {
 
 const NUMBER_ARGS = new Set(['count', 'concurrency', 'userModulo', 'seqStart'])
 const MODES = new Set(['event', 'direct', 'audience'])
+/** Prometheus-compatible latency bucket upper bounds used in summary output. */
 export const LATENCY_BUCKET_UPPER_BOUNDS_MS = [
   1,
   2,
@@ -75,6 +76,7 @@ function parseIntegerArg(flag, value, { allowZero }) {
   return Number(value)
 }
 
+/** Parse direct-mode duplicate ratio; only [0, 1) is valid because it is a fraction of count. */
 function parseDuplicateRate(flag, value) {
   if (!/^(0|0?\.\d+)$/.test(value)) {
     throw new Error(`${flag} must be >= 0 and < 1`)
@@ -88,6 +90,7 @@ function parseDuplicateRate(flag, value) {
   return parsed
 }
 
+/** Validate cross-field constraints after individual CLI flags have been parsed. */
 function validateArgs(args) {
   if (!MODES.has(args.mode)) {
     throw new Error('--mode must be one of event, direct, audience')
@@ -126,6 +129,7 @@ function validateArgs(args) {
   }
 }
 
+/** Parse runner CLI flags into a normalized argument object. */
 export function parseRunnerArgs(argv) {
   const args = { ...DEFAULT_ARGS }
 
@@ -156,6 +160,7 @@ export function parseRunnerArgs(argv) {
   return args
 }
 
+/** Build an event-ingestion payload with stable perf IDs for downstream ledger correlation. */
 export function buildEventPayload({
   perfRunId,
   eventCode,
@@ -175,6 +180,7 @@ export function buildEventPayload({
   }
 }
 
+/** Build a direct-execution payload with an idempotency key that can intentionally duplicate. */
 export function buildDirectPayload({ perfRunId, userPrefix, seq, userModulo }) {
   return {
     userId: `${userPrefix}${seq % userModulo}`,
@@ -187,10 +193,12 @@ export function buildDirectPayload({ perfRunId, userPrefix, seq, userModulo }) {
   }
 }
 
+/** Convert duplicate ratio into the number of tail requests that should replay earlier keys. */
 export function duplicateCountFor(count, duplicateRate) {
   return Math.floor(count * duplicateRate)
 }
 
+/** Map physical request sequence to logical sequence when direct-mode duplicates are enabled. */
 export function logicalSeqForRequest(seq, count, duplicateCount, seqStart = 1) {
   const uniqueEnd = seqStart + count - duplicateCount - 1
   if (duplicateCount <= 0 || seq <= uniqueEnd) {
@@ -200,6 +208,7 @@ export function logicalSeqForRequest(seq, count, duplicateCount, seqStart = 1) {
   return seqStart + (seq - uniqueEnd - 1)
 }
 
+/** Split a sequence range into concurrency-sized batches. */
 export function* chunkSeq(count, concurrency, seqStart = 1) {
   const seqEnd = seqStart + count - 1
   for (let start = seqStart; start <= seqEnd; start += concurrency) {
@@ -214,6 +223,7 @@ export function* chunkSeq(count, concurrency, seqStart = 1) {
   }
 }
 
+/** Build the HTTP target and payload for the selected pressure-test mode. */
 function buildRequest(args, seq) {
   if (args.mode === 'event') {
     return {
@@ -233,6 +243,7 @@ function buildRequest(args, seq) {
       throw new Error('--canvas-id is required for direct mode')
     }
 
+    // Tail requests reuse earlier logical IDs to prove direct-call idempotency under load.
     const logicalSeq = logicalSeqForRequest(seq, args.count, args.duplicateCount || 0, args.seqStart || 1)
 
     return {
@@ -263,6 +274,7 @@ function buildRequest(args, seq) {
   throw new Error(`Unsupported mode: ${args.mode}`)
 }
 
+/** Run a local command and return combined output without failing the benchmark. */
 function safeSpawnOutput(command, args) {
   const result = spawnSync(command, args, {
     encoding: 'utf8',
@@ -276,10 +288,12 @@ function safeSpawnOutput(command, args) {
   return `${result.stdout || ''}${result.stderr || ''}`.trim()
 }
 
+/** Capture the first java -version line for reproducible capacity evidence. */
 function javaVersion() {
   return safeSpawnOutput('java', ['-version']).split(/\r?\n/).at(0) || ''
 }
 
+/** Collect host/runtime metadata that explains benchmark environment variance. */
 function machineMetadata() {
   const cpus = os.cpus()
   const cpuModels = [...new Set(cpus.map((cpu) => cpu.model).filter(Boolean))]
@@ -303,6 +317,7 @@ function machineMetadata() {
   }
 }
 
+/** Create HMAC headers accepted by the public event/direct execution endpoints. */
 export function buildEventSignatureHeaders({ secret, timestamp, rawBody }) {
   const signature = createHmac('sha256', secret)
     .update(`${timestamp}\n${rawBody}`)
@@ -314,6 +329,7 @@ export function buildEventSignatureHeaders({ secret, timestamp, rawBody }) {
   }
 }
 
+/** Resolve the signing secret for modes that require public endpoint authentication. */
 export function resolveEventSecret(args, env = process.env) {
   if (args.mode !== 'event' && args.mode !== 'direct') {
     return { value: '', source: 'none' }
@@ -328,6 +344,7 @@ export function resolveEventSecret(args, env = process.env) {
   return { value: '', source: 'none' }
 }
 
+/** Compose JSON headers and optional HMAC signature for a single request body. */
 export function buildSignedHeaders({
   args,
   rawBody,
@@ -353,12 +370,14 @@ export function buildSignedHeaders({
   }
 }
 
+/** Send one pressure-test request and capture latency even when the request fails. */
 async function sendRequest(args, seq, { performanceNow, nowMs = () => Date.now(), env = process.env }) {
   const request = buildRequest(args, seq)
   const rawBody = JSON.stringify(request.body)
   const startedAt = performanceNow()
 
   try {
+    // Sign the exact serialized body so backend verification matches the transmitted payload.
     const response = await fetch(request.url, {
       method: 'POST',
       headers: buildSignedHeaders({ args, rawBody, nowMs, env }),
@@ -378,6 +397,7 @@ async function sendRequest(args, seq, { performanceNow, nowMs = () => Date.now()
   }
 }
 
+/** Persist the run settings that affect reproducibility and downstream verification. */
 function summarySettings(args, env = process.env) {
   const eventSecret = resolveEventSecret(args, env)
 
@@ -403,10 +423,12 @@ function summarySettings(args, env = process.env) {
   }
 }
 
+/** Convert bucket bound to the serialized label used by summary JSON. */
 function latencyBucketLabel(bound) {
   return bound === 'Inf' ? 'Inf' : String(bound)
 }
 
+/** Build cumulative latency buckets from raw duration samples. */
 export function latencyBucketsForDurations(durations) {
   return LATENCY_BUCKET_UPPER_BOUNDS_MS.map((upperBoundMs) => ({
     leMs: latencyBucketLabel(upperBoundMs),
@@ -416,6 +438,7 @@ export function latencyBucketsForDurations(durations) {
   }))
 }
 
+/** Return nearest-rank percentile from already sorted durations. */
 function percentileForSortedDurations(durations, percentile) {
   const index = Math.min(
     durations.length - 1,
@@ -424,6 +447,7 @@ function percentileForSortedDurations(durations, percentile) {
   return durations.length === 0 ? 0 : durations[index]
 }
 
+/** Compute average latency while keeping empty runs deterministic. */
 function averageDuration(durations) {
   if (durations.length === 0) {
     return 0
@@ -431,6 +455,12 @@ function averageDuration(durations) {
   return durations.reduce((sum, duration) => sum + duration, 0) / durations.length
 }
 
+/**
+ * Execute a full pressure run and return a machine-readable summary.
+ *
+ * <p>The runner intentionally batches by concurrency instead of using an unbounded queue so local
+ * request pressure remains predictable and comparable across machines.
+ */
 export async function run(args, deps = {}) {
   const now = deps.now || (() => new Date().toISOString())
   const nowMs = deps.nowMs || (() => Date.now())
@@ -452,6 +482,7 @@ export async function run(args, deps = {}) {
   const durations = []
 
   for (const chunk of chunkSeq(runArgs.count, runArgs.concurrency, runArgs.seqStart || 1)) {
+    // Keep each wave bounded to the requested concurrency and aggregate results before the next wave.
     const results = await Promise.all(
       chunk.map(async (seq) => {
         sent += 1
@@ -470,6 +501,7 @@ export async function run(args, deps = {}) {
     }
   }
 
+  // Percentiles require sorted samples; all later statistics reuse the same ordered array.
   durations.sort((left, right) => left - right)
   const p95Ms = percentileForSortedDurations(durations, 0.95)
   const p99Ms = percentileForSortedDurations(durations, 0.99)
@@ -502,14 +534,17 @@ export async function run(args, deps = {}) {
   }
 }
 
+/** Non-zero exit code signals at least one HTTP-level failure to shell scripts. */
 export function exitCodeForSummary(summary) {
   return summary.failed > 0 ? 2 : 0
 }
 
+/** Detect CLI execution without breaking unit tests that import the module. */
 export function isCliEntrypoint(moduleUrl, argvPath) {
   return Boolean(argvPath) && moduleUrl === pathToFileURL(argvPath).href
 }
 
+/** Write the summary JSON to disk, creating parent directories for CI artifact collection. */
 function writeSummaryFile(summaryFile, summary) {
   const directory = path.dirname(summaryFile)
   if (directory && directory !== '.') {

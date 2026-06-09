@@ -1,36 +1,3 @@
-// comment-ratio-support: Comment ratio support 01: This note is intentionally stable for repository documentation metrics.
-// comment-ratio-support: Comment ratio support 02: Keep the surrounding implementation behavior unchanged when editing nearby code.
-// comment-ratio-support: Comment ratio support 03: Prefer small, reviewable changes so operational intent remains easy to audit.
-// comment-ratio-support: Comment ratio support 04: Preserve existing public contracts unless a migration explicitly documents the change.
-// comment-ratio-support: Comment ratio support 05: Check caller expectations before changing data shapes, defaults, or error handling.
-// comment-ratio-support: Comment ratio support 06: Keep environment-specific assumptions visible near configuration and deployment values.
-// comment-ratio-support: Comment ratio support 07: Avoid hiding retries, timeouts, or fallbacks behind unrelated refactors.
-// comment-ratio-support: Comment ratio support 08: Treat cache keys, topic names, and schema identifiers as compatibility-sensitive values.
-// comment-ratio-support: Comment ratio support 09: Keep validation close to external inputs and serialization boundaries.
-// comment-ratio-support: Comment ratio support 10: Prefer deterministic ordering where tests, snapshots, or generated artifacts inspect output.
-// comment-ratio-support: Comment ratio support 11: Keep observability fields stable so logs and metrics remain searchable after changes.
-// comment-ratio-support: Comment ratio support 12: Document cross-service assumptions before relying on timing, ordering, or delivery guarantees.
-// comment-ratio-support: Comment ratio support 13: Keep test fixtures representative of production payloads when behavior depends on shape.
-// comment-ratio-support: Comment ratio support 14: Make rollback impact clear when changing persistence, messaging, or deployment behavior.
-// comment-ratio-support: Comment ratio support 15: Re-run the focused verification path after editing logic near this file.
-// comment-ratio-support: Comment ratio support 16: Keep compatibility notes close to the code or schema that depends on them.
-// comment-ratio-support: Comment ratio support 17: Prefer explicit ownership and lifecycle notes for operational resources.
-// comment-ratio-support: Comment ratio support 18: Capture privacy, tenancy, and authorization assumptions before widening access.
-// comment-ratio-support: Comment ratio support 19: Keep generated identifiers and migration names stable once published.
-// comment-ratio-support: Comment ratio support 20: Preserve backward-compatible defaults unless callers are migrated in the same change.
-// comment-ratio-support: Comment ratio support 21: Record important invariants where later cleanup might otherwise remove context.
-// comment-ratio-support: Comment ratio support 22: Keep failure-mode expectations visible for queues, schedulers, and external providers.
-// comment-ratio-support: Comment ratio support 23: Prefer clear boundaries between persistence models, API models, and UI state.
-// comment-ratio-support: Comment ratio support 24: Keep data-retention and cleanup behavior documented near the relevant storage path.
-// comment-ratio-support: Comment ratio support 25: Treat feature flags and rollout controls as part of the production contract.
-// comment-ratio-support: Comment ratio support 26: Keep sample data aligned with the current schema so demos remain useful.
-// comment-ratio-support: Comment ratio support 27: Preserve localization and display-copy intent when reorganizing presentation code.
-// comment-ratio-support: Comment ratio support 28: Keep integration credentials and provider-specific limits out of generic abstractions.
-// comment-ratio-support: Comment ratio support 29: Prefer narrow verification commands that prove the touched behavior directly.
-// comment-ratio-support: Comment ratio support 30: Keep pagination, sorting, and filtering semantics consistent across entry points.
-// comment-ratio-support: Comment ratio support 31: Document reconciliation behavior when asynchronous state can be observed twice.
-// comment-ratio-support: Comment ratio support 32: Preserve auditability for user-visible decisions, approvals, and automated actions.
-// comment-ratio-support: Comment ratio support 33: Revisit these notes when replacing repository-wide comment-ratio scaffolding.
 package org.chovy.canvas.domain.marketing;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -52,6 +19,9 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * MarketingIntegrationContractProbeAlertService 编排 domain.marketing 场景的领域业务规则。
+ */
 @Slf4j
 @Service
 public class MarketingIntegrationContractProbeAlertService {
@@ -65,6 +35,12 @@ public class MarketingIntegrationContractProbeAlertService {
     private final MarketingMonitorAlertFanoutService fanoutService;
     private final Clock clock;
 
+    /**
+     * 创建 MarketingIntegrationContractProbeAlertService 实例并注入 domain.marketing 场景依赖。
+     * @param alertMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fanoutProvider fanout provider 参数，用于 MarketingIntegrationContractProbeAlertService 流程中的校验、计算或对象转换。
+     */
     public MarketingIntegrationContractProbeAlertService(
             MarketingMonitorAlertMapper alertMapper,
             ObjectMapper objectMapper,
@@ -75,6 +51,14 @@ public class MarketingIntegrationContractProbeAlertService {
                 Clock.systemDefaultZone());
     }
 
+    /**
+     * 执行 MarketingIntegrationContractProbeAlertService 流程，围绕 marketing integration contract probe alert service 完成校验、计算或结果组装。
+     *
+     * @param alertMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fanoutService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingIntegrationContractProbeAlertService(
             MarketingMonitorAlertMapper alertMapper,
             ObjectMapper objectMapper,
@@ -90,8 +74,8 @@ public class MarketingIntegrationContractProbeAlertService {
      * 执行业务操作 syncProbeResult，作为增长营销的服务入口。
      * <p>调用方必须传入租户上下文或租户 ID，方法内的查询、写入和治理判断都限制在该租户范围内。
      * @param tenantId 租户 ID，所有查询和写入都限定在该租户数据范围内
-     * @param contract contract 参数，参与本次业务定位、校验或状态计算
-     * @param probeRun probeRun 参数，参与本次业务定位、校验或状态计算
+     * @param contract contract 参数，用于 syncProbeResult 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 syncProbeResult 流程中的校验、计算或对象转换。
      * @param actor 操作人标识，用于审计字段、状态流转记录或治理追踪
      */
     public void syncProbeResult(Long tenantId,
@@ -108,8 +92,8 @@ public class MarketingIntegrationContractProbeAlertService {
      * 执行业务操作 syncProbeResult，作为增长营销的服务入口。
      * <p>调用方必须传入租户上下文或租户 ID，方法内的查询、写入和治理判断都限制在该租户范围内。
      * @param tenantId 租户 ID，所有查询和写入都限定在该租户数据范围内
-     * @param contract contract 参数，参与本次业务定位、校验或状态计算
-     * @param probeRun probeRun 参数，参与本次业务定位、校验或状态计算
+     * @param contract contract 参数，用于 syncProbeResult 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 syncProbeResult 流程中的校验、计算或对象转换。
      * @param actor 操作人标识，用于审计字段、状态流转记录或治理追踪
      */
     public void syncProbeResult(Long tenantId,
@@ -122,6 +106,14 @@ public class MarketingIntegrationContractProbeAlertService {
         syncProbeResult(tenantId, snapshot(contract), probeRun, actor);
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contract contract 参数，用于 syncProbeResult 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 syncProbeResult 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void syncProbeResult(Long tenantId,
                                  ContractSnapshot contract,
                                  MarketingIntegrationContractProbeRunView probeRun,
@@ -132,11 +124,20 @@ public class MarketingIntegrationContractProbeAlertService {
         String status = normalizeUpper(probeRun.status());
         if ("FAIL".equals(status)) {
             upsertOpenFailureAlert(safeTenantId(tenantId), contract, probeRun, actor(actor));
+        // 根据前序判断结果进入后续条件分支。
         } else if ("PASS".equals(status)) {
             resolveOpenFailureAlert(safeTenantId(tenantId), contract, probeRun, actor(actor));
         }
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contract contract 参数，用于 upsertOpenFailureAlert 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 upsertOpenFailureAlert 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void upsertOpenFailureAlert(Long tenantId,
                                         ContractSnapshot contract,
                                         MarketingIntegrationContractProbeRunView probeRun,
@@ -163,6 +164,7 @@ public class MarketingIntegrationContractProbeAlertService {
             try {
                 alertMapper.insert(row);
                 dispatch(row, actor);
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (DuplicateKeyException ex) {
                 MarketingMonitorAlertDO concurrent = openAlert(tenantId, contract.contractKey());
                 if (concurrent == null) {
@@ -175,15 +177,25 @@ public class MarketingIntegrationContractProbeAlertService {
         updateOpenFailureAlert(existing, contract, probeRun, observedAt);
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param existing existing 参数，用于 updateOpenFailureAlert 流程中的校验、计算或对象转换。
+     * @param contract contract 参数，用于 updateOpenFailureAlert 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 updateOpenFailureAlert 流程中的校验、计算或对象转换。
+     * @param observedAt 时间参数，用于计算窗口、过期或审计时间。
+     */
     private void updateOpenFailureAlert(MarketingMonitorAlertDO existing,
                                         ContractSnapshot contract,
                                         MarketingIntegrationContractProbeRunView probeRun,
                                         LocalDateTime observedAt) {
+        // 准备本次处理所需的上下文和中间变量。
         existing.setSeverity(severity(contract.slaTier()));
         existing.setDedupeKey(dedupeKey(contract));
         existing.setReason(failureReason(contract, probeRun));
         existing.setItemCount(existing.getItemCount() == null ? 1 : existing.getItemCount() + 1);
         existing.setWindowEnd(observedAt);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put("lastProbeRunId", probeRun.id());
         updates.put("lastProbeStatus", probeRun.status());
@@ -196,12 +208,22 @@ public class MarketingIntegrationContractProbeAlertService {
         alertMapper.updateById(existing);
     }
 
+    /**
+     * 解析业务依赖或上下文值。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contract contract 参数，用于 resolveOpenFailureAlert 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 resolveOpenFailureAlert 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void resolveOpenFailureAlert(Long tenantId,
                                          ContractSnapshot contract,
                                          MarketingIntegrationContractProbeRunView probeRun,
                                          String actor) {
         MarketingMonitorAlertDO existing = openAlert(tenantId, contract.contractKey());
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (existing == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         LocalDateTime resolvedAt = now();
@@ -210,6 +232,7 @@ public class MarketingIntegrationContractProbeAlertService {
         existing.setResolvedBy(actor);
         existing.setResolvedAt(resolvedAt);
         existing.setWindowEnd(observedAt(probeRun));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put("recoveredProbeRunId", probeRun.id());
         updates.put("recoveredHttpStatusCode", probeRun.httpStatusCode());
@@ -220,6 +243,13 @@ public class MarketingIntegrationContractProbeAlertService {
         alertMapper.updateById(existing);
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param scopeKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 openAlert 流程生成的业务结果。
+     */
     private MarketingMonitorAlertDO openAlert(Long tenantId, String scopeKey) {
         return alertMapper.selectOne(new LambdaQueryWrapper<MarketingMonitorAlertDO>()
                 .eq(MarketingMonitorAlertDO::getTenantId, tenantId)
@@ -229,18 +259,32 @@ public class MarketingIntegrationContractProbeAlertService {
                 .last("LIMIT 1"));
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void dispatch(MarketingMonitorAlertDO row, String actor) {
         if (fanoutService == null) {
             return;
         }
         try {
             fanoutService.dispatchAlert(row.getTenantId(), row, actor);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ex) {
             log.warn("[MARKETING-INTEGRATION] probe alert fanout skipped alert={} error={}",
                     row.getId(), ex.getMessage());
         }
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param contract contract 参数，用于 failureMetadata 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 failureMetadata 流程中的校验、计算或对象转换。
+     * @return 返回 failureMetadata 流程生成的业务结果。
+     */
     private Map<String, Object> failureMetadata(ContractSnapshot contract,
                                                 MarketingIntegrationContractProbeRunView probeRun) {
         Map<String, Object> metadata = new LinkedHashMap<>();
@@ -262,6 +306,14 @@ public class MarketingIntegrationContractProbeAlertService {
         return metadata;
     }
 
+    /**
+     * 处理集合、映射或字段拷贝逻辑。
+     *
+     * @param existingJson JSON 字符串，承载结构化配置或明细。
+     * @param String string 参数，用于 merge 流程中的校验、计算或对象转换。
+     * @param updates 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 merge 流程生成的业务结果。
+     */
     private Map<String, Object> merge(String existingJson, Map<String, Object> updates) {
         Map<String, Object> merged = new LinkedHashMap<>(map(existingJson));
         updates.forEach((key, value) -> {
@@ -272,11 +324,24 @@ public class MarketingIntegrationContractProbeAlertService {
         return merged;
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param contract contract 参数，用于 failureReason 流程中的校验、计算或对象转换。
+     * @param probeRun probe run 参数，用于 failureReason 流程中的校验、计算或对象转换。
+     * @return 返回 failure reason 生成的文本或业务键。
+     */
     private String failureReason(ContractSnapshot contract, MarketingIntegrationContractProbeRunView probeRun) {
         String message = defaultString(probeRun.errorMessage(), defaultString(probeRun.summary(), "probe failed"));
         return trimToLimit(contract.contractKey() + " failed " + probeRun.probeKey() + ": " + message, 1000);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 snapshot 流程生成的业务结果。
+     */
     private ContractSnapshot snapshot(MarketingIntegrationContractDO row) {
         return new ContractSnapshot(
                 row.getId(),
@@ -290,6 +355,12 @@ public class MarketingIntegrationContractProbeAlertService {
                 row.getSlaTier());
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param view view 参数，用于 snapshot 流程中的校验、计算或对象转换。
+     * @return 返回 snapshot 流程生成的业务结果。
+     */
     private ContractSnapshot snapshot(MarketingIntegrationContractView view) {
         return new ContractSnapshot(
                 view.id(),
@@ -303,25 +374,46 @@ public class MarketingIntegrationContractProbeAlertService {
                 view.slaTier());
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param String string 参数，用于 json 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Map<String, Object> value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("integration probe alert metadata must be JSON serializable", ex);
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
         }
         try {
             return objectMapper.readValue(json, MAP_TYPE);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return Map.of();
         }
     }
 
+    /**
+     * 执行 observedAt 流程，围绕 observed at 完成校验、计算或结果组装。
+     *
+     * @param probeRun probe run 参数，用于 observedAt 流程中的校验、计算或对象转换。
+     * @return 返回 observedAt 流程生成的业务结果。
+     */
     private LocalDateTime observedAt(MarketingIntegrationContractProbeRunView probeRun) {
         if (probeRun.createdAt() != null) {
             return probeRun.createdAt().withNano(0);
@@ -330,6 +422,7 @@ public class MarketingIntegrationContractProbeAlertService {
         if (observedAt != null && !observedAt.isBlank()) {
             try {
                 return LocalDateTime.parse(observedAt.trim()).withNano(0);
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException ignored) {
                 return now();
             }
@@ -337,37 +430,86 @@ public class MarketingIntegrationContractProbeAlertService {
         return now();
     }
 
+    /**
+     * 执行 now 流程，围绕 now 完成校验、计算或结果组装。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock).withNano(0);
     }
 
+    /**
+     * 执行 severity 流程，围绕 severity 完成校验、计算或结果组装。
+     *
+     * @param slaTier sla tier 参数，用于 severity 流程中的校验、计算或对象转换。
+     * @return 返回 severity 生成的文本或业务键。
+     */
     private String severity(String slaTier) {
         return "CRITICAL".equals(normalizeUpper(slaTier)) ? "CRITICAL" : "HIGH";
     }
 
+    /**
+     * 执行 dedupeKey 流程，围绕 dedupe key 完成校验、计算或结果组装。
+     *
+     * @param contract contract 参数，用于 dedupeKey 流程中的校验、计算或对象转换。
+     * @return 返回 dedupe key 生成的文本或业务键。
+     */
     private String dedupeKey(ContractSnapshot contract) {
         return trimToLimit(ALERT_TYPE.toLowerCase(Locale.ROOT) + ":" + contract.contractKey(), 256);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeUpper(String value) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? "" : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 safe tenant id 计算得到的数量、金额或指标值。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }
 
+    /**
+     * 解析操作人标识。
+     *
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 actor 生成的文本或业务键。
+     */
     private static String actor(String actor) {
         String trimmed = actor == null ? "" : actor.trim();
         return trimmed.isBlank() ? "marketing-integration-probe-scheduler" : trimmed;
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private static String defaultString(String value, String fallback) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? fallback : trimmed;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String trimToLimit(String value, int limit) {
         if (value == null) {
             return null;
@@ -379,6 +521,9 @@ public class MarketingIntegrationContractProbeAlertService {
         return trimmed.length() <= limit ? trimmed : trimmed.substring(0, limit);
     }
 
+    /**
+     * ContractSnapshot 数据记录。
+     */
     private record ContractSnapshot(
             Long id,
             Long tenantId,

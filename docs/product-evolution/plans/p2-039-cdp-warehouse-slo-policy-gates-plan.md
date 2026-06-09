@@ -1,10 +1,14 @@
 # CDP Warehouse SLO Policy Gates Implementation Plan
 
+Spec: `../specs/p2-039-cdp-warehouse-slo-policy-gates.md`
+
 **Goal:** Add tenant-governed readiness SLO thresholds and wire them into offline and audience materialization readiness checks.
 
 **Architecture:** Add `CdpWarehouseSloPolicyService` as the SLO policy control plane. `CdpWarehouseReadinessService` resolves the effective policy once per readiness call and uses it for freshness/gap decisions.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

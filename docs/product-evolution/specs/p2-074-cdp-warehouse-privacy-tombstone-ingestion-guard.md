@@ -5,6 +5,8 @@ Sequence: 074
 Source: `docs/product-evolution/specs/p2-073-cdp-warehouse-privacy-erasure-propagation-proof.md`, `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/compliance/DataDeletionService.java`
 Implementation plan: `../plans/p2-074-cdp-warehouse-privacy-tombstone-ingestion-guard-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Prevent erased CDP subjects from being recreated by future events or mirrored back into warehouse OLAP storage by adding tenant-scoped privacy tombstones and enforcing them before CDP profile creation, event persistence, realtime warehouse mirror, and downstream backfill eligibility.

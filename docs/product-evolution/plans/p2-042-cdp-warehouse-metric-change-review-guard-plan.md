@@ -1,10 +1,14 @@
 # CDP Warehouse Metric Change Review Guard Implementation Plan
 
+Spec: `../specs/p2-042-cdp-warehouse-metric-change-review-guard.md`
+
 **Goal:** Add a tenant-scoped semantic metric change workflow that captures P2-041 impact evidence and applies edits only after approval.
 
 **Architecture:** Persist review requests in a small warehouse governance table. `CdpWarehouseMetricChangeReviewService` resolves existing metrics through the BI dataset resolver, calls `CdpWarehouseMetricLineageService` for impact evidence, validates proposed allowed dimensions against dataset dimensions, and updates the existing `bi_metric` row after approval.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

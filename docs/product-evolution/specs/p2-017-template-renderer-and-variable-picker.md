@@ -2,8 +2,10 @@
 
 Priority: P2
 Sequence: 017
-Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/bmad-product-review-2026-05.md`
+Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`
 Implementation plan: `../plans/p2-017-template-renderer-and-variable-picker-plan.md`
+
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
 
 ## Goal
 

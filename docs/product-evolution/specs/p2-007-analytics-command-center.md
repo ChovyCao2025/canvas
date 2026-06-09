@@ -5,6 +5,8 @@ Sequence: 007
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#analytics-command-center`
 Implementation plan: `../plans/p2-007-analytics-command-center-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Create a deeper analytics command center with revenue, ROI, channel comparison, canvas comparison, report templates, scheduled reports, export, and chart drill-down.

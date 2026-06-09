@@ -18,7 +18,7 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p0-005-production-operability-and-runtime-gates.md`
-- Optimization sources: `docs/optimization/production-readiness-checklist.md`, `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/todo/2026-05-31-evolution-directions.md`
+- Optimization sources: `docs/optimization/archive/production-readiness-checklist.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`, `docs/optimization/todo/2026-05-31-evolution-directions.md`
 
 ## File Structure
 
@@ -234,7 +234,8 @@ docker build -f frontend/Dockerfile frontend
 
 Expected: PASS or documented prerequisite issue.
 
-- [ ] **Step 3: Commit implementation slice**
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

@@ -5,6 +5,10 @@ Sequence: 002
 Source: `todo/p3/long-term-ai-commerce-and-ecosystem-bets.md`
 Implementation plan: `../plans/p3-002-long-term-ai-commerce-and-ecosystem-bets-plan.md`
 
+## Implementation Status
+
+Status: discovery package and validator are complete in the current workspace record. Commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Convert broad AI commerce, AI-native operations, commercial expansion, industry expansion, globalization, privacy, and ecosystem bets into a ranked evidence backlog with explicit gates for later child specs.

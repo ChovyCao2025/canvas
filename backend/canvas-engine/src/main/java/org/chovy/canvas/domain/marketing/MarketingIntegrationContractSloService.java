@@ -1,36 +1,3 @@
-// comment-ratio-support: Comment ratio support 01: This note is intentionally stable for repository documentation metrics.
-// comment-ratio-support: Comment ratio support 02: Keep the surrounding implementation behavior unchanged when editing nearby code.
-// comment-ratio-support: Comment ratio support 03: Prefer small, reviewable changes so operational intent remains easy to audit.
-// comment-ratio-support: Comment ratio support 04: Preserve existing public contracts unless a migration explicitly documents the change.
-// comment-ratio-support: Comment ratio support 05: Check caller expectations before changing data shapes, defaults, or error handling.
-// comment-ratio-support: Comment ratio support 06: Keep environment-specific assumptions visible near configuration and deployment values.
-// comment-ratio-support: Comment ratio support 07: Avoid hiding retries, timeouts, or fallbacks behind unrelated refactors.
-// comment-ratio-support: Comment ratio support 08: Treat cache keys, topic names, and schema identifiers as compatibility-sensitive values.
-// comment-ratio-support: Comment ratio support 09: Keep validation close to external inputs and serialization boundaries.
-// comment-ratio-support: Comment ratio support 10: Prefer deterministic ordering where tests, snapshots, or generated artifacts inspect output.
-// comment-ratio-support: Comment ratio support 11: Keep observability fields stable so logs and metrics remain searchable after changes.
-// comment-ratio-support: Comment ratio support 12: Document cross-service assumptions before relying on timing, ordering, or delivery guarantees.
-// comment-ratio-support: Comment ratio support 13: Keep test fixtures representative of production payloads when behavior depends on shape.
-// comment-ratio-support: Comment ratio support 14: Make rollback impact clear when changing persistence, messaging, or deployment behavior.
-// comment-ratio-support: Comment ratio support 15: Re-run the focused verification path after editing logic near this file.
-// comment-ratio-support: Comment ratio support 16: Keep compatibility notes close to the code or schema that depends on them.
-// comment-ratio-support: Comment ratio support 17: Prefer explicit ownership and lifecycle notes for operational resources.
-// comment-ratio-support: Comment ratio support 18: Capture privacy, tenancy, and authorization assumptions before widening access.
-// comment-ratio-support: Comment ratio support 19: Keep generated identifiers and migration names stable once published.
-// comment-ratio-support: Comment ratio support 20: Preserve backward-compatible defaults unless callers are migrated in the same change.
-// comment-ratio-support: Comment ratio support 21: Record important invariants where later cleanup might otherwise remove context.
-// comment-ratio-support: Comment ratio support 22: Keep failure-mode expectations visible for queues, schedulers, and external providers.
-// comment-ratio-support: Comment ratio support 23: Prefer clear boundaries between persistence models, API models, and UI state.
-// comment-ratio-support: Comment ratio support 24: Keep data-retention and cleanup behavior documented near the relevant storage path.
-// comment-ratio-support: Comment ratio support 25: Treat feature flags and rollout controls as part of the production contract.
-// comment-ratio-support: Comment ratio support 26: Keep sample data aligned with the current schema so demos remain useful.
-// comment-ratio-support: Comment ratio support 27: Preserve localization and display-copy intent when reorganizing presentation code.
-// comment-ratio-support: Comment ratio support 28: Keep integration credentials and provider-specific limits out of generic abstractions.
-// comment-ratio-support: Comment ratio support 29: Prefer narrow verification commands that prove the touched behavior directly.
-// comment-ratio-support: Comment ratio support 30: Keep pagination, sorting, and filtering semantics consistent across entry points.
-// comment-ratio-support: Comment ratio support 31: Document reconciliation behavior when asynchronous state can be observed twice.
-// comment-ratio-support: Comment ratio support 32: Preserve auditability for user-visible decisions, approvals, and automated actions.
-// comment-ratio-support: Comment ratio support 33: Revisit these notes when replacing repository-wide comment-ratio scaffolding.
 package org.chovy.canvas.domain.marketing;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -57,6 +24,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * MarketingIntegrationContractSloService 编排 domain.marketing 场景的领域业务规则。
+ */
 @Slf4j
 @Service
 public class MarketingIntegrationContractSloService {
@@ -78,6 +48,14 @@ public class MarketingIntegrationContractSloService {
     private final MarketingMonitorAlertFanoutService fanoutService;
     private final Clock clock;
 
+    /**
+     * 创建 MarketingIntegrationContractSloService 实例并注入 domain.marketing 场景依赖。
+     * @param contractMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param observationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param alertMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fanoutProvider fanout provider 参数，用于 MarketingIntegrationContractSloService 流程中的校验、计算或对象转换。
+     */
     public MarketingIntegrationContractSloService(
             MarketingIntegrationContractMapper contractMapper,
             MarketingIntegrationContractProbeObservationMapper observationMapper,
@@ -92,6 +70,16 @@ public class MarketingIntegrationContractSloService {
                 Clock.systemDefaultZone());
     }
 
+    /**
+     * 执行 MarketingIntegrationContractSloService 流程，围绕 marketing integration contract slo service 完成校验、计算或结果组装。
+     *
+     * @param contractMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param observationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param alertMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fanoutService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingIntegrationContractSloService(
             MarketingIntegrationContractMapper contractMapper,
             MarketingIntegrationContractProbeObservationMapper observationMapper,
@@ -119,6 +107,7 @@ public class MarketingIntegrationContractSloService {
                                                                                             Integer limit) {
         Long scopedTenantId = safeTenantId(tenantId);
         int boundedLimit = boundedLimit(limit);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<MarketingIntegrationContractDO> rows = contractMapper.selectList(
                 new LambdaQueryWrapper<MarketingIntegrationContractDO>()
                         .eq(MarketingIntegrationContractDO::getTenantId, scopedTenantId)
@@ -126,6 +115,7 @@ public class MarketingIntegrationContractSloService {
                         .eq(MarketingIntegrationContractDO::getStatus, "ACTIVE")
                         .orderByDesc(MarketingIntegrationContractDO::getUpdatedAt)
                         .last("LIMIT " + boundedLimit));
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return (rows == null ? List.<MarketingIntegrationContractDO>of() : rows).stream()
                 .filter(row -> scopedTenantId.equals(row.getTenantId()))
                 .filter(row -> "PRODUCTION".equalsIgnoreCase(defaultString(row.getEnvironment(), "")))
@@ -139,7 +129,7 @@ public class MarketingIntegrationContractSloService {
      * 执行业务操作 evaluateAndSyncContract，作为增长营销的服务入口。
      * <p>调用方必须传入租户上下文或租户 ID，方法内的查询、写入和治理判断都限制在该租户范围内。
      * @param tenantId 租户 ID，所有查询和写入都限定在该租户数据范围内
-     * @param contract contract 参数，参与本次业务定位、校验或状态计算
+     * @param contract contract 参数，用于 evaluateAndSyncContract 流程中的校验、计算或对象转换。
      * @param probeKey 业务键，用于定位租户内的配置、资产或治理对象
      * @param actor 操作人标识，用于审计字段、状态流转记录或治理追踪
      * @return 返回本次处理的状态、计数、命中明细或治理结论，供控制器和调度任务判断后续动作
@@ -154,6 +144,14 @@ public class MarketingIntegrationContractSloService {
         return view;
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contract contract 参数，用于 evaluateContract 流程中的校验、计算或对象转换。
+     * @param probeKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 evaluateContract 流程生成的业务结果。
+     */
     private MarketingIntegrationContractSloEvaluationView evaluateContract(Long tenantId,
                                                                           MarketingIntegrationContractDO contract,
                                                                           String probeKey) {
@@ -194,6 +192,15 @@ public class MarketingIntegrationContractSloService {
             windows.add(shortWindow);
             if (Boolean.TRUE.equals(longWindow.breached()) && Boolean.TRUE.equals(shortWindow.breached())) {
                 return view(tenantId, contract, probeKey, rule.status(), rule.severity(), rule.key(),
+                        /**
+                         * 执行 reason 流程，围绕 reason 完成校验、计算或结果组装。
+                         *
+                         * @param contract contract 参数，用于 reason 流程中的校验、计算或对象转换。
+                         * @param rule rule 参数，用于 reason 流程中的校验、计算或对象转换。
+                         * @param longWindow long window 参数，用于 reason 流程中的校验、计算或对象转换。
+                         * @param generatedAt 时间参数，用于计算窗口、过期或审计时间。
+                         * @return 返回 reason 流程生成的业务结果。
+                         */
                         targetPercent, errorBudget, reason(contract, rule, longWindow, shortWindow),
                         generatedAt, List.of(longWindow, shortWindow));
             }
@@ -205,6 +212,21 @@ public class MarketingIntegrationContractSloService {
                 generatedAt, windows);
     }
 
+    /**
+     * 执行 window 流程，围绕 window 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contract contract 参数，用于 window 流程中的校验、计算或对象转换。
+     * @param probeKey 业务键，用于在同一租户下定位资源。
+     * @param rule rule 参数，用于 window 流程中的校验、计算或对象转换。
+     * @param windowKey 业务键，用于在同一租户下定位资源。
+     * @param windowMinutes window minutes 参数，用于 window 流程中的校验、计算或对象转换。
+     * @param minSamples min samples 参数，用于 window 流程中的校验、计算或对象转换。
+     * @param targetPercent target percent 参数，用于 window 流程中的校验、计算或对象转换。
+     * @param errorBudget error budget 参数，用于 window 流程中的校验、计算或对象转换。
+     * @param generatedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 window 流程生成的业务结果。
+     */
     private MarketingIntegrationContractSloWindowView window(Long tenantId,
                                                             MarketingIntegrationContractDO contract,
                                                             String probeKey,
@@ -215,7 +237,9 @@ public class MarketingIntegrationContractSloService {
                                                             double targetPercent,
                                                             double errorBudget,
                                                             LocalDateTime generatedAt) {
+        // 准备本次处理所需的上下文和中间变量。
         LocalDateTime windowStart = generatedAt.minusMinutes(windowMinutes);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         MarketingIntegrationContractProbeWindowStatsDO stats = observationMapper.selectWindowStats(
                 tenantId,
                 contract.getId(),
@@ -227,6 +251,7 @@ public class MarketingIntegrationContractSloService {
         double burnRate = round2(badRatio / errorBudget);
         boolean sufficient = total >= minSamples;
         boolean breached = sufficient && burnRate >= rule.thresholdBurnRate();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new MarketingIntegrationContractSloWindowView(
                 rule.key(),
                 windowKey,
@@ -242,6 +267,22 @@ public class MarketingIntegrationContractSloService {
                 generatedAt.toString());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contract contract 参数，用于 view 流程中的校验、计算或对象转换。
+     * @param probeKey 业务键，用于在同一租户下定位资源。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param severity severity 参数，用于 view 流程中的校验、计算或对象转换。
+     * @param triggeredRuleKey 业务键，用于在同一租户下定位资源。
+     * @param targetPercent target percent 参数，用于 view 流程中的校验、计算或对象转换。
+     * @param errorBudget error budget 参数，用于 view 流程中的校验、计算或对象转换。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @param generatedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param windows windows 参数，用于 view 流程中的校验、计算或对象转换。
+     * @return 返回 view 流程生成的业务结果。
+     */
     private MarketingIntegrationContractSloEvaluationView view(Long tenantId,
                                                               MarketingIntegrationContractDO contract,
                                                               String probeKey,
@@ -270,17 +311,30 @@ public class MarketingIntegrationContractSloService {
                 windows);
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param view view 参数，用于 syncAlert 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void syncAlert(MarketingIntegrationContractSloEvaluationView view, String actor) {
         if (view == null || alertMapper == null) {
             return;
         }
         if ("PAGE".equals(view.status()) || "TICKET".equals(view.status())) {
             upsertAlert(view, actor);
+        // 根据前序判断结果进入后续条件分支。
         } else if ("OK".equals(view.status())) {
             resolveAlert(view, actor);
         }
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param view view 参数，用于 upsertAlert 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void upsertAlert(MarketingIntegrationContractSloEvaluationView view, String actor) {
         MarketingMonitorAlertDO existing = openAlert(view.tenantId(), view.contractKey());
         if (existing == null) {
@@ -303,6 +357,7 @@ public class MarketingIntegrationContractSloService {
             try {
                 alertMapper.insert(row);
                 dispatch(row, actor);
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (DuplicateKeyException ex) {
                 MarketingMonitorAlertDO concurrent = openAlert(view.tenantId(), view.contractKey());
                 if (concurrent == null) {
@@ -315,6 +370,12 @@ public class MarketingIntegrationContractSloService {
         updateAlert(existing, view);
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param existing existing 参数，用于 updateAlert 流程中的校验、计算或对象转换。
+     * @param view view 参数，用于 updateAlert 流程中的校验、计算或对象转换。
+     */
     private void updateAlert(MarketingMonitorAlertDO existing, MarketingIntegrationContractSloEvaluationView view) {
         existing.setSeverity(view.severity());
         existing.setDedupeKey(dedupeKey(view.contractKey()));
@@ -327,6 +388,12 @@ public class MarketingIntegrationContractSloService {
         alertMapper.updateById(existing);
     }
 
+    /**
+     * 解析业务依赖或上下文值。
+     *
+     * @param view view 参数，用于 resolveAlert 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void resolveAlert(MarketingIntegrationContractSloEvaluationView view, String actor) {
         MarketingMonitorAlertDO existing = openAlert(view.tenantId(), view.contractKey());
         if (existing == null) {
@@ -346,6 +413,13 @@ public class MarketingIntegrationContractSloService {
         alertMapper.updateById(existing);
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contractKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 openAlert 流程生成的业务结果。
+     */
     private MarketingMonitorAlertDO openAlert(Long tenantId, String contractKey) {
         return alertMapper.selectOne(new LambdaQueryWrapper<MarketingMonitorAlertDO>()
                 .eq(MarketingMonitorAlertDO::getTenantId, tenantId)
@@ -355,18 +429,31 @@ public class MarketingIntegrationContractSloService {
                 .last("LIMIT 1"));
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void dispatch(MarketingMonitorAlertDO row, String actor) {
         if (fanoutService == null) {
             return;
         }
         try {
             fanoutService.dispatchAlert(row.getTenantId(), row, actor);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ex) {
             log.warn("[MARKETING-INTEGRATION] SLO burn-rate fanout skipped alert={} error={}",
                     row.getId(), ex.getMessage());
         }
     }
 
+    /**
+     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+     *
+     * @param view view 参数，用于 metadata 流程中的校验、计算或对象转换。
+     * @return 返回 metadata 流程生成的业务结果。
+     */
     private Map<String, Object> metadata(MarketingIntegrationContractSloEvaluationView view) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("contractId", view.contractId());
@@ -384,7 +471,14 @@ public class MarketingIntegrationContractSloService {
         return metadata;
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param view view 参数，用于 triggerWindowStart 流程中的校验、计算或对象转换。
+     * @return 返回 triggerWindowStart 流程生成的业务结果。
+     */
     private LocalDateTime triggerWindowStart(MarketingIntegrationContractSloEvaluationView view) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return view.windows().stream()
                 .map(MarketingIntegrationContractSloWindowView::windowStart)
                 .map(LocalDateTime::parse)
@@ -392,24 +486,63 @@ public class MarketingIntegrationContractSloService {
                 .orElse(now());
     }
 
+    /**
+     * 执行 reason 流程，围绕 reason 完成校验、计算或结果组装。
+     *
+     * @param contract contract 参数，用于 reason 流程中的校验、计算或对象转换。
+     * @param rule rule 参数，用于 reason 流程中的校验、计算或对象转换。
+     * @param longWindow long window 参数，用于 reason 流程中的校验、计算或对象转换。
+     * @param shortWindow short window 参数，用于 reason 流程中的校验、计算或对象转换。
+     * @return 返回 reason 生成的文本或业务键。
+     */
     private String reason(MarketingIntegrationContractDO contract,
                           SloRule rule,
                           MarketingIntegrationContractSloWindowView longWindow,
                           MarketingIntegrationContractSloWindowView shortWindow) {
         return trimToLimit(contract.getContractKey() + " breached " + rule.key()
+                /**
+                 * 执行 formatRate 流程，围绕 format rate 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 formatRate 流程生成的业务结果。
+                 */
                 + ": " + formatRate(longWindow.burnRate()) + " burn over " + longWindow.windowMinutes() + "m"
+                /**
+                 * 执行 formatRate 流程，围绕 format rate 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 formatRate 流程生成的业务结果。
+                 */
                 + " and " + formatRate(shortWindow.burnRate()) + " over " + shortWindow.windowMinutes() + "m", 1000);
     }
 
+    /**
+     * 执行 formatRate 流程，围绕 format rate 完成校验、计算或结果组装。
+     *
+     * @param burnRate burn rate 参数，用于 formatRate 流程中的校验、计算或对象转换。
+     * @return 返回 format rate 生成的文本或业务键。
+     */
     private static String formatRate(Double burnRate) {
         return String.format(Locale.ROOT, "%.2fx", burnRate == null ? 0.0 : burnRate);
     }
 
+    /**
+     * 执行 sloProbeKey 流程，围绕 slo probe key 完成校验、计算或结果组装。
+     *
+     * @param contract contract 参数，用于 sloProbeKey 流程中的校验、计算或对象转换。
+     * @return 返回 slo probe key 生成的文本或业务键。
+     */
     private String sloProbeKey(MarketingIntegrationContractDO contract) {
         return defaultString(stringMetadata(map(contract == null ? null : contract.getMetadataJson()), "sloProbeKey"),
                 MarketingIntegrationContractProbeAutomationService.PROBE_KEY);
     }
 
+    /**
+     * 执行 targetPercent 流程，围绕 target percent 完成校验、计算或结果组装。
+     *
+     * @param contract contract 参数，用于 targetPercent 流程中的校验、计算或对象转换。
+     * @param String string 参数，用于 targetPercent 流程中的校验、计算或对象转换。
+     * @param metadata metadata 参数，用于 targetPercent 流程中的校验、计算或对象转换。
+     * @return 返回 target percent 计算得到的数量、金额或指标值。
+     */
     private double targetPercent(MarketingIntegrationContractDO contract, Map<String, Object> metadata) {
         Double configured = doubleMetadata(metadata, "sloTargetPercent");
         if (configured != null) {
@@ -423,6 +556,14 @@ public class MarketingIntegrationContractSloService {
         };
     }
 
+    /**
+     * 执行 doubleMetadata 流程，围绕 double metadata 完成校验、计算或结果组装。
+     *
+     * @param String string 参数，用于 doubleMetadata 流程中的校验、计算或对象转换。
+     * @param metadata metadata 参数，用于 doubleMetadata 流程中的校验、计算或对象转换。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @return 返回 double metadata 计算得到的数量、金额或指标值。
+     */
     private Double doubleMetadata(Map<String, Object> metadata, String key) {
         Object value = metadata.get(key);
         if (value instanceof Number number) {
@@ -431,6 +572,7 @@ public class MarketingIntegrationContractSloService {
         if (value instanceof String text && !text.isBlank()) {
             try {
                 return Double.parseDouble(text.trim());
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (NumberFormatException ignored) {
                 return null;
             }
@@ -438,6 +580,15 @@ public class MarketingIntegrationContractSloService {
         return null;
     }
 
+    /**
+     * 执行 intMetadata 流程，围绕 int metadata 完成校验、计算或结果组装。
+     *
+     * @param String string 参数，用于 intMetadata 流程中的校验、计算或对象转换。
+     * @param metadata metadata 参数，用于 intMetadata 流程中的校验、计算或对象转换。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param fallback fallback 参数，用于 intMetadata 流程中的校验、计算或对象转换。
+     * @return 返回 int metadata 计算得到的数量、金额或指标值。
+     */
     private int intMetadata(Map<String, Object> metadata, String key, int fallback) {
         Double value = doubleMetadata(metadata, key);
         if (value == null || value < 1) {
@@ -446,38 +597,78 @@ public class MarketingIntegrationContractSloService {
         return Math.min(10_000, value.intValue());
     }
 
+    /**
+     * 执行 stringMetadata 流程，围绕 string metadata 完成校验、计算或结果组装。
+     *
+     * @param String string 参数，用于 stringMetadata 流程中的校验、计算或对象转换。
+     * @param metadata metadata 参数，用于 stringMetadata 流程中的校验、计算或对象转换。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @return 返回 string metadata 生成的文本或业务键。
+     */
     private String stringMetadata(Map<String, Object> metadata, String key) {
         Object value = metadata.get(key);
         return value == null ? null : String.valueOf(value);
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param String string 参数，用于 json 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Map<String, Object> value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("integration SLO alert metadata must be JSON serializable", ex);
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
         }
         try {
             return objectMapper.readValue(json, MAP_TYPE);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return Map.of();
         }
     }
 
+    /**
+     * 执行 now 流程，围绕 now 完成校验、计算或结果组装。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock).withNano(0);
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 safe tenant id 计算得到的数量、金额或指标值。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static int boundedLimit(Integer limit) {
         if (limit == null || limit < 1) {
             return DEFAULT_LIMIT;
@@ -485,33 +676,77 @@ public class MarketingIntegrationContractSloService {
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 解析操作人标识。
+     *
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 actor 生成的文本或业务键。
+     */
     private static String actor(String actor) {
         String trimmed = actor == null ? "" : actor.trim();
         return trimmed.isBlank() ? "marketing-integration-slo-evaluator" : trimmed;
     }
 
+    /**
+     * 执行 dedupeKey 流程，围绕 dedupe key 完成校验、计算或结果组装。
+     *
+     * @param contractKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 dedupe key 生成的文本或业务键。
+     */
     private static String dedupeKey(String contractKey) {
         return trimToLimit(ALERT_TYPE.toLowerCase(Locale.ROOT) + ":" + contractKey, 256);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalizeUpper(String value) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? "" : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private static String defaultString(String value, String fallback) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? fallback : trimmed;
     }
 
+    /**
+     * 执行 round2 流程，围绕 round2 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 round2 计算得到的数量、金额或指标值。
+     */
     private static double round2(double value) {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    /**
+     * 执行 round4 流程，围绕 round4 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 round4 计算得到的数量、金额或指标值。
+     */
     private static double round4(double value) {
         return Math.round(value * 10_000.0) / 10_000.0;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String trimToLimit(String value, int limit) {
         if (value == null) {
             return null;
@@ -523,6 +758,9 @@ public class MarketingIntegrationContractSloService {
         return trimmed.length() <= limit ? trimmed : trimmed.substring(0, limit);
     }
 
+    /**
+     * SloRule 数据记录。
+     */
     private record SloRule(
             String key,
             String status,

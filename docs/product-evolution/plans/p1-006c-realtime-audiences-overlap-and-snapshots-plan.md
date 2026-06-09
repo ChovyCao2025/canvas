@@ -232,7 +232,8 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-006c-realtime-audiences-overlap-and-snapshots.md`
 - Modify: `docs/product-evolution/plans/p1-006c-realtime-audiences-overlap-and-snapshots-plan.md`
 
-- [ ] **Step 1: Commit realtime audience slice** - skipped in this session per user instruction not to commit.
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

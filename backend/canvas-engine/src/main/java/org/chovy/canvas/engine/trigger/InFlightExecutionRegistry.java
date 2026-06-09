@@ -281,15 +281,34 @@ public class InFlightExecutionRegistry {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param executionId 业务对象 ID，用于定位具体记录。
+     * @return 返回 local execution key 生成的文本或业务键。
+     */
     private static String localExecutionKey(Long canvasId, String executionId) {
         return canvasId + ":" + executionId;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param lane lane 参数，用于 localLaneActiveCount 流程中的校验、计算或对象转换。
+     * @return 返回 local lane active count 计算得到的数量、金额或指标值。
+     */
     private long localLaneActiveCount(ExecutionLane lane) {
         ExecutionLane effectiveLane = lane != null ? lane : ExecutionLane.STANDARD;
         return localExecutionLanes.values().stream().filter(effectiveLane::equals).count();
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param result result 参数，用于 mapReason 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private static ExecutionLaneAdmissionResult.Reason mapReason(Long result) {
         if (result == null) {
             return ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE;

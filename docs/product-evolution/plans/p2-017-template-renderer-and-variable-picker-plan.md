@@ -1,5 +1,7 @@
 # Template Renderer And Variable Picker Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add one runtime-safe template renderer and a graph-aware variable picker.
@@ -13,6 +15,15 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p2-017-template-renderer-and-variable-picker.md`
+
+## Current Status Note
+
+The implementation files are present in the current worktree and fresh focused verification passed on 2026-06-09:
+
+- `JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-engine test -Dtest=TemplateRenderServiceTest,UserInputHandlerTest,WaitEventFilterTest,WaitHandlerTest,ConnectedContentHandlerTest,ExecutionRerunControllerTest,CanvasBatchOperationControllerTest,RuntimeMigrationEvidenceTest` (covered `TemplateRenderServiceTest`; 48 total selected backend tests passed).
+- `npm test -- variableAvailability.test.ts variablePicker.test.tsx executionTimeline.test.tsx` (covered `variableAvailability.test.ts` and `variablePicker.test.tsx`; 12 frontend tests passed).
+
+Historical RED-state checks were not reproduced because the current worktree already contains the implementation. No commit or merge was created in this audit, so commit and merge status remain unverified.
 
 ## File Structure
 
@@ -30,7 +41,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/template/TemplateRenderServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/template/TemplateRenderService.java`
 
-- [ ] **Step 1: Write renderer tests**
+- [x] **Step 1: Write renderer tests**
 
 Create tests:
 
@@ -58,7 +69,7 @@ void supportsDateFormattingConditionalsAndRepeatedLists() {
 }
 ```
 
-- [ ] **Step 2: Run renderer tests and confirm red state**
+Historical RED-state boundary: not reproduced in this audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -68,11 +79,11 @@ cd backend && mvn -pl canvas-engine test -Dtest=TemplateRenderServiceTest
 
 Expected: FAIL because renderer does not exist.
 
-- [ ] **Step 3: Implement renderer**
+- [x] **Step 3: Implement renderer**
 
 Implement `render(String template, Map<String,Object> context)` with interpolation, HTML escaping by default, missing-variable errors, max rendered length, `formatDate`, `#if`, and `#each` support.
 
-- [ ] **Step 4: Run renderer tests**
+- [x] **Step 4: Run renderer tests**
 
 Run:
 
@@ -91,7 +102,7 @@ Expected: PASS.
 - Create: `frontend/src/components/config-panel/variablePicker.test.tsx`
 - Modify: `frontend/src/components/config-panel/index.tsx`
 
-- [ ] **Step 1: Write availability tests**
+- [x] **Step 1: Write availability tests**
 
 Create `variableAvailability.test.ts`:
 
@@ -116,15 +127,15 @@ it('returns trigger profile and upstream variables but hides downstream output',
 })
 ```
 
-- [ ] **Step 2: Write picker tests**
+- [x] **Step 2: Write picker tests**
 
 Create `variablePicker.test.tsx` with render, search, keyboard select, and insertion callback assertions.
 
-- [ ] **Step 3: Implement helper and picker**
+- [x] **Step 3: Implement helper and picker**
 
 `availableVariables` returns `{ token, label, source }[]`. `VariablePicker` renders searchable options and calls `onInsert(token)` without mutating other config fields.
 
-- [ ] **Step 4: Run frontend tests**
+- [x] **Step 4: Run frontend tests**
 
 Run:
 
@@ -140,7 +151,7 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p2-017-template-renderer-and-variable-picker.md`
 - Modify: `docs/product-evolution/plans/p2-017-template-renderer-and-variable-picker-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -151,7 +162,7 @@ cd frontend && npm test -- variableAvailability.test.ts variablePicker.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 2: Commit**
+Commit boundary: no commit was created in this audit; commit and merge status remain unverified.
 
 Run:
 

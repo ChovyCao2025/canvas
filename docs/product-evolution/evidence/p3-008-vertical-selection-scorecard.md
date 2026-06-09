@@ -2,7 +2,7 @@
 
 ## Scorecard
 
-| Vertical | Evidence Source | Demand Score | Fit Score | Compliance Risk | Template Reuse | Support Readiness | Recommendation |
+| Vertical | Evidence Source | Demand Score | Repeatability Score | Compliance Risk | Existing Template Coverage | Sales/Support Readiness | Decision Implication |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Retail lifecycle marketing | Template usage analytics | 5 | 4 | Low | High | Medium | Best first package candidate. |
 | Financial services retention | Implementation notes | 4 | 3 | High | Medium | Low | Needs compliance child spec before packaging. |

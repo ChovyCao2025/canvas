@@ -31,11 +31,19 @@ public class SqlWhereGenerator {
             RuleSqlCompiler.SqlWhere where = new RuleSqlCompiler()
                     .compile(parseCached(ruleJson));
             return new SqlWhere(where.sql(), where.params());
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuleValidationException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
         }
     }
 
+    /**
+     * 解析并缓存规则 JSON。
+     *
+     * @param ruleJson 原始规则 JSON
+     * @return 解析后的规则组
+     * @throws Exception 规则解析失败时抛出
+     */
     private RuleGroup parseCached(String ruleJson) throws Exception {
         String cacheKey = ruleJson == null ? "" : ruleJson;
         RuleGroup cached = ruleCache.get(cacheKey);
@@ -47,13 +55,15 @@ public class SqlWhereGenerator {
         return parsed;
     }
 
+    /**
+     * SQL WHERE 片段及其命名参数。
+     *
+     * @param sql WHERE 片段，不包含 WHERE 关键字.
+     * @param params 与命名参数占位符对应的参数集合.
+     */
     public record SqlWhere(
-            /** WHERE 片段，不包含 WHERE 关键字。 */
-            String sql,
-            /** 与命名参数占位符对应的参数集合。 */
-            MapSqlParameterSource params
+        String sql,
+        MapSqlParameterSource params
     ) {
-        // sql: 仅 WHERE 片段（不含 "WHERE" 关键字）
-        // params: 与命名参数占位符一一对应
     }
 }

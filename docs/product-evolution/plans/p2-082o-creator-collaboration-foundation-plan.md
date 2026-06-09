@@ -10,6 +10,8 @@
 
 **Implementation status (2026-06-06):** Completed. The actual Flyway migration is `V321__creator_collaboration_foundation.sql` because `V320` is already allocated to BI Quick Engine capacity policy in the current workspace. Focused creator tests passed 7/7, paid-media + creator regression passed 15/15, and conversation adapter compatibility tests passed 37/37 after restoring shared provider adapter testCompile compatibility.
 
+Status: Completed on 2026-06-06.
+
 ---
 
 ## Scope

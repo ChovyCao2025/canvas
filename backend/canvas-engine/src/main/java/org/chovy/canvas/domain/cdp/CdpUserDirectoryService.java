@@ -44,11 +44,13 @@ public class CdpUserDirectoryService {
     public List<CanvasUserRowDTO> listUsers(Long tenantId, String keyword) {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
         LambdaQueryWrapper<CdpUserProfileDO> profileQuery = profileQuery(tenantId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (normalizedKeyword != null && !normalizedKeyword.isBlank()) {
             profileQuery.and(q -> q.like(CdpUserProfileDO::getUserId, normalizedKeyword)
                     .or()
                     .like(CdpUserProfileDO::getDisplayName, normalizedKeyword));
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<CdpUserProfileDO> profiles = profileMapper.selectList(profileQuery
                 .orderByDesc(CdpUserProfileDO::getLastSeenAt)
                 .orderByDesc(CdpUserProfileDO::getId));
@@ -57,6 +59,7 @@ public class CdpUserDirectoryService {
             return List.of();
         }
 
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         Set<String> userIds = profiles.stream().map(CdpUserProfileDO::getUserId).collect(Collectors.toSet());
         List<CanvasExecutionDO> executions = executionMapper.selectList(executionQuery(tenantId)
                 .in(CanvasExecutionDO::getUserId, userIds)
@@ -73,6 +76,7 @@ public class CdpUserDirectoryService {
 
     /** 将用户画像与执行统计合并为用户目录列表行。 */
     private CanvasUserRowDTO toRow(Long tenantId, CdpUserProfileDO profile, List<CanvasExecutionDO> executions) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         long successCount = executions.stream()
                 .filter(item -> item.getStatus() != null && item.getStatus() == ExecutionStatus.SUCCESS.getCode())
                 .count();
@@ -84,6 +88,7 @@ public class CdpUserDirectoryService {
                 .orElse(null);
         LocalDateTime firstEnteredAt = profile.getFirstSeenAt();
         LocalDateTime lastEnteredAt = profile.getLastSeenAt();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new CanvasUserRowDTO(
                 profile.getUserId(),
                 profile.getDisplayName() == null || profile.getDisplayName().isBlank() ? profile.getUserId() : profile.getDisplayName(),
@@ -99,6 +104,7 @@ public class CdpUserDirectoryService {
 
     /** 将最近一次执行状态码转换为目录展示文案。 */
     private String statusLabel(Integer status) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (status != null && status == ExecutionStatus.SUCCESS.getCode()) {
             return "SUCCESS";
         }
@@ -111,9 +117,16 @@ public class CdpUserDirectoryService {
         if (status != null && status == ExecutionStatus.RUNNING.getCode()) {
             return "RUNNING";
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return status == null ? "-" : String.valueOf(status);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 profileQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<CdpUserProfileDO> profileQuery(Long tenantId) {
         LambdaQueryWrapper<CdpUserProfileDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {
@@ -122,6 +135,12 @@ public class CdpUserDirectoryService {
         return query;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 executionQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<CanvasExecutionDO> executionQuery(Long tenantId) {
         LambdaQueryWrapper<CanvasExecutionDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {

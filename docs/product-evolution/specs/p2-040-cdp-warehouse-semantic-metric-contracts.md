@@ -2,8 +2,10 @@
 
 Priority: P2
 Sequence: 040
-Source: `docs/product-evolution/specs/p2-023-bi-dataset-query-compiler-foundation.md`, `docs/product-evolution/specs/p2-027-cdp-warehouse-catalog-and-lineage.md`, `backend/canvas-engine/src/main/resources/db/migration/V191__bi_platform_foundation.sql`
+Source: `docs/product-evolution/specs/p2-023-bi-dataset-query-compiler-foundation.md`, `docs/product-evolution/specs/p2-027-cdp-warehouse-catalog-and-lineage.md`, `backend/canvas-engine/src/main/resources/db/migration/V216__bi_platform_foundation.sql`
 Implementation plan: `../plans/p2-040-cdp-warehouse-semantic-metric-contracts-plan.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Goal
 
@@ -11,7 +13,7 @@ Promote BI metrics from query-time expressions into enforceable semantic contrac
 
 ## Current Baseline
 
-- V191 already creates `bi_metric` with expression, aggregation, data type, owner, description, status, and `allowed_dimensions_json`.
+- V216 already creates `bi_metric` with expression, aggregation, data type, owner, description, status, and `allowed_dimensions_json`.
 - `BiDatasetResourceService` already persists and resolves BI dataset fields and metrics.
 - `BiQueryCompiler` currently validates that requested metric keys exist, but does not enforce metric-level allowed dimensions.
 - Warehouse operators do not have a warehouse-oriented API for inspecting semantic metric contracts and their dimension constraints.

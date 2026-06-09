@@ -2,7 +2,7 @@
 
 Priority: P1
 Sequence: 004D
-Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004d-3000-concurrency-runbook-and-baseline-gate-plan.md`
 
 ## Implementation Status

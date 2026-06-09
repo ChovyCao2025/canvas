@@ -5,6 +5,8 @@ Sequence: 083
 Source: user-requested production-grade OLAP completion after P2-081 readiness gate
 Implementation plan: `../plans/p2-083-cdp-warehouse-enterprise-olap-operational-evidence-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Turn the P2-081 enterprise OLAP readiness gate into a production evidence loop that can collect, persist, and evaluate live Doris and operator evidence instead of relying on hand-assembled proof rows.

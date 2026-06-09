@@ -441,7 +441,8 @@ Result: 15 tests, 0 failures, 0 errors, 0 skipped.
 
 - Frontend production build was attempted by the frontend worker but is currently blocked by existing unrelated TypeScript errors in `frontend/src/pages/bi/index.tsx`.
 
-- [ ] **Step 2: Commit this slice**
+- [x] **Step 2: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

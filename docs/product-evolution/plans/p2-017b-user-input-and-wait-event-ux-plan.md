@@ -1,5 +1,7 @@
 # User Input And Wait Event UX Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add user input response storage and richer WAIT event filter configuration with completed/timeout branches.
@@ -13,6 +15,14 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p2-017b-user-input-and-wait-event-ux.md`
+
+## Current Status Note
+
+The implementation files are present in the current worktree and fresh focused verification passed on 2026-06-09:
+
+- `JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-engine test -Dtest=TemplateRenderServiceTest,UserInputHandlerTest,WaitEventFilterTest,WaitHandlerTest,ConnectedContentHandlerTest,ExecutionRerunControllerTest,CanvasBatchOperationControllerTest,RuntimeMigrationEvidenceTest` (covered `UserInputHandlerTest`, `WaitEventFilterTest`, and `WaitHandlerTest`; 48 total selected backend tests passed).
+
+Historical RED-state checks were not reproduced because the current worktree already contains the implementation. No commit or merge was created in this audit, so commit and merge status remain unverified.
 
 ## File Structure
 
@@ -30,11 +40,11 @@
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V113__user_input_wait_event_tools.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/UserInputHandler.java`
 
-- [ ] **Step 1: Write tests**
+- [x] **Step 1: Write tests**
 
 Create tests for missing schema rejection, pending response creation, completed branch resume, timeout branch resume, and duplicate response idempotency.
 
-- [ ] **Step 2: Run tests and confirm red state**
+Historical RED-state boundary: not reproduced in this audit because the current worktree already contains the implementation.
 
 Run:
 
@@ -44,15 +54,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=UserInputHandlerTest
 
 Expected: FAIL because migration and handler do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
 Create tables `user_input_form`, `user_input_response`, and `user_input_resume_audit` with tenant id, execution id, node id, user id, schema JSON, response JSON, status, idempotency key, completed node id, timeout node id, and timestamps.
 
-- [ ] **Step 4: Implement handler**
+- [x] **Step 4: Implement handler**
 
 `UserInputHandler` validates schema, inserts a pending response row, returns `NodeResult.pending(resumeAt, "USER_INPUT_PENDING", "waiting for user input")`, and writes trace output keys `inputStatus`, `inputResponseId`, and `timeoutNodeId`.
 
-- [ ] **Step 5: Run user input tests**
+- [x] **Step 5: Run user input tests**
 
 Run:
 
@@ -69,19 +79,19 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/wait/WaitSubscriptionService.java`
 - Modify: `frontend/src/components/config-panel/index.tsx`
 
-- [ ] **Step 1: Write filter tests**
+- [x] **Step 1: Write filter tests**
 
 Create tests for event code, property predicate match, timeout branch persistence, duplicate resume idempotency, and non-matching event skip.
 
-- [ ] **Step 2: Implement persisted filter matching**
+- [x] **Step 2: Implement persisted filter matching**
 
 Store filter JSON with WAIT subscription. Match incoming events by event code and predicates, then resume exactly once with completed or timeout branch metadata.
 
-- [ ] **Step 3: Add config panel controls**
+- [x] **Step 3: Add config panel controls**
 
 Add event schema selector, filter builder, timeout duration, completed branch, timeout branch, and preview state for WAIT `UNTIL_EVENT`.
 
-- [ ] **Step 4: Run backend tests**
+- [x] **Step 4: Run backend tests**
 
 Run:
 
@@ -97,7 +107,7 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p2-017b-user-input-and-wait-event-ux.md`
 - Modify: `docs/product-evolution/plans/p2-017b-user-input-and-wait-event-ux-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -107,7 +117,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=UserInputHandlerTest,WaitEventFi
 
 Expected: PASS.
 
-- [ ] **Step 2: Commit**
+Commit boundary: no commit was created in this audit; commit and merge status remain unverified.
 
 Run:
 

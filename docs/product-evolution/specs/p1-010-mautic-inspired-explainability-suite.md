@@ -78,7 +78,7 @@ Add a read-only operator explainability suite inspired by Mautic concepts that C
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05.
 
 - `MauticInspiredInsightService` exposes read-only explanations for audience membership, journey path, channel preference resolution, suppression timeline, publish health, and frequency templates.
 - `MauticInspiredInsightController` serves the suite under `/canvas/mautic-insights` without mutating delivery, audience, or policy state.

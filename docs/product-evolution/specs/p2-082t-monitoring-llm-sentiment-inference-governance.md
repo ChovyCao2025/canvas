@@ -9,9 +9,9 @@ Implementation plan: `../plans/p2-082t-monitoring-llm-sentiment-inference-govern
 
 Add a governed model-inference layer for already-ingested monitoring mentions so marketing operators can run LLM-style sentiment, entity, topic, and risk inference with tenant scoping, prompt/input hashes, fallback evidence, and auditable output without replacing the existing deterministic ingest-time sentiment path.
 
-## Delivery Status
+## Implementation Status
 
-Delivered backend first slice on 2026-06-06:
+Status: Delivered backend first slice on 2026-06-06.
 
 - Additive `marketing_monitor_inference` ledger for tenant-scoped item inference.
 - Service API that validates monitor-item tenant ownership, builds input/prompt hashes, runs an injectable generator, and persists normalized output.

@@ -5,6 +5,8 @@ Sequence: 082D2
 Parent: `p2-082-marketing-platform-gap-closure.md`
 Implementation plan: `../plans/p2-082d2-private-domain-contact-group-sync-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a production-usable private-domain sync foundation for SCRM contacts, relationship owners, customer groups, group members, sync runs, and audit evidence so the conversation workspace can operate on real WeCom/private-domain customer assets instead of only ad hoc conversation sessions.

@@ -34,13 +34,13 @@ public class TieredCacheAspect {
     private final SpelKeyEvaluator keyEvaluator;
 
     /**
-     * 执行 around Cached 对应的业务逻辑。
+     * 拦截 {@link TieredCached} 并执行声明式缓存读取。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     * <p>切面先计算 SpEL key 和 condition，再按返回类型处理同步值、Optional 和 Mono，未命中时执行原方法并按 unless/cacheNull 写回缓存。
      *
-     * @param pjp pjp 方法执行所需的业务参数
-     * @param annotation annotation 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param pjp 被拦截的业务方法调用
+     * @param annotation 缓存读取注解
+     * @return 缓存命中值或原方法执行结果
      */
     @Around("@annotation(annotation)")
     public Object aroundCached(ProceedingJoinPoint pjp, TieredCached annotation) {
@@ -95,13 +95,13 @@ public class TieredCacheAspect {
     }
 
     /**
-     * 执行 around Evict 对应的业务逻辑。
+     * 拦截 {@link TieredCacheEvict} 并执行声明式缓存失效。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>支持前置失效和后置失效；后置失效默认挂到事务提交后，避免事务回滚后缓存被错误清理。
      *
-     * @param pjp pjp 方法执行所需的业务参数
-     * @param annotation annotation 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param pjp 被拦截的业务方法调用
+     * @param annotation 缓存失效注解
+     * @return 原方法执行结果
      */
     @Around("@annotation(annotation)")
     public Object aroundEvict(ProceedingJoinPoint pjp, TieredCacheEvict annotation) {
@@ -119,13 +119,13 @@ public class TieredCacheAspect {
     }
 
     /**
-     * 执行 around Put 对应的业务逻辑。
+     * 拦截 {@link TieredCachePut} 并把方法返回值写入缓存。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>Optional 会写入其内部值或 null；Mono 会在元素产生时写入；普通返回值按 afterCommit 设置决定立即或提交后写入。
      *
-     * @param pjp pjp 方法执行所需的业务参数
-     * @param annotation annotation 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param pjp 被拦截的业务方法调用
+     * @param annotation 缓存写入注解
+     * @return 原方法执行结果
      */
     @Around("@annotation(annotation)")
     public Object aroundPut(ProceedingJoinPoint pjp, TieredCachePut annotation) {
@@ -148,15 +148,15 @@ public class TieredCacheAspect {
     }
 
     /**
-     * 判断 should Store 相关的业务数据。
+     * 判断目标方法返回值是否应写入缓存。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>null 结果先受 cacheNull 控制，再执行 unless 表达式；unless 为 true 表示跳过写回。
      *
-     * @param annotation annotation 方法执行所需的业务参数
-     * @param method method 方法执行所需的业务参数
-     * @param args args 方法执行所需的业务参数
-     * @param result result 方法执行所需的业务参数
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param annotation 缓存读取注解
+     * @param method 被拦截的方法
+     * @param args 方法实参数组
+     * @param result 目标方法返回值或 Mono 元素
+     * @return true 表示允许写入缓存
      */
     private boolean shouldStore(TieredCached annotation, Method method, Object[] args, Object result) {
         if (result == null && !annotation.cacheNull()) {
@@ -166,12 +166,12 @@ public class TieredCacheAspect {
     }
 
     /**
-     * 删除、清理或失效 evict Keys 相关的业务数据。
+     * 失效 SpEL 表达式解析出的一个或多个 key。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>表达式结果可以是单值、集合或数组；每个 key 都会进入缓存实现的完整失效链路。
      *
-     * @param cacheName cacheName 方法执行所需的业务参数
-     * @param keyExpressionValue keyExpressionValue 对应的缓存键、配置键或业务键
+     * @param cacheName 缓存实例名称
+     * @param keyExpressionValue SpEL 表达式解析结果
      */
     private void evictKeys(String cacheName, Object keyExpressionValue) {
         // key 表达式可返回单个 key、集合或数组，批量失效时逐项触发缓存实现的失效链路。
@@ -179,12 +179,12 @@ public class TieredCacheAspect {
     }
 
     /**
-     * 执行 keys 对应的业务逻辑。
+     * 将 key 表达式结果展开为 Stream。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>支持集合、对象数组和基本类型数组，方便一个注解同时失效多个业务 key。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 方法执行后的业务结果
+     * @param value key 表达式解析结果
+     * @return 待处理 key 的流
      */
     private Stream<?> keys(Object value) {
         if (value instanceof Collection<?> collection) {
@@ -203,16 +203,17 @@ public class TieredCacheAspect {
     }
 
     /**
-     * 执行 proceed 对应的业务逻辑。
+     * 执行原始业务方法并统一异常边界。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>运行时异常原样抛出，受检异常包装为 RuntimeException，便于缓存切面保持统一调用签名。
      *
-     * @param pjp pjp 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param pjp 被拦截的业务方法调用
+     * @return 原方法返回值
      */
     private Object proceed(ProceedingJoinPoint pjp) {
         try {
             return pjp.proceed();
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Throwable e) {
             if (e instanceof RuntimeException runtime) {
                 throw runtime;
@@ -222,17 +223,22 @@ public class TieredCacheAspect {
     }
 
     /**
-     * 执行 run After Commit 对应的业务逻辑。
+     * 根据注解配置决定立即执行缓存动作或延后到事务提交后。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>存在 Spring 事务同步且 afterCommit 为 true 时注册 afterCommit 回调，否则直接执行。
      *
-     * @param afterCommit afterCommit 方法执行所需的业务参数
-     * @param action action 方法执行所需的业务参数
+     * @param afterCommit 是否等待事务提交
+     * @param action 缓存写入或失效动作
      */
     private void runAfterCommit(boolean afterCommit, Runnable action) {
         if (afterCommit && TransactionSynchronizationManager.isSynchronizationActive()) {
             // 有事务同步时把缓存写入/失效挂到 afterCommit，避免事务回滚后缓存状态领先数据库。
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                /**
+                 * 在当前事务成功提交后执行缓存动作。
+                 *
+                 * <p>缓存写入或失效只在提交后发生，避免目标方法返回但事务最终回滚时污染 L1/L2。
+                 */
                 @Override
                 public void afterCommit() {
                     action.run();

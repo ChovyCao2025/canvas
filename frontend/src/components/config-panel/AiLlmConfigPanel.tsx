@@ -22,11 +22,12 @@ export interface AiLlmFormValues {
   templateId?: string | number
   modelKey?: string
   temperature?: number
+  maxTokens?: number
   timeoutMs?: number
   promptOverride?: string
+  schemaOverride?: string
   outputPrefix?: string
   nextNodeId?: string
-  failNodeId?: string
 }
 
 export function createAiLlmPatch(
@@ -34,10 +35,12 @@ export function createAiLlmPatch(
   values: AiLlmFormValues,
 ): Partial<CanvasNodeData> {
   const { name, ...bizValues } = values
+  const existingBizConfig = { ...(nodeData.bizConfig ?? {}) }
+  delete existingBizConfig.failNodeId
   return {
     ...(name !== undefined ? { name: String(name) } : {}),
     bizConfig: {
-      ...(nodeData.bizConfig ?? {}),
+      ...existingBizConfig,
       ...bizValues,
     },
   }
@@ -190,10 +193,16 @@ export default function AiLlmConfigPanel({
           <Form.Item name="temperature" label={label('温度')}>
             <InputNumber min={0} max={2} step={0.1} style={{ width: '100%', ...controlChrome }} />
           </Form.Item>
+          <Form.Item name="maxTokens" label={label('最大 Token')}>
+            <InputNumber min={1} max={8000} step={50} style={{ width: '100%', ...controlChrome }} />
+          </Form.Item>
           <Form.Item name="timeoutMs" label={label('超时毫秒')}>
             <InputNumber min={100} max={30000} step={100} style={{ width: '100%', ...controlChrome }} />
           </Form.Item>
           <Form.Item name="promptOverride" label={label('提示词覆盖')}>
+            <Input.TextArea rows={5} className="config-panel-ios-input" style={controlChrome} />
+          </Form.Item>
+          <Form.Item name="schemaOverride" label={label('输出 Schema 覆盖')}>
             <Input.TextArea rows={5} className="config-panel-ios-input" style={controlChrome} />
           </Form.Item>
           <Form.Item name="outputPrefix" label={label('输出前缀')}>
@@ -203,16 +212,6 @@ export default function AiLlmConfigPanel({
 
         <ConfigSectionCard title="出口路由" accentColor={accentColor}>
           <Form.Item name="nextNodeId" label={label('成功后')}>
-            <Select
-              className="config-panel-ios-select"
-              style={{ width: '100%' }}
-              options={nodeOptions}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-            />
-          </Form.Item>
-          <Form.Item name="failNodeId" label={label('失败后')}>
             <Select
               className="config-panel-ios-select"
               style={{ width: '100%' }}

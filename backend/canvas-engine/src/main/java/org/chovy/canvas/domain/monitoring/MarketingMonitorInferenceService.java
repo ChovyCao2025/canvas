@@ -30,6 +30,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+/**
+ * MarketingMonitorInferenceService 编排 domain.monitoring 场景的领域业务规则。
+ */
 @Service
 public class MarketingMonitorInferenceService {
 
@@ -55,6 +58,13 @@ public class MarketingMonitorInferenceService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    /**
+     * 创建 MarketingMonitorInferenceService 实例并注入 domain.monitoring 场景依赖。
+     * @param itemMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param inferenceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param generatorProvider generator provider 参数，用于 MarketingMonitorInferenceService 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public MarketingMonitorInferenceService(MarketingMonitorItemMapper itemMapper,
                                             MarketingMonitorInferenceMapper inferenceMapper,
@@ -66,6 +76,15 @@ public class MarketingMonitorInferenceService {
                 Clock.systemDefaultZone());
     }
 
+    /**
+     * 执行 MarketingMonitorInferenceService 流程，围绕 marketing monitor inference service 完成校验、计算或结果组装。
+     *
+     * @param itemMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param inferenceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param generator generator 参数，用于 MarketingMonitorInferenceService 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     MarketingMonitorInferenceService(MarketingMonitorItemMapper itemMapper,
                                      MarketingMonitorInferenceMapper inferenceMapper,
                                      MarketingMonitorInferenceGenerator generator,
@@ -78,6 +97,15 @@ public class MarketingMonitorInferenceService {
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
+    /**
+     * 执行业务操作 analyze，作为营销监控的服务入口。
+     * <p>调用方必须传入租户上下文或租户 ID，方法内的查询、写入和治理判断都限制在该租户范围内。
+     * 会通过 Mapper 写入、更新或关闭持久化记录。
+     * @param tenantId 租户 ID，所有查询和写入都限定在该租户数据范围内
+     * @param command 本次操作的业务请求参数，包含目标对象、状态或外部回调载荷
+     * @param actor 操作人标识，用于审计字段、状态流转记录或治理追踪
+     * @return 返回租户范围内的最新业务视图或持久化对象快照
+     */
     @Transactional(rollbackFor = Exception.class)
     public MarketingMonitorInferenceView analyze(Long tenantId,
                                                  MarketingMonitorInferenceCommand command,
@@ -105,6 +133,7 @@ public class MarketingMonitorInferenceService {
         if (!Boolean.TRUE.equals(command.forceFallback()) && generator != null) {
             try {
                 result = generator.generate(context);
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException ex) {
                 result = fallback(context, Map.of("generatorError", message(ex)));
             }
@@ -141,7 +170,16 @@ public class MarketingMonitorInferenceService {
         return toView(row);
     }
 
+    /**
+     * 查询业务列表，作为营销监控的服务入口。
+     * <p>调用方必须传入租户上下文或租户 ID，方法内的查询、写入和治理判断都限制在该租户范围内。
+     * 不直接修改业务状态，主要读取数据或执行本地规则计算。
+     * @param tenantId 租户 ID，所有查询和写入都限定在该租户数据范围内
+     * @param query query 参数，用于 list 流程中的校验、计算或对象转换。
+     * @return 返回按租户、状态和数量限制过滤后的视图列表；无数据时返回空列表
+     */
     public List<MarketingMonitorInferenceView> list(Long tenantId, MarketingMonitorInferenceQuery query) {
+        // 准备本次流程的上下文、默认值和中间结果。
         Long scopedTenantId = normalizeTenant(tenantId);
         MarketingMonitorInferenceQuery effectiveQuery = query == null
                 ? new MarketingMonitorInferenceQuery(null, null, null, null, null, 50)
@@ -150,6 +188,7 @@ public class MarketingMonitorInferenceService {
         String sentimentLabel = normalizeOptionalUpper(effectiveQuery.sentimentLabel());
         String modelKey = trimToNull(effectiveQuery.modelKey());
         String providerStatus = normalizeOptionalUpper(effectiveQuery.providerStatus());
+        // 访问持久化数据，读取现有配置或写入本次变更。
         List<MarketingMonitorInferenceDO> rows = safeList(inferenceMapper.selectList(
                 new LambdaQueryWrapper<MarketingMonitorInferenceDO>()
                         .eq(MarketingMonitorInferenceDO::getTenantId, scopedTenantId)
@@ -161,6 +200,7 @@ public class MarketingMonitorInferenceService {
                                 MarketingMonitorInferenceDO::getFallbackUsed, effectiveQuery.fallbackUsed())
                         .orderByDesc(MarketingMonitorInferenceDO::getCreatedAt)
                         .last("LIMIT " + limit)));
+        // 遍历候选记录并转换为前端或服务层需要的视图。
         return rows.stream()
                 .filter(row -> scopedTenantId.equals(row.getTenantId()))
                 .filter(row -> effectiveQuery.itemId() == null || effectiveQuery.itemId().equals(row.getItemId()))
@@ -174,6 +214,13 @@ public class MarketingMonitorInferenceService {
                 .toList();
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @param extraEvidence extra evidence 参数，用于 fallback 流程中的校验、计算或对象转换。
+     * @return 返回 fallback 流程生成的业务结果。
+     */
     private MarketingMonitorInferenceGenerationResult fallback(MarketingMonitorInferenceGenerationContext context,
                                                                Map<String, Object> extraEvidence) {
         MarketingMonitorItemDO item = context.item();
@@ -181,7 +228,19 @@ public class MarketingMonitorInferenceService {
         List<String> positive = matchedTerms(item.getTextContent(), POSITIVE_TERMS);
         int hits = negative.size() + positive.size();
         BigDecimal score = hits == 0
+                /**
+                 * 执行 scaled 流程，围绕 scaled 完成校验、计算或结果组装。
+                 *
+                 * @param hits hits 参数，用于 scaled 流程中的校验、计算或对象转换。
+                 * @return 返回 scaled 流程生成的业务结果。
+                 */
                 ? scaled(0)
+                /**
+                 * 执行 scaled 流程，围绕 scaled 完成校验、计算或结果组装。
+                 *
+                 * @param hits hits 参数，用于 scaled 流程中的校验、计算或对象转换。
+                 * @return 返回 scaled 流程生成的业务结果。
+                 */
                 : scaled((positive.size() - negative.size()) / (double) hits);
         String label = score.compareTo(BigDecimal.ZERO) < 0
                 ? "NEGATIVE"
@@ -212,6 +271,12 @@ public class MarketingMonitorInferenceService {
                 1L);
     }
 
+    /**
+     * 执行 inputContext 流程，围绕 input context 完成校验、计算或结果组装。
+     *
+     * @param item item 参数，用于 inputContext 流程中的校验、计算或对象转换。
+     * @return 返回 inputContext 流程生成的业务结果。
+     */
     private Map<String, Object> inputContext(MarketingMonitorItemDO item) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("itemId", item.getId());
@@ -228,6 +293,13 @@ public class MarketingMonitorInferenceService {
         return result;
     }
 
+    /**
+     * 执行 promptContext 流程，围绕 prompt context 完成校验、计算或结果组装。
+     *
+     * @param item item 参数，用于 promptContext 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回 promptContext 流程生成的业务结果。
+     */
     private Map<String, Object> promptContext(MarketingMonitorItemDO item,
                                               MarketingMonitorInferenceCommand command) {
         Map<String, Object> result = new LinkedHashMap<>(inputContext(item));
@@ -237,6 +309,12 @@ public class MarketingMonitorInferenceService {
         return result;
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param item item 参数，用于 fallbackEntities 流程中的校验、计算或对象转换。
+     * @return 返回 fallbackEntities 流程生成的业务结果。
+     */
     private List<Map<String, Object>> fallbackEntities(MarketingMonitorItemDO item) {
         if (!hasText(item.getBrandKey())) {
             return List.of();
@@ -247,9 +325,17 @@ public class MarketingMonitorInferenceService {
                 "sentiment", "UNKNOWN"));
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param item item 参数，用于 fallbackTopics 流程中的校验、计算或对象转换。
+     * @return 返回 fallback topics 汇总后的集合、分页或映射视图。
+     */
     private List<String> fallbackTopics(MarketingMonitorItemDO item) {
+        // 准备本次处理所需的上下文和中间变量。
         String text = lower(item.getTextContent());
         LinkedHashSet<String> topics = new LinkedHashSet<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (containsAny(text, "refund", "chargeback", "退款")) {
             topics.add("refund");
         }
@@ -259,12 +345,21 @@ public class MarketingMonitorInferenceService {
         if (containsAny(text, "support", "service", "客服")) {
             topics.add("support");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ArrayList<>(topics);
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param text text 参数，用于 fallbackRiskFlags 流程中的校验、计算或对象转换。
+     * @return 返回 fallback risk flags 汇总后的集合、分页或映射视图。
+     */
     private List<String> fallbackRiskFlags(String text) {
+        // 准备本次处理所需的上下文和中间变量。
         String scopedText = lower(text);
         LinkedHashSet<String> flags = new LinkedHashSet<>();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (containsAny(scopedText, "refund", "chargeback", "退款", "退费")) {
             flags.add("SENSITIVE_REFUND");
         }
@@ -280,10 +375,18 @@ public class MarketingMonitorInferenceService {
         if (containsAny(scopedText, "complaint", "angry", "投诉", "不满")) {
             flags.add("SENSITIVE_COMPLAINT");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ArrayList<>(flags);
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private MarketingMonitorInferenceView toView(MarketingMonitorInferenceDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new MarketingMonitorInferenceView(
                 row.getId(),
                 row.getTenantId(),
@@ -307,64 +410,109 @@ public class MarketingMonitorInferenceService {
                 row.getLatencyMs() == null ? 0L : row.getLatencyMs(),
                 row.getRequestedBy(),
                 row.getCreatedAt(),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 row.getUpdatedAt());
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("marketing monitor inference JSON serialization failed", ex);
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (!hasText(json)) {
             return Map.of();
         }
         try {
             return objectMapper.readValue(json, OBJECT_MAP);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return Map.of();
         }
     }
 
+    /**
+     * 执行 entities 流程，围绕 entities 完成校验、计算或结果组装。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 entities 流程生成的业务结果。
+     */
     private List<Map<String, Object>> entities(String json) {
         if (!hasText(json)) {
             return List.of();
         }
         try {
             return objectMapper.readValue(json, ENTITY_LIST);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return List.of();
         }
     }
 
+    /**
+     * 执行 strings 流程，围绕 strings 完成校验、计算或结果组装。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 strings 汇总后的集合、分页或映射视图。
+     */
     private List<String> strings(String json) {
         if (!hasText(json)) {
             return List.of();
         }
         try {
             return objectMapper.readValue(json, STRING_LIST);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return List.of();
         }
     }
 
+    /**
+     * 执行 sha256 流程，围绕 sha256 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 sha256 生成的文本或业务键。
+     */
     private String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(defaultString(value, "").getBytes(StandardCharsets.UTF_8)));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is not available", ex);
         }
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param text text 参数，用于 matchedTerms 流程中的校验、计算或对象转换。
+     * @param terms terms 参数，用于 matchedTerms 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private List<String> matchedTerms(String text, List<String> terms) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!hasText(text) || terms == null || terms.isEmpty()) {
             return List.of();
         }
         LinkedHashSet<String> matches = new LinkedHashSet<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (String term : terms) {
             if (!hasText(term)) {
                 continue;
@@ -377,9 +525,17 @@ public class MarketingMonitorInferenceService {
                 matches.add(trimmed);
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return List.copyOf(matches);
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param text text 参数，用于 fallbackConfidence 流程中的校验、计算或对象转换。
+     * @param hits hits 参数，用于 fallbackConfidence 流程中的校验、计算或对象转换。
+     * @return 返回 fallback confidence 计算得到的数量、金额或指标值。
+     */
     private BigDecimal fallbackConfidence(String text, int hits) {
         if (!hasText(text)) {
             return scaled(0.2);
@@ -391,33 +547,64 @@ public class MarketingMonitorInferenceService {
         return clamped(BigDecimal.valueOf(value), 0, 1, 5);
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param String string 参数，用于 safeEntities 流程中的校验、计算或对象转换。
+     * @param values values 参数，用于 safeEntities 流程中的校验、计算或对象转换。
+     * @return 返回 safeEntities 流程生成的业务结果。
+     */
     private List<Map<String, Object>> safeEntities(List<Map<String, Object>> values) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (values == null || values.isEmpty()) {
             return List.of();
         }
         List<Map<String, Object>> result = new ArrayList<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map<String, Object> value : values) {
             if (value != null && !value.isEmpty()) {
                 result.add(new LinkedHashMap<>(value));
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return result;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param values values 参数，用于 safeStrings 流程中的校验、计算或对象转换。
+     * @return 返回 safe strings 汇总后的集合、分页或映射视图。
+     */
     private List<String> safeStrings(List<String> values) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (values == null || values.isEmpty()) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return values.stream()
                 .filter(this::hasText)
                 .map(String::trim)
                 .toList();
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param String string 参数，用于 safeMap 流程中的校验、计算或对象转换。
+     * @param values values 参数，用于 safeMap 流程中的校验、计算或对象转换。
+     * @return 返回 safeMap 流程生成的业务结果。
+     */
     private Map<String, Object> safeMap(Map<String, Object> values) {
         return values == null || values.isEmpty() ? Map.of() : new LinkedHashMap<>(values);
     }
 
+    /**
+     * 执行 riskFlags 流程，围绕 risk flags 完成校验、计算或结果组装。
+     *
+     * @param values values 参数，用于 riskFlags 流程中的校验、计算或对象转换。
+     * @return 返回 risk flags 汇总后的集合、分页或映射视图。
+     */
     private List<String> riskFlags(List<String> values) {
         LinkedHashSet<String> flags = new LinkedHashSet<>();
         for (String value : values == null ? List.<String>of() : values) {
@@ -429,6 +616,12 @@ public class MarketingMonitorInferenceService {
         return new ArrayList<>(flags);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeRiskFlag(String value) {
         if (!hasText(value)) {
             return "";
@@ -439,6 +632,13 @@ public class MarketingMonitorInferenceService {
                 .replaceAll("^_+|_+$", "");
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param score score 参数，用于 normalizeSentiment 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeSentiment(String value, BigDecimal score) {
         String label = normalizeOptionalUpper(value);
         if (label != null && SENTIMENT_LABELS.contains(label)) {
@@ -450,10 +650,25 @@ public class MarketingMonitorInferenceService {
                 : boundedScore.compareTo(BigDecimal.ZERO) > 0 ? "POSITIVE" : "NEUTRAL";
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeStatus(String status) {
         return defaultString(normalizeOptionalUpper(status), "UNKNOWN");
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param min min 参数，用于 clamped 流程中的校验、计算或对象转换。
+     * @param max max 参数，用于 clamped 流程中的校验、计算或对象转换。
+     * @param scale scale 参数，用于 clamped 流程中的校验、计算或对象转换。
+     * @return 返回 clamped 计算得到的数量、金额或指标值。
+     */
     private BigDecimal clamped(BigDecimal value, int min, int max, int scale) {
         BigDecimal effective = value == null ? BigDecimal.ZERO : value;
         if (effective.compareTo(BigDecimal.valueOf(min)) < 0) {
@@ -465,14 +680,33 @@ public class MarketingMonitorInferenceService {
         return effective.setScale(scale, RoundingMode.HALF_UP);
     }
 
+    /**
+     * 执行 scaled 流程，围绕 scaled 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 scaled 计算得到的数量、金额或指标值。
+     */
     private BigDecimal scaled(double value) {
         return BigDecimal.valueOf(value).setScale(5, RoundingMode.HALF_UP);
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required id 计算得到的数量、金额或指标值。
+     */
     private Long requiredId(Long value, String field) {
         if (value == null) {
             throw new IllegalArgumentException(field + " is required");
@@ -480,30 +714,73 @@ public class MarketingMonitorInferenceService {
         return value;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOptionalUpper(String value) {
         return hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : null;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String trimToNull(String value) {
         return hasText(value) ? value.trim() : null;
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private String defaultString(String value, String fallback) {
         return hasText(value) ? value.trim() : fallback;
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 enabled 的布尔判断结果。
+     */
     private boolean enabled(Boolean value) {
         return Boolean.TRUE.equals(value);
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundedLimit(int limit) {
         if (limit < 1) {
             return 1;
@@ -511,14 +788,33 @@ public class MarketingMonitorInferenceService {
         return Math.min(limit, 100);
     }
 
+    /**
+     * 执行 lower 流程，围绕 lower 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 lower 生成的文本或业务键。
+     */
     private String lower(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 执行 dateTime 流程，围绕 date time 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 date time 生成的文本或业务键。
+     */
     private String dateTime(LocalDateTime value) {
         return value == null ? null : value.toString();
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param text text 参数，用于 containsAny 流程中的校验、计算或对象转换。
+     * @param terms terms 参数，用于 containsAny 流程中的校验、计算或对象转换。
+     * @return 返回 contains any 的布尔判断结果。
+     */
     private boolean containsAny(String text, String... terms) {
         String value = text == null ? "" : text;
         for (String term : terms) {
@@ -529,6 +825,12 @@ public class MarketingMonitorInferenceService {
         return false;
     }
 
+    /**
+     * 执行 message 流程，围绕 message 完成校验、计算或结果组装。
+     *
+     * @param throwable throwable 参数，用于 message 流程中的校验、计算或对象转换。
+     * @return 返回 message 生成的文本或业务键。
+     */
     private String message(Throwable throwable) {
         if (throwable == null) {
             return "";
@@ -537,6 +839,11 @@ public class MarketingMonitorInferenceService {
         return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
     }
 
+    /**
+     * 执行 now 流程，围绕 now 完成校验、计算或结果组装。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }

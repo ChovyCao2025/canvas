@@ -53,6 +53,13 @@ public class PointsOperationHandler implements NodeHandler {
                 .onErrorResume(e -> Mono.just(NodeResult.fail("POINTS_OPERATION: " + e.getMessage())));
     }
 
+    /**
+     * 同步执行积分流水写入。
+     *
+     * @param config 节点配置
+     * @param ctx 执行上下文
+     * @return 节点执行结果
+     */
     private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         String idempotencyKey = string(config, "idempotencyKey",
                 ctx.getExecutionId() + ":" + string(config, "__nodeId", "points"));
@@ -77,6 +84,7 @@ public class PointsOperationHandler implements NodeHandler {
         ledger.setCreatedAt(LocalDateTime.now());
         try {
             ledgerService.insert(ledger);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DuplicateKeyException e) {
             return NodeResult.ok(string(config, "nextNodeId", null),
                     Map.of(MapFieldKeys.DUPLICATE, true, "idempotent", true));
@@ -90,22 +98,37 @@ public class PointsOperationHandler implements NodeHandler {
     }
 
     /**
-     * 判断 is Benefit Node 相关的业务数据。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * isBenefitNode 校验或转换 engine.handlers 场景的数据。
+     * @return 返回布尔判断结果。
      */
     @Override
     public boolean isBenefitNode() {
         return true;
     }
 
+    /**
+     * 声明积分节点会写入积分流水并产生权益副作用，需要节点级幂等保护。
+     *
+     * <p>重复执行时调度层可复用已完成输出，避免重复插入积分流水；节点内部也会按流水幂等键兜底查重。
+     *
+     * @param config 当前积分节点配置，包含操作类型、积分数和幂等键
+     * @param ctx 画布执行上下文
+     * @return 始终为 {@code true}
+     */
     @Override
     public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
         return true;
     }
 
+    /**
+     * 构造积分操作的副作用操作键。
+     *
+     * <p>优先使用显式幂等键；未配置时按用户、操作类型和积分数量生成稳定键，决定重复执行时是否跳过积分流水写入。
+     *
+     * @param config 当前积分节点配置，读取 {@code idempotencyKey}、operation 和 points
+     * @param ctx 画布执行上下文，读取用户 ID
+     * @return 用于节点副作用幂等表的业务操作键
+     */
     @Override
     public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
         Object explicit = config.get("idempotencyKey");
@@ -114,33 +137,40 @@ public class PointsOperationHandler implements NodeHandler {
         }
         return ctx.getUserId()
                 + ":points:"
+                /**
+                 * 执行 string 流程，围绕 string 完成校验、计算或结果组装。
+                 *
+                 * @param config 配置对象，用于控制运行参数和策略开关。
+                 * @return 返回 string 流程生成的业务结果。
+                 */
                 + string(config, "operation", "GRANT")
                 + ":"
+                /**
+                 * 执行 number 流程，围绕 number 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 number 流程生成的业务结果。
+                 */
                 + number(config.get("points"), 0);
     }
 
     /**
-     * 执行 number 对应的业务逻辑。
+     * 将对象转换为整数。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 计算得到的数值结果
+     * @param value 原始值
+     * @param fallback 默认值
+     * @return 整数值或默认值
      */
     private int number(Object value, int fallback) {
         return value instanceof Number number ? number.intValue() : fallback;
     }
 
     /**
-     * 执行 string 对应的业务逻辑。
+     * 读取字符串配置。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param config 节点配置或业务配置，方法会从中读取执行参数
-     * @param key key 对应的缓存键、配置键或业务键
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param config 节点配置
+     * @param key 配置 key
+     * @param fallback 默认值
+     * @return 字符串值或默认值
      */
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);

@@ -11,7 +11,7 @@ Expose webhook subscription management, secret rotation, test delivery, and deli
 
 ## Current Baseline
 
-- Implemented and merged into `main` on 2026-06-05.
+- Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - P1-005B adds schema, validation, and signing.
 - P1-005B2 adds dispatcher and delivery logs.
 - Webhook management is available at `/webhook-subscriptions` for administrators.
@@ -55,7 +55,7 @@ Expose webhook subscription management, secret rotation, test delivery, and deli
 
 ## Implementation Status
 
-- Status: implemented and merged into `main` on 2026-06-05.
+- Status: implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - Backend: added `WebhookSubscriptionController` with list/create/update/pause/resume/disable/rotate/test-delivery/delivery-log endpoints under `/cdp/webhooks`.
 - Frontend: added webhook API helpers, status/secret presentation helpers, `/webhook-subscriptions` operator page, admin route, and side-nav entry.
 - Production compile: `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.

@@ -30,7 +30,7 @@ The capabilities that remain partial or absent are not equal in urgency. The pro
   - https://developers.google.com/google-ads/api/docs/remarketing/audience-segments/customer-match
   - https://developers.facebook.com/docs/marketing-api/audiences/guides/custom-audiences
 
-## Delivery Status
+## Implementation Status
 
 Implemented and verified backend slices:
 

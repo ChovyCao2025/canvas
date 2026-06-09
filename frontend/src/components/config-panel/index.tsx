@@ -42,7 +42,19 @@ import {
 import AiLlmConfigPanel from './AiLlmConfigPanel'
 
 /** API 参数定义的最小形态，用于事件属性预览等只读控件。 */
-interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
+interface ApiParamDef {
+  /** 参数字段名，对应运行时上下文或请求体 key。 */
+  name: string
+
+  /** 参数展示名。 */
+  displayName: string
+
+  /** 参数类型编码。 */
+  type: string
+
+  /** 是否必填。 */
+  required: boolean
+}
 
 /** 配置面板内常用文本组件别名。 */
 const { Text } = Typography
@@ -87,6 +99,7 @@ function isBlankDependencyValue(value: unknown): boolean {
   return value == null || (typeof value === 'string' && value.trim() === '')
 }
 
+/** 把后端字符串日期转换成 DatePicker 可识别的 dayjs 值。 */
 function toDatePickerValue(value: unknown) {
   if (value == null || value === '') return value
   if (dayjs.isDayjs(value)) return value
@@ -94,6 +107,7 @@ function toDatePickerValue(value: unknown) {
   return parsed.isValid() ? parsed : null
 }
 
+/** 把 DatePicker 值转换成后端保存使用的日期时间字符串。 */
 function fromDatePickerValue(value: unknown): string | undefined {
   if (value == null || value === '') return undefined
   if (dayjs.isDayjs(value)) return value.format('YYYY-MM-DDTHH:mm:ss')
@@ -535,6 +549,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
 }
 
 // ── visible 条件评估（设计文档 config_schema 规范）─────────────────
+/** 评估 schema visible/showWhen 的轻量表达式，控制配置项是否显示。 */
 function evaluateVisible(visible: string | undefined, values: Record<string, unknown>): boolean {
   if (!visible) return true
   // 支持：fieldName==value、fieldName!=value、fieldName==true
@@ -680,8 +695,16 @@ function renderControl(
   }
 }
 
-interface JsonPathMappingItem { path: string; outputKey: string }
+/** JSONPath 到上下文输出字段的单条映射。 */
+interface JsonPathMappingItem {
+  /** 从响应 JSON 中读取值的 JSONPath。 */
+  path: string
 
+  /** 写入上下文的输出字段名。 */
+  outputKey: string
+}
+
+/** Connected Content 等节点的 JSONPath 映射列表控件。 */
 function JsonPathMappingList({ fieldKey, applyFormPatch }: {
   fieldKey: string
   applyFormPatch: (patch: Record<string, unknown>) => void
@@ -690,6 +713,7 @@ function JsonPathMappingList({ fieldKey, applyFormPatch }: {
   const items: JsonPathMappingItem[] = Form.useWatch(fieldKey, form) ?? []
   const inlineChrome = getInlineControlChrome()
 
+  /** 提交完整映射列表，保证 Form 和节点 bizConfig 同步。 */
   const commit = (next: JsonPathMappingItem[]) => {
     form.setFieldValue(fieldKey, next)
     applyFormPatch({ [fieldKey]: next })
@@ -734,17 +758,33 @@ function JsonPathMappingList({ fieldKey, applyFormPatch }: {
   )
 }
 
+/** 用户输入节点中单个可填写字段的定义。 */
 interface UserInputFieldItem {
+  /** 表单字段 key。 */
   key: string
+
+  /** 用户可见标签。 */
   label: string
+
+  /** 输入类型。 */
   type: string
+
+  /** 是否必填。 */
   required?: boolean
+
+  /** 输入占位提示。 */
   placeholder?: string
 }
 
+/** 事件过滤器中单条条件的表单形态。 */
 interface EventFilterItem {
+  /** 待比较的事件字段。 */
   field: string
+
+  /** 比较操作符。 */
   operator: string
+
+  /** 比较值；in 操作符用逗号分隔。 */
   value: string
 }
 
@@ -767,6 +807,7 @@ const USER_INPUT_FIELD_TYPES = [
   { label: '日期', value: 'date' },
 ]
 
+/** 用户输入字段列表控件，维护 USER_INPUT 节点的动态表单定义。 */
 function UserInputFieldList({ fieldKey, applyFormPatch }: {
   fieldKey: string
   applyFormPatch: (patch: Record<string, unknown>) => void
@@ -775,6 +816,7 @@ function UserInputFieldList({ fieldKey, applyFormPatch }: {
   const items: UserInputFieldItem[] = Form.useWatch(fieldKey, form) ?? []
   const inlineChrome = getInlineControlChrome()
 
+  /** 写回完整字段列表，避免只保存单个子字段。 */
   const commit = (next: UserInputFieldItem[]) => {
     form.setFieldValue(fieldKey, next)
     applyFormPatch({ [fieldKey]: next })
@@ -850,6 +892,7 @@ function UserInputFieldList({ fieldKey, applyFormPatch }: {
   )
 }
 
+/** 事件过滤条件构建器，把用户编辑的行列表转换成后端 filters 对象。 */
 function EventFilterBuilder({ fieldKey, ctxFields, applyFormPatch }: {
   fieldKey: string
   ctxFields: ContextField[]
@@ -883,6 +926,7 @@ function EventFilterBuilder({ fieldKey, ctxFields, applyFormPatch }: {
     ? attrs.map(attr => ({ label: attr.displayName || attr.name, value: attr.name }))
     : ctxFields.map(field => ({ label: field.fieldName, value: field.fieldKey }))
 
+  /** 将行式编辑结果转换成 filters 对象并同步到表单。 */
   const commit = (nextItems: EventFilterItem[]) => {
     const next = itemsToFilters(nextItems)
     form.setFieldValue(fieldKey, next)
@@ -941,6 +985,7 @@ function EventFilterBuilder({ fieldKey, ctxFields, applyFormPatch }: {
   )
 }
 
+/** 把后端 filters 对象转换成适合列表编辑的数组。 */
 function filtersToItems(filters: Record<string, unknown> | undefined): EventFilterItem[] {
   if (!filters || typeof filters !== 'object') return []
   return Object.entries(filters).map(([field, rule]) => {
@@ -956,6 +1001,7 @@ function filtersToItems(filters: Record<string, unknown> | undefined): EventFilt
   })
 }
 
+/** 把列表编辑结果还原成后端 filters 对象。 */
 function itemsToFilters(items: EventFilterItem[]): Record<string, unknown> {
   const filters: Record<string, unknown> = {}
   items
@@ -972,17 +1018,38 @@ function itemsToFilters(items: EventFilterItem[]): Record<string, unknown> {
 
 // ── 条件规则列表控件（IF判断 / MQ_TRIGGER 等）─────────
 interface SharedConfigOptions {
+  /** 条件操作符选项。 */
   conditionOps: { label: string; value: string }[]
+
+  /** 上下文取值类型选项。 */
   contextValueTypes: { label: string; value: string }[]
+
+  /** 参数类型选项。 */
   paramTypes: { label: string; value: string }[]
+
+  /** 延迟单位选项。 */
   delayUnits: { label: string; value: string }[]
+
+  /** cron 频率选项。 */
   cronFrequencies: { label: string; value: string }[]
+
+  /** 星期选项。 */
   weekdays: { label: string; value: number }[]
 }
 
 /** 条件规则配置项，表示单条字段比较表达式。 */
 interface ConditionRule {
-  field: string; operator: string; value: string; isCustom: boolean
+  /** 被比较的上下文字段。 */
+  field: string
+
+  /** 比较操作符。 */
+  operator: string
+
+  /** 比较值或 ${contextKey} 引用。 */
+  value: string
+
+  /** 是否为用户自定义条件。 */
+  isCustom: boolean
 }
 
 /** 条件规则列表字段名兜底，兼容旧 schema 未显式指定 key 的情况。 */
@@ -1061,7 +1128,17 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
 }
 
 // ── 上下文引用值列表控件（SEND_MESSAGE / GROOVY inputParams 等）─
-interface ContextValueItem { name: string; valueType: 'CUSTOM' | 'CONTEXT'; value: string }
+/** 上下文值映射项，可写固定值或引用已有上下文字段。 */
+interface ContextValueItem {
+  /** 写入目标字段名。 */
+  name: string
+
+  /** 取值类型：固定值或上下文引用。 */
+  valueType: 'CUSTOM' | 'CONTEXT'
+
+  /** 固定值或 ${contextKey}。 */
+  value: string
+}
 
 /** 上下文引用值列表，支持固定值和 ${contextKey} 两种来源。 */
 function ContextValueList({ ctxFields, valueTypeOptions, fieldKey }: {
@@ -1126,7 +1203,20 @@ function ContextValueList({ ctxFields, valueTypeOptions, fieldKey }: {
 }
 
 // ── 参数定义列表控件（DIRECT_CALL inputParams / GROOVY outputParams）
-interface ParamDef { name: string; description?: string; dataType: string; required?: boolean }
+/** 参数定义项，用于声明节点输入或输出参数。 */
+interface ParamDef {
+  /** 参数名。 */
+  name: string
+
+  /** 参数说明。 */
+  description?: string
+
+  /** 参数类型编码。 */
+  dataType: string
+
+  /** 是否必填。 */
+  required?: boolean
+}
 
 /** 参数定义列表控件，用于直调和脚本类节点声明输入/输出参数。 */
 function ParamDefineList({ paramTypeOptions }: { paramTypeOptions: { label: string; value: string }[] }) {
@@ -1167,7 +1257,14 @@ function ParamDefineList({ paramTypeOptions }: { paramTypeOptions: { label: stri
 }
 
 // ── 广播分支控件（broadcast-branch-list）────────────────────────────
-interface BroadcastBranchItem { label: string; nextNodeId?: string }
+/** 广播分支配置项。 */
+interface BroadcastBranchItem {
+  /** 分支展示名。 */
+  label: string
+
+  /** 分支后继节点 ID，由连线写回。 */
+  nextNodeId?: string
+}
 
 /** 多下游广播分支；后继节点由画布连线写回 nextNodeId。 */
 function BroadcastBranchList({ onBranchesChange }: { onBranchesChange: (branches: BroadcastBranchItem[]) => void }) {
@@ -1222,10 +1319,19 @@ function BroadcastBranchList({ onBranchesChange }: { onBranchesChange: (branches
 
 // ── SPLIT 分支控件（split-branch-list）────────────────────────────
 interface SplitBranchItem {
+  /** 分支稳定 ID。 */
   branchId?: string
+
+  /** 历史数据兼容 ID。 */
   id?: string
+
+  /** 分支展示名。 */
   label?: string
+
+  /** 分流权重。 */
   weight?: number
+
+  /** 分支后继节点 ID，由连线写回。 */
   nextNodeId?: string
 }
 
@@ -1371,12 +1477,47 @@ function CanvasSelector() {
 
 /** 后端 configSchema 中单个表单字段的前端可用子集。 */
 interface SchemaField {
-  key: string; label: string; type: string
-  required?: boolean; options?: any[]; dataSource?: string; optionCategory?: string
-  visible?: string; showWhen?: string; defaultValue?: unknown
-  hint?: string; icon?: string          // edge-hint 使用
-  apiKeyField?: string                   // api-input-params 使用，默认 apiKey
-  defsSource?: string                    // api-input-params 使用，默认 /meta/api-definitions
+  /** bizConfig 中的字段 key。 */
+  key: string
+
+  /** 表单展示标签。 */
+  label: string
+
+  /** 控件类型。 */
+  type: string
+
+  /** 是否必填。 */
+  required?: boolean
+
+  /** 静态选项。 */
+  options?: any[]
+
+  /** 远程选项数据源，可包含 {field} 依赖模板。 */
+  dataSource?: string
+
+  /** 系统字典分类。 */
+  optionCategory?: string
+
+  /** 显示条件表达式。 */
+  visible?: string
+
+  /** 兼容旧 schema 的显示条件表达式。 */
+  showWhen?: string
+
+  /** 默认值。 */
+  defaultValue?: unknown
+
+  /** 辅助提示文案。 */
+  hint?: string
+
+  /** edge-hint 使用的图标标记。 */
+  icon?: string
+
+  /** api-input-params 依赖的接口字段名，默认 apiKey。 */
+  apiKeyField?: string
+
+  /** api-input-params 的定义数据源，默认 /meta/api-definitions。 */
+  defsSource?: string
 }
 
 /** 安全解析后端 configSchema，解析失败时按空 schema 处理。 */
@@ -1384,16 +1525,42 @@ function parseSchema(raw: string | undefined): SchemaField[] {
   try { return raw ? JSON.parse(raw) : [] } catch { return [] }
 }
 
+const RISK_DECISION_FALLBACK_SCHEMA: SchemaField[] = [
+  { key: 'sceneKey', label: '场景 Key', type: 'text', required: true },
+  { key: 'subjectMapping', label: '主体映射', type: 'key-value', required: true },
+  { key: 'eventMapping', label: '事件映射', type: 'key-value', required: true },
+  { key: 'contextMapping', label: '上下文映射', type: 'key-value' },
+  { key: 'actionRoutes', label: '动作路由', type: 'key-value', required: true },
+  {
+    key: 'failPolicy',
+    label: '失败策略',
+    type: 'select',
+    required: true,
+    options: [
+      { label: 'Fail Open', value: 'FAIL_OPEN' },
+      { label: 'Fail Review', value: 'FAIL_REVIEW' },
+      { label: 'Fail Closed', value: 'FAIL_CLOSED' },
+    ],
+    defaultValue: 'FAIL_REVIEW',
+  },
+  { key: 'timeoutMs', label: '超时毫秒', type: 'number', required: true, defaultValue: 50 },
+  { key: 'includeTrace', label: '包含追踪', type: 'toggle', defaultValue: false },
+]
+
+/** 过滤当前节点真正需要渲染的 schema 字段。 */
 function getRenderableSchemaFields(raw: string | undefined, nodeType: string): SchemaField[] {
   const fields = parseSchema(raw)
+  if (nodeType === 'RISK_DECISION' && fields.length === 0) return RISK_DECISION_FALLBACK_SCHEMA
   if (nodeType !== 'SCHEDULED_TRIGGER') return fields
   return fields.filter(field => field.key !== 'userSource' && field.type !== 'user-source-config')
 }
 
+/** 判断字段是否支持插入变量 token。 */
 function supportsVariablePicker(field: SchemaField): boolean {
   return field.type === 'text' || field.type === 'multi-text'
 }
 
+/** 把 React Flow 节点转换成变量可用性模块需要的节点结构。 */
 function buildVariableAvailabilityNodes(
   nodes: Node<CanvasNodeData>[] | undefined,
   ctxFields: ContextField[],
@@ -1406,10 +1573,12 @@ function buildVariableAvailabilityNodes(
   }))
 }
 
+/** 根据节点类型提取该节点会产出的上下文变量。 */
 export function getNodeVariableOutputs(node: Node<CanvasNodeData>, ctxFields: ContextField[]): VariableField[] {
   const config = node.data.bizConfig ?? {}
   if (node.data.nodeType === 'API_CALL') {
     const outputPrefix = typeof config.outputPrefix === 'string' ? config.outputPrefix.trim() : ''
+    // API_CALL 的可用输出来自后端上下文字段定义，并按 outputPrefix 收窄。
     return ctxFields
       .filter(field => field.sourceNodeType === 'API_CALL')
       .filter(field => !outputPrefix || field.fieldKey.startsWith(`${outputPrefix}.`))
@@ -1417,6 +1586,7 @@ export function getNodeVariableOutputs(node: Node<CanvasNodeData>, ctxFields: Co
   }
 
   if (node.data.nodeType === 'GROOVY' && Array.isArray(config.outputParams)) {
+    // GROOVY 输出由用户在参数定义列表中声明。
     return config.outputParams
       .map((param): VariableField | null => {
         if (!param || typeof param !== 'object') return null
@@ -1466,6 +1636,7 @@ export function getNodeVariableOutputs(node: Node<CanvasNodeData>, ctxFields: Co
   return []
 }
 
+/** 从任意 bizConfig 结构中递归提取 xxxNodeId 后继引用。 */
 function getNodeTargetIds(config: Record<string, unknown> | undefined): string[] {
   const targets = new Set<string>()
   const visit = (value: unknown, key?: string) => {
@@ -1488,6 +1659,7 @@ function getNodeTargetIds(config: Record<string, unknown> | undefined): string[]
   return [...targets]
 }
 
+/** 把后端上下文字段转换为变量字段结构。 */
 function contextFieldToVariableField(field: ContextField): VariableField {
   return {
     fieldKey: field.fieldKey,
@@ -1495,14 +1667,17 @@ function contextFieldToVariableField(field: ContextField): VariableField {
   }
 }
 
+/** 判断是否为用户画像字段。 */
 function isProfileContextField(field: ContextField): boolean {
   return field.fieldKey.startsWith('profile.')
 }
 
+/** 判断是否为计算字段。 */
 function isComputedContextField(field: ContextField): boolean {
   return field.fieldKey.startsWith('computed.')
 }
 
+/** 判断是否为触发事件字段；API_CALL 输出不归入触发字段。 */
 function isTriggerContextField(field: ContextField): boolean {
   return !isProfileContextField(field) &&
     !isComputedContextField(field) &&
@@ -1644,6 +1819,7 @@ function DelayInput({
   )
 }
 
+/** 兼容对象格式的时长控件，读写 { value, unit } 结构。 */
 function DurationObjectInput({ fieldKey, unitOptions, applyFormPatch }: {
   fieldKey: string
   unitOptions: { label: string; value: string }[]
@@ -1672,6 +1848,7 @@ function DurationObjectInput({ fieldKey, unitOptions, applyFormPatch }: {
   })
 
   const commit = (patch: Record<string, unknown>) => {
+    // 保留历史字段并覆盖当前编辑字段，兼容 durationValue/durationUnit 旧结构。
     const next = { value, unit, ...(rawValue ?? {}), ...patch }
     form.setFieldValue(fieldKey, next)
     applyFormPatch({ [fieldKey]: next })

@@ -87,11 +87,30 @@ public class SendMqHandler implements NodeHandler {
                 });
     }
 
+    /**
+     * 声明 SEND_MQ 节点会产生外部 MQ 投递副作用，调度层需要先占用节点副作用幂等记录。
+     *
+     * <p>返回 {@code true} 后，同一执行上下文、节点和操作键重复进入时会复用已完成输出，避免重复发送 RocketMQ 消息。
+     *
+     * @param config 当前节点配置，主要读取显式幂等键和消息编码
+     * @param ctx 画布执行上下文，提供租户、执行实例和用户维度
+     * @return 始终为 {@code true}，表示本节点必须走副作用幂等保护
+     */
     @Override
     public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
         return true;
     }
 
+    /**
+     * 构造 SEND_MQ 副作用操作键。
+     *
+     * <p>优先使用节点配置中的显式幂等键；未配置时按用户和 {@code messageCodeKey} 生成稳定键，调度层再结合执行实例、
+     * 节点 ID 和节点类型计算最终哈希键。该键决定重复执行时是否跳过 RocketMQ 投递并复用上下文输出。
+     *
+     * @param config 当前节点配置，读取 {@code idempotencyKey} 和 {@code messageCodeKey}
+     * @param ctx 画布执行上下文，读取用户 ID
+     * @return 用于节点副作用幂等表的业务操作键
+     */
     @Override
     public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
         Object explicit = config.get(MapFieldKeys.IDEMPOTENCY_KEY);
@@ -120,13 +139,11 @@ public class SendMqHandler implements NodeHandler {
     }
 
     /**
-     * 执行 copy Params 对应的业务逻辑。
+     * 将节点参数配置复制到 MQ payload。
      *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param payload payload 请求体、消息体或事件载荷
-     * @param rawParams rawParams 方法执行所需的业务参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @param payload 目标 payload
+     * @param rawParams 原始参数配置
+     * @param ctx 执行上下文
      */
     private void copyParams(Map<String, Object> payload, Object rawParams, ExecutionContext ctx) {
         if (rawParams == null) {

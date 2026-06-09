@@ -5,6 +5,8 @@ Sequence: 033
 Source: `docs/product-evolution/specs/p2-030-cdp-warehouse-quality-incident-loop.md`, `docs/product-evolution/specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`
 Implementation plan: `../plans/p2-033-cdp-warehouse-realtime-pipeline-incidents-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Connect realtime warehouse pipeline runtime health to the existing incident loop so failed, stale, or lagging CDC/Flink/Kafka-style pipelines become operator-visible incidents.

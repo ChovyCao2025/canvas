@@ -23,11 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Configuration
 public class TestTieredCacheConfig {
     /**
-     * 创建并注册 test Annotation Cache Resolver 相关的 Spring Bean。
+     * 创建测试专用注解缓存解析器。
      *
-     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     * <p>解析器使用 {@link InMemoryTieredCache} 替代 Redis 分层缓存，让业务测试不依赖外部 Redis 服务。
      *
-     * @return 方法执行后的业务结果
+     * @return 测试注解缓存解析器
      */
     @Bean
     @Primary
@@ -37,12 +37,12 @@ public class TestTieredCacheConfig {
             private final Map<String, TieredCache<Object, Object>> caches = new ConcurrentHashMap<>();
 
             /**
-             * 构建、解析或转换 resolve 相关的业务数据。
+             * 解析或懒创建注解声明的内存缓存。
              *
-             * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+             * <p>未命中加载由切面执行原方法后写入，因此这里的默认 loader 只作为误用保护。
              *
-             * @param annotation annotation 方法执行所需的业务参数
-             * @return 方法执行后的业务结果
+             * @param annotation 缓存读取注解
+             * @return 测试内存缓存实例
              */
             @Override
             public TieredCache<Object, Object> resolve(TieredCached annotation) {
@@ -54,12 +54,12 @@ public class TestTieredCacheConfig {
             }
 
             /**
-             * 查询或读取 get Existing 相关的业务数据。
+             * 获取已存在或懒创建的测试缓存。
              *
-             * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+             * <p>允许 {@code @TieredCachePut} 先于 {@code @TieredCached} 使用同名缓存，贴近业务测试写路径。
              *
-             * @param name name 方法执行所需的业务参数
-             * @return 方法执行后的业务结果
+             * @param name 缓存实例名称
+             * @return 测试内存缓存实例
              */
             @Override
             public TieredCache<Object, Object> getExisting(String name) {
@@ -69,12 +69,12 @@ public class TestTieredCacheConfig {
             }
 
             /**
-             * 删除、清理或失效 evict If Present 相关的业务数据。
+             * 在测试缓存存在时失效指定 key。
              *
-             * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+             * <p>缓存尚未创建时静默跳过，避免失效注解强制初始化无关缓存。
              *
-             * @param name name 方法执行所需的业务参数
-             * @param key key 对应的缓存键、配置键或业务键
+             * @param name 缓存实例名称
+             * @param key 需要失效的业务缓存 key
              */
             @Override
             public void evictIfPresent(String name, Object key) {
@@ -87,11 +87,11 @@ public class TestTieredCacheConfig {
     }
 
     /**
-     * 创建并注册 test Spel Key Evaluator 相关的 Spring Bean。
+     * 创建测试用 SpEL key 计算器。
      *
-     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     * <p>保持与生产切面相同的 key、condition 和 unless 表达式解析语义。
      *
-     * @return 方法执行后的业务结果
+     * @return SpEL key 计算器
      */
     @Bean
     @Primary
@@ -100,13 +100,13 @@ public class TestTieredCacheConfig {
     }
 
     /**
-     * 创建并注册 test Tiered Cache Aspect 相关的 Spring Bean。
+     * 创建测试用分层缓存切面。
      *
-     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     * <p>切面逻辑与生产一致，只把底层缓存替换为内存实现，便于验证注解缓存行为。
      *
-     * @param resolver resolver 方法执行所需的业务参数
-     * @param keyEvaluator keyEvaluator 对应的缓存键、配置键或业务键
-     * @return 方法执行后的业务结果
+     * @param resolver 测试注解缓存解析器
+     * @param keyEvaluator SpEL key 计算器
+     * @return 测试缓存切面
      */
     @Bean
     @Primary
@@ -116,11 +116,11 @@ public class TestTieredCacheConfig {
     }
 
     /**
-     * 创建并注册 test Tiered Cache Manager 相关的 Spring Bean。
+     * 创建测试用缓存管理器。
      *
-     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     * <p>测试管理器不连接 Redis，也不启动 Pub/Sub；仅用于满足依赖注入和手工注册场景。
      *
-     * @return 方法执行后的业务结果
+     * @return 测试缓存管理器
      */
     @Bean
     @Primary

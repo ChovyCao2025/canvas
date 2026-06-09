@@ -8,12 +8,14 @@
 
 **Tech Stack:** Node.js built-in test runner, ES modules, `tools/perf/capacity-report.mjs`.
 
+**Implementation Status:** Implemented and focused-verified on 2026-06-05. `capacity-report.mjs` now exports `evaluateHardeningGates(samples)` with deterministic gate ordering for Redis, MySQL, MQ, Disruptor overflow, retry backlog, DLQ, and protected lane latency samples.
+
 ---
 
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-004b-3000-hardening-stop-gate-evaluator.md`
-- Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+- Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 
 ## File Structure
 
@@ -188,7 +190,8 @@ Expected: PASS.
 
 Observed: PASS on 2026-06-05, 10 tests passed.
 
-- [ ] **Step 2: Commit implementation slice**
+- [x] **Step 2: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

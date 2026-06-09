@@ -33,6 +33,33 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ContextPersistenceService {
 
+    private static final RedisScript<Long> NODE_GATE_ACQUIRE_SCRIPT = RedisScript.of("""
+            if redis.call('set', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) then
+                return 1
+            end
+            redis.call('set', KEYS[2], '1', 'PX', ARGV[2])
+            return 0
+            """, Long.class);
+
+    private static final RedisScript<Long> NODE_GATE_RELEASE_SCRIPT = RedisScript.of("""
+            if redis.call('get', KEYS[1]) ~= ARGV[1] then
+                return 0
+            end
+            redis.call('del', KEYS[1])
+            if redis.call('get', KEYS[2]) then
+                redis.call('del', KEYS[2])
+                return 1
+            end
+            return 0
+            """, Long.class);
+
+    private static final RedisScript<Long> RESUME_LOCK_RELEASE_SCRIPT = RedisScript.of("""
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            end
+            return 0
+            """, Long.class);
+
     /** 阻塞式 Redis 模板（执行链路中以轻量 KV 操作为主）。 */
     private final StringRedisTemplate redis;
 
@@ -52,6 +79,9 @@ public class ContextPersistenceService {
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ttlSec;
 
+    /**
+     * NodeState 数据记录。
+     */
     public record NodeState(NodeStatus status, Map<String, Object> output) {
     }
 
@@ -69,6 +99,7 @@ public class ContextPersistenceService {
         String json;
         try {
             json = objectMapper.writeValueAsString(ctx);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.error("序列化 ExecutionContext 失败: {}", e.getMessage());
             return;
@@ -77,6 +108,7 @@ public class ContextPersistenceService {
         try {
             redis.opsForValue().set(keys.context(ctx.getCanvasId(), ctx.getUserId()),
                     json, Duration.ofSeconds(ttlSec));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("保存 ExecutionContext 到 Redis 失败: {}", e.getMessage());
         }
@@ -90,6 +122,7 @@ public class ContextPersistenceService {
         String json = null;
         try {
             json = redis.opsForValue().get(redisKey);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("读取 Redis ExecutionContext 失败，尝试 DB 冷恢复 canvasId={} userId={}: {}",
                     canvasId, userId, e.getMessage());
@@ -105,6 +138,17 @@ public class ContextPersistenceService {
         redis.delete(keys.context(canvasId, userId));
     }
 
+    /**
+     * 保存单个节点的运行状态和输出到 Redis。
+     *
+     * <p>方法写入节点状态 Hash，并把节点 ID 加入执行实例的状态索引，同时刷新 TTL。写入失败时会删除半写入状态并抛异常，
+     * 由调度层决定是否重试或失败节点。
+     *
+     * @param executionId 执行实例 ID
+     * @param nodeId 节点 ID
+     * @param status 节点状态
+     * @param output 节点上下文输出，空值按空 Map 存储
+     */
     public void saveNodeState(String executionId, String nodeId,
                               NodeStatus status, Map<String, Object> output) {
         String stateKey = keys.nodeState(executionId, nodeId);
@@ -121,15 +165,25 @@ public class ContextPersistenceService {
             if (!Boolean.TRUE.equals(redis.expire(stateKey, Duration.ofSeconds(ttlSec)))) {
                 throw new IllegalStateException("Failed to refresh node state TTL");
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             try {
                 redis.delete(stateKey);
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (Exception ignored) {
             }
             throw new IllegalStateException("Failed to save node state to Redis", e);
         }
     }
 
+    /**
+     * 删除单个节点的 Redis 状态并记录重置索引。
+     *
+     * <p>方法会把节点 ID 写入 reset index，用于恢复流程识别被清理的节点状态，然后删除状态 Hash 并从状态索引移除。
+     *
+     * @param executionId 执行实例 ID
+     * @param nodeId 节点 ID
+     */
     public void deleteNodeState(String executionId, String nodeId) {
         String resetKey = keys.nodeStateResetIndex(executionId);
         String stateKey = keys.nodeState(executionId, nodeId);
@@ -140,11 +194,21 @@ public class ContextPersistenceService {
             }
             redis.delete(stateKey);
             redis.opsForSet().remove(keys.nodeStateIndex(executionId), nodeId);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalStateException("Failed to delete node state from Redis", e);
         }
     }
 
+    /**
+     * 从 Redis 加载单个节点的运行状态。
+     *
+     * <p>方法读取节点状态 Hash 并反序列化 output JSON；不存在时返回 null，解析或 Redis 访问失败时抛异常。
+     *
+     * @param executionId 执行实例 ID
+     * @param nodeId 节点 ID
+     * @return 节点状态和输出，未命中时为 null
+     */
     @SuppressWarnings("unchecked")
     public NodeState loadNodeState(String executionId, String nodeId) {
         try {
@@ -159,18 +223,33 @@ public class ContextPersistenceService {
             if (outputValue != null && !String.valueOf(outputValue).isBlank()) {
                 try {
                     output = objectMapper.readValue(String.valueOf(outputValue), Map.class);
+                // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                 } catch (Exception e) {
                     throw new IllegalStateException("Failed to parse node output from Redis", e);
                 }
             }
             return new NodeState(status, output);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IllegalStateException e) {
             throw e;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load node state from Redis", e);
         }
     }
 
+    /**
+     * 尝试获取节点执行门闩。
+     *
+     * <p>方法通过 Redis Lua 脚本原子写入 gate 和 repeat 标记，防止同一执行实例的同一节点被并发重复调度；Redis 异常时
+     * 返回 false，调用方应视为未获取到执行权。
+     *
+     * @param executionId 执行实例 ID
+     * @param nodeId 节点 ID
+     * @param owner 当前 worker 标识
+     * @param ttl 门闩过期时间
+     * @return {@code true} 表示成功获得节点执行权
+     */
     public boolean tryAcquireNodeGate(String executionId, String nodeId, String owner, Duration ttl) {
         long ttlMillis = Math.max(1L, ttl == null ? 1L : ttl.toMillis());
         try {
@@ -178,6 +257,7 @@ public class ContextPersistenceService {
                     List.of(keys.gate(executionId, nodeId), keys.gateRepeat(executionId, nodeId)),
                     owner, String.valueOf(ttlMillis));
             return Long.valueOf(1L).equals(acquired);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[CTX] node gate acquire failed executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
@@ -185,12 +265,23 @@ public class ContextPersistenceService {
         }
     }
 
+    /**
+     * 释放节点执行门闩。
+     *
+     * <p>方法通过 Redis Lua 脚本校验 owner 后释放 gate，并保留 repeat 标记供重复调度判断；Redis 异常时返回 false。
+     *
+     * @param executionId 执行实例 ID
+     * @param nodeId 节点 ID
+     * @param owner 获取门闩时的 worker 标识
+     * @return {@code true} 表示释放成功且可按 repeat 语义继续
+     */
     public boolean releaseNodeGate(String executionId, String nodeId, String owner) {
         try {
             Long repeat = redis.execute(NODE_GATE_RELEASE_SCRIPT,
                     List.of(keys.gate(executionId, nodeId), keys.gateRepeat(executionId, nodeId)),
                     owner);
             return Long.valueOf(1L).equals(repeat);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("[CTX] node gate release failed executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
@@ -204,6 +295,7 @@ public class ContextPersistenceService {
             if (Boolean.TRUE.equals(redis.hasKey(keys.context(canvasId, userId)))) {
                 return true;
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("检查 Redis ExecutionContext 失败，尝试 DB 冷备 canvasId={} userId={}: {}",
                     canvasId, userId, e.getMessage());
@@ -212,18 +304,33 @@ public class ContextPersistenceService {
         return backup != null && hasText(backup.getContextSnapshotJson());
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param ctx ctx 参数，用于 saveColdBackup 流程中的校验、计算或对象转换。
+     * @param json JSON 字符串，承载结构化配置或明细。
+     */
     private void saveColdBackup(ExecutionContext ctx, String json) {
         if (ctx == null || !hasText(ctx.getExecutionId())) {
             return;
         }
         try {
             executionMapper.updateContextSnapshot(ctx.getExecutionId(), json);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("保存 ExecutionContext DB 冷备失败 executionId={}: {}",
                     ctx.getExecutionId(), e.getMessage());
         }
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @param redisKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 loadColdBackup 流程生成的业务结果。
+     */
     private ExecutionContext loadColdBackup(Long canvasId, String userId, String redisKey) {
         CanvasExecutionDO backup = latestPausedBackup(canvasId, userId);
         if (backup == null || !hasText(backup.getContextSnapshotJson())) {
@@ -236,9 +343,17 @@ public class ContextPersistenceService {
         return ctx;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param userId 业务对象 ID，用于定位具体记录。
+     * @return 返回 latestPausedBackup 流程生成的业务结果。
+     */
     private CanvasExecutionDO latestPausedBackup(Long canvasId, String userId) {
         try {
             return executionMapper.selectLatestPausedContextSnapshot(canvasId, userId);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("读取 ExecutionContext DB 冷备失败 canvasId={} userId={}: {}",
                     canvasId, userId, e.getMessage());
@@ -246,38 +361,48 @@ public class ContextPersistenceService {
         }
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @param source source 参数，用于 deserializeContext 流程中的校验、计算或对象转换。
+     * @return 返回 deserializeContext 流程生成的业务结果。
+     */
     private ExecutionContext deserializeContext(String json, String source) {
         try {
             return objectMapper.readValue(json, ExecutionContext.class);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.error("反序列化 {} ExecutionContext 失败: {}", source, e.getMessage());
             return null;
         }
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param redisKey 业务键，用于在同一租户下定位资源。
+     * @param json JSON 字符串，承载结构化配置或明细。
+     */
     private void refreshRedisSnapshot(String redisKey, String json) {
         try {
             redis.opsForValue().set(redisKey, json, Duration.ofSeconds(ttlSec));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.warn("DB 冷恢复后回填 Redis ExecutionContext 失败 key={}: {}", redisKey, e.getMessage());
         }
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
-    /**
-     * 执行 acquire Resume Lock 对应的业务逻辑。
-     *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
-     *
-     * @param canvasId canvasId 对应的业务主键或标识
-     * @param userId userId 对应的业务主键或标识
-     * @param instanceId instanceId 对应的业务主键或标识
-     * @param timeoutSec timeoutSec 时间、过期时间或持续时长参数
-     * @return 判断结果，true 表示校验通过或条件成立
-     */
 // ── 恢复锁 ─────────────────────────────────────────────────────
 
     /**
@@ -298,58 +423,24 @@ public class ContextPersistenceService {
     }
 
     /**
-     * 原子释放 resumeLock（Lua check-then-del，跨机安全）。
-     *
-     * <p>只有当锁的 value 等于 {@code token} 时才执行 DEL，防止锁过期后被其他机器重新获取，
-     * 而本机因执行延迟才来释放，错误删除他机的锁。
-     *
-     * @param token 获锁时传入的 instanceId；为空时不会释放锁
-     * @return true 表示当前 token 匹配且锁已释放
+     * 释放 resumeLock；只有持有者 token 匹配时才删除，避免误删其他实例续持的锁。
      */
-    public boolean releaseResumeLock(Long canvasId, String userId, String token) {
-        if (!hasText(token)) {
+    public boolean releaseResumeLock(Long canvasId, String userId, String instanceId) {
+        if (!hasText(instanceId)) {
             return false;
         }
-        String key = keys.resumeLock(canvasId, userId);
         try {
-            Long released = redis.execute(RESUME_LOCK_RELEASE_SCRIPT, List.of(key), token);
+            Long released = redis.execute(RESUME_LOCK_RELEASE_SCRIPT,
+                    List.of(keys.resumeLock(canvasId, userId)), instanceId);
             return Long.valueOf(1L).equals(released);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
-            log.warn("[CTX] resumeLock Lua 释放失败，保留锁等待 TTL 过期 key={}: {}", key, e.getMessage());
+            log.warn("[CTX] resume-lock release failed canvasId={} userId={}: {}",
+                    canvasId, userId, e.getMessage());
             return false;
         }
     }
 
-    /** 释放 WAIT 恢复锁的 Lua 脚本，保证只释放当前持有者的锁。 */
-    private static final RedisScript<Long> RESUME_LOCK_RELEASE_SCRIPT = RedisScript.of(
-            "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
-            Long.class
-    );
-
-    private static final RedisScript<Long> NODE_GATE_ACQUIRE_SCRIPT = RedisScript.of(
-            "if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) then "
-                    + "return 1 else redis.call('SET', KEYS[2], '1', 'PX', ARGV[2]); return 0 end",
-            Long.class
-    );
-
-    private static final RedisScript<Long> NODE_GATE_RELEASE_SCRIPT = RedisScript.of(
-            "if redis.call('GET', KEYS[1]) == ARGV[1] then "
-                    + "redis.call('DEL', KEYS[1]); return redis.call('DEL', KEYS[2]); "
-                    + "else return 0 end",
-            Long.class
-    );
-
-    /**
-     * 执行 acquire Dedup 对应的业务逻辑。
-     *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
-     *
-     * @param canvasId canvasId 对应的业务主键或标识
-     * @param userId userId 对应的业务主键或标识
-     * @param msgId msgId 对应的业务主键或标识
-     * @param ttl ttl 时间、过期时间或持续时长参数
-     * @return 判断结果，true 表示校验通过或条件成立
-     */
 // ── dedup key ────────────────────────────────────────────────
 
     /** 尝试写入消息级幂等 key，成功表示本次消息可继续执行。 */

@@ -98,7 +98,15 @@ public class TagImportController {
                         .contentLength(bytes.length)
                         .body(bytes));
     }
-
+    /**
+     * 导入 标签导入接口，对应 POST /excel。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 副作用：会导入并落库资源。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param filePart 上传文件。
+     * @return 异步返回统一响应，包含导入 标签导入后的业务数据。
+     */
     @PostMapping(value = "/excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Mono<R<TagImportResult>> importExcel(@RequestPart("file") FilePart filePart) {
         return DataBufferUtils.join(filePart.content())
@@ -122,7 +130,16 @@ public class TagImportController {
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(R::ok);
     }
-
+    /**
+     * 查询标签导入列表接口，对应 GET /batches/{id}/errors。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 主要委托 tagImportService.listErrors 完成业务处理。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param batchId 批次 ID。
+     * @return 异步返回统一响应，包含列表结果。
+     */
     @GetMapping("/batches/{id}/errors")
     public Mono<R<List<TagImportErrorDO>>> listErrors(@PathVariable("id") Long batchId) {
         return Mono.fromCallable(() -> tagImportService.listErrors(batchId))
@@ -131,12 +148,10 @@ public class TagImportController {
     }
 
     /**
-     * 查询或读取 read Rows 相关的业务数据。
+     * 查询或读取业务数据。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param bytes bytes 方法执行所需的业务参数
-     * @return 查询、转换或计算得到的结果集合
+     * @param bytes bytes 参数，用于 readRows 流程中的校验、计算或对象转换。
+     * @return 返回 read rows 汇总后的集合、分页或映射视图。
      */
     static List<TagImportRow> readRows(byte[] bytes) {
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes), 0)) {
@@ -153,13 +168,12 @@ public class TagImportController {
     }
 
     /**
-     * 构建、解析或转换 to Import Row 相关的业务数据。
+     * 转换为接口返回或领域视图。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param rowNo rowNo 方法执行所需的业务参数
-     * @param map map 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param rowNo row no 参数，用于 toImportRow 流程中的校验、计算或对象转换。
+     * @param String string 参数，用于 toImportRow 流程中的校验、计算或对象转换。
+     * @param map map 参数，用于 toImportRow 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
      */
     static TagImportRow toImportRow(int rowNo, Map<String, ?> map) {
         TagImportRow row = new TagImportRow();
@@ -173,12 +187,10 @@ public class TagImportController {
     }
 
     /**
-     * 执行 normalize Value 对应的业务逻辑。
+     * 规范化输入值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 转换或查询得到的字符串结果
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
      */
     static String normalizeValue(Object value) {
         if (value == null) {
@@ -189,13 +201,11 @@ public class TagImportController {
     }
 
     /**
-     * 执行 import Excel 对应的业务逻辑。
+     * 执行 importExcel 流程，围绕 import excel 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param dataBuffer dataBuffer 方法执行所需的业务参数
-     * @param fileName fileName 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param dataBuffer data buffer 参数，用于 importExcel 流程中的校验、计算或对象转换。
+     * @param fileName 名称文本，用于展示或唯一性校验。
+     * @return 返回 importExcel 流程生成的业务结果。
      */
     private TagImportResult importExcel(DataBuffer dataBuffer, String fileName) {
         byte[] bytes = new byte[dataBuffer.readableByteCount()];
@@ -206,11 +216,9 @@ public class TagImportController {
     }
 
     /**
-     * 创建或新增 create Template Bytes 相关的业务数据。
+     * 执行数据写入或状态变更。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @return 方法执行后的业务结果
+     * @return 返回流程执行后的业务结果。
      */
     private static byte[] createTemplateBytes() {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -223,12 +231,10 @@ public class TagImportController {
     }
 
     /**
-     * 构建、解析或转换 parse Tag Time 相关的业务数据。
+     * 解析并校验输入数据。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 方法执行后的业务结果
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
      */
     private static LocalDateTime parseTagTime(Object value) {
         if (value == null) {

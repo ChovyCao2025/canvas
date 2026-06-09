@@ -5,19 +5,19 @@ package org.chovy.canvas.engine.audience;
  *
  * <p>用于在控制器、服务、异步任务或实时推送之间传递结构化数据，隔离外部 API 契约与数据库实体。
  * <p>该类型应保持轻量，只表达字段语义和序列化边界，不放入复杂业务流程。
+ * @param audienceId 人群定义 ID.
+ * @param audienceName 人群展示名称.
+ * @param status 计算状态，如 READY、FAILED 或 IN_PROGRESS.
+ * @param estimatedSize 估算命中人数.
+ * @param bitmapSizeKb 序列化后位图大小，单位 KB.
+ * @param errorMsg 失败或进行中提示信息.
  */
 public record AudienceComputeResult(
-        /** 人群定义 ID。 */
         Long audienceId,
-        /** 人群展示名称。 */
         String audienceName,
-        /** 计算状态，如 READY、FAILED 或 IN_PROGRESS。 */
         String status,
-        /** 估算命中人数。 */
         Long estimatedSize,
-        /** 序列化后位图大小，单位 KB。 */
         Integer bitmapSizeKb,
-        /** 失败或进行中提示信息。 */
         String errorMsg
 ) {
     /**

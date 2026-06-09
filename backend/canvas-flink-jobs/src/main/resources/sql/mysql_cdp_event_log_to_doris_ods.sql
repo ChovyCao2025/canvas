@@ -1,5 +1,6 @@
 -- pipeline: mysql_cdp_event_log_to_doris_ods
 -- sink: canvas_ods.cdp_event_log
+-- Purpose: stream accepted CDP event ledger rows from MySQL into Doris ODS for downstream DWD facts.
 CREATE TABLE mysql_cdp_event_log_source (
     id BIGINT,
     tenant_id BIGINT,
@@ -34,6 +35,7 @@ CREATE TABLE mysql_cdp_event_log_source (
     'scan.startup.mode' = 'initial'
 );
 
+-- Doris ODS stores only fields needed by realtime warehouse transformations and lineage checks.
 CREATE TABLE doris_cdp_event_log_ods_sink (
     tenant_id BIGINT,
     event_log_id BIGINT,
@@ -74,4 +76,5 @@ SELECT
     event_time,
     received_at
 FROM mysql_cdp_event_log_source
+-- Only accepted events are analytical facts; rejected rows stay in MySQL for ingestion diagnostics.
 WHERE status = 'ACCEPTED';

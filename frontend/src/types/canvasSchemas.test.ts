@@ -4,6 +4,7 @@ import {
   nodeTypeRegistrySchema,
   parseCanvasGraph,
   parseCanvasGraphJson,
+  riskDecisionConfigSchema,
 } from './canvasSchemas'
 
 describe('canvasSchemas', () => {
@@ -69,5 +70,94 @@ describe('canvasSchemas', () => {
       isTerminal: 0,
       enabled: 1,
     }).typeKey).toBe('WAIT')
+  })
+
+  describe('RISK_DECISION config schema', () => {
+    const validRiskDecisionConfig = {
+      sceneKey: 'MARKETING_BENEFIT_ISSUE',
+      subjectMapping: { userId: '$.profile.userId' },
+      eventMapping: { amount: '$.event.amount' },
+      contextMapping: { caller: 'CANVAS_NODE' },
+      actionRoutes: {
+        ALLOW: 'node_allow',
+        REVIEW: 'node_review',
+        VERIFY: 'node_verify',
+        BLOCK: 'node_block',
+        LIMIT: 'node_limit',
+        DELAY: 'node_delay',
+      },
+      failPolicy: 'FAIL_REVIEW',
+      timeoutMs: 50,
+      includeTrace: false,
+    }
+
+    it('requires sceneKey', () => {
+      expect(() => riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        sceneKey: '',
+      })).toThrow()
+    })
+
+    it('requires at least one subject mapping', () => {
+      expect(() => riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        subjectMapping: {},
+      })).toThrow()
+    })
+
+    it('requires eventMapping', () => {
+      expect(() => riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        eventMapping: {},
+      })).toThrow()
+    })
+
+    it('requires actionRoutes.ALLOW', () => {
+      const { ALLOW: _allow, ...routesWithoutAllow } = validRiskDecisionConfig.actionRoutes
+
+      expect(() => riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        actionRoutes: routesWithoutAllow,
+      })).toThrow()
+    })
+
+    it('accepts REVIEW, VERIFY, BLOCK, LIMIT, and DELAY routes', () => {
+      const parsed = riskDecisionConfigSchema.parse(validRiskDecisionConfig)
+
+      expect(parsed.actionRoutes.REVIEW).toBe('node_review')
+      expect(parsed.actionRoutes.VERIFY).toBe('node_verify')
+      expect(parsed.actionRoutes.BLOCK).toBe('node_block')
+      expect(parsed.actionRoutes.LIMIT).toBe('node_limit')
+      expect(parsed.actionRoutes.DELAY).toBe('node_delay')
+    })
+
+    it('rejects timeoutMs below 10', () => {
+      expect(() => riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        timeoutMs: 9,
+      })).toThrow()
+    })
+
+    it('rejects timeoutMs above 500', () => {
+      expect(() => riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        timeoutMs: 501,
+      })).toThrow()
+    })
+
+    it('accepts FAIL_OPEN, FAIL_REVIEW, and FAIL_CLOSED', () => {
+      expect(riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        failPolicy: 'FAIL_OPEN',
+      }).failPolicy).toBe('FAIL_OPEN')
+      expect(riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        failPolicy: 'FAIL_REVIEW',
+      }).failPolicy).toBe('FAIL_REVIEW')
+      expect(riskDecisionConfigSchema.parse({
+        ...validRiskDecisionConfig,
+        failPolicy: 'FAIL_CLOSED',
+      }).failPolicy).toBe('FAIL_CLOSED')
+    })
   })
 })

@@ -28,7 +28,7 @@ class NodeTypeGovernanceTest {
                 "LOOP",
                 "DIRECT_CALL", "EVENT_TRIGGER", "MQ_TRIGGER", "SCHEDULED_TRIGGER",
                 "IF_CONDITION", "LOGIC_RELATION", "SPLIT",
-                "WAIT", "USER_INPUT", "HUB", "AGGREGATE", "THRESHOLD",
+                "WAIT", "USER_INPUT", "MANUAL_APPROVAL", "HUB", "AGGREGATE", "THRESHOLD",
                 "API_CALL", "SEND_MQ", "GROOVY",
                 "SEND_MESSAGE",
                 "AI_LLM",

@@ -6,6 +6,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, Flyway, MySQL, JUnit 5, Mockito, AssertJ.
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Current State
 
 - Realtime warehouse writes are best-effort and recoverable through retry.

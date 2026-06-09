@@ -1,5 +1,9 @@
 # CDP Warehouse Scheduled Audience Contract Gates Implementation Plan
 
+Spec: `../specs/p2-064-cdp-warehouse-scheduled-audience-contract-gates.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Gate scheduled OLAP audience refreshes with P2-060 consumer availability contracts on a per-audience basis.
 
 **Architecture:** Extend `AudienceMaterializationScheduleService` with a contract-gated refresh method that scans existing materialization candidates, checks due status, derives a contract key, evaluates the P2-060 contract, and materializes only allowed audiences. Extend `CdpWarehouseAudienceMaterializationScheduler` with disabled-by-default consumer contract gate configuration that takes precedence over the existing P2-058 window-level scheduled gate.

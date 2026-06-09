@@ -23,6 +23,19 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class WebClientConfig {
 
+    /**
+     * webClientBuilder 处理 config 场景的业务逻辑。
+     * @param maxConnections max connections 参数，用于 webClientBuilder 流程中的校验、计算或对象转换。
+     * @param pendingAcquireMaxCount pending acquire max count 参数，用于 webClientBuilder 流程中的校验、计算或对象转换。
+     * @param pendingAcquireTimeoutMs 时间参数，用于计算窗口、过期或审计时间。
+     * @param connectTimeoutMs 时间参数，用于计算窗口、过期或审计时间。
+     * @param responseTimeoutMs 时间参数，用于计算窗口、过期或审计时间。
+     * @param writeTimeoutMs 时间参数，用于计算窗口、过期或审计时间。
+     * @param maxInMemoryBytes max in memory bytes 参数，用于 webClientBuilder 流程中的校验、计算或对象转换。
+     * @param maxIdleSeconds max idle seconds 参数，用于 webClientBuilder 流程中的校验、计算或对象转换。
+     * @param maxLifeMinutes max life minutes 参数，用于 webClientBuilder 流程中的校验、计算或对象转换。
+     * @return 返回 webClientBuilder 流程生成的业务结果。
+     */
     @Bean
     public WebClient.Builder webClientBuilder(
             @Value("${canvas.http-client.max-connections:500}") int maxConnections,

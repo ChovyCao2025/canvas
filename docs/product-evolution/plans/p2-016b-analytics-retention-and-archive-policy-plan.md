@@ -1,10 +1,12 @@
 # Analytics Retention And Archive Policy Implementation Plan
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add tenant-bounded retention and archive policies for analytics-related records.
+**Goal:** Add tenant-bounded retention and archive policy execution for analytics event and trace records.
 
-**Architecture:** Store tenant policy in MySQL, enforce platform min/max bounds from configuration, and process archive/delete jobs in bounded batches with dry-run and legal-hold skip behavior.
+**Architecture:** Use existing `V133__analytics_retention_policy.sql`, `AnalyticsRetentionPolicyDO`, `AnalyticsRetentionRunDO`, and analytics event/trace mappers. `RetentionPolicyService` resolves tenant policy with tenant `0` default fallback, enforces platform bounds from `canvas.analytics.retention.*`, runs dry-run/archive/delete in one bounded batch, skips legal-hold rows, and records every run to `analytics_retention_run`.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, MySQL, JUnit 5, Mockito, AssertJ.
 
@@ -13,194 +15,75 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p2-016b-analytics-retention-and-archive-policy.md`
-- Depends on P2-016 archive/retention fields.
+- Depends on P2-016 analytics event/trace archive and retention fields.
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V128__analytics_retention_policy.sql`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsRetentionPolicyDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsRetentionRunDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsRetentionPolicyMapper.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsRetentionRunMapper.java`
+- Existing schema: `backend/canvas-engine/src/main/resources/db/migration/V133__analytics_retention_policy.sql`
+- Existing data objects: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsRetentionPolicyDO.java`, `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsRetentionRunDO.java`
+- Existing mappers: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsRetentionPolicyMapper.java`, `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsRetentionRunMapper.java`, `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsEventMapper.java`, `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsEventTraceMapper.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/RetentionPolicyService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/RetentionPolicyServiceTest.java`
 - Modify: `backend/canvas-engine/src/main/resources/application.yml`
+- Modify: `docs/product-evolution/specs/p2-016b-analytics-retention-and-archive-policy.md`
+- Modify: `docs/product-evolution/plans/p2-016b-analytics-retention-and-archive-policy-plan.md`
 
-### Task 1: Schema And Policy Bounds
-
-**Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/RetentionPolicyServiceTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V128__analytics_retention_policy.sql`
-
-- [ ] **Step 1: Write schema and bounds tests**
-
-Create tests:
-
-```java
-@Test
-void migrationCreatesRetentionPolicyAndRunTables() throws Exception {
-    String sql = Files.readString(Path.of("src/main/resources/db/migration/V128__analytics_retention_policy.sql"));
-
-    assertThat(sql)
-            .contains("CREATE TABLE IF NOT EXISTS analytics_retention_policy")
-            .contains("record_kind")
-            .contains("retention_days")
-            .contains("action")
-            .contains("max_batch_size")
-            .contains("CREATE TABLE IF NOT EXISTS analytics_retention_run")
-            .contains("dry_run")
-            .contains("archived_count")
-            .contains("deleted_count");
-}
-
-@Test
-void tenantOverrideMustStayWithinPlatformBounds() {
-    RetentionPolicyService service = new RetentionPolicyService(
-            mock(RetentionPolicyService.PolicyRepository.class),
-            mock(RetentionPolicyService.RetentionTargetRepository.class),
-            new RetentionPolicyService.Bounds(7, 730));
-
-    assertThatThrownBy(() -> service.validate(new RetentionPolicyService.PolicyInput(0L, "EVENT", 1, "DELETE", 100, false)))
-            .hasMessageContaining("below platform minimum");
-    assertThatThrownBy(() -> service.validate(new RetentionPolicyService.PolicyInput(0L, "EVENT", 1000, "DELETE", 100, false)))
-            .hasMessageContaining("above platform maximum");
-}
-```
-
-- [ ] **Step 2: Run tests and confirm red state**
-
-Run:
-
-```bash
-cd backend && mvn -pl canvas-engine test -Dtest=RetentionPolicyServiceTest
-```
-
-Expected: FAIL because migration and service do not exist.
-
-- [ ] **Step 3: Add migration**
-
-Create `V128__analytics_retention_policy.sql`:
-
-```sql
-CREATE TABLE IF NOT EXISTS analytics_retention_policy (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id BIGINT NOT NULL DEFAULT 0,
-  record_kind VARCHAR(32) NOT NULL,
-  retention_days INT NOT NULL,
-  action VARCHAR(20) NOT NULL,
-  max_batch_size INT NOT NULL DEFAULT 1000,
-  legal_hold_behavior VARCHAR(20) NOT NULL DEFAULT 'SKIP',
-  enabled TINYINT NOT NULL DEFAULT 1,
-  updated_by VARCHAR(128) NULL,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_analytics_retention_policy (tenant_id, record_kind)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS analytics_retention_run (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id BIGINT NOT NULL DEFAULT 0,
-  record_kind VARCHAR(32) NOT NULL,
-  action VARCHAR(20) NOT NULL,
-  dry_run TINYINT NOT NULL DEFAULT 1,
-  scanned_count BIGINT NOT NULL DEFAULT 0,
-  archived_count BIGINT NOT NULL DEFAULT 0,
-  deleted_count BIGINT NOT NULL DEFAULT 0,
-  skipped_count BIGINT NOT NULL DEFAULT 0,
-  failed_count BIGINT NOT NULL DEFAULT 0,
-  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  finished_at DATETIME NULL,
-  INDEX idx_analytics_retention_run (tenant_id, record_kind, started_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
-
-- [ ] **Step 4: Implement policy validation**
-
-Create `RetentionPolicyService` records `Bounds`, `PolicyInput`, and `RunResult`. `validate` must reject non-positive batch size, retention below min, retention above max, unknown `recordKind`, and unknown action outside `ARCHIVE|DELETE`.
-
-- [ ] **Step 5: Run schema and bounds tests**
-
-Run:
-
-```bash
-cd backend && mvn -pl canvas-engine test -Dtest=RetentionPolicyServiceTest#migrationCreatesRetentionPolicyAndRunTables,RetentionPolicyServiceTest#tenantOverrideMustStayWithinPlatformBounds
-```
-
-Expected: PASS.
-
-### Task 2: Bounded Archive/Delete Jobs
+### Task 1: Schema And Bounds Contract
 
 **Files:**
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V133__analytics_retention_policy.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/RetentionPolicyServiceTest.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/RetentionPolicyService.java`
 
-- [ ] **Step 1: Add retention job tests**
+- [x] **Step 1: Write schema and bounds tests**
 
-Append tests:
+`RetentionPolicyServiceTest` verifies the existing V133 migration creates retention policy/run tables with policy fields, dry-run flag, and archive/delete counters. It also verifies retention days below/above platform bounds, non-positive batch size, and unsupported record kinds are rejected.
 
-```java
-@Test
-void dryRunCountsEligibleRowsWithoutMutating() {
-    RetentionPolicyService.RetentionTargetRepository targets = mock(RetentionPolicyService.RetentionTargetRepository.class);
-    when(targets.countEligible(0L, "TRACE", 90, true)).thenReturn(42L);
-    RetentionPolicyService service = serviceWithTargets(targets);
+- [x] **Step 2: Confirm red state**
 
-    RetentionPolicyService.RunResult result = service.run(new RetentionPolicyService.PolicyInput(0L, "TRACE", 90, "ARCHIVE", 100, true));
+Initial red state on 2026-06-09: `RetentionPolicyServiceTest` failed to compile because `RetentionPolicyService` did not exist.
 
-    assertThat(result.scannedCount()).isEqualTo(42);
-    assertThat(result.archivedCount()).isZero();
-    verify(targets, never()).archiveBatch(any(), any(), anyInt());
-}
+- [x] **Step 3: Implement policy validation and config**
 
-@Test
-void archiveAndDeleteAreLimitedToMaxBatchSizeAndSkipLegalHold() {
-    RetentionPolicyService.RetentionTargetRepository targets = mock(RetentionPolicyService.RetentionTargetRepository.class);
-    when(targets.archiveBatch(0L, "EVENT", 90, 10)).thenReturn(10);
-    RetentionPolicyService service = serviceWithTargets(targets);
+`RetentionPolicyService` accepts platform bounds through `canvas.analytics.retention.min-days`, `max-days`, `default-days`, and `max-batch-size`. It supports the current analytics targets `EVENT` and `TRACE`, and actions `ARCHIVE` and `DELETE`.
 
-    RetentionPolicyService.RunResult result = service.run(new RetentionPolicyService.PolicyInput(0L, "EVENT", 90, "ARCHIVE", 10, false));
+### Task 2: Tenant Policy Resolution And Bounded Jobs
 
-    assertThat(result.archivedCount()).isEqualTo(10);
-    verify(targets).archiveBatch(0L, "EVENT", 90, 10);
-}
-```
+**Files:**
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/RetentionPolicyService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/RetentionPolicyServiceTest.java`
 
-- [ ] **Step 2: Implement bounded run**
+- [x] **Step 1: Add tenant default/override tests**
 
-`run` must compute cutoff from `retentionDays`, skip rows where `legal_hold=1`, and call only one bounded repository method per invocation: `archiveBatch` or `deleteBatch`.
+`tenantOverrideFallsBackToPlatformDefaultPolicy` proves tenant-specific policy lookup falls back to tenant `0` platform defaults while preserving the requested tenant scope.
 
-- [ ] **Step 3: Run retention tests**
+- [x] **Step 2: Add dry-run/archive/delete tests**
 
-Run:
+`dryRunCountsEligibleRowsWithoutMutating` proves dry-run only counts eligible rows and records an audit result. `archiveAndDeleteAreLimitedToMaxBatchSizeAndSkipLegalHold` proves archive/delete call one bounded mapper operation per invocation and compute skipped rows as eligible rows not changed in that batch.
 
-```bash
-cd backend && mvn -pl canvas-engine test -Dtest=RetentionPolicyServiceTest
-```
+- [x] **Step 3: Implement run repositories**
 
-Expected: PASS.
+The service wraps existing MyBatis mappers behind small repository interfaces:
+- `PolicyRepository` reads enabled retention policies.
+- `RetentionTargetRepository` delegates count/archive/delete to `AnalyticsEventMapper` and `AnalyticsEventTraceMapper`.
+- `RunRepository` writes `AnalyticsRetentionRunDO` audit rows.
 
-### Task 3: Verification And Commit
+### Task 3: Verification
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-016b-analytics-retention-and-archive-policy.md`
 - Modify: `docs/product-evolution/plans/p2-016b-analytics-retention-and-archive-policy-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=RetentionPolicyServiceTest
+cd backend
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=RetentionPolicyServiceTest
 ```
 
-Expected: PASS.
+Result on 2026-06-09: PASS, 5 tests, 0 failures, 0 errors.
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Commit and merge**
 
-Run:
-
-```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V128__analytics_retention_policy.sql backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/RetentionPolicyService.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsRetentionPolicyDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AnalyticsRetentionRunDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsRetentionPolicyMapper.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AnalyticsRetentionRunMapper.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/RetentionPolicyServiceTest.java backend/canvas-engine/src/main/resources/application.yml docs/product-evolution/specs/p2-016b-analytics-retention-and-archive-policy.md docs/product-evolution/plans/p2-016b-analytics-retention-and-archive-policy-plan.md
-git commit -m "feat: add analytics retention policy"
-```
-
-Expected: commit contains only retention policy schema, service, tests, config, and related docs.
+Commit and merge status are intentionally not claimed by this document. Treat this as an implementation and focused-verification record until the branch is committed and integrated.

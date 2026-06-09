@@ -5,6 +5,8 @@ Sequence: 052
 Source: `docs/product-evolution/specs/p2-031-cdp-warehouse-physical-table-governance.md`, `docs/product-evolution/specs/p2-051-cdp-warehouse-live-doris-ddl-drift.md`, `docs/product-evolution/specs/p2-030-cdp-warehouse-quality-incident-loop.md`
 Implementation plan: `../plans/p2-052-cdp-warehouse-table-drift-incident-automation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Route warehouse physical table drift into the existing incident queue so WARN/FAIL contract inspections become actionable production operations work instead of passive evidence.

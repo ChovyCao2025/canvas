@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Locale;
 
 @Service
+/**
+ * CdpWarehouseIncidentService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class CdpWarehouseIncidentService {
 
     private static final int MAX_LIMIT = 100;
@@ -28,10 +31,20 @@ public class CdpWarehouseIncidentService {
 
     private final CdpWarehouseIncidentMapper incidentMapper;
 
+    /**
+     * 初始化 CdpWarehouseIncidentService 实例。
+     *
+     * @param incidentMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public CdpWarehouseIncidentService(CdpWarehouseIncidentMapper incidentMapper) {
         this.incidentMapper = incidentMapper;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param check check 参数，用于 recordQualityIncident 流程中的校验、计算或对象转换。
+     */
     public void recordQualityIncident(CdpWarehouseQualityService.QualityCheckResult check) {
         if (check == null || !shouldOpenIncident(check.status())) {
             return;
@@ -51,6 +64,11 @@ public class CdpWarehouseIncidentService {
         incidentMapper.upsertOpen(row);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     */
     public void recordRealtimePipelineIncident(RealtimePipelineIncidentInput input) {
         if (input == null || !shouldOpenIncident(input.status())) {
             return;
@@ -70,6 +88,11 @@ public class CdpWarehouseIncidentService {
         incidentMapper.upsertOpen(row);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     */
     public void recordRealtimeJobIncident(RealtimeJobIncidentInput input) {
         if (input == null || !shouldOpenIncident(input.healthStatus())) {
             return;
@@ -90,6 +113,11 @@ public class CdpWarehouseIncidentService {
         incidentMapper.upsertOpen(row);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     */
     public void recordReadinessIncident(ReadinessIncidentInput input) {
         if (input == null || !shouldOpenIncident(input.sectionStatus())) {
             return;
@@ -109,6 +137,11 @@ public class CdpWarehouseIncidentService {
         incidentMapper.upsertOpen(row);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     */
     public void recordTableDriftIncident(TableDriftIncidentInput input) {
         if (input == null || !shouldOpenIncident(input.status())) {
             return;
@@ -128,6 +161,11 @@ public class CdpWarehouseIncidentService {
         incidentMapper.upsertOpen(row);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     */
     public void recordAvailabilityIncident(AvailabilityIncidentInput input) {
         if (input == null || !shouldOpenIncident(input.gateStatus())) {
             return;
@@ -147,6 +185,11 @@ public class CdpWarehouseIncidentService {
         incidentMapper.upsertOpen(row);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     */
     public void recordConsumerAvailabilityIncident(ConsumerAvailabilityIncidentInput input) {
         if (input == null || !shouldOpenIncident(input.contractStatus())) {
             return;
@@ -166,6 +209,14 @@ public class CdpWarehouseIncidentService {
         incidentMapper.upsertOpen(row);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<IncidentView> listIncidents(Long tenantId, String status, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         LambdaQueryWrapper<CdpWarehouseIncidentDO> query = new LambdaQueryWrapper<CdpWarehouseIncidentDO>()
@@ -180,18 +231,42 @@ public class CdpWarehouseIncidentService {
         return rows == null ? List.of() : rows.stream().map(this::toView).toList();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param incidentId 业务对象 ID，用于定位具体记录。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 acknowledge 的布尔判断结果。
+     */
     public boolean acknowledge(Long tenantId, Long incidentId, String operator) {
         requireId(incidentId);
         return incidentMapper.acknowledge(normalizeTenant(tenantId), incidentId,
                 normalizeOperator(operator), LocalDateTime.now()) == 1;
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param incidentId 业务对象 ID，用于定位具体记录。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 resolve 的布尔判断结果。
+     */
     public boolean resolve(Long tenantId, Long incidentId, String operator) {
         requireId(incidentId);
         return incidentMapper.resolve(normalizeTenant(tenantId), incidentId,
                 normalizeOperator(operator), LocalDateTime.now()) == 1;
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param tableKey 业务键，用于在同一租户下定位资源。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 resolve table drift incident 的布尔判断结果。
+     */
     public boolean resolveTableDriftIncident(Long tenantId, String tableKey, String operator) {
         String incidentKey = "TABLE_DRIFT:" + required(tableKey, "UNKNOWN");
         return incidentMapper.resolveTableDriftByKey(
@@ -201,6 +276,15 @@ public class CdpWarehouseIncidentService {
                 LocalDateTime.now()) == 1;
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param mode mode 参数，用于 resolveAvailabilityIncident 流程中的校验、计算或对象转换。
+     * @param gateKey 业务键，用于在同一租户下定位资源。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 resolve availability incident 的布尔判断结果。
+     */
     public boolean resolveAvailabilityIncident(Long tenantId, String mode, String gateKey, String operator) {
         return incidentMapper.resolveAvailabilityByKey(
                 normalizeTenant(tenantId),
@@ -209,6 +293,14 @@ public class CdpWarehouseIncidentService {
                 LocalDateTime.now()) == 1;
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param contractKey 业务键，用于在同一租户下定位资源。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 resolve consumer availability incident 的布尔判断结果。
+     */
     public boolean resolveConsumerAvailabilityIncident(Long tenantId, String contractKey, String operator) {
         return incidentMapper.resolveConsumerAvailabilityByKey(
                 normalizeTenant(tenantId),
@@ -217,6 +309,12 @@ public class CdpWarehouseIncidentService {
                 LocalDateTime.now()) == 1;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private IncidentView toView(CdpWarehouseIncidentDO row) {
         return new IncidentView(
                 row.getId(),
@@ -237,6 +335,12 @@ public class CdpWarehouseIncidentService {
                 row.getResolvedAt());
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回布尔判断结果。
+     */
     private boolean shouldOpenIncident(String status) {
         if (!hasText(status)) {
             return false;
@@ -245,6 +349,12 @@ public class CdpWarehouseIncidentService {
         return !STATUS_PASS.equals(normalized) && !STATUS_SKIPPED.equals(normalized);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回 severity 生成的文本或业务键。
+     */
     private String severity(String status) {
         if (!hasText(status)) {
             return STATUS_WARN;
@@ -253,42 +363,90 @@ public class CdpWarehouseIncidentService {
         return STATUS_FAIL.equals(normalized) ? "CRITICAL" : STATUS_WARN;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param check check 参数，用于 title 流程中的校验、计算或对象转换。
+     * @return 返回 title 生成的文本或业务键。
+     */
     private String title(CdpWarehouseQualityService.QualityCheckResult check) {
         return "Warehouse quality " + check.status() + ": " + check.checkType();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 pipeline title 生成的文本或业务键。
+     */
     private String pipelineTitle(RealtimePipelineIncidentInput input) {
         return "Warehouse realtime pipeline " + upperDefault(input.status(), STATUS_WARN)
                 + ": " + required(input.pipelineKey(), "UNKNOWN");
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 readiness title 生成的文本或业务键。
+     */
     private String readinessTitle(ReadinessIncidentInput input) {
         return "Warehouse readiness " + upperDefault(input.sectionStatus(), STATUS_WARN)
                 + ": " + required(input.sectionKey(), "UNKNOWN");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 job title 生成的文本或业务键。
+     */
     private String jobTitle(RealtimeJobIncidentInput input) {
         return "Warehouse realtime job " + upperDefault(input.healthStatus(), STATUS_WARN)
                 + ": " + required(input.pipelineKey(), "UNKNOWN")
                 + "/" + required(input.jobKey(), "UNKNOWN");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 table drift title 生成的文本或业务键。
+     */
     private String tableDriftTitle(TableDriftIncidentInput input) {
         return "Warehouse table drift " + upperDefault(input.status(), STATUS_WARN)
                 + ": " + required(input.tableKey(), "UNKNOWN");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 availability title 生成的文本或业务键。
+     */
     private String availabilityTitle(AvailabilityIncidentInput input) {
         return "Warehouse availability " + upperDefault(input.gateStatus(), STATUS_WARN)
                 + ": " + required(input.mode(), "HYBRID")
                 + "/" + required(input.gateKey(), "UNKNOWN");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 consumer availability title 生成的文本或业务键。
+     */
     private String consumerAvailabilityTitle(ConsumerAvailabilityIncidentInput input) {
         return "Warehouse consumer availability " + upperDefault(input.contractStatus(), STATUS_WARN)
                 + ": " + required(input.contractKey(), "UNKNOWN");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param check check 参数，用于 description 流程中的校验、计算或对象转换。
+     * @return 返回 description 生成的文本或业务键。
+     */
     private String description(CdpWarehouseQualityService.QualityCheckResult check) {
         String value = "checkType=" + check.checkType()
                 + ", status=" + check.status()
@@ -303,6 +461,12 @@ public class CdpWarehouseIncidentService {
         return value.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 pipeline description 生成的文本或业务键。
+     */
     private String pipelineDescription(RealtimePipelineIncidentInput input) {
         String value = "pipelineKey=" + input.pipelineKey()
                 + ", status=" + input.status()
@@ -318,6 +482,12 @@ public class CdpWarehouseIncidentService {
         return value.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 readiness description 生成的文本或业务键。
+     */
     private String readinessDescription(ReadinessIncidentInput input) {
         String value = "readinessStatus=" + input.readinessStatus()
                 + ", sectionKey=" + input.sectionKey()
@@ -330,6 +500,12 @@ public class CdpWarehouseIncidentService {
         return value.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 job description 生成的文本或业务键。
+     */
     private String jobDescription(RealtimeJobIncidentInput input) {
         String value = "pipelineKey=" + input.pipelineKey()
                 + ", jobKey=" + input.jobKey()
@@ -349,6 +525,12 @@ public class CdpWarehouseIncidentService {
         return value.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 table drift description 生成的文本或业务键。
+     */
     private String tableDriftDescription(TableDriftIncidentInput input) {
         String value = "tableKey=" + input.tableKey()
                 + ", physicalName=" + input.physicalName()
@@ -366,6 +548,12 @@ public class CdpWarehouseIncidentService {
         return value.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 availability description 生成的文本或业务键。
+     */
     private String availabilityDescription(AvailabilityIncidentInput input) {
         String value = "mode=" + input.mode()
                 + ", gateKey=" + input.gateKey()
@@ -384,6 +572,12 @@ public class CdpWarehouseIncidentService {
         return value.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param input 输入数据，用于驱动规则判断或对象转换。
+     * @return 返回 consumer availability description 生成的文本或业务键。
+     */
     private String consumerAvailabilityDescription(ConsumerAvailabilityIncidentInput input) {
         String value = "contractKey=" + input.contractKey()
                 + ", consumerType=" + input.consumerType()
@@ -403,30 +597,75 @@ public class CdpWarehouseIncidentService {
         return value.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param mode mode 参数，用于 availabilityIncidentKey 流程中的校验、计算或对象转换。
+     * @param gateKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 availability incident key 生成的文本或业务键。
+     */
     private String availabilityIncidentKey(String mode, String gateKey) {
         return "AVAILABILITY:" + required(mode, "HYBRID") + ":" + required(gateKey, "UNKNOWN");
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param contractKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 consumer availability incident key 生成的文本或业务键。
+     */
     private String consumerAvailabilityIncidentKey(String contractKey) {
         return "CONSUMER_AVAILABILITY:" + required(contractKey, "UNKNOWN");
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOperator(String operator) {
         return hasText(operator) ? operator.trim() : "operator";
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 required 流程中的校验、计算或对象转换。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String fallback) {
         return hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : fallback;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 upperDefault 流程中的校验、计算或对象转换。
+     * @return 返回 upper default 生成的文本或业务键。
+     */
     private String upperDefault(String value, String fallback) {
         return hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : fallback;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundLimit(int limit) {
         if (limit <= 0) {
             return 20;
@@ -434,20 +673,40 @@ public class CdpWarehouseIncidentService {
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     */
     private void requireId(Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("incidentId must be positive");
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 null to zero 计算得到的数量、金额或指标值。
+     */
     private long nullToZero(Long value) {
         return value == null ? 0L : value;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * IncidentView 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record IncidentView(
             Long id,
             Long tenantId,
@@ -467,6 +726,9 @@ public class CdpWarehouseIncidentService {
             LocalDateTime resolvedAt) {
     }
 
+    /**
+     * RealtimePipelineIncidentInput 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record RealtimePipelineIncidentInput(
             Long tenantId,
             Long pipelineId,
@@ -480,6 +742,9 @@ public class CdpWarehouseIncidentService {
             List<String> reasons) {
     }
 
+    /**
+     * RealtimeJobIncidentInput 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record RealtimeJobIncidentInput(
             Long tenantId,
             Long jobInstanceId,
@@ -497,6 +762,9 @@ public class CdpWarehouseIncidentService {
             List<String> reasons) {
     }
 
+    /**
+     * ReadinessIncidentInput 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ReadinessIncidentInput(
             Long tenantId,
             String sectionKey,
@@ -506,6 +774,9 @@ public class CdpWarehouseIncidentService {
             LocalDateTime generatedAt) {
     }
 
+    /**
+     * TableDriftIncidentInput 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record TableDriftIncidentInput(
             Long tenantId,
             Long inspectionId,
@@ -520,6 +791,9 @@ public class CdpWarehouseIncidentService {
             LocalDateTime inspectedAt) {
     }
 
+    /**
+     * AvailabilityIncidentInput 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record AvailabilityIncidentInput(
             Long tenantId,
             String mode,
@@ -535,6 +809,9 @@ public class CdpWarehouseIncidentService {
             LocalDateTime generatedAt) {
     }
 
+    /**
+     * ConsumerAvailabilityIncidentInput 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ConsumerAvailabilityIncidentInput(
             Long tenantId,
             String contractKey,

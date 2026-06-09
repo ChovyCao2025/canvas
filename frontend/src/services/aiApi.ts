@@ -97,8 +97,10 @@ export function createAiApi(client: HttpLike) {
     listAiPromptTemplates: () =>
       client.get<R<AiPromptTemplateSummary[]>, R<AiPromptTemplateSummary[]>>('/ai/prompt-templates'),
 
-    saveAiPromptTemplate: (payload: AiPromptTemplateSaveRequest) =>
-      client.post<R<AiPromptTemplateDetail>, R<AiPromptTemplateDetail>>('/ai/prompt-templates', payload),
+    saveAiPromptTemplate: (payload: AiPromptTemplateSaveRequest, id?: number) =>
+      id == null
+        ? client.post<R<AiPromptTemplateDetail>, R<AiPromptTemplateDetail>>('/ai/prompt-templates', payload)
+        : client.put<R<AiPromptTemplateDetail>, R<AiPromptTemplateDetail>>(`/ai/prompt-templates/${id}`, payload),
 
     disableAiPromptTemplate: (id: number) =>
       client.post<R<void>, R<void>>(`/ai/prompt-templates/${id}/disable`),

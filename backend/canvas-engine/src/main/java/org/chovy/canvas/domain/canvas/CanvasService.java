@@ -100,6 +100,25 @@ public class CanvasService {
     /** 项目归属 Mapper，用于 projectId 列表过滤。 */
     private CanvasProjectFolderMapper projectFolderMapper;
 
+    /**
+     * 创建 CanvasService 实例并注入 domain.canvas 场景依赖。
+     * @param canvasMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param canvasVersionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dagParser dag parser 参数，用于 CanvasService 流程中的校验、计算或对象转换。
+     * @param triggerRouteService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param schedulerService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param configCache 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param canvasExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param preCheckService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param groovyHandler groovy handler 参数，用于 CanvasService 流程中的校验、计算或对象转换。
+     * @param mqTriggerHandler mq trigger handler 参数，用于 CanvasService 流程中的校验、计算或对象转换。
+     * @param canvasRuleGraphValidator canvas rule graph validator 参数，用于 CanvasService 流程中的校验、计算或对象转换。
+     * @param redis redis 参数，用于 CanvasService 流程中的校验、计算或对象转换。
+     * @param canvasTransactionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param stateTransitionPolicy state transition policy 参数，用于 CanvasService 流程中的校验、计算或对象转换。
+     * @param examplesProperties 配置对象，用于控制运行参数和策略开关。
+     * @param tenantScopeSupport tenant scope support 参数，用于 CanvasService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public CanvasService(CanvasMapper canvasMapper,
                          CanvasVersionMapper canvasVersionMapper,
@@ -128,26 +147,51 @@ public class CanvasService {
         }
     }
 
+    /**
+     * 执行 setBackgroundExecutor 流程，围绕 set background executor 完成校验、计算或结果组装。
+     *
+     * @param backgroundExecutor 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     @Autowired(required = false)
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
         this.backgroundExecutor = backgroundExecutor;
     }
 
+    /**
+     * 执行 setStateTransitionPolicy 流程，围绕 set state transition policy 完成校验、计算或结果组装。
+     *
+     * @param stateTransitionPolicy state transition policy 参数，用于 setStateTransitionPolicy 流程中的校验、计算或对象转换。
+     */
     @Autowired(required = false)
     void setStateTransitionPolicy(CanvasStateTransitionPolicy stateTransitionPolicy) {
         this.stateTransitionPolicy = stateTransitionPolicy;
     }
 
+    /**
+     * 执行 setAudienceSnapshotService 流程，围绕 set audience snapshot service 完成校验、计算或结果组装。
+     *
+     * @param audienceSnapshotService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setAudienceSnapshotService(AudienceSnapshotService audienceSnapshotService) {
         this.audienceSnapshotService = audienceSnapshotService;
     }
 
+    /**
+     * 执行 setProjectFolderMetadataService 流程，围绕 set project folder metadata service 完成校验、计算或结果组装。
+     *
+     * @param projectFolderMetadataService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setProjectFolderMetadataService(CanvasProjectFolderMetadataService projectFolderMetadataService) {
         this.projectFolderMetadataService = projectFolderMetadataService;
     }
 
+    /**
+     * 执行 setProjectFolderMapper 流程，围绕 set project folder mapper 完成校验、计算或结果组装。
+     *
+     * @param projectFolderMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired(required = false)
     void setProjectFolderMapper(CanvasProjectFolderMapper projectFolderMapper) {
         this.projectFolderMapper = projectFolderMapper;
@@ -192,6 +236,10 @@ public class CanvasService {
         return canvas;
     }
 
+    /**
+     * 使用认证态租户创建 Canvas。
+     * 方法会把传入租户写入创建请求后复用通用创建逻辑，确保控制器传来的租户上下文优先于请求体。
+     */
     public CanvasDO create(CanvasCreateReq req, Long tenantId) {
         CanvasCreateReq scoped = req == null ? new CanvasCreateReq() : req;
         scoped.setTenantId(tenantId);
@@ -245,7 +293,9 @@ public class CanvasService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateDraft(Long id, CanvasUpdateReq req) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CanvasDO canvas = canvasMapper.selectById(id);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
         stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
         assertPublishedRuntimePolicyUnchanged(canvas, req);
@@ -263,8 +313,9 @@ public class CanvasService {
 
         if (req.getGraphJson() == null) return;
 
+        boolean published = stateTransitionPolicy.isPublished(canvas);
         CanvasVersionDO existing = latestDraft(id);
-        if (existing != null) {
+        if (existing != null && !published) {
             existing.setGraphJson(req.getGraphJson());
             canvasVersionMapper.updateById(existing);
         } else {
@@ -297,12 +348,23 @@ public class CanvasService {
         return listInternal(q, tenantContext);
     }
 
+    /**
+     * 按指定租户分页查询 Canvas 列表。
+     * 该重载把租户条件写入查询对象后走统一查询逻辑，返回结果不会跨租户。
+     */
     public PageResult<CanvasDO> list(CanvasListQuery q, Long tenantId) {
         CanvasListQuery scoped = q == null ? new CanvasListQuery() : q;
         scoped.setTenantId(tenantId);
         return listInternal(scoped, null);
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param q q 参数，用于 listInternal 流程中的校验、计算或对象转换。
+     * @param tenantContext 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private PageResult<CanvasDO> listInternal(CanvasListQuery q, TenantContext tenantContext) {
         CanvasListQuery query = q == null ? new CanvasListQuery() : q;
         LambdaQueryWrapper<CanvasDO> wrapper = new LambdaQueryWrapper<>();
@@ -322,11 +384,37 @@ public class CanvasService {
         return PageResult.of(page.getTotal(), page.getRecords());
     }
 
+    /**
+     * 处理安全、签名或敏感信息逻辑。
+     *
+     * @param canvas canvas 参数，用于 saveProjectAssignment 流程中的校验、计算或对象转换。
+     * @param req 请求对象，承载本次操作的输入参数。
+     */
     private void saveProjectAssignment(CanvasDO canvas, CanvasCreateReq req) {
         if (req.getProjectId() == null
+                /**
+                 * 判断业务条件是否成立。
+                 *
+                 * @return 返回布尔判断结果。
+                 */
                 && isBlank(req.getProjectKey())
+                /**
+                 * 判断业务条件是否成立。
+                 *
+                 * @return 返回布尔判断结果。
+                 */
                 && isBlank(req.getProjectName())
+                /**
+                 * 判断业务条件是否成立。
+                 *
+                 * @return 返回布尔判断结果。
+                 */
                 && isBlank(req.getFolderKey())
+                /**
+                 * 判断业务条件是否成立。
+                 *
+                 * @return 返回布尔判断结果。
+                 */
                 && isBlank(req.getFolderName())) {
             return;
         }
@@ -343,7 +431,14 @@ public class CanvasService {
                         req.getCreatedBy()));
     }
 
+    /**
+     * 执行 projectCanvasIds 流程，围绕 project canvas ids 完成校验、计算或结果组装。
+     *
+     * @param query query 参数，用于 projectCanvasIds 流程中的校验、计算或对象转换。
+     * @return 返回 project canvas ids 汇总后的集合、分页或映射视图。
+     */
     private List<Long> projectCanvasIds(CanvasListQuery query) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (query.getProjectId() == null) {
             return null;
         }
@@ -353,6 +448,7 @@ public class CanvasService {
         LambdaQueryWrapper<CanvasProjectFolderDO> wrapper = new LambdaQueryWrapper<CanvasProjectFolderDO>()
                 .eq(CanvasProjectFolderDO::getProjectId, query.getProjectId())
                 .eq(query.getTenantId() != null, CanvasProjectFolderDO::getTenantId, query.getTenantId());
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return projectFolderMapper.selectList(wrapper).stream()
                 .map(CanvasProjectFolderDO::getCanvasId)
                 .filter(Objects::nonNull)
@@ -435,6 +531,14 @@ public class CanvasService {
             Long.class
     );
 
+    /**
+     * 执行 bindAudienceSnapshotsForPublish 流程，围绕 bind audience snapshots for publish 完成校验、计算或结果组装。
+     *
+     * @param canvasId 业务对象 ID，用于定位具体记录。
+     * @param draft draft 参数，用于 bindAudienceSnapshotsForPublish 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 bind audience snapshots for publish 生成的文本或业务键。
+     */
     private String bindAudienceSnapshotsForPublish(Long canvasId, CanvasVersionDO draft, String operator) {
         if (audienceSnapshotService == null) {
             return draft.getGraphJson();
@@ -474,6 +578,14 @@ public class CanvasService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param graph graph 参数，用于 validateSubFlowDependencies 流程中的校验、计算或对象转换。
+     * @param path path 参数，用于 validateSubFlowDependencies 流程中的校验、计算或对象转换。
+     * @param visited visited 参数，用于 validateSubFlowDependencies 流程中的校验、计算或对象转换。
+     * @param errors errors 参数，用于 validateSubFlowDependencies 流程中的校验、计算或对象转换。
+     */
     private void validateSubFlowDependencies(DagGraph graph,
                                              List<Long> path,
                                              Set<Long> visited,
@@ -487,6 +599,7 @@ public class CanvasService {
             Long subFlowId;
             try {
                 subFlowId = Long.parseLong(String.valueOf(subFlowIdObj));
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (NumberFormatException e) {
                 errors.add("节点「" + node.getName() + "」引用的子流程 ID 非法: " + subFlowIdObj);
                 return;
@@ -501,10 +614,13 @@ public class CanvasService {
             CanvasDO subFlow = canvasMapper.selectById(subFlowId);
             if (subFlow == null) {
                 errors.add("节点「" + node.getName() + "」引用的子流程 ID=" + subFlowId + " 不存在");
+            // 根据前序判断结果进入后续条件分支。
             } else if (!Objects.equals(subFlow.getStatus(), CanvasStatusEnum.PUBLISHED.getCode())) {
                 errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」未发布（当前状态: " + subFlow.getStatus() + "）");
+            // 根据前序判断结果进入后续条件分支。
             } else if (subFlow.getPublishedVersionId() == null) {
                 errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」缺少发布版本");
+            // 根据前序判断结果进入后续条件分支。
             } else if (visited.add(subFlowId)) {
                 CanvasVersionDO publishedVersion = canvasVersionMapper.selectById(subFlow.getPublishedVersionId());
                 if (publishedVersion == null) {
@@ -514,6 +630,7 @@ public class CanvasService {
                 path.add(subFlowId);
                 try {
                     validateSubFlowDependencies(dagParser.parse(publishedVersion.getGraphJson()), path, visited, errors);
+                // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                 } catch (RuntimeException e) {
                     errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」校验失败: " + e.getMessage());
                 } finally {
@@ -523,6 +640,12 @@ public class CanvasService {
         });
     }
 
+    /**
+     * 执行 joinPath 流程，围绕 join path 完成校验、计算或结果组装。
+     *
+     * @param path path 参数，用于 joinPath 流程中的校验、计算或对象转换。
+     * @return 返回 join path 生成的文本或业务键。
+     */
     private String joinPath(List<Long> path) {
         return path.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(" -> "));
     }
@@ -644,14 +767,6 @@ public class CanvasService {
         canvasExecutionService.invalidateCanvas(canvasId);
     }
 
-    /**
-     * 执行 latest Draft 对应的业务逻辑。
-     *
-     * <p>实现会通过持久化层读取或写入数据库记录。
-     *
-     * @param canvasId canvasId 对应的业务主键或标识
-     * @return 方法执行后的业务结果
-     */
 // ── private helpers ──────────────────────────────────────
 
     /** 查询最新草稿版本。 */
@@ -682,7 +797,9 @@ public class CanvasService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void revertToVersion(Long canvasId, Long versionId) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CanvasVersionDO target = canvasVersionMapper.selectById(versionId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (target == null) throw new IllegalArgumentException("版本不存在: " + versionId);
         if (!target.getCanvasId().equals(canvasId)) throw new IllegalArgumentException("版本不属于该画布");
         CanvasDO canvas = canvasMapper.selectById(canvasId);
@@ -766,7 +883,9 @@ public class CanvasService {
 
     /** 从当前发布版本反解析 DAG 并清理全部触发路由。 */
     private void clearTriggerRoutes(Long canvasId) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         CanvasDO canvas = canvasMapper.selectById(canvasId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (canvas == null || canvas.getPublishedVersionId() == null) return;
         CanvasVersionDO v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
         if (v == null) return;
@@ -793,6 +912,12 @@ public class CanvasService {
         });
     }
 
+    /**
+     * 应用请求中的业务字段或租户约束。
+     *
+     * @param canvas canvas 参数，用于 applyRuntimePolicyFields 流程中的校验、计算或对象转换。
+     * @param req 请求对象，承载本次操作的输入参数。
+     */
     private void applyRuntimePolicyFields(CanvasDO canvas, CanvasUpdateReq req) {
         if (req.getTriggerType() != null) canvas.setTriggerType(req.getTriggerType());
         canvas.setCronExpression(req.getCronExpression());
@@ -808,21 +933,82 @@ public class CanvasService {
         canvas.setAttributionWindowDays(req.getAttributionWindowDays());
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param canvas canvas 参数，用于 assertPublishedRuntimePolicyUnchanged 流程中的校验、计算或对象转换。
+     * @param req 请求对象，承载本次操作的输入参数。
+     */
     private void assertPublishedRuntimePolicyUnchanged(CanvasDO canvas, CanvasUpdateReq req) {
         if (!stateTransitionPolicy.isPublished(canvas)) {
             return;
         }
         boolean changed = changed(req.getTriggerType(), canvas.getTriggerType())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getCronExpression(), canvas.getCronExpression())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getValidStart(), canvas.getValidStart())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getValidEnd(), canvas.getValidEnd())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getMaxTotalExecutions(), canvas.getMaxTotalExecutions())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getPerUserDailyLimit(), canvas.getPerUserDailyLimit())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getPerUserTotalLimit(), canvas.getPerUserTotalLimit())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getCooldownSeconds(), canvas.getCooldownSeconds())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getControlGroupPercent(), canvas.getControlGroupPercent())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getControlGroupSalt(), canvas.getControlGroupSalt())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getConversionEventCode(), canvas.getConversionEventCode())
+                /**
+                 * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 changed 流程生成的业务结果。
+                 */
                 || changed(req.getAttributionWindowDays(), canvas.getAttributionWindowDays());
         if (changed) {
             throw new IllegalStateException(
@@ -830,10 +1016,23 @@ public class CanvasService {
         }
     }
 
+    /**
+     * 执行 changed 流程，围绕 changed 完成校验、计算或结果组装。
+     *
+     * @param requested requested 参数，用于 changed 流程中的校验、计算或对象转换。
+     * @param current current 参数，用于 changed 流程中的校验、计算或对象转换。
+     * @return 返回 changed 的布尔判断结果。
+     */
     private static boolean changed(Object requested, Object current) {
         return requested != null && !Objects.equals(requested, current);
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

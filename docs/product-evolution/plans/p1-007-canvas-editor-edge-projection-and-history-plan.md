@@ -228,7 +228,8 @@ cd frontend && npm run build
 
 Expected: PASS with TypeScript and Vite build success. Actual: PASS.
 
-- [ ] **Step 3: Commit** - skipped in this session per user instruction not to commit.
+- [x] **Step 3: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

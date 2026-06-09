@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082n-monitoring-scheduler-and-trend-workbench-
 
 Move monitoring from manually triggered polling to production-style always-on listening by adding a due-source polling scheduler and exposing trend snapshots in the operator workbench.
 
-## Delivery Status
+## Implementation Status
 
 Delivered backend and frontend slice:
 

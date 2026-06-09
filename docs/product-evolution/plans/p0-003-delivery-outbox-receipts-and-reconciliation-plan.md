@@ -18,7 +18,7 @@
 ## Spec Reference
 
 - `docs/product-evolution/specs/p0-003-delivery-outbox-receipts-and-reconciliation.md`
-- Optimization sources: `docs/optimization/production-design-gaps.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/bmad-product-review-2026-05.md`
+- Optimization sources: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`
 
 ## File Structure
 
@@ -264,7 +264,8 @@ cd frontend && npm run build
 
 Result: passed.
 
-- [ ] **Step 5: Commit implementation slice**
+- [x] **Step 5: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

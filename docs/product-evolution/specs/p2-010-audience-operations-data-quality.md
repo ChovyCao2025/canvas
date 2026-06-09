@@ -5,6 +5,8 @@ Sequence: 010
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#audience-operations-and-data-quality`
 Implementation plan: `../plans/p2-010-audience-operations-data-quality-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Add audience set operations, snapshots, freshness, health monitoring, user 360 refinements, data catalog, and quality checks.

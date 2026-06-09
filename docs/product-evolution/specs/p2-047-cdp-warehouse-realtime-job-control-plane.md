@@ -5,6 +5,8 @@ Sequence: 047
 Source: `docs/product-evolution/specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`, `docs/product-evolution/specs/p2-033-cdp-warehouse-realtime-pipeline-incidents.md`, `docs/product-evolution/specs/p2-046-cdp-warehouse-realtime-schema-evolution-guard.md`
 Implementation plan: `../plans/p2-047-cdp-warehouse-realtime-job-control-plane-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a production control plane for external realtime warehouse jobs so Flink CDC, Flink SQL, Kafka Connect, and Doris routine-load style jobs can report heartbeats, expose stale or failed runtime state, and receive auditable pause, resume, and restart requests.

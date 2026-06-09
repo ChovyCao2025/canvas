@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Scaffolds a new conversation provider adapter and focused verification hooks.
+#
+# Generated files follow the existing adapter contract layout so new providers can
+# be added with consistent DTOs, tests, and dry-run guidance.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

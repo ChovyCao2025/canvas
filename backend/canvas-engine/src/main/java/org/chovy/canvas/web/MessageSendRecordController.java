@@ -18,13 +18,32 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 
+/**
+ * MessageSendRecordController 暴露 web 场景的 HTTP 接口。
+ */
 @RestController
 @RequestMapping("/canvas/message-send-records")
 @RequiredArgsConstructor
 public class MessageSendRecordController {
 
     private final MessageSendRecordMapper mapper;
-
+    /**
+     * 查询消息 Send Record列表接口，对应 GET 请求。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param canvasId 画布 ID，可选。
+     * @param executionId execution ID，可选。
+     * @param userId user ID，可选。
+     * @param channel 渠道过滤条件，可选。
+     * @param status 状态过滤条件，可选。
+     * @param startAt 请求参数，可选。
+     * @param endAt 请求参数，可选。
+     * @param page 请求参数，默认值为 1。
+     * @param size 请求参数，默认值为 20。
+     * @return 异步返回统一响应，包含分页结果。
+     */
     @GetMapping
     public Mono<R<PageResult<MessageSendRecordDO>>> list(
             @RequestParam(required = false) Long canvasId,
@@ -51,7 +70,15 @@ public class MessageSendRecordController {
             return R.ok(PageResult.of(result.getTotal(), result.getRecords()));
         }).subscribeOn(Schedulers.boundedElastic());
     }
-
+    /**
+     * 获取消息 Send Record详情接口，对应 GET /{id}。
+     * 接口不直接解析租户上下文，访问边界由路由鉴权和下游服务约束。
+     * 该接口只读取数据，不主动触发业务写入。
+     * 阻塞型服务调用被包在 Mono 中，并调度到 boundedElastic 线程池执行。
+     *
+     * @param id 资源 ID。
+     * @return 异步返回统一响应，包含获取消息 Send Record详情后的业务数据。
+     */
     @GetMapping("/{id}")
     public Mono<R<MessageSendRecordDO>> detail(@PathVariable Long id) {
         return Mono.fromCallable(() -> {
@@ -63,14 +90,32 @@ public class MessageSendRecordController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param size 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 clamp 计算得到的数量、金额或指标值。
+     */
     private static int clamp(int size) {
         return Math.max(1, Math.min(size, 100));
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String normalize(String value) {
         return value == null ? null : value.trim().toUpperCase();
     }

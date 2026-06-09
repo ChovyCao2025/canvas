@@ -5,6 +5,8 @@ Sequence: 014
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#design-system-and-guided-experience`
 Implementation plan: `../plans/p2-014-design-system-guided-experience-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Create design tokens, consistent empty states, onboarding tours, content style rules, accessible form patterns, motion guidelines, and reduced-motion support.

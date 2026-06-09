@@ -1,3 +1,4 @@
+# 一次性提交 MySQL CDP 事件日志到 Doris ODS 的 Flink 作业。
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -9,6 +10,7 @@ metadata:
     app.kubernetes.io/part-of: marketing-canvas
     canvas.chovy.org/pipeline-key: mysql_cdp_event_log_to_doris_ods
 spec:
+  # submitter 只负责把作业提交到远端 JobManager，失败时最多重试 3 次。
   backoffLimit: 3
   template:
     metadata:
@@ -17,21 +19,29 @@ spec:
         app.kubernetes.io/component: flink-job-submitter
         app.kubernetes.io/part-of: marketing-canvas
     spec:
+      # 提交脚本失败时重启 Pod，成功提交后 Job 即完成。
       restartPolicy: OnFailure
+      # 使用 Flink 专用 ServiceAccount，便于后续按需收敛集群权限。
       serviceAccountName: canvas-flink
       containers:
         - name: submit
+          # 镜像内包含业务 jar 与 flink CLI，用于向运行中的 JobManager 发起 run 命令。
           image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
           imagePullPolicy: IfNotPresent
           env:
+            # 作业管道键，同时写入环境变量和命令行参数，保证运行时配置与提交入口一致。
             - name: CANVAS_FLINK_JOB_PIPELINE_KEY
               value: mysql_cdp_event_log_to_doris_ods
+            # 默认租户 0 用于平台级同步任务，业务多租户作业可按需覆盖。
             - name: CANVAS_FLINK_TENANT_ID
               value: "0"
+            # 上报来源用于后端任务状态与告警定位提交者。
             - name: CANVAS_FLINK_REPORTED_BY
               value: canvas-flink-jobs-prod
+            # Doris Stream Load label 后缀，留空时由任务运行时自动生成幂等标签。
             - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
               value: ""
+            # MySQL 连接信息来自 Secret，避免在部署清单中暴露数据库凭据。
             - name: CANVAS_FLINK_MYSQL_URL
               valueFrom:
                 secretKeyRef:
@@ -47,6 +57,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-mysql-password
+            # Doris FE/BE/JDBC 与账号统一从运行时 Secret 注入，支持环境间替换。
             - name: CANVAS_FLINK_DORIS_FE_NODES
               valueFrom:
                 secretKeyRef:
@@ -72,6 +83,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-doris-password
+            # checkpoint 回调地址与内部 API token 用于作业向 canvas-engine 上报运行状态。
             - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
               valueFrom:
                 secretKeyRef:
@@ -85,15 +97,18 @@ spec:
           command: ["/bin/bash", "-ec"]
           args:
             - |
+              # 等待 JobManager REST 端点可用，避免 Deployment 尚未就绪时提交失败。
               until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
                 sleep 5
               done
+              # 以 detached 模式提交业务 jar，Kubernetes Job 完成后 Flink 作业继续运行。
               flink run -d \
                 -m canvas-flink-jobmanager:8081 \
                 -c org.chovy.canvas.flink.CanvasFlinkJobMain \
                 /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar \
                 --pipeline-key=mysql_cdp_event_log_to_doris_ods
 ---
+# 一次性提交 Canvas 行为轨迹到 Doris ODS 的 Flink 作业。
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -105,6 +120,7 @@ metadata:
     app.kubernetes.io/part-of: marketing-canvas
     canvas.chovy.org/pipeline-key: mysql_canvas_trace_to_doris_ods
 spec:
+  # submitter 只负责提交，不承载实际流处理；短暂失败交给 Job 重试。
   backoffLimit: 3
   template:
     metadata:
@@ -113,21 +129,29 @@ spec:
         app.kubernetes.io/component: flink-job-submitter
         app.kubernetes.io/part-of: marketing-canvas
     spec:
+      # 提交 Pod 出错时重启，提交成功后由 Kubernetes 标记 Job 完成。
       restartPolicy: OnFailure
+      # 与 Flink 集群使用同一服务身份，方便统一管理访问权限。
       serviceAccountName: canvas-flink
       containers:
         - name: submit
+          # 业务提交镜像，包含 flink CLI 和 canvas-flink-jobs 业务包。
           image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
           imagePullPolicy: IfNotPresent
           env:
+            # 当前提交的管道键，对应 Canvas 轨迹表到 Doris ODS 层的同步任务。
             - name: CANVAS_FLINK_JOB_PIPELINE_KEY
               value: mysql_canvas_trace_to_doris_ods
+            # 平台级离线/实时同步默认归属租户 0。
             - name: CANVAS_FLINK_TENANT_ID
               value: "0"
+            # 标记运行状态来源，便于在后端排查是哪个部署环境提交的作业。
             - name: CANVAS_FLINK_REPORTED_BY
               value: canvas-flink-jobs-prod
+            # Doris label 后缀默认留空，运行时按 pipeline 与 checkpoint 生成。
             - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
               value: ""
+            # MySQL 源端连接配置使用 Secret 管理。
             - name: CANVAS_FLINK_MYSQL_URL
               valueFrom:
                 secretKeyRef:
@@ -143,6 +167,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-mysql-password
+            # Doris 目标端节点与凭据同样从 Secret 注入，部署文件只保留引用关系。
             - name: CANVAS_FLINK_DORIS_FE_NODES
               valueFrom:
                 secretKeyRef:
@@ -168,6 +193,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-doris-password
+            # 作业状态上报所需的后端接口地址和鉴权令牌。
             - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
               valueFrom:
                 secretKeyRef:
@@ -181,15 +207,18 @@ spec:
           command: ["/bin/bash", "-ec"]
           args:
             - |
+              # 轮询 JobManager，确保 REST 提交入口已经可连接。
               until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
                 sleep 5
               done
+              # detached 提交后 submitter Pod 退出，实际流处理由 Flink 集群托管。
               flink run -d \
                 -m canvas-flink-jobmanager:8081 \
                 -c org.chovy.canvas.flink.CanvasFlinkJobMain \
                 /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar \
                 --pipeline-key=mysql_canvas_trace_to_doris_ods
 ---
+# 一次性提交 Doris ODS 事件明细到 DWD 事实层的 Flink 作业。
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -201,6 +230,7 @@ metadata:
     app.kubernetes.io/part-of: marketing-canvas
     canvas.chovy.org/pipeline-key: doris_ods_cdp_event_to_dwd_fact
 spec:
+  # 允许提交阶段短暂失败后自动重试，降低 JobManager 滚动发布时的误失败概率。
   backoffLimit: 3
   template:
     metadata:
@@ -209,21 +239,29 @@ spec:
         app.kubernetes.io/component: flink-job-submitter
         app.kubernetes.io/part-of: marketing-canvas
     spec:
+      # 只要提交脚本失败就重启 Pod；提交完成后不再常驻。
       restartPolicy: OnFailure
+      # 复用 Flink 运行服务账号，后续如需访问 ConfigMap/Secret 可统一授权。
       serviceAccountName: canvas-flink
       containers:
         - name: submit
+          # submitter 镜像必须与业务 jar 版本保持一致，避免入口类或配置模型不匹配。
           image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
           imagePullPolicy: IfNotPresent
           env:
+            # DWD 事实层构建管道键，业务入口据此选择 SQL/算子拓扑。
             - name: CANVAS_FLINK_JOB_PIPELINE_KEY
               value: doris_ods_cdp_event_to_dwd_fact
+            # 汇总公共事实数据时使用平台租户。
             - name: CANVAS_FLINK_TENANT_ID
               value: "0"
+            # 上报来源用于追踪生产 submitter 发起的状态更新。
             - name: CANVAS_FLINK_REPORTED_BY
               value: canvas-flink-jobs-prod
+            # Doris 写入 label 的可选后缀，保持空值即可使用运行时默认策略。
             - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
               value: ""
+            # MySQL 配置仍注入，满足通用运行时依赖和后续维表/配置读取需求。
             - name: CANVAS_FLINK_MYSQL_URL
               valueFrom:
                 secretKeyRef:
@@ -239,6 +277,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-mysql-password
+            # 读取和写入 Doris 所需的节点、JDBC 与账号信息。
             - name: CANVAS_FLINK_DORIS_FE_NODES
               valueFrom:
                 secretKeyRef:
@@ -264,6 +303,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-doris-password
+            # 后端 checkpoint 上报配置，用于把 Flink 进度同步回平台。
             - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
               valueFrom:
                 secretKeyRef:
@@ -277,15 +317,18 @@ spec:
           command: ["/bin/bash", "-ec"]
           args:
             - |
+              # 等待 JobManager 可接受 CLI 请求，避免提交脚本在集群启动窗口失败。
               until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
                 sleep 5
               done
+              # 使用统一入口类提交，具体 DAG 由 pipeline-key 决定。
               flink run -d \
                 -m canvas-flink-jobmanager:8081 \
                 -c org.chovy.canvas.flink.CanvasFlinkJobMain \
                 /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar \
                 --pipeline-key=doris_ods_cdp_event_to_dwd_fact
 ---
+# 一次性提交 Doris DWD 用户事实到 DWS 日指标层的 Flink 作业。
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -297,6 +340,7 @@ metadata:
     app.kubernetes.io/part-of: marketing-canvas
     canvas.chovy.org/pipeline-key: doris_dwd_user_fact_to_dws_metric_daily
 spec:
+  # 提交动作最多重试 3 次，实际流任务失败恢复由 Flink 自身策略负责。
   backoffLimit: 3
   template:
     metadata:
@@ -305,21 +349,29 @@ spec:
         app.kubernetes.io/component: flink-job-submitter
         app.kubernetes.io/part-of: marketing-canvas
     spec:
+      # OnFailure 只覆盖 submitter 脚本，不会在提交成功后反复创建作业。
       restartPolicy: OnFailure
+      # 使用 Flink ServiceAccount 保持集群内访问身份一致。
       serviceAccountName: canvas-flink
       containers:
         - name: submit
+          # 生产提交镜像，包含 DWS 指标作业所需的业务 jar。
           image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
           imagePullPolicy: IfNotPresent
           env:
+            # DWS 日指标汇总管道键，对应用户事实到日粒度指标的计算链路。
             - name: CANVAS_FLINK_JOB_PIPELINE_KEY
               value: doris_dwd_user_fact_to_dws_metric_daily
+            # 指标汇总作业默认在平台租户下运行。
             - name: CANVAS_FLINK_TENANT_ID
               value: "0"
+            # 运行状态上报的提交者标识。
             - name: CANVAS_FLINK_REPORTED_BY
               value: canvas-flink-jobs-prod
+            # 预留 Doris label 后缀，通常由运行时自动拼接。
             - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
               value: ""
+            # 通用 MySQL 连接配置，供任务读取平台配置或维度信息。
             - name: CANVAS_FLINK_MYSQL_URL
               valueFrom:
                 secretKeyRef:
@@ -335,6 +387,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-mysql-password
+            # Doris 集群访问配置用于读取 DWD 数据并写入 DWS 指标表。
             - name: CANVAS_FLINK_DORIS_FE_NODES
               valueFrom:
                 secretKeyRef:
@@ -360,6 +413,7 @@ spec:
                 secretKeyRef:
                   name: canvas-flink-runtime
                   key: canvas-flink-doris-password
+            # 进度回调与内部鉴权令牌由后端校验，防止外部伪造状态更新。
             - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
               valueFrom:
                 secretKeyRef:
@@ -373,9 +427,11 @@ spec:
           command: ["/bin/bash", "-ec"]
           args:
             - |
+              # 先确认 JobManager REST 服务可用，再提交指标汇总作业。
               until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
                 sleep 5
               done
+              # detached 模式让 submitter 只承担启动职责，作业生命周期交给 Flink 管理。
               flink run -d \
                 -m canvas-flink-jobmanager:8081 \
                 -c org.chovy.canvas.flink.CanvasFlinkJobMain \

@@ -9,6 +9,9 @@ import org.chovy.canvas.dal.dataobject.CdpWarehouseTableContractDO;
 
 import java.time.LocalDateTime;
 
+/**
+ * CdpWarehouseTableContractMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface CdpWarehouseTableContractMapper extends BaseMapper<CdpWarehouseTableContractDO> {
 
@@ -42,6 +45,12 @@ public interface CdpWarehouseTableContractMapper extends BaseMapper<CdpWarehouse
                 expected_properties_json = VALUES(expected_properties_json),
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsert(@Param("row") CdpWarehouseTableContractDO row);
 
     @Update("""
@@ -53,6 +62,16 @@ public interface CdpWarehouseTableContractMapper extends BaseMapper<CdpWarehouse
             WHERE tenant_id = #{tenantId}
               AND table_key = #{tableKey}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param tableKey 业务键，用于在同一租户下定位资源。
+     * @param inspectedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     * @return 返回流程执行后的业务结果。
+     */
     int updateInspection(@Param("tenantId") Long tenantId,
                          @Param("tableKey") String tableKey,
                          @Param("inspectedAt") LocalDateTime inspectedAt,

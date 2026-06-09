@@ -1,5 +1,9 @@
 # CDP Warehouse Quality Incident Loop Implementation Plan
 
+Spec: `../specs/p2-030-cdp-warehouse-quality-incident-loop.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Convert warehouse quality warnings into durable incidents with acknowledge and resolve lifecycle APIs.
 
 **Architecture:** Keep `cdp_warehouse_quality_check` as the immutable check ledger. Add a deduplicated incident table keyed by tenant and incident key. `CdpWarehouseQualityService` records incidents as a best-effort side effect after warning checks are persisted.

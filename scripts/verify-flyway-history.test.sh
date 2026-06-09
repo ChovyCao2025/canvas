@@ -36,8 +36,10 @@ cat > "$resolved" <<'EOF'
 91	data security and tenant isolation	1
 92	execution context cold backup	1
 93	tenant scope datasources and execution requests	1
-272	sanitize demo datasource credentials	1
-273	enforce core tenant not null	1
+272	github oauth integration	1
+273	add filesystem read capability	1
+354	sanitize demo datasource credentials	1
+355	enforce core tenant not null	1
 EOF
 cat > "$old_conflict" <<'EOF'
 91	sanitize demo datasource credentials	1

@@ -68,7 +68,9 @@ public class TagDefinitionService {
 
     /** 删除标签定义，若已有用户标签引用则阻止删除。 */
     public void delete(Long id) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         TagDefinitionDO existing = tagDefinitionMapper.selectById(id);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (existing == null) {
             throw new IllegalArgumentException("tag definition not found: " + id);
         }
@@ -104,9 +106,11 @@ public class TagDefinitionService {
 
     /** 更新标签可选值。 */
     public void updateValue(Long id, TagValueDefinitionDO body) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (body == null) {
             throw new IllegalArgumentException("tag value body is required");
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         TagValueDefinitionDO existingValue = tagValueDefinitionMapper.selectById(id);
         if (existingValue == null) {
             throw new IllegalArgumentException("tag value definition not found: " + id);
@@ -129,7 +133,9 @@ public class TagDefinitionService {
 
     /** 删除标签可选值。 */
     public void deleteValue(Long id) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         TagValueDefinitionDO existing = tagValueDefinitionMapper.selectById(id);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (existing == null) {
             throw new IllegalArgumentException("tag value definition not found: " + id);
         }
@@ -213,6 +219,7 @@ public class TagDefinitionService {
 
     /** 为标签定义写入启用状态、写入策略和描述类字段默认值。 */
     private static void applyDefaults(TagDefinitionDO body) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (body.getEnabled() == null) {
             body.setEnabled(1);
         }
@@ -239,7 +246,9 @@ public class TagDefinitionService {
     /** 校验标签可选值所属标签和值内容，并规范化展示文案。 */
     private static void validateAndNormalizeValueBody(
             TagValueDefinitionDO body, TagDefinitionDO definition, String expectedTagCode, boolean allowMissingValue) {
+        // 准备本次处理所需的上下文和中间变量。
         String normalizedTagCode = normalizeTagCode(body.getTagCode());
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!expectedTagCode.equals(normalizedTagCode)) {
             throw new IllegalArgumentException("tagCode does not match existing definition");
         }
@@ -263,6 +272,7 @@ public class TagDefinitionService {
 
     /** 为标签可选值写入排序、启用状态和来源默认值。 */
     private static void applyValueDefaults(TagValueDefinitionDO body) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (body.getSortOrder() == null) {
             body.setSortOrder(0);
         }
@@ -278,6 +288,7 @@ public class TagDefinitionService {
 
     /** 按标签值类型校验候选值，确保 NUMBER、BOOLEAN 等类型可被执行链路消费。 */
     private static void validateTagValue(String valueType, String tagValue) {
+        // 准备本次处理所需的上下文和中间变量。
         String normalizedValue = normalizeValue(tagValue);
         String normalizedValueType = normalizeValueType(valueType);
         switch (normalizedValueType) {
@@ -297,6 +308,7 @@ public class TagDefinitionService {
                 }
                 return;
             case "JSON":
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return;
             default:
                 throw new IllegalArgumentException("unsupported valueType: " + normalizedValueType);

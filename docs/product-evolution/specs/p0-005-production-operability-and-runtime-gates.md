@@ -2,7 +2,7 @@
 
 Priority: P0
 Sequence: 005
-Source: `docs/optimization/production-readiness-checklist.md`, `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/todo/2026-05-31-evolution-directions.md`
+Source: `docs/optimization/archive/production-readiness-checklist.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`, `docs/optimization/todo/2026-05-31-evolution-directions.md`
 Implementation plan: `../plans/p0-005-production-operability-and-runtime-gates-plan.md`
 
 ## Implementation Status

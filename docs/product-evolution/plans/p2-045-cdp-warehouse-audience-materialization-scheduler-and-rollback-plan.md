@@ -1,10 +1,14 @@
 # CDP Warehouse Audience Materialization Scheduler And Rollback Implementation Plan
 
+Spec: `../specs/p2-045-cdp-warehouse-audience-materialization-scheduler-and-rollback.md`
+
 **Goal:** Add production-grade scheduled audience materialization and guarded rollback for versioned audience bitmaps.
 
 **Architecture:** Keep P2-021 materialization as the single writer. Add due-selection and scheduling around it. Keep rollback in the bitmap store/persistence layer so membership lookup continues to rely on DB `READY` state. Reuse `CdpWarehouseJobLeaseService` for distributed scheduler protection.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

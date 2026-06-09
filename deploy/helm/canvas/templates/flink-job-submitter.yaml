@@ -1,5 +1,6 @@
 {{- if .Values.flink.enabled }}
 {{- $root := . }}
+# Render one submitter Job per configured realtime warehouse pipeline.
 {{- range .Values.flink.pipelines }}
 ---
 apiVersion: batch/v1
@@ -12,6 +13,7 @@ metadata:
     app.kubernetes.io/component: flink-job-submitter
     canvas.chovy.org/pipeline-key: {{ . | quote }}
 spec:
+  # Submitter jobs are idempotent enough for limited retry while the JobManager becomes reachable.
   backoffLimit: 3
   template:
     metadata:
@@ -31,6 +33,7 @@ spec:
           image: "{{ $root.Values.flink.image.repository }}:{{ $root.Values.flink.image.tag }}"
           imagePullPolicy: {{ $root.Values.flink.image.pullPolicy }}
           env:
+            # Pipeline key selects the SQL template and checkpoint reporting identity.
             - name: CANVAS_FLINK_JOB_PIPELINE_KEY
               value: {{ . | quote }}
             - name: CANVAS_FLINK_TENANT_ID
@@ -92,9 +95,11 @@ spec:
           command: ["/bin/bash", "-ec"]
           args:
             - |
+              # Wait for the in-cluster JobManager REST endpoint before submitting detached SQL jobs.
               until flink list -m {{ include "canvas.fullname" $root }}-flink-jobmanager:8081 >/dev/null 2>&1; do
                 sleep 5
               done
+              # Detached submission lets the Kubernetes Job finish after handing work to Flink.
               flink run -d \
                 -m {{ include "canvas.fullname" $root }}-flink-jobmanager:8081 \
                 -c org.chovy.canvas.flink.CanvasFlinkJobMain \

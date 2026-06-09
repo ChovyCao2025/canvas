@@ -31,6 +31,12 @@ public class CdpTagOperationService {
     private final CdpTagService tagService;
     private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
 
+    /**
+     * 创建 CdpTagOperationService 实例并注入 domain.cdp 场景依赖。
+     * @param operationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param tagService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param ignoredBackgroundTaskExecutor 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     @Autowired
     public CdpTagOperationService(CdpTagOperationMapper operationMapper,
                                   CdpTagService tagService,
@@ -39,6 +45,11 @@ public class CdpTagOperationService {
         this.tagService = tagService;
     }
 
+    /**
+     * 执行 setBackgroundExecutor 流程，围绕 set background executor 完成校验、计算或结果组装。
+     *
+     * @param backgroundExecutor 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     @Autowired(required = false)
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
         this.backgroundExecutor = backgroundExecutor;
@@ -116,6 +127,7 @@ public class CdpTagOperationService {
                             req.operator(), op.getId() + ":" + userId + ":" + req.tagCode()));
                 }
                 success++;
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException e) {
                 fail++;
                 if (errors.length() < 900) {
@@ -133,14 +145,17 @@ public class CdpTagOperationService {
 
     /** 从任务错误摘要中提取失败用户 ID，供失败重试复用。 */
     private List<String> extractFailedUserIds(String errorMsg) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (errorMsg == null || errorMsg.isBlank()) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return Arrays.stream(errorMsg.split(";"))
                 .map(String::trim)
                 .filter(item -> !item.isBlank())
                 .map(item -> {
                     int idx = item.indexOf(':');
+                    // 汇总前面计算出的状态和明细，返回给调用方。
                     return idx > 0 ? item.substring(0, idx).trim() : "";
                 })
                 .filter(item -> !item.isBlank())

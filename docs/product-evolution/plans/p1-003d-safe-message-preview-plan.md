@@ -423,7 +423,8 @@ Result: TypeScript and Vite build passed.
 - Read: `docs/product-evolution/specs/p1-003d-safe-message-preview.md`
 - Read: `docs/product-evolution/plans/p1-003d-safe-message-preview-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

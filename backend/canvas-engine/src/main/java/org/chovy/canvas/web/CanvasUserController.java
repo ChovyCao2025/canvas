@@ -29,12 +29,13 @@ public class CanvasUserController {
     private final CanvasUserQueryService service;
 
     /**
-     * 处理 list 对应的 HTTP 接口请求。
+     * 查询指定画布当前命中的用户清单。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     * <p>接口以画布 ID 作为查询边界，返回用户在该画布下的基础画像和触达相关字段；
+     * 租户访问控制由查询服务按画布归属处理，控制器只负责异步封装和统一响应。</p>
      *
-     * @param id id 对应的业务主键或标识
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param id 画布 ID，用于限定用户清单所属的营销旅程。
+     * @return 异步返回画布命中的用户行数据。
      */
     @GetMapping
     public Mono<R<List<CanvasUserRowDTO>>> list(@PathVariable Long id) {
@@ -43,13 +44,14 @@ public class CanvasUserController {
     }
 
     /**
-     * 处理 get 对应的 HTTP 接口请求。
+     * 查询单个用户在指定画布中的画像和触达状态。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     * <p>该接口用于画布用户明细页，服务层会把 {@code id} 与 {@code userId} 组合校验，
+     * 避免读取不属于该画布命中集合的用户数据。</p>
      *
-     * @param id id 对应的业务主键或标识
-     * @param userId userId 对应的业务主键或标识
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param id 画布 ID。
+     * @param userId 业务用户标识，通常来自 CDP 用户索引或触达事件。
+     * @return 异步返回该用户在画布内的用户行数据。
      */
     @GetMapping("/{userId}")
     public Mono<R<CanvasUserRowDTO>> get(@PathVariable Long id, @PathVariable String userId) {
@@ -58,13 +60,14 @@ public class CanvasUserController {
     }
 
     /**
-     * 处理 executions 对应的 HTTP 接口请求。
+     * 查询单个用户在指定画布中的执行轨迹。
      *
-     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     * <p>返回结果按服务层定义展示节点执行记录，可用于排查用户为什么进入、跳过或停留在某个节点。
+     * 查询只读，不会重放节点或改变画布运行状态。</p>
      *
-     * @param id id 对应的业务主键或标识
-     * @param userId userId 对应的业务主键或标识
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @param id 画布 ID。
+     * @param userId 业务用户标识。
+     * @return 异步返回该用户在画布内的执行记录列表。
      */
     @GetMapping("/{userId}/executions")
     public Mono<R<List<CanvasExecutionDO>>> executions(@PathVariable Long id, @PathVariable String userId) {

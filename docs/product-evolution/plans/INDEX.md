@@ -1,6 +1,6 @@
 # Product Evolution Plans Index
 
-Plans are ordered by priority and sequence. Each plan uses the superpowers writing-plans header and checkbox task structure.
+Plans are ordered by priority and sequence. Most active implementation plans use the superpowers writing-plans header and checkbox task structure; older completed plans may be status-record plans and are tracked as such in `../EXECUTABLE_PLAN_AUDIT.md`.
 
 | Order | Plan |
 |-------|------|
@@ -132,6 +132,7 @@ Plans are ordered by priority and sequence. Each plan uses the superpowers writi
 | P2-080 | [Conversational Session Foundation](p2-080-conversational-session-foundation-plan.md) |
 | P2-081 | [CDP Warehouse Enterprise OLAP Readiness](p2-081-cdp-warehouse-enterprise-olap-readiness-plan.md) |
 | P2-082 | [Marketing Platform Gap Closure](p2-082-marketing-platform-gap-closure-plan.md) |
+| P2-082A/B/C | Tracked inside the P2-082 umbrella plan; standalone child plan files start at P2-082D. |
 | P2-082D | [SCRM Operator Workspace](p2-082d-scrm-operator-workspace-plan.md) |
 | P2-082D2 | [Private-Domain Contact And Group Sync](p2-082d2-private-domain-contact-group-sync-plan.md) |
 | P2-082E | [Paid-Media Audience Sync](p2-082e-paid-media-audience-sync-plan.md) |
@@ -175,7 +176,7 @@ Plans are ordered by priority and sequence. Each plan uses the superpowers writi
 | P3-006 | [Ecosystem And Partner Program](p3-006-ecosystem-and-partner-program-plan.md) |
 | P3-007 | [AI Native Marketing Operations](p3-007-ai-native-marketing-operations-plan.md) |
 | P3-008 | [Industry Packaging](p3-008-industry-packaging-plan.md) |
-| P3-009 | [Globalization And Regional Expansion](p3-009-globalization-and-regional-expansion-plan.md) |
-| P3-010 | [Advanced Privacy And Compliance](p3-010-advanced-privacy-and-compliance-plan.md) |
-| P3-011 | [Advanced Architecture And Deployment Strategy](p3-011-advanced-architecture-and-deployment-strategy-plan.md) |
-| P3-012 | [Product Led Growth And Community](p3-012-product-led-growth-and-community-plan.md) |
+| P3-009 | [Globalization And Regional Expansion Evidence Plan](p3-009-globalization-and-regional-expansion-plan.md) |
+| P3-010 | [Advanced Privacy And Compliance Evidence Plan](p3-010-advanced-privacy-and-compliance-plan.md) |
+| P3-011 | [Advanced Architecture And Deployment Strategy Evidence Plan](p3-011-advanced-architecture-and-deployment-strategy-plan.md) |
+| P3-012 | [Product Led Growth And Community Evidence Plan](p3-012-product-led-growth-and-community-plan.md) |

@@ -83,136 +83,136 @@ public class TieredCacheBuilder<K, V> {
     /**
      * 构造 TieredCacheBuilder 实例。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>请通过 {@link #builder()} 创建，确保默认 TTL、穿透/击穿/雪崩保护和失败策略一致。
      */
     private TieredCacheBuilder() {}
 
     /**
-     * 配置 builder 参数，并返回当前构建器以继续链式设置。
+     * 创建一个带默认分层缓存策略的构建器。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>默认启用短 TTL 空值缓存、L1 单机 single-flight、L2 TTL 抖动和 Redis 失败降级回源。
      *
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @return 新的缓存构建器
      */
     public static <K, V> TieredCacheBuilder<K, V> builder() {
         return new TieredCacheBuilder<>();
     }
 
     /**
-     * 配置 name 参数，并返回当前构建器以继续链式设置。
+     * 设置缓存实例名称。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>名称会用于管理器注册、指标标签、Redis key 前缀的一部分和跨节点失效频道，应保持稳定且唯一。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 缓存实例名称
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> name(String value) { this.name = value; return this; }
     /**
-     * 配置 l1 Max Size 参数，并返回当前构建器以继续链式设置。
+     * 设置 L1 本地缓存最大条目数。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该限制只作用于当前 JVM 内的 Caffeine 缓存，不影响 Redis 中的 L2 数据容量。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value L1 最大条目数，必须大于 0
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> l1MaxSize(int value) { this.l1MaxSize = value; return this; }
     /**
-     * 配置 l1 Refresh After Write 参数，并返回当前构建器以继续链式设置。
+     * 设置 L1 写入后的异步刷新间隔。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>Caffeine 在读取热点 key 时会按该间隔触发 refresh，刷新逻辑仍会优先检查 L2，再按需回源 L3。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value L1 刷新间隔，必须为正数
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> l1RefreshAfterWrite(Duration value) { this.l1RefreshAfterWrite = value; return this; }
     /**
-     * 配置 l2 Key Prefix 参数，并返回当前构建器以继续链式设置。
+     * 设置 L2 Redis key 前缀。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>最终 Redis key 会包含该前缀、缓存名称、key schema 版本和业务 key，用于隔离不同缓存域。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value Redis key 前缀
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> l2KeyPrefix(String value) { this.l2KeyPrefix = value; return this; }
     /**
-     * 配置 l2 Ttl 参数，并返回当前构建器以继续链式设置。
+     * 设置 L2 Redis 正常值 TTL。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>业务值写入 Redis 时使用该 TTL；空值和空集合会分别使用 nullValueTtl、emptyValueTtl。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value L2 正常值过期时间，必须为正数
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> l2Ttl(Duration value) { this.l2Ttl = value; return this; }
     /**
-     * 配置 l2 Ttl Jitter 参数，并返回当前构建器以继续链式设置。
+     * 设置 L2 TTL 抖动比例。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>开启雪崩保护时，实际 Redis TTL 会在基础 TTL 上增加随机抖动，避免大量 key 同时过期。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 抖动比例，范围 0 到 1
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> l2TtlJitter(double value) { this.l2TtlJitter = value; return this; }
     /**
-     * 配置 key Schema Version 参数，并返回当前构建器以继续链式设置。
+     * 设置缓存 key 结构版本。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>当业务 key 拼接规则或序列化兼容性变化时提升版本，可以让新旧 Redis 数据自然隔离。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value key schema 版本号
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> keySchemaVersion(int value) { this.keySchemaVersion = value; return this; }
     /**
-     * 配置 null Value Ttl 参数，并返回当前构建器以继续链式设置。
+     * 设置 null 业务值的短 TTL。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>穿透保护缓存 null 占位时使用该 TTL，既减少无效回源，也避免长期屏蔽后续新增数据。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value null 占位过期时间，必须为正数
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> nullValueTtl(Duration value) { this.nullValueTtl = value; return this; }
     /**
-     * 配置 empty Value Ttl 参数，并返回当前构建器以继续链式设置。
+     * 设置空集合或空结果的短 TTL。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>用于缓存非 null 但语义为空的结果，降低空查询压力，同时保留较快恢复窗口。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 空结果过期时间，必须为正数
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> emptyValueTtl(Duration value) { this.emptyValueTtl = value; return this; }
     /**
-     * 配置 lock Ttl 参数，并返回当前构建器以继续链式设置。
+     * 设置分布式加载锁 TTL。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>启用分布式击穿保护时，Redis 锁超过该时间会自动释放，避免加载节点异常导致其他节点永久等待。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 分布式锁过期时间，必须为正数
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> lockTtl(Duration value) { this.lockTtl = value; return this; }
     /**
-     * 配置 refresh Ahead 参数，并返回当前构建器以继续链式设置。
+     * 设置提前刷新窗口。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该值预留给接近过期时的主动刷新策略，必须非负；为 0 时不启用提前刷新窗口。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 提前刷新窗口，必须非负
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> refreshAhead(Duration value) { this.refreshAhead = value; return this; }
     /**
-     * 配置 stale Ttl 参数，并返回当前构建器以继续链式设置。
+     * 设置旧值兜底可用时间。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>启用加载失败返回旧值策略时，最近一次成功加载的值会在该窗口内作为失败兜底。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 旧值兜底 TTL，必须为正数
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> staleTtl(Duration value) { this.staleTtl = value; return this; }
     /**
-     * 配置 hotspot Protection 参数，并返回当前构建器以继续链式设置。
+     * 开关热点 key 保护。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>开启后会把默认击穿策略升级为本地加分布式互斥，降低热点 key 在多节点同时回源的概率。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 是否启用热点 key 保护
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> hotspotProtection(boolean value) {
         this.hotspotProtection = value;
@@ -223,103 +223,103 @@ public class TieredCacheBuilder<K, V> {
         return this;
     }
     /**
-     * 配置 penetration 参数，并返回当前构建器以继续链式设置。
+     * 设置缓存穿透保护策略。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该策略决定非法 key、布隆过滤器判空或加载器返回 null 时，是拒绝、短 TTL 缓存空值还是直接回源透传。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 穿透保护策略
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> penetration(PenetrationProtectionStrategy value) { this.penetration = value; return this; }
     /**
-     * 配置 breakdown 参数，并返回当前构建器以继续链式设置。
+     * 设置缓存击穿保护策略。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该策略决定未命中回源时是否使用本地 single-flight、Redis 分布式锁或组合策略来收敛并发加载。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 击穿保护策略
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> breakdown(BreakdownProtectionStrategy value) { this.breakdown = value; return this; }
     /**
-     * 配置 avalanche 参数，并返回当前构建器以继续链式设置。
+     * 设置缓存雪崩保护策略。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>当前实现主要通过 TTL 抖动分散 L2 key 过期时间，降低同一时间大量回源的风险。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 雪崩保护策略
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> avalanche(AvalancheProtectionStrategy value) { this.avalanche = value; return this; }
     /**
-     * 配置 key Validator 参数，并返回当前构建器以继续链式设置。
+     * 设置业务 key 校验器。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>校验失败的 key 会进入穿透保护分支，可用于拦截明显非法的用户输入或空 key。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 业务 key 校验器
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> keyValidator(Predicate<K> value) { this.keyValidator = value; return this; }
     /**
-     * 配置 bloom Filter 参数，并返回当前构建器以继续链式设置。
+     * 设置布隆过滤器。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>当过滤器判断 key 不可能存在时，缓存可直接按穿透保护策略处理，避免访问 L3 数据源。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 布隆过滤器实现
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> bloomFilter(CacheBloomFilter<K> value) { this.bloomFilter = value; return this; }
     /**
-     * 配置 on Loader Failure 参数，并返回当前构建器以继续链式设置。
+     * 设置 L3 加载器失败策略。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该策略决定回源异常时是向调用方抛出、返回空结果，还是在可用时返回最近一次旧值兜底。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 加载器失败策略
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> onLoaderFailure(LoaderFailureStrategy value) { this.loaderFailure = value; return this; }
     /**
-     * 配置 on Redis Read Failure 参数，并返回当前构建器以继续链式设置。
+     * 设置 Redis 读取失败策略。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>默认降级为继续访问 L3，避免 Redis 短暂不可用时阻断业务读取；也可配置为直接抛出。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value Redis 读取失败策略
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> onRedisReadFailure(RedisFailureStrategy value) { this.redisReadFailure = value; return this; }
     /**
-     * 配置 on Redis Write Failure 参数，并返回当前构建器以继续链式设置。
+     * 设置 Redis 写入失败策略。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>默认记录失败并继续返回业务结果，避免 L2 写入故障影响 L3 查询成功的主流程。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value Redis 写入失败策略
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> onRedisWriteFailure(RedisFailureStrategy value) { this.redisWriteFailure = value; return this; }
     /**
-     * 配置 on Deserialize Failure 参数，并返回当前构建器以继续链式设置。
+     * 设置 Redis 值反序列化失败策略。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>当 L2 中存在脏数据或类型不兼容数据时，可选择删除后回源、直接抛出，或按配置降级。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 反序列化失败策略
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> onDeserializeFailure(DeserializeFailureStrategy value) { this.deserializeFailure = value; return this; }
     /**
-     * 配置 loader 参数，并返回当前构建器以继续链式设置。
+     * 设置 L3 数据加载器。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>缓存未命中且穿透/击穿保护允许回源时会调用该函数；返回 null 会按空值缓存策略处理。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value L3 数据加载函数
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> loader(Function<K, V> value) { this.loader = value; return this; }
 
     /**
-     * 配置 value Type 参数，并返回当前构建器以继续链式设置。
+     * 设置缓存值类型。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>该类型用于 Jackson 反序列化 Redis 中的 L2 JSON 值，必须与 loader 返回值兼容。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 缓存值 Java 类型
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> valueType(Class<?> value) {
         this.configuredValueType = value;
@@ -328,12 +328,12 @@ public class TieredCacheBuilder<K, V> {
     }
 
     /**
-     * 配置 value Type 参数，并返回当前构建器以继续链式设置。
+     * 设置带泛型信息的缓存值类型。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>用于 List、Map 等泛型值，避免 L2 JSON 反序列化时丢失元素类型。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 缓存值类型引用
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> valueType(TypeReference<?> value) {
         this.configuredValueType = value.getType();
@@ -342,12 +342,12 @@ public class TieredCacheBuilder<K, V> {
     }
 
     /**
-     * 配置 object Mapper 参数，并返回当前构建器以继续链式设置。
+     * 设置缓存值序列化使用的 ObjectMapper。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>如果此前已经配置 valueType，本方法会用新的 ObjectMapper 重新构造 JavaType，保证读写使用同一类型体系。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value Jackson ObjectMapper
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> objectMapper(ObjectMapper value) {
         this.objectMapper = value;
@@ -359,31 +359,32 @@ public class TieredCacheBuilder<K, V> {
     }
 
     /**
-     * 配置 enable Metrics 参数，并返回当前构建器以继续链式设置。
+     * 开关 Micrometer 指标注册。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>关闭后不会向 MeterRegistry 注册 L1/L2/L3 计数和大小指标，但 {@link TieredCache#stats()} 仍可读取内部计数。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 是否启用指标注册
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> enableMetrics(boolean value) { this.enableMetrics = value; return this; }
     /**
-     * 配置 meter Registry 参数，并返回当前构建器以继续链式设置。
+     * 设置当前缓存专用的 MeterRegistry。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>未设置时会沿用 {@link TieredCacheManager} 中的全局 registry；设置后仅影响当前 builder 构建出的缓存。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param value 指标注册表
+     * @return 当前构建器
      */
     public TieredCacheBuilder<K, V> meterRegistry(MeterRegistry value) { this.meterRegistry = value; return this; }
 
     /**
-     * 构建、解析或转换 build 相关的业务数据。
+     * 校验配置并构建缓存实例。
      *
-     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     * <p>构建时注入同步/响应式 Redis、失效发布器和指标注册表，并立即注册到 manager，供注解切面和跨节点失效使用。
      *
-     * @param manager manager 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param manager 缓存注册中心和 Redis 依赖来源
+     * @return 已注册的分层缓存实例
+     * @throws IllegalStateException 必填配置缺失或 TTL、抖动比例等参数非法时抛出
      */
     public TieredCache<K, V> build(TieredCacheManager manager) {
         if (name == null || name.isBlank()) throw new IllegalStateException("name is required");

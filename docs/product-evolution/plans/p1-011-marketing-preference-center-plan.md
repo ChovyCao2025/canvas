@@ -1,10 +1,16 @@
 # Marketing Preference Center Implementation Plan
 
+Spec: `../specs/p1-011-marketing-preference-center.md`
+
 **Goal:** Implement the missing Mautic-inspired operator/admin surface for marketing consent, customer channels, and suppression records using existing Canvas policy tables.
 
 **Architecture:** Add a tenant-scoped service above the existing MyBatis-Plus mappers. Expose WebFlux endpoints for user report and policy writes. Add a React/Ant Design workbench that manages one user at a time and keeps delivery-path policy logic unchanged.
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, JUnit 5, Mockito, AssertJ, React, Ant Design, Vitest.
+
+**Implementation Status:** Completed on 2026-06-05.
+
+Status: Completed on 2026-06-05.
 
 ## Task 1: Product Documentation
 

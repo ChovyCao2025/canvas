@@ -5,6 +5,8 @@ Sequence: 060
 Source: `docs/product-evolution/specs/p2-055-cdp-warehouse-data-availability-gates.md`, `docs/product-evolution/specs/p2-040-cdp-warehouse-semantic-metric-contracts.md`, `docs/product-evolution/specs/p2-045-cdp-warehouse-audience-materialization-scheduler-and-rollback.md`
 Implementation plan: `../plans/p2-060-cdp-warehouse-consumer-availability-contracts-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add table, dataset, and metric availability contracts for downstream warehouse consumers so BI queries, semantic metrics, audience materialization, and future schedulers can declare the warehouse assets they depend on and receive a deterministic allow/block decision for a requested data window.

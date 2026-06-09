@@ -17,29 +17,29 @@ import java.lang.annotation.Target;
 @Documented
 public @interface TieredCachePut {
     /**
-     * 返回 TieredCachePut 的 name 配置值。
+     * 指定要写入的缓存实例名称。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>切面会通过该名称定位已注册缓存；不存在时会抛出配置错误，避免静默丢失缓存写入。
      *
-     * @return 转换或查询得到的字符串结果
+     * @return 缓存实例名称
      */
     String name();
 
     /**
-     * 返回 TieredCachePut 的 key 配置值。
+     * 指定写入 key 的 SpEL 表达式。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>表达式可引用方法参数和返回结果变量 {@code #result}，用于把更新后的对象写回对应缓存 key。
      *
-     * @return 转换或查询得到的字符串结果
+     * @return SpEL key 表达式
      */
     String key();
 
     /**
-     * 执行 after Commit 对应的业务逻辑。
+     * 是否等待事务提交后再写入缓存。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>默认在事务提交后写入，避免数据库回滚但缓存已经保存新返回值导致脏读。
      *
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @return true 表示提交后写入，false 表示目标方法返回后立即写入
      */
     boolean afterCommit() default true;
 }

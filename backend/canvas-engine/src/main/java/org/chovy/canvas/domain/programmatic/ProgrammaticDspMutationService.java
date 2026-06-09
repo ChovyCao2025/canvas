@@ -30,6 +30,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * ProgrammaticDspMutationService 编排 domain.programmatic 场景的领域业务规则。
+ */
 @Service
 public class ProgrammaticDspMutationService {
 
@@ -64,6 +67,16 @@ public class ProgrammaticDspMutationService {
     private final ProgrammaticDspProviderWriteGateway gateway;
     private final Clock clock;
 
+    /**
+     * 创建 ProgrammaticDspMutationService 实例并注入 domain.programmatic 场景依赖。
+     * @param seatMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param campaignMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param lineItemMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param supplyPathMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param mutationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param gateway gateway 参数，用于 ProgrammaticDspMutationService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public ProgrammaticDspMutationService(ProgrammaticDspSeatMapper seatMapper,
                                           ProgrammaticDspCampaignMapper campaignMapper,
@@ -76,6 +89,18 @@ public class ProgrammaticDspMutationService {
                 gateway, Clock.systemDefaultZone());
     }
 
+    /**
+     * 执行 ProgrammaticDspMutationService 流程，围绕 programmatic dsp mutation service 完成校验、计算或结果组装。
+     *
+     * @param seatMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param campaignMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param lineItemMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param supplyPathMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param mutationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param gateway gateway 参数，用于 ProgrammaticDspMutationService 流程中的校验、计算或对象转换。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     ProgrammaticDspMutationService(ProgrammaticDspSeatMapper seatMapper,
                                    ProgrammaticDspCampaignMapper campaignMapper,
                                    ProgrammaticDspLineItemMapper lineItemMapper,
@@ -94,9 +119,14 @@ public class ProgrammaticDspMutationService {
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
+    /**
+     * 提交程序化 DSP Provider 写操作提案。
+     * 方法校验 seat/campaign/line item/supply path 的租户关系和 payload，按 mutationKey 幂等创建草稿并记录请求 hash。
+     */
     public ProgrammaticDspMutationView propose(Long tenantId,
                                                ProgrammaticDspMutationCommand command,
                                                String actor) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("programmatic DSP mutation command is required");
         }
@@ -114,6 +144,7 @@ public class ProgrammaticDspMutationService {
         String requestHash = sha256(payloadJson);
         String mutationKey = required(command.mutationKey(), "mutationKey");
         String idempotencyKey = defaultString(command.idempotencyKey(), mutationKey);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         ProgrammaticDspMutationDO existing = mutationMapper.selectOne(new LambdaQueryWrapper<ProgrammaticDspMutationDO>()
                 .eq(ProgrammaticDspMutationDO::getTenantId, scopedTenantId)
                 .eq(ProgrammaticDspMutationDO::getMutationKey, mutationKey)
@@ -148,9 +179,14 @@ public class ProgrammaticDspMutationService {
         row.setCreatedAt(changedAt);
         row.setUpdatedAt(changedAt);
         mutationMapper.insert(row);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row);
     }
 
+    /**
+     * 审批 DSP Provider 写操作提案。
+     * 通过后进入 READY，拒绝后进入 CANCELLED，并记录审批人、时间和决策原因。
+     */
     public ProgrammaticDspMutationView approve(Long tenantId,
                                                Long mutationId,
                                                ProgrammaticDspMutationApprovalCommand command,
@@ -162,6 +198,7 @@ public class ProgrammaticDspMutationService {
             rejectSelfApproval(row.getCreatedBy(), actor);
             row.setApprovalStatus("APPROVED");
             row.setStatus("READY");
+        // 根据前序判断结果进入后续条件分支。
         } else if ("REJECTED".equals(decision)) {
             row.setApprovalStatus("REJECTED");
             row.setStatus("CANCELLED");
@@ -179,12 +216,17 @@ public class ProgrammaticDspMutationService {
         return toView(row);
     }
 
+    /**
+     * 执行或干跑已审批的 DSP Provider 写操作。
+     * 会按 dry-run 要求控制正式执行，调用 Provider gateway 后保存脱敏请求、响应、错误码和状态。
+     */
     public ProgrammaticDspMutationView execute(Long tenantId,
                                                Long mutationId,
                                                ProgrammaticDspMutationExecuteCommand command,
                                                String actor) {
         Long scopedTenantId = normalizeTenant(tenantId);
         ProgrammaticDspMutationDO row = mutation(scopedTenantId, mutationId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!"APPROVED".equals(row.getApprovalStatus())) {
             throw new IllegalStateException("programmatic DSP mutation must be approved before execution");
         }
@@ -215,6 +257,7 @@ public class ProgrammaticDspMutationService {
                 command == null || !Boolean.FALSE.equals(command.partialFailure()),
                 map(row.getPayloadJson()),
                 command == null || command.metadata() == null ? Map.of() : command.metadata());
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         ProgrammaticDspMutationResult result = gateway.execute(request);
         LocalDateTime changedAt = now();
         row.setProviderRequestJson(json(providerRequestEvidence(request)));
@@ -230,9 +273,14 @@ public class ProgrammaticDspMutationService {
             row.setStatus(dryRun ? "DRY_RUN_FAILED" : "FAILED");
         }
         mutationMapper.updateById(row);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row);
     }
 
+    /**
+     * 查询租户内 DSP Provider 写操作提案。
+     * 支持按 seat、campaign、line item、执行状态和审批状态过滤，按更新时间倒序返回。
+     */
     public List<ProgrammaticDspMutationView> list(Long tenantId, ProgrammaticDspMutationQuery query) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long seatId = query == null ? null : query.seatId();
@@ -241,6 +289,7 @@ public class ProgrammaticDspMutationService {
         String status = query == null ? null : normalizeOptionalUpper(query.status());
         String approvalStatus = query == null ? null : normalizeOptionalUpper(query.approvalStatus());
         int limit = Math.min(Math.max(query == null || query.limit() == null ? 50 : query.limit(), 1), 100);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return safeList(mutationMapper.selectList(new LambdaQueryWrapper<ProgrammaticDspMutationDO>()
                 .eq(ProgrammaticDspMutationDO::getTenantId, scopedTenantId)
                 .eq(seatId != null, ProgrammaticDspMutationDO::getSeatId, seatId)
@@ -249,6 +298,7 @@ public class ProgrammaticDspMutationService {
                 .eq(status != null, ProgrammaticDspMutationDO::getStatus, status)
                 .eq(approvalStatus != null, ProgrammaticDspMutationDO::getApprovalStatus, approvalStatus)
                 .orderByDesc(ProgrammaticDspMutationDO::getUpdatedAt)
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .last("LIMIT " + limit))).stream()
                 .filter(row -> scopedTenantId.equals(row.getTenantId()))
                 .filter(row -> seatId == null || Objects.equals(seatId, row.getSeatId()))
@@ -261,6 +311,13 @@ public class ProgrammaticDspMutationService {
                 .toList();
     }
 
+    /**
+     * 执行 seat 流程，围绕 seat 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param seatId 业务对象 ID，用于定位具体记录。
+     * @return 返回 seat 流程生成的业务结果。
+     */
     private ProgrammaticDspSeatDO seat(Long tenantId, Long seatId) {
         ProgrammaticDspSeatDO seat = seatMapper.selectById(requiredId(seatId, "seatId"));
         validateTenant(tenantId, seat == null ? null : seat.getTenantId(), "seat");
@@ -270,6 +327,13 @@ public class ProgrammaticDspMutationService {
         return seat;
     }
 
+    /**
+     * 执行 campaign 流程，围绕 campaign 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param campaignId 业务对象 ID，用于定位具体记录。
+     * @return 返回 campaign 流程生成的业务结果。
+     */
     private ProgrammaticDspCampaignDO campaign(Long tenantId, Long campaignId) {
         if (campaignId == null) {
             return null;
@@ -279,6 +343,13 @@ public class ProgrammaticDspMutationService {
         return campaign;
     }
 
+    /**
+     * 执行 lineItem 流程，围绕 line item 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param lineItemId 业务对象 ID，用于定位具体记录。
+     * @return 返回 lineItem 流程生成的业务结果。
+     */
     private ProgrammaticDspLineItemDO lineItem(Long tenantId, Long lineItemId) {
         if (lineItemId == null) {
             return null;
@@ -288,6 +359,13 @@ public class ProgrammaticDspMutationService {
         return lineItem;
     }
 
+    /**
+     * 执行 supplyPath 流程，围绕 supply path 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param supplyPathId 业务对象 ID，用于定位具体记录。
+     * @return 返回 supplyPath 流程生成的业务结果。
+     */
     private ProgrammaticDspSupplyPathDO supplyPath(Long tenantId, Long supplyPathId) {
         if (supplyPathId == null) {
             return null;
@@ -298,20 +376,43 @@ public class ProgrammaticDspMutationService {
         return supplyPath;
     }
 
+    /**
+     * 执行 mutation 流程，围绕 mutation 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param mutationId 业务对象 ID，用于定位具体记录。
+     * @return 返回 mutation 流程生成的业务结果。
+     */
     private ProgrammaticDspMutationDO mutation(Long tenantId, Long mutationId) {
         ProgrammaticDspMutationDO row = mutationMapper.selectById(requiredId(mutationId, "mutationId"));
         validateTenant(tenantId, row == null ? null : row.getTenantId(), "mutation");
         return row;
     }
 
+    /**
+     * 执行 campaignId 流程，围绕 campaign id 完成校验、计算或结果组装。
+     *
+     * @param commandCampaignId 业务对象 ID，用于定位具体记录。
+     * @param lineItem line item 参数，用于 campaignId 流程中的校验、计算或对象转换。
+     * @return 返回 campaign id 计算得到的数量、金额或指标值。
+     */
     private Long campaignId(Long commandCampaignId, ProgrammaticDspLineItemDO lineItem) {
         return commandCampaignId == null && lineItem != null ? lineItem.getCampaignId() : commandCampaignId;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param seat 时间参数，用于计算窗口、过期或审计时间。
+     * @param campaign campaign 参数，用于 validateRelationship 流程中的校验、计算或对象转换。
+     * @param lineItem line item 参数，用于 validateRelationship 流程中的校验、计算或对象转换。
+     * @param supplyPath supply path 参数，用于 validateRelationship 流程中的校验、计算或对象转换。
+     */
     private void validateRelationship(ProgrammaticDspSeatDO seat,
                                       ProgrammaticDspCampaignDO campaign,
                                       ProgrammaticDspLineItemDO lineItem,
                                       ProgrammaticDspSupplyPathDO supplyPath) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (lineItem != null && !Objects.equals(seat.getId(), lineItem.getSeatId())) {
             throw new IllegalArgumentException("line item does not belong to seat");
         }
@@ -331,6 +432,17 @@ public class ProgrammaticDspMutationService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param mutationType 类型标识，用于选择对应处理分支。
+     * @param entityType 类型标识，用于选择对应处理分支。
+     * @param campaign campaign 参数，用于 validatePayload 流程中的校验、计算或对象转换。
+     * @param lineItem line item 参数，用于 validatePayload 流程中的校验、计算或对象转换。
+     * @param supplyPath supply path 参数，用于 validatePayload 流程中的校验、计算或对象转换。
+     * @param payload 待处理业务值，用于规则计算、转换或外部调用。
+     * @param externalEntityId 业务对象 ID，用于定位具体记录。
+     */
     private void validatePayload(String mutationType,
                                  String entityType,
                                  ProgrammaticDspCampaignDO campaign,
@@ -338,9 +450,11 @@ public class ProgrammaticDspMutationService {
                                  ProgrammaticDspSupplyPathDO supplyPath,
                                  Map<String, Object> payload,
                                  String externalEntityId) {
+        // 准备本次处理所需的上下文和中间变量。
         rejectProviderSecrets(payload);
         switch (mutationType) {
             case "CREATE_INSERTION_ORDER" -> {
+                // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                 if (!"CAMPAIGN".equals(entityType) && !"INSERTION_ORDER".equals(entityType)) {
                     throw new IllegalArgumentException("insertion order mutation entity must be CAMPAIGN or INSERTION_ORDER");
                 }
@@ -401,18 +515,37 @@ public class ProgrammaticDspMutationService {
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param campaign campaign 参数，用于 requireCampaign 流程中的校验、计算或对象转换。
+     * @param mutationType 类型标识，用于选择对应处理分支。
+     */
     private void requireCampaign(ProgrammaticDspCampaignDO campaign, String mutationType) {
         if (campaign == null) {
             throw new IllegalArgumentException(mutationType + " requires campaign");
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param lineItem line item 参数，用于 requireLineItem 流程中的校验、计算或对象转换。
+     * @param mutationType 类型标识，用于选择对应处理分支。
+     */
     private void requireLineItem(ProgrammaticDspLineItemDO lineItem, String mutationType) {
         if (lineItem == null) {
             throw new IllegalArgumentException(mutationType + " requires line item");
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param String string 参数，用于 requireAnyPayloadValue 流程中的校验、计算或对象转换。
+     * @param payload 待处理业务值，用于规则计算、转换或外部调用。
+     * @param keys keys 参数，用于 requireAnyPayloadValue 流程中的校验、计算或对象转换。
+     */
     private void requireAnyPayloadValue(Map<String, Object> payload, String... keys) {
         for (String key : keys) {
             Object value = payload.get(key);
@@ -420,6 +553,7 @@ public class ProgrammaticDspMutationService {
                 if (trimToNull(text) != null) {
                     return;
                 }
+            // 根据前序判断结果进入后续条件分支。
             } else if (value != null) {
                 return;
             }
@@ -427,7 +561,14 @@ public class ProgrammaticDspMutationService {
         throw new IllegalArgumentException(String.join(" or ", keys) + " is required");
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private ProgrammaticDspMutationView toView(ProgrammaticDspMutationDO row) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ProgrammaticDspMutationView(
                 row.getId(),
                 row.getTenantId(),
@@ -454,12 +595,19 @@ public class ProgrammaticDspMutationService {
                 row.getCreatedBy(),
                 row.getApprovedBy(),
                 row.getApprovedAt(),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 row.getExecutedBy(),
                 row.getExecutedAt(),
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }
 
+    /**
+     * 执行 providerRequestEvidence 流程，围绕 provider request evidence 完成校验、计算或结果组装。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 providerRequestEvidence 流程生成的业务结果。
+     */
     private Map<String, Object> providerRequestEvidence(ProgrammaticDspMutationRequest request) {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("provider", request.provider());
@@ -480,6 +628,13 @@ public class ProgrammaticDspMutationService {
         return ProviderWriteEvidenceSanitizer.sanitizeMap(evidence);
     }
 
+    /**
+     * 执行 payload 流程，围绕 payload 完成校验、计算或结果组装。
+     *
+     * @param String string 参数，用于 payload 流程中的校验、计算或对象转换。
+     * @param payload 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 payload 流程生成的业务结果。
+     */
     private Map<String, Object> payload(Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
             throw new IllegalArgumentException("programmatic DSP mutation payload is required");
@@ -487,6 +642,11 @@ public class ProgrammaticDspMutationService {
         return Map.copyOf(payload);
     }
 
+    /**
+     * 处理安全、签名或敏感信息逻辑。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     */
     private void rejectProviderSecrets(Object value) {
         if (value instanceof Map<?, ?> values) {
             values.forEach((key, nestedValue) -> {
@@ -495,17 +655,31 @@ public class ProgrammaticDspMutationService {
                 }
                 rejectProviderSecrets(nestedValue);
             });
+        // 根据前序判断结果进入后续条件分支。
         } else if (value instanceof Iterable<?> values) {
             values.forEach(this::rejectProviderSecrets);
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param expectedTenantId 业务对象 ID，用于定位具体记录。
+     * @param actualTenantId 业务对象 ID，用于定位具体记录。
+     * @param resource resource 参数，用于 validateTenant 流程中的校验、计算或对象转换。
+     */
     private void validateTenant(Long expectedTenantId, Long actualTenantId, String resource) {
         if (!expectedTenantId.equals(actualTenantId)) {
             throw new IllegalArgumentException(resource + " does not belong to current tenant");
         }
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         if (tenantId == null || tenantId < 0) {
             return 0L;
@@ -513,6 +687,13 @@ public class ProgrammaticDspMutationService {
         return tenantId;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required id 计算得到的数量、金额或指标值。
+     */
     private Long requiredId(Long value, String field) {
         if (value == null || value <= 0) {
             throw new IllegalArgumentException(field + " is required");
@@ -520,6 +701,13 @@ public class ProgrammaticDspMutationService {
         return value;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String field) {
         String trimmed = trimToNull(value);
         if (trimmed == null) {
@@ -528,6 +716,12 @@ public class ProgrammaticDspMutationService {
         return trimmed;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeMutationType(String value) {
         String type = normalizeUpper(value, "mutationType");
         if (!MUTATION_TYPES.contains(type)) {
@@ -536,26 +730,58 @@ public class ProgrammaticDspMutationService {
         return type;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeUpper(String value, String field) {
         return required(value, field).toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeOptionalUpper(String value) {
         String trimmed = trimToNull(value);
         return trimmed == null ? null : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultString 流程中的校验、计算或对象转换。
+     * @return 返回 default string 生成的文本或业务键。
+     */
     private String defaultString(String value, String fallback) {
         String trimmed = trimToNull(value);
         return trimmed == null ? fallback : trimmed;
     }
 
+    /**
+     * 执行业务决策动作，并同步后续状态。
+     *
+     * @param createdBy created by 参数，用于 rejectSelfApproval 流程中的校验、计算或对象转换。
+     * @param actor 操作人标识，用于审计和权限判断。
+     */
     private void rejectSelfApproval(String createdBy, String actor) {
         if (Objects.equals(defaultString(createdBy, "system"), defaultString(actor, "system"))) {
             throw new IllegalStateException("creator cannot approve live programmatic DSP provider mutation");
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -564,18 +790,36 @@ public class ProgrammaticDspMutationService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    /**
+     * 执行 now 流程，围绕 now 完成校验、计算或结果组装。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("programmatic DSP mutation metadata is not JSON serializable", ex);
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
@@ -583,19 +827,33 @@ public class ProgrammaticDspMutationService {
         try {
             Map<String, Object> values = objectMapper.readValue(json, OBJECT_MAP);
             return values == null ? Map.of() : values;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
             return Map.of();
         }
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 执行 sha256 流程，围绕 sha256 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 sha256 生成的文本或业务键。
+     */
     private String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ex) {
             throw new IllegalStateException("Could not hash programmatic DSP mutation request", ex);
         }

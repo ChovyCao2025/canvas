@@ -6,6 +6,8 @@ Spec: `../specs/p2-082ab-provider-write-operations-ui.md`
 
 Expose the governed SEM, creator, and DSP provider mutation ledgers in the marketing platform page so operators can approve, dry-run, and apply writes without using raw APIs.
 
+**Implementation Status:** Current workspace record: delivered frontend first slice. Verification results are recorded below.
+
 ## Tasks
 
 ### Task 1: Index P2-082AB Docs

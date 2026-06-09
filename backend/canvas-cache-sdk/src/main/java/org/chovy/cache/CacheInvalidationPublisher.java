@@ -1,16 +1,18 @@
 package org.chovy.cache;
 
 /**
- * Publishes cache invalidation events to an external transport such as MQ.
+ * 缓存失效事件外部发布器。
+ *
+ * <p>用于把本地缓存失效事件桥接到 MQ、事件总线或其他跨集群通道，补充 Redis Pub/Sub 的传播范围。
  */
 @FunctionalInterface
 public interface CacheInvalidationPublisher {
     /**
-     * 发布或发送 publish 相关的业务数据。
+     * 发布一条缓存失效事件。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     * <p>调用方会捕获并记录发布异常，因此实现应尽量保证幂等，避免单次发布失败影响缓存主流程。
      *
-     * @param event event 方法执行所需的业务参数
+     * @param event 需要传播的缓存失效事件
      */
     void publish(CacheInvalidationEvent event);
 }

@@ -10,6 +10,8 @@
 
 **Implementation status (2026-06-06):** Completed. Focused P2-082T tests passed 20/20; monitoring regression passed 70/70.
 
+Status: Completed on 2026-06-06.
+
 ---
 
 ## Scope

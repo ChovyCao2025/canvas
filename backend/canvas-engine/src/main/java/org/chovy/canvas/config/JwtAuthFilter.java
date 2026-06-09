@@ -100,6 +100,12 @@ public class JwtAuthFilter implements WebFilter {
         }
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param claims claims 参数，用于 loadCurrentUser 流程中的校验、计算或对象转换。
+     * @return 返回 loadCurrentUser 流程生成的业务结果。
+     */
     private SysUserDO loadCurrentUser(Claims claims) {
         String subject = claims.getSubject();
         if (subject == null || subject.isBlank()) {
@@ -108,6 +114,12 @@ public class JwtAuthFilter implements WebFilter {
         return userService.findById(Long.parseLong(subject));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param exchange exchange 参数，用于 unauthorized 流程中的校验、计算或对象转换。
+     * @return 返回 unauthorized 流程生成的业务结果。
+     */
     private Mono<Void> unauthorized(ServerWebExchange exchange) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         return exchange.getResponse().setComplete();

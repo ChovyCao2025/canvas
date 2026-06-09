@@ -105,6 +105,36 @@ class ApprovalControllerTest {
         verify(service, never()).syncPendingExternalInstances(7L, 25);
     }
 
+    @Test
+    void syncSingleLarkApprovalRequiresTenantAdminAndDelegatesInstanceId() {
+        ApprovalWorkflowService service = mock(ApprovalWorkflowService.class);
+        ApprovalController controller = new ApprovalController(resolver(RoleNames.TENANT_ADMIN), service);
+        when(service.syncExternalInstance(7L, 101L)).thenReturn(instance("APPROVED"));
+
+        StepVerifier.create(controller.syncLarkApprovalInstance(101L))
+                .assertNext(response -> {
+                    assertThat(response.getData().id()).isEqualTo(101L);
+                    assertThat(response.getData().status()).isEqualTo("APPROVED");
+                })
+                .verifyComplete();
+
+        verify(service).syncExternalInstance(7L, 101L);
+    }
+
+    @Test
+    void syncSingleLarkApprovalRejectsOperatorRole() {
+        ApprovalWorkflowService service = mock(ApprovalWorkflowService.class);
+        ApprovalController controller = new ApprovalController(resolver(RoleNames.OPERATOR), service);
+
+        StepVerifier.create(controller.syncLarkApprovalInstance(101L))
+                .expectErrorSatisfies(error -> assertThat(error)
+                        .isInstanceOf(AccessDeniedException.class)
+                        .hasMessageContaining("admin role"))
+                .verify();
+
+        verify(service, never()).syncExternalInstance(7L, 101L);
+    }
+
     private TenantContextResolver resolver() {
         return resolver(RoleNames.TENANT_ADMIN);
     }

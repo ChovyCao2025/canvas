@@ -1,5 +1,9 @@
 # CDP Warehouse Consumer Availability Incident Automation Implementation Plan
 
+Spec: `../specs/p2-063-cdp-warehouse-consumer-availability-incident-automation.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Route P2-060 consumer contract WARN/FAIL/PASS scan evidence into warehouse incidents.
 
 **Architecture:** Reuse `cdp_warehouse_incident` and `CdpWarehouseIncidentService`. Add a consumer availability incident service that evaluates one contract or active contracts, records `WAREHOUSE_CONSUMER_AVAILABILITY` incidents for WARN/FAIL, resolves matching incidents for PASS, and exposes manual scan plus disabled scheduled scan paths.

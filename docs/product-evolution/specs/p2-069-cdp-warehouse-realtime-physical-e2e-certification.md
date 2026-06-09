@@ -5,6 +5,8 @@ Sequence: 069
 Source: `docs/product-evolution/specs/p2-032-cdp-warehouse-realtime-pipeline-runtime.md`, `docs/product-evolution/specs/p2-047-cdp-warehouse-realtime-job-control-plane.md`, `docs/product-evolution/specs/p2-066-cdp-warehouse-physical-e2e-certification.md`, `docs/product-evolution/specs/p2-068-cdp-warehouse-e2e-certification-scheduler-and-gate.md`
 Implementation plan: `../plans/p2-069-cdp-warehouse-realtime-physical-e2e-certification-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Extend warehouse physical E2E certification so production promotion can require fresh realtime pipeline checkpoint and realtime job heartbeat evidence, not only Doris JDBC and live table contract proof.

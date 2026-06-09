@@ -8,6 +8,8 @@ Spec: `../specs/p2-082w-monitoring-provider-oauth-refresh-revocation.md`
 
 Close the OAuth credential operational loop for monitoring providers with scheduled due-refresh and provider revocation.
 
+**Implementation Status:** Current workspace record: delivered backend first slice. Verification results are recorded below.
+
 ## Design
 
 - Extend provider credentials with revoke endpoint and revoke status fields.

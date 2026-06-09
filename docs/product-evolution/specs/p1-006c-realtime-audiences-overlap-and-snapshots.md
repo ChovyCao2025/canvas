@@ -5,6 +5,10 @@ Sequence: 006C
 Source: `docs/optimization/todo/cdp_gap_analysis.md`, `docs/optimization/todo/2026-05-30-cdp-roadmap.md`
 Implementation plan: `../plans/p1-006c-realtime-audiences-overlap-and-snapshots-plan.md`
 
+## Implementation Status
+
+Implemented on 2026-06-05. This repo already used `V106__realtime_audience_overlap_snapshots.sql` and CDP-prefixed tables, so the implementation follows `cdp_realtime_audience_event_log` and `cdp_audience_snapshot` instead of creating unprefixed tables. Commit step was not executed because the user requested no commit.
+
 ## Goal
 
 Upgrade offline audience membership into event-driven realtime updates, overlap analysis, guarded merge/exclusion, and audience snapshots.

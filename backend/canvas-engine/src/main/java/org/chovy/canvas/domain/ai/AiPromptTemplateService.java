@@ -1,8 +1,12 @@
 package org.chovy.canvas.domain.ai;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.chovy.canvas.dal.dataobject.AiPromptTemplateDO;
+import org.chovy.canvas.dal.mapper.AiPromptTemplateMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -21,15 +25,40 @@ public class AiPromptTemplateService {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{\\s*([^}]+?)\\s*}|\\{\\{\\s*([^}]+?)\\s*}}");
 
     private final ObjectMapper objectMapper;
+    private final AiPromptTemplateMapper templateMapper;
     private final AtomicLong templateIdSequence = new AtomicLong(100L);
     private final ConcurrentMap<Long, TemplateRegistration> templates = new ConcurrentHashMap<>();
 
     public AiPromptTemplateService(ObjectMapper objectMapper) {
+        this(objectMapper, null, true);
+    }
+
+    @Autowired
+    public AiPromptTemplateService(ObjectMapper objectMapper, AiPromptTemplateMapper templateMapper) {
+        this(objectMapper, templateMapper, false);
+    }
+
+    private AiPromptTemplateService(ObjectMapper objectMapper,
+                                    AiPromptTemplateMapper templateMapper,
+                                    boolean seedMemory) {
         this.objectMapper = objectMapper;
-        seedBuiltInTemplates();
+        this.templateMapper = templateMapper;
+        if (seedMemory) {
+            seedBuiltInTemplates();
+        }
     }
 
     public List<TemplateSummary> listTemplates(Long tenantId) {
+        if (mapperBacked()) {
+            return templateMapper.selectList(templateScope(tenantId))
+                    .stream()
+                    .filter(template -> enabled(template.getEnabled()))
+                    .filter(template -> AiProviderModelRegistryService.visibleToTenant(template.getTenantId(), tenantId))
+                    .sorted(Comparator.comparing(AiPromptTemplateDO::getTenantId, Comparator.nullsFirst(Long::compareTo))
+                            .thenComparing(AiPromptTemplateDO::getId))
+                    .map(this::toSummary)
+                    .toList();
+        }
         return templates.values().stream()
                 .filter(template -> template.enabled())
                 .filter(template -> AiProviderModelRegistryService.visibleToTenant(template.tenantId(), tenantId))
@@ -43,6 +72,18 @@ public class AiPromptTemplateService {
         Long scopedTenantId = AiProviderModelRegistryService.normalizeTenantId(tenantId);
         JsonNode outputSchema = requireObject(req.outputSchema(), "outputSchema");
         JsonNode defaultValues = requireObject(req.defaultValues(), "defaultValues");
+        if (mapperBacked()) {
+            AiPromptTemplateDO row = new AiPromptTemplateDO();
+            row.setTenantId(scopedTenantId);
+            row.setName(requireText(req.name(), "name"));
+            row.setCategory(requireText(req.category(), "category"));
+            row.setPromptTemplate(requireText(req.promptTemplate(), "promptTemplate"));
+            row.setOutputSchema(writeJson(outputSchema));
+            row.setDefaultValues(writeJson(defaultValues));
+            row.setEnabled(req.enabled() == null || req.enabled() ? 1 : 0);
+            templateMapper.insert(row);
+            return toDetail(row);
+        }
         long id = templateIdSequence.incrementAndGet();
         TemplateRegistration template = new TemplateRegistration(
                 id,
@@ -58,10 +99,60 @@ public class AiPromptTemplateService {
     }
 
     public TemplateDetail getTemplate(Long tenantId, Long templateId) {
+        if (mapperBacked()) {
+            return toDetail(requireVisibleTemplateRow(tenantId, templateId));
+        }
         return toDetail(requireVisibleTemplate(tenantId, templateId));
     }
 
+    public TemplateDetail updateTemplate(Long tenantId, Long templateId, TemplateCreateRequest req) {
+        Long scopedTenantId = AiProviderModelRegistryService.normalizeTenantId(tenantId);
+        if (mapperBacked()) {
+            AiPromptTemplateDO existing = requireVisibleTemplateRow(tenantId, templateId);
+            if (!Objects.equals(existing.getTenantId(), scopedTenantId)) {
+                throw new IllegalArgumentException("Built-in AI prompt templates cannot be updated");
+            }
+            existing.setName(blankToDefault(req.name(), existing.getName()));
+            existing.setCategory(blankToDefault(req.category(), existing.getCategory()));
+            existing.setPromptTemplate(blankToDefault(req.promptTemplate(), existing.getPromptTemplate()));
+            if (req.outputSchema() != null) {
+                existing.setOutputSchema(writeJson(requireObject(req.outputSchema(), "outputSchema")));
+            }
+            if (req.defaultValues() != null) {
+                existing.setDefaultValues(writeJson(requireObject(req.defaultValues(), "defaultValues")));
+            }
+            existing.setEnabled(req.enabled() == null ? existing.getEnabled() : (req.enabled() ? 1 : 0));
+            templateMapper.updateById(existing);
+            return toDetail(existing);
+        }
+        TemplateRegistration existing = requireVisibleTemplate(tenantId, templateId);
+        if (!Objects.equals(existing.tenantId(), scopedTenantId)) {
+            throw new IllegalArgumentException("Built-in AI prompt templates cannot be updated");
+        }
+        TemplateRegistration updated = new TemplateRegistration(
+                existing.id(),
+                existing.tenantId(),
+                blankToDefault(req.name(), existing.name()),
+                blankToDefault(req.category(), existing.category()),
+                blankToDefault(req.promptTemplate(), existing.promptTemplate()),
+                req.outputSchema() == null ? existing.outputSchema() : requireObject(req.outputSchema(), "outputSchema"),
+                req.defaultValues() == null ? existing.defaultValues() : requireObject(req.defaultValues(), "defaultValues"),
+                req.enabled() == null ? existing.enabled() : req.enabled());
+        templates.put(templateId, updated);
+        return toDetail(updated);
+    }
+
     public void disableTemplate(Long tenantId, Long templateId) {
+        if (mapperBacked()) {
+            AiPromptTemplateDO existing = requireVisibleTemplateRow(tenantId, templateId);
+            Long scopedTenantId = AiProviderModelRegistryService.normalizeTenantId(tenantId);
+            if (!Objects.equals(existing.getTenantId(), scopedTenantId)) {
+                throw new IllegalArgumentException("Built-in AI prompt templates cannot be disabled");
+            }
+            existing.setEnabled(0);
+            templateMapper.updateById(existing);
+            return;
+        }
         TemplateRegistration existing = requireVisibleTemplate(tenantId, templateId);
         Long scopedTenantId = AiProviderModelRegistryService.normalizeTenantId(tenantId);
         if (!Objects.equals(existing.tenantId(), scopedTenantId)) {
@@ -79,6 +170,13 @@ public class AiPromptTemplateService {
     }
 
     public TemplateDetail requireEnabledTemplate(Long tenantId, Long templateId) {
+        if (mapperBacked()) {
+            AiPromptTemplateDO template = requireVisibleTemplateRow(tenantId, templateId);
+            if (!enabled(template.getEnabled())) {
+                throw new IllegalArgumentException("AI prompt template is disabled: " + templateId);
+            }
+            return toDetail(template);
+        }
         TemplateRegistration template = requireVisibleTemplate(tenantId, templateId);
         if (!template.enabled()) {
             throw new IllegalArgumentException("AI prompt template is disabled: " + templateId);
@@ -134,6 +232,14 @@ public class AiPromptTemplateService {
         return template;
     }
 
+    private AiPromptTemplateDO requireVisibleTemplateRow(Long tenantId, Long templateId) {
+        AiPromptTemplateDO template = templateMapper.selectById(templateId);
+        if (template == null || !AiProviderModelRegistryService.visibleToTenant(template.getTenantId(), tenantId)) {
+            throw new IllegalArgumentException("AI prompt template not found: " + templateId);
+        }
+        return template;
+    }
+
     private String resolveVariable(JsonNode variables, String path) {
         JsonNode node = variables;
         for (String segment : path.split("\\.")) {
@@ -163,6 +269,15 @@ public class AiPromptTemplateService {
                 template.enabled());
     }
 
+    private TemplateSummary toSummary(AiPromptTemplateDO template) {
+        return new TemplateSummary(
+                template.getId(),
+                template.getTenantId(),
+                template.getName(),
+                template.getCategory(),
+                enabled(template.getEnabled()));
+    }
+
     private TemplateDetail toDetail(TemplateRegistration template) {
         return new TemplateDetail(
                 template.id(),
@@ -175,11 +290,59 @@ public class AiPromptTemplateService {
                 template.enabled());
     }
 
+    private TemplateDetail toDetail(AiPromptTemplateDO template) {
+        return new TemplateDetail(
+                template.getId(),
+                template.getTenantId(),
+                template.getName(),
+                template.getCategory(),
+                template.getPromptTemplate(),
+                readObject(template.getOutputSchema(), "outputSchema"),
+                readObject(template.getDefaultValues(), "defaultValues"),
+                enabled(template.getEnabled()));
+    }
+
     private JsonNode requireObject(JsonNode value, String fieldName) {
         if (value == null || !value.isObject()) {
             throw new IllegalArgumentException(fieldName + " must be a JSON object");
         }
         return value;
+    }
+
+    private JsonNode readObject(String json, String fieldName) {
+        try {
+            JsonNode value = objectMapper.readTree(json == null || json.isBlank() ? "{}" : json);
+            return requireObject(value, fieldName).deepCopy();
+        } catch (Exception ex) {
+            throw new IllegalArgumentException(fieldName + " is not valid JSON", ex);
+        }
+    }
+
+    private String writeJson(JsonNode value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("template JSON is not serializable", ex);
+        }
+    }
+
+    private LambdaQueryWrapper<AiPromptTemplateDO> templateScope(Long tenantId) {
+        Long scopedTenantId = AiProviderModelRegistryService.normalizeTenantId(tenantId);
+        return new LambdaQueryWrapper<AiPromptTemplateDO>()
+                .and(wrapper -> wrapper
+                        .isNull(AiPromptTemplateDO::getTenantId)
+                        .or()
+                        .eq(AiPromptTemplateDO::getTenantId, 0L)
+                        .or()
+                        .eq(AiPromptTemplateDO::getTenantId, scopedTenantId));
+    }
+
+    private boolean mapperBacked() {
+        return templateMapper != null;
+    }
+
+    private static boolean enabled(Integer enabled) {
+        return enabled == null || enabled != 0;
     }
 
     private static String requireText(String value, String fieldName) {

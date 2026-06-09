@@ -5,6 +5,8 @@ Sequence: 073
 Source: `docs/product-evolution/specs/p2-034-cdp-warehouse-field-governance-and-bi-policy.md`, `docs/product-evolution/specs/p3-010-advanced-privacy-and-compliance.md`
 Implementation plan: `../plans/p2-073-cdp-warehouse-privacy-erasure-propagation-proof-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add an auditable CDP warehouse privacy erasure propagation proof so data-subject deletion work can be tracked across MySQL CDP state, Doris ODS/DWD assets, realtime buffers, and audience materialization outputs before production readiness is allowed to pass.

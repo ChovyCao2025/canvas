@@ -8,6 +8,10 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux controllers, MyBatis-Plus, Flyway, Jackson, JUnit 5, Mockito, AssertJ, React 18, Vite, TypeScript, Ant Design, Vitest.
 
+**Implementation Status:** Current workspace record: delivered backend and frontend first slices. Verification results are recorded below.
+
+Status: Delivered backend and frontend first slices in the current workspace record.
+
 ---
 
 ## Scope

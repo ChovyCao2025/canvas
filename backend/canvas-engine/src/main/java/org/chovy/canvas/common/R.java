@@ -23,42 +23,82 @@ public class R<T> {
     /** 链路追踪 ID，用于错误排查时关联日志。 */
     private String traceId;
 
+    /**
+     * getCode 查询 common 场景的业务数据。
+     * @return 返回 get code 计算得到的数量、金额或指标值。
+     */
     public int getCode() {
         return code;
     }
 
+    /**
+     * setCode 处理 common 场景的业务逻辑。
+     * @param code 业务编码，用于匹配对应类型或状态。
+     */
     public void setCode(int code) {
         this.code = code;
     }
 
+    /**
+     * getMessage 查询 common 场景的业务数据。
+     * @return 返回 get message 生成的文本或业务键。
+     */
     public String getMessage() {
         return message;
     }
 
+    /**
+     * setMessage 处理 common 场景的业务逻辑。
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     */
     public void setMessage(String message) {
         this.message = message;
     }
 
+    /**
+     * getErrorCode 查询 common 场景的业务数据。
+     * @return 返回 get error code 生成的文本或业务键。
+     */
     public String getErrorCode() {
         return errorCode;
     }
 
+    /**
+     * setErrorCode 处理 common 场景的业务逻辑。
+     * @param errorCode 业务编码，用于匹配对应类型或状态。
+     */
     public void setErrorCode(String errorCode) {
         this.errorCode = errorCode;
     }
 
+    /**
+     * getData 查询 common 场景的业务数据。
+     * @return 返回 getData 流程生成的业务结果。
+     */
     public T getData() {
         return data;
     }
 
+    /**
+     * setData 处理 common 场景的业务逻辑。
+     * @param data data 参数，用于 setData 流程中的校验、计算或对象转换。
+     */
     public void setData(T data) {
         this.data = data;
     }
 
+    /**
+     * getTraceId 查询 common 场景的业务数据。
+     * @return 返回 get trace id 生成的文本或业务键。
+     */
     public String getTraceId() {
         return traceId;
     }
 
+    /**
+     * setTraceId 处理 common 场景的业务逻辑。
+     * @param traceId 业务对象 ID，用于定位具体记录。
+     */
     public void setTraceId(String traceId) {
         this.traceId = traceId;
     }

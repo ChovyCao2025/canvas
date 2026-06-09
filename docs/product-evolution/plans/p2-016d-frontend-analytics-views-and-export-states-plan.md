@@ -1,12 +1,14 @@
 # Frontend Analytics Views And Export States Implementation Plan
 
+Status: Current frontend implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add frontend analytics views and bounded export states on top of P2-016C APIs.
+**Goal:** Add frontend analytics views and bounded export states on top of currently exposed P2-016C APIs.
 
-**Architecture:** Keep HTTP calls in `analyticsApi.ts`, put formatting/state decisions in `analyticsPresentation.ts`, and build the page from tested states before wiring charts/tables into the route.
+**Architecture:** Keep HTTP calls in `analyticsApi.ts`, put formatting/state decisions in `analyticsPresentation.ts`, and build the route from current backend contracts: event counts, event total, user timeline, and attribute distribution. Funnel, alert preview, and export-job backend endpoints are not exposed in this backend slice, so the page shows an explicit unavailable export state instead of calling missing APIs.
 
-**Tech Stack:** React 18, TypeScript, Ant Design, Recharts, Vitest.
+**Tech Stack:** React 18, TypeScript, Ant Design, Vitest, Vite.
 
 ---
 
@@ -22,6 +24,8 @@
 - Create: `frontend/src/pages/analytics/analyticsPresentation.ts`
 - Create: `frontend/src/pages/analytics/analyticsPresentation.test.ts`
 - Create: `frontend/src/pages/analytics/index.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
 - Modify: `frontend/src/pages/cdp-user-detail/index.tsx`
 
 ### Task 1: API Wrapper And Presentation Helpers
@@ -32,185 +36,100 @@
 - Create: `frontend/src/pages/analytics/analyticsPresentation.ts`
 - Create: `frontend/src/pages/analytics/analyticsPresentation.test.ts`
 
-- [ ] **Step 1: Write API wrapper tests**
+- [x] **Step 1: Write API wrapper tests**
 
-Create `analyticsApi.test.ts`:
+`analyticsApi.test.ts` covers event counts, event total, user timeline path encoding, and attribute distribution path encoding against the currently exposed backend routes.
 
-```ts
-import { describe, expect, it, vi } from 'vitest'
-import { createAnalyticsApi } from './analyticsApi'
+- [x] **Step 2: Write presentation tests**
 
-describe('analyticsApi', () => {
-  it('passes tenant and bounded date range to event and export endpoints', async () => {
-    const http = {
-      get: vi.fn().mockResolvedValue({ data: [] }),
-      post: vi.fn().mockResolvedValue({ data: { id: 1, status: 'QUEUED' } }),
-    }
-    const api = createAnalyticsApi(http as any)
+`analyticsPresentation.test.ts` covers date-range requirements, event count formatting, timeline row formatting, event count sorting, and export state labels.
 
-    await api.eventAnalysis({ tenantId: 0, startDate: '2026-06-01', endDate: '2026-06-03' })
-    await api.createExport({ tenantId: 0, reportType: 'EVENT_ANALYSIS', startDate: '2026-06-01', endDate: '2026-06-03', rowLimit: 1000 })
+- [x] **Step 3: Verify red state**
 
-    expect(http.get).toHaveBeenCalledWith('/analytics/events', { params: { tenantId: 0, startDate: '2026-06-01', endDate: '2026-06-03' } })
-    expect(http.post).toHaveBeenCalledWith('/analytics/exports', { tenantId: 0, reportType: 'EVENT_ANALYSIS', startDate: '2026-06-01', endDate: '2026-06-03', rowLimit: 1000 })
-  })
-})
+Initial run on 2026-06-09:
+
+```bash
+cd frontend
+npm test -- analyticsApi.test.ts analyticsPresentation.test.ts
 ```
 
-- [ ] **Step 2: Write presentation tests**
+Result: FAIL because `analyticsApi.ts` and `analyticsPresentation.ts` did not exist.
 
-Create `analyticsPresentation.test.ts`:
+- [x] **Step 4: Implement API wrapper**
 
-```ts
-import { describe, expect, it } from 'vitest'
-import { exportStateText, formatEventCount, requireDateRangeMessage, timelineRowText } from './analyticsPresentation'
+`analyticsApi.ts` wraps:
+- `GET /analytics/events/counts`
+- `GET /analytics/events/count`
+- `GET /analytics/users/{userId}/timeline`
+- `GET /analytics/events/attributes/{attribute}/distribution`
 
-describe('analyticsPresentation', () => {
-  it('requires date range before querying', () => {
-    expect(requireDateRangeMessage({ startDate: undefined, endDate: '2026-06-03' })).toBe('Select a start and end date')
-    expect(requireDateRangeMessage({ startDate: '2026-06-01', endDate: '2026-06-03' })).toBeNull()
-  })
+- [x] **Step 5: Implement presentation helpers**
 
-  it('formats event counts and timeline rows', () => {
-    expect(formatEventCount({ eventCode: 'OrderPaid', count: 12 })).toBe('OrderPaid: 12')
-    expect(timelineRowText({ eventCode: 'OrderPaid', eventTime: '2026-06-02T10:00:00Z' })).toBe('2026-06-02T10:00:00Z - OrderPaid')
-  })
+`analyticsPresentation.ts` implements date-range guard, event/timeline formatting, sorted event count rows, and export status labels.
 
-  it('formats export states', () => {
-    expect(exportStateText('QUEUED')).toBe('Queued')
-    expect(exportStateText('FAILED')).toBe('Failed')
-  })
-})
-```
-
-- [ ] **Step 3: Run tests and confirm red state**
+- [x] **Step 6: Run API and presentation tests**
 
 Run:
 
 ```bash
-cd frontend && npm test -- analyticsApi.test.ts analyticsPresentation.test.ts
+cd frontend
+npm test -- analyticsApi.test.ts analyticsPresentation.test.ts
 ```
 
-Expected: FAIL because files do not exist.
+Result on 2026-06-09: PASS, 2 test files, 6 tests, 0 failures.
 
-- [ ] **Step 4: Implement API wrapper**
-
-Create `frontend/src/services/analyticsApi.ts`:
-
-```ts
-import http from './api'
-
-export interface AnalyticsScope {
-  tenantId: number
-  startDate: string
-  endDate: string
-}
-
-export interface ExportPayload extends AnalyticsScope {
-  reportType: string
-  rowLimit: number
-}
-
-export function createAnalyticsApi(client = http) {
-  return {
-    eventAnalysis: (scope: AnalyticsScope) => client.get('/analytics/events', { params: scope }),
-    funnel: (funnelKey: string, scope: AnalyticsScope) => client.get(`/analytics/funnels/${funnelKey}`, { params: scope }),
-    userTimeline: (userId: string, scope: AnalyticsScope & { page: number; size: number }) =>
-      client.get(`/analytics/users/${encodeURIComponent(userId)}/timeline`, { params: scope }),
-    attributeDistribution: (attribute: string, scope: AnalyticsScope) =>
-      client.get(`/analytics/attributes/${encodeURIComponent(attribute)}/distribution`, { params: scope }),
-    alertPreview: (payload: Record<string, unknown>) => client.post('/analytics/alerts/preview', payload),
-    createExport: (payload: ExportPayload) => client.post('/analytics/exports', payload),
-    exportStatus: (id: number) => client.get(`/analytics/exports/${id}`),
-  }
-}
-
-export const analyticsApi = createAnalyticsApi()
-```
-
-- [ ] **Step 5: Implement presentation helpers**
-
-Create `analyticsPresentation.ts`:
-
-```ts
-export function requireDateRangeMessage(input: { startDate?: string; endDate?: string }): string | null {
-  return input.startDate && input.endDate ? null : 'Select a start and end date'
-}
-
-export function formatEventCount(row: { eventCode: string; count: number }): string {
-  return `${row.eventCode}: ${row.count}`
-}
-
-export function timelineRowText(row: { eventCode: string; eventTime: string }): string {
-  return `${row.eventTime} - ${row.eventCode}`
-}
-
-export function exportStateText(status: string): string {
-  return status === 'QUEUED' ? 'Queued' : status === 'RUNNING' ? 'Running' : status === 'DONE' ? 'Done' : 'Failed'
-}
-```
-
-- [ ] **Step 6: Run API and presentation tests**
-
-Run:
-
-```bash
-cd frontend && npm test -- analyticsApi.test.ts analyticsPresentation.test.ts
-```
-
-Expected: PASS.
-
-### Task 2: Analytics Page And User Detail Link
+### Task 2: Analytics Page And Navigation
 
 **Files:**
 - Create: `frontend/src/pages/analytics/index.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
 - Modify: `frontend/src/pages/cdp-user-detail/index.tsx`
 
-- [ ] **Step 1: Build analytics page states**
+- [x] **Step 1: Build analytics page states**
 
-Create tabs for event analysis, funnel, user timeline, attribute distribution, alerts, and exports. Each tab must use `requireDateRangeMessage` before calling the API and show loading, empty, error, and permission-denied states from the API result.
+The page provides event overview, user timeline, attribute distribution, and export status tabs. It handles loading, empty, and error states through Ant Design table/alert states.
 
-- [ ] **Step 2: Add export queued state**
+- [x] **Step 2: Add export unavailable state**
 
-When `analyticsApi.createExport` returns `QUEUED`, show the formatted status from `exportStateText` and a refresh action that calls `exportStatus(id)`.
+Because the current backend does not expose export-job endpoints, the frontend renders `UNAVAILABLE` through `exportStateText` and does not call nonexistent routes.
 
-- [ ] **Step 3: Add CDP user detail link**
+- [x] **Step 3: Add route and menu entry**
 
-In `cdp-user-detail/index.tsx`, add a link to the analytics timeline view with `userId`, `startDate`, and `endDate` query params. Do not duplicate analytics query logic inside the CDP page.
+`App.tsx` lazy-loads `/analytics`, and `AppLayout.tsx` adds the analytics menu item under the data analysis group.
 
-- [ ] **Step 4: Run focused frontend tests**
+- [x] **Step 4: Add CDP user detail link**
 
-Run:
+`cdp-user-detail/index.tsx` adds a user timeline link that opens `/analytics` with `userId`, `startDate`, and `endDate` query params. Analytics querying remains inside the analytics page.
 
-```bash
-cd frontend && npm test -- analyticsApi.test.ts analyticsPresentation.test.ts
-```
-
-Expected: PASS.
-
-### Task 3: Verification And Commit
+### Task 3: Verification
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-016d-frontend-analytics-views-and-export-states.md`
 - Modify: `docs/product-evolution/plans/p2-016d-frontend-analytics-views-and-export-states-plan.md`
 
-- [ ] **Step 1: Run frontend build**
+- [x] **Step 1: Run focused frontend tests**
 
 Run:
 
 ```bash
-cd frontend && npm run build
+cd frontend
+npm test -- analyticsApi.test.ts analyticsPresentation.test.ts
 ```
 
-Expected: PASS.
+Result on 2026-06-09: PASS, 2 test files, 6 tests, 0 failures.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Run frontend build**
 
 Run:
 
 ```bash
-git add frontend/src/services/analyticsApi.ts frontend/src/services/analyticsApi.test.ts frontend/src/pages/analytics frontend/src/pages/cdp-user-detail/index.tsx docs/product-evolution/specs/p2-016d-frontend-analytics-views-and-export-states.md docs/product-evolution/plans/p2-016d-frontend-analytics-views-and-export-states-plan.md
-git commit -m "feat: add frontend analytics views"
+cd frontend
+npm run build
 ```
 
-Expected: commit contains only frontend analytics API, page, presentation helpers, CDP detail link, tests, and related docs.
+Result on 2026-06-09: PASS.
+
+- [ ] **Step 3: Commit and merge**
+
+Commit and merge status are intentionally not claimed by this document. Treat this as an implementation and focused-verification record until the branch is committed and integrated.

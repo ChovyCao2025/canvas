@@ -5,6 +5,10 @@ Sequence: 001
 Source: `todo/p3/ecosystem-and-plugin-marketplace-strategy.md`
 Implementation plan: `../plans/p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md`
 
+## Implementation Status
+
+Status: discovery package and validator are complete in the current workspace record. Commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Convert the public plugin marketplace idea into an evidence-backed governance package that can decide whether a later child spec should build submission, review, publishing, and partner-support workflows.

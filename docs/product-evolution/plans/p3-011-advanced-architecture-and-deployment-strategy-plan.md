@@ -1,5 +1,7 @@
 # Advanced Architecture And Deployment Strategy Evidence Plan
 
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an architecture and deployment evidence gate so service split, event-driven communication, serverless, edge, multi-cloud, and data residency candidates cannot proceed without current-state proof, dependency review, cost notes, and rollback evidence.
@@ -36,7 +38,7 @@
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/architecture/ArchitectureDeploymentEvidenceServiceTest.java`
 
-- [ ] **Step 1: Write migration and service tests**
+- [x] **Step 1: Write migration and service tests**
 
 Create `ArchitectureDeploymentEvidenceServiceTest`:
 
@@ -112,7 +114,7 @@ class ArchitectureDeploymentEvidenceServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -129,7 +131,7 @@ Expected: FAIL because the migration and service do not exist.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/architecture/ArchitectureDeploymentEvidenceService.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/architecture/ArchitectureDeploymentEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add the additive migration**
+- [x] **Step 1: Add the additive migration**
 
 Create `V183__architecture_deployment_evidence.sql`:
 
@@ -156,7 +158,7 @@ CREATE TABLE IF NOT EXISTS architecture_deployment_evidence (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 2: Implement the evidence gate**
+- [x] **Step 2: Implement the evidence gate**
 
 Create `ArchitectureDeploymentEvidenceService`:
 
@@ -234,7 +236,7 @@ public class ArchitectureDeploymentEvidenceService {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -250,7 +252,7 @@ Expected: PASS for migration shape and service gate behavior.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/architecture/ArchitectureDeploymentEvidenceService.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/architecture/ArchitectureDeploymentEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add approval test**
+- [x] **Step 1: Add approval test**
 
 Add this test:
 
@@ -274,7 +276,7 @@ void approvalRequiresReviewerAndChildSpec() {
 }
 ```
 
-- [ ] **Step 2: Implement approval method**
+- [x] **Step 2: Implement approval method**
 
 Add this method to `ArchitectureDeploymentEvidenceService` and add the matching method to `EvidenceRepository`:
 
@@ -292,7 +294,7 @@ public interface EvidenceRepository {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -308,7 +310,7 @@ Expected: PASS with registration and approval gate coverage.
 - Modify: `docs/product-evolution/specs/p3-011-advanced-architecture-and-deployment-strategy.md`
 - Modify: `docs/product-evolution/plans/p3-011-advanced-architecture-and-deployment-strategy-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -318,7 +320,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=ArchitectureDeploymentEvidenceSe
 
 Expected: PASS.
 
-- [ ] **Step 2: Run migration naming check**
+- [x] **Step 2: Run migration naming check**
 
 Run:
 
@@ -328,11 +330,11 @@ test -f backend/canvas-engine/src/main/resources/db/migration/V183__architecture
 
 Expected: command exits 0.
 
-- [ ] **Step 3: Rollout notes**
+- [x] **Step 3: Rollout notes**
 
 Rollout: run `V183__architecture_deployment_evidence.sql`, then allow architects to register deployment candidates with current-state proof. Keep runtime architecture unchanged until a reviewed child spec exists. Rollback: disable evidence registration or hide the admin entry point; no runtime deployment path depends on this additive table.
 
-- [ ] **Step 4: Commit the scoped slice**
+Commit boundary: no commit was created in this docs-only audit; commit and merge status remains unverified.
 
 Run:
 

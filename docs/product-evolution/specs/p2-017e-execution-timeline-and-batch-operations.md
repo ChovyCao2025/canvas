@@ -2,8 +2,10 @@
 
 Priority: P2
 Sequence: 017E
-Source: `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/optimization_list_v7.md`
+Source: `docs/optimization/archive/bmad-product-review-2026-05.md`, `docs/optimization/archive/optimization_list_v7.md`
 Implementation plan: `../plans/p2-017e-execution-timeline-and-batch-operations-plan.md`
+
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
 
 ## Goal
 

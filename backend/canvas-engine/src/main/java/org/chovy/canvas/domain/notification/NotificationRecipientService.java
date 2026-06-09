@@ -10,10 +10,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * 通知消息 Recipient 通知领域组件。
+ * 通知收件人解析服务。
  *
- * <p>负责站内通知的创建、收件人解析、未读状态和实时推送封装。
- * <p>该组件连接异步任务、WebSocket 和通知持久化模型，保证消息中心口径一致。
+ * <p>当前负责查询可接收系统通知的管理员账号，并在查询异常时提供保底收件人。
  */
 @Slf4j
 @Service
@@ -35,6 +34,7 @@ public class NotificationRecipientService {
                     .filter(this::hasText)
                     .distinct()
                     .toList();
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.error("[NOTIFICATION] 查询管理员收件人失败: {}", e.getMessage(), e);
             return List.of("admin");

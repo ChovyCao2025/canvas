@@ -1,5 +1,9 @@
 # CDP Warehouse Consumer Availability Contracts Implementation Plan
 
+Spec: `../specs/p2-060-cdp-warehouse-consumer-availability-contracts.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add table/dataset/metric availability observations and downstream consumer contracts that combine asset-level evidence with the existing warehouse availability gate.
 
 **Architecture:** Introduce two additive MySQL tables, a `CdpWarehouseConsumerAvailabilityService`, and APIs under `/warehouse/availability`. The service evaluates a contract by calling `CdpWarehouseAvailabilityService.evaluate` and then applying asset-specific gates from the latest availability observations.

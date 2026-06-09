@@ -5,6 +5,8 @@ Sequence: 057
 Source: `docs/product-evolution/specs/p2-023-bi-dataset-query-compiler-foundation.md`, `docs/product-evolution/specs/p2-034-cdp-warehouse-field-governance-and-bi-policy.md`, `docs/product-evolution/specs/p2-055-cdp-warehouse-data-availability-gates.md`
 Implementation plan: `../plans/p2-057-cdp-warehouse-bi-query-availability-gate-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Wire warehouse data availability gates into BI query execution so operators can block report queries when the requested offline, realtime, or hybrid warehouse window is not safe to consume.

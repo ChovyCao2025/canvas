@@ -43,6 +43,21 @@ export interface Branch {
   [k: string]: unknown
 }
 
+export type RiskDecisionActionRoute = 'ALLOW' | 'REVIEW' | 'VERIFY' | 'BLOCK' | 'LIMIT' | 'DELAY'
+
+export type RiskDecisionFailPolicy = 'FAIL_OPEN' | 'FAIL_REVIEW' | 'FAIL_CLOSED'
+
+export interface RiskDecisionNodeConfig {
+  sceneKey: string
+  subjectMapping: Record<string, string>
+  eventMapping: Record<string, string>
+  contextMapping?: Record<string, string>
+  actionRoutes: Record<RiskDecisionActionRoute, string> & Partial<Record<RiskDecisionActionRoute, string>>
+  failPolicy: RiskDecisionFailPolicy
+  timeoutMs: number
+  includeTrace?: boolean
+}
+
 // bizConfig 结构（对应 config 字段）
 export interface BizConfig {
   /** 默认后继节点。 */

@@ -5,6 +5,8 @@ Sequence: 067
 Source: `docs/product-evolution/specs/p2-065-cdp-warehouse-production-readiness-proof.md`, `docs/product-evolution/specs/p2-066-cdp-warehouse-physical-e2e-certification.md`
 Implementation plan: `../plans/p2-067-cdp-warehouse-e2e-certification-history-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Persist operator-triggered CDP warehouse E2E certification runs so production readiness decisions have auditable evidence, not only a transient API response.

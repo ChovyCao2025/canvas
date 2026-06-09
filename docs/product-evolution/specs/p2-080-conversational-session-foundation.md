@@ -5,6 +5,8 @@ Sequence: 080
 Source: `docs/optimization/todo/plans/2026-05-31-direction-23-conversational-marketing-social-channels-P0P1P2.md`
 Implementation plan: `../plans/p2-080-conversational-session-foundation-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add the reusable conversation session foundation that lets inbound customer replies resume canvas execution through existing WAIT semantics before any single external conversational channel, such as WhatsApp or social DM, is fully integrated.

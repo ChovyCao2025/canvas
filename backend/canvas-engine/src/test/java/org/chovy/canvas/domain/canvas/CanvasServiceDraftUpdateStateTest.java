@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
 class CanvasServiceDraftUpdateStateTest {
 
     @Test
-    void updateDraftPreservesPublishedRuntimePolicyWhenEditingMetadataAndDraftGraph() {
+    void updateDraftPreservesPublishedRuntimePolicyAndCreatesNewDraftVersionWhenEditingGraph() {
         CanvasMapper canvasMapper = mock(CanvasMapper.class);
         CanvasVersionMapper versionMapper = mock(CanvasVersionMapper.class);
         CanvasDO canvas = publishedCanvas();
@@ -62,8 +62,15 @@ class CanvasServiceDraftUpdateStateTest {
         assertThat(updated.getPerUserTotalLimit()).isEqualTo(10);
         assertThat(updated.getCooldownSeconds()).isEqualTo(60);
 
-        verify(versionMapper).updateById(draft);
-        assertThat(draft.getGraphJson()).isEqualTo("{\"nodes\":[{\"id\":\"start\"}]}");
+        ArgumentCaptor<CanvasVersionDO> versionCaptor = ArgumentCaptor.forClass(CanvasVersionDO.class);
+        verify(versionMapper).insert(versionCaptor.capture());
+        verify(versionMapper, never()).updateById(any(CanvasVersionDO.class));
+        CanvasVersionDO inserted = versionCaptor.getValue();
+        assertThat(inserted.getCanvasId()).isEqualTo(10L);
+        assertThat(inserted.getVersion()).isEqualTo(3);
+        assertThat(inserted.getStatus()).isEqualTo(VersionStatus.DRAFT.getCode());
+        assertThat(inserted.getGraphJson()).isEqualTo("{\"nodes\":[{\"id\":\"start\"}]}");
+        assertThat(inserted.getCreatedBy()).isEqualTo("operator");
     }
 
     @Test

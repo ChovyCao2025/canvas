@@ -11,7 +11,7 @@ Add computed profile attributes so CDP profiles can store governed values derive
 
 ## Current Baseline
 
-- Implemented on 2026-06-05 and merged into `main`.
+- Implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - `cdp_user_profile.properties_json` stores static and computed profile attributes.
 - `ComputedProfileAttributeService` supports governed definition creation, activation, pause, preview, manual run, event-run idempotency, run history, and change-log lookup.
 - Operator UI is available at `/cdp/computed-profile` for administrators.
@@ -66,7 +66,7 @@ Add computed profile attributes so CDP profiles can store governed values derive
 
 ## Implementation Status
 
-- Status: implemented on 2026-06-05 and merged into `main`.
+- Status: implemented in the current workspace record on 2026-06-05; commit and merge status was not verified in this docs-only audit.
 - Backend: added schema coverage for `V104`, tightened definition validation, added `unchangedCount`, tenant-safe profile scans, pause, run-history, change-log lookup, event idempotency by `(tenant_id, attr_id, source_event_id)`, and `CdpComputedProfileController` endpoints under `/cdp/computed-profile-attributes`.
 - Frontend: added typed `cdpApi.computedProfiles` helpers, presentation helpers, `/cdp/computed-profile` admin page, route, and side-nav entry.
-- Verification: backend production compile passed with `mvn -pl canvas-engine -DskipTests compile`; focused P1-006 backend tests pass in an isolated runner because Maven `testCompile` remains blocked by unrelated existing test-source errors. Frontend `npm run test -- computedProfilePresentation.test.ts cdpApi.test.ts` and `npm run build` passed.
+- Verification: focused Java 21 backend verification passed on 2026-06-08 with `ComputedProfileAttributeSchemaTest`, `ComputedProfileAttributeServiceTest`, and `CdpComputedProfileControllerTest` covering 9 tests. Focused frontend verification passed on 2026-06-08 with `computedProfilePresentation.test.ts` and `cdpApi.test.ts` covering 7 tests.

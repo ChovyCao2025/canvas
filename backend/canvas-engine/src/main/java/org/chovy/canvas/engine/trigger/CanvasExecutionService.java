@@ -17,6 +17,7 @@ import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.chovy.canvas.engine.lane.DagCostProfiler;
 import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.rule.CanvasRuleGraphValidator;
 import org.chovy.canvas.engine.scheduler.DagEngine;
@@ -87,6 +88,7 @@ public class CanvasExecutionService {
     private ExecutionLifecycleGate lifecycleGate = new ExecutionLifecycleGate(0);
     private CanvasRuntimeMetrics runtimeMetrics;
     private CanvasRuleGraphValidator canvasRuleGraphValidator;
+    private DagCostProfiler dagCostProfiler;
 
     @Autowired(required = false)
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
@@ -106,6 +108,11 @@ public class CanvasExecutionService {
     @Autowired(required = false)
     void setCanvasRuleGraphValidator(CanvasRuleGraphValidator canvasRuleGraphValidator) {
         this.canvasRuleGraphValidator = canvasRuleGraphValidator;
+    }
+
+    @Autowired(required = false)
+    void setDagCostProfiler(DagCostProfiler dagCostProfiler) {
+        this.dagCostProfiler = dagCostProfiler;
     }
 
     /** 执行上下文在 Redis 中的保留秒数。 */
@@ -269,8 +276,19 @@ public class CanvasExecutionService {
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId,
             int priorAttemptCount, String lastError) {
+        return triggerFromExecutionRequest(canvasId, userId, triggerType, triggerNodeType,
+                matchKey, payload, msgId, priorAttemptCount, lastError, null);
+    }
+
+    /** 从执行请求队列触发画布执行，并透传请求派发阶段预解析 lane。 */
+    public Mono<Map<String, Object>> triggerFromExecutionRequest(
+            Long canvasId, String userId, String triggerType,
+            String triggerNodeType, String matchKey,
+            Map<String, Object> payload, String msgId,
+            int priorAttemptCount, String lastError,
+            ExecutionLane executionLane) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, false, 0, true, priorAttemptCount, lastError, null);
+                payload, msgId, false, false, 0, true, priorAttemptCount, lastError, executionLane);
     }
 
     /**
@@ -648,12 +666,13 @@ public class CanvasExecutionService {
                 throw new IllegalStateException(
                         "找不到触发器节点 type=" + triggerNodeType + " key=" + matchKey);
             }
+            ExecutionLane effectiveLane = applyDagCostProfile(executionLane, graph, triggerType, triggerNodeType, payload);
 
             // 构建返回结果
             return buildPrepareResultMap(
                     isResume, canvas,
                     admissionLimit, acquiredDedupKey,
-                    executionLane, ctx, graph, triggerNodeId
+                    effectiveLane, ctx, graph, triggerNodeId
             );
         } catch (RuntimeException e) {
             if (resumeLockAcquired) {
@@ -663,6 +682,39 @@ public class CanvasExecutionService {
             releaseDedupIfPresent(acquiredDedupKey);
             throw e;
         }
+    }
+
+    private ExecutionLane applyDagCostProfile(ExecutionLane currentLane,
+                                              DagGraph graph,
+                                              String triggerType,
+                                              String triggerNodeType,
+                                              Map<String, Object> payload) {
+        if (dagCostProfiler == null || currentLane != ExecutionLane.STANDARD) {
+            return currentLane;
+        }
+        DagCostProfiler.CostProfile costProfile = dagCostProfiler.profile(
+                graph, triggerType, triggerNodeType, estimateRecipientCount(payload));
+        return costProfile.recommendedLane() != null ? costProfile.recommendedLane() : currentLane;
+    }
+
+    private int estimateRecipientCount(Map<String, Object> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return 0;
+        }
+        for (String key : java.util.List.of("estimatedRecipientCount", "recipientCount", "audienceSize")) {
+            Object value = payload.get(key);
+            if (value instanceof Number number) {
+                return Math.max(0, number.intValue());
+            }
+            if (value instanceof String text && !text.isBlank()) {
+                try {
+                    return Math.max(0, Integer.parseInt(text.trim()));
+                } catch (NumberFormatException ignored) {
+                    // Try the next supported payload key.
+                }
+            }
+        }
+        return 0;
     }
 
     private void releaseDedupIfPresent(String acquiredDedupKey) {

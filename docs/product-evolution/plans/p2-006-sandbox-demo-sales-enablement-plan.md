@@ -10,7 +10,7 @@
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05.
 
 - Actual migration version is `V269__sandbox_demo_sales_enablement.sql`; the earlier planned migration slot was no longer available in this workspace.
 - Backend implementation includes `DemoSandboxService`, `JdbcDemoSandboxRepository`, and authenticated `DemoSandboxController` endpoints for install, reset, and expired-sandbox lookup.

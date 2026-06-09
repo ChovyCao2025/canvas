@@ -26,6 +26,9 @@
 - [architecture/archive/reference/deployment-guide.md](./architecture/archive/reference/deployment-guide.md) — 部署指南：本地开发 + Docker Compose
 - [architecture/archive/reference/security-considerations.md](./architecture/archive/reference/security-considerations.md) — 安全考量历史参考
 - [architecture/archive/reference/testing-strategy.md](./architecture/archive/reference/testing-strategy.md) — 测试策略历史参考
+- [ddd-rewrite/README.md](./ddd-rewrite/README.md) — DDD 模块化重写专项入口：后端模块化单体、边界上下文、包归属规则、并行 worker 计划和防跑偏护栏
+- [program-coordination/README.md](./program-coordination/README.md) — 跨专项协调入口：DDD 重写与 Open Source Growth 的依赖顺序、冲突矩阵和并行执行规则
+- [program-coordination/max-parallel-subagent-execution-plan.md](./program-coordination/max-parallel-subagent-execution-plan.md) — 最大并发子代理执行计划：实际 worker 拆分、写入范围、派发波次和并发上限
 - [architecture/archive/reference/coding-standards.md](./architecture/archive/reference/coding-standards.md) — 编码规范历史参考
 
 ### 架构审查与评估
@@ -65,6 +68,8 @@
 ### 产品战略
 - [product-evolution/product-strategy-dual-track-2026-05-31.md](./product-evolution/product-strategy-dual-track-2026-05-31.md) — 产品战略方案（163KB）：双轨并行，稳定 60% + 创新 40%，5 阶段 12 个月
 - [product-evolution/product-strategy-supplementary-dimensions-2026-05-31.md](./product-evolution/product-strategy-supplementary-dimensions-2026-05-31.md) — 产品战略补充维度（F-O）：8 个补充维度快速参考
+- [open-source-growth/README.md](./open-source-growth/README.md) — Open Source Growth 专项入口：半年内把 Canvas 产品化为开源、插件驱动、AI 辅助的营销自动化平台
+- [program-coordination/conflict-matrix.md](./program-coordination/conflict-matrix.md) — Open Source Growth 各工作流与 DDD 模块边界的冲突等级、等待条件和停止规则
 
 ### 产品演进方向
 - [product-evolution/product-evolution-directions-2026-05-31.md](./product-evolution/product-evolution-directions-2026-05-31.md) — 10 大演进方向深度方案（45KB）

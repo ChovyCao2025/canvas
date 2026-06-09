@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.chovy.canvas.dal.dataobject.CustomerChannelDO;
 import org.chovy.canvas.dal.dataobject.MarketingConsentDO;
 import org.chovy.canvas.dal.dataobject.MarketingSuppressionDO;
 import org.chovy.canvas.dal.mapper.CustomerChannelMapper;
@@ -26,22 +27,25 @@ class MarketingPolicyServiceTest {
 
     private MarketingConsentMapper consentMapper;
     private MarketingSuppressionMapper suppressionMapper;
+    private CustomerChannelMapper channelMapper;
     private MarketingPolicyService service;
 
     @BeforeAll
     static void initMyBatisPlusTableInfo() {
-        TableInfoHelper.initTableInfo(
-                new MapperBuilderAssistant(new MybatisConfiguration(), ""),
-                MarketingSuppressionDO.class);
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, MarketingConsentDO.class);
+        TableInfoHelper.initTableInfo(assistant, MarketingSuppressionDO.class);
+        TableInfoHelper.initTableInfo(assistant, CustomerChannelDO.class);
     }
 
     @BeforeEach
     void setUp() {
         consentMapper = mock(MarketingConsentMapper.class);
         suppressionMapper = mock(MarketingSuppressionMapper.class);
+        channelMapper = mock(CustomerChannelMapper.class);
         service = new MarketingPolicyService(
                 mock(CustomerProfileMapper.class),
-                mock(CustomerChannelMapper.class),
+                channelMapper,
                 consentMapper,
                 suppressionMapper,
                 mock(StringRedisTemplate.class));
@@ -118,9 +122,54 @@ class MarketingPolicyServiceTest {
         assertThat(wrapper.getParamNameValuePairs().values()).contains("SMS", "ALL");
     }
 
+    @Test
+    void tenantAwareConsentQueryIncludesTenantPredicate() {
+        when(consentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(consent(MarketingConsentDO.OPT_IN));
+
+        service.consentAllowed(7L, "user-1", "sms", true);
+
+        ArgumentCaptor<LambdaQueryWrapper<MarketingConsentDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(consentMapper).selectOne(captor.capture());
+        assertThat(captor.getValue().getCustomSqlSegment().toUpperCase()).contains("TENANT_ID");
+        assertThat(captor.getValue().getParamNameValuePairs().values()).contains(7L, "user-1", "SMS");
+    }
+
+    @Test
+    void tenantAwareSuppressionQueryIncludesTenantPredicate() {
+        when(suppressionMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        service.suppressionAllowed(7L, "user-1", "sms");
+
+        ArgumentCaptor<LambdaQueryWrapper<MarketingSuppressionDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(suppressionMapper).selectCount(captor.capture());
+        assertThat(captor.getValue().getCustomSqlSegment().toUpperCase()).contains("TENANT_ID");
+        assertThat(captor.getValue().getParamNameValuePairs().values()).contains(7L, "user-1", "SMS", "ALL");
+    }
+
+    @Test
+    void tenantAwareChannelQueryIncludesTenantPredicate() {
+        when(channelMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(channel("SMS", "13800000000"));
+
+        MarketingPolicyService.PolicyDecision decision = service.channelAvailable(7L, "user-1", "sms");
+
+        assertThat(decision.allowed()).isTrue();
+        ArgumentCaptor<LambdaQueryWrapper<CustomerChannelDO>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(channelMapper).selectOne(captor.capture());
+        assertThat(captor.getValue().getCustomSqlSegment().toUpperCase()).contains("TENANT_ID");
+        assertThat(captor.getValue().getParamNameValuePairs().values()).contains(7L, "user-1", "SMS", 1);
+    }
+
     private MarketingConsentDO consent(String status) {
         MarketingConsentDO consent = new MarketingConsentDO();
         consent.setConsentStatus(status);
         return consent;
+    }
+
+    private CustomerChannelDO channel(String channel, String address) {
+        CustomerChannelDO row = new CustomerChannelDO();
+        row.setChannel(channel);
+        row.setAddress(address);
+        row.setEnabled(1);
+        return row;
     }
 }

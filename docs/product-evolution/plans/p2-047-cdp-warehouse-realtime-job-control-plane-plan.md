@@ -1,10 +1,14 @@
 # CDP Warehouse Realtime Job Control Plane Implementation Plan
 
+Spec: `../specs/p2-047-cdp-warehouse-realtime-job-control-plane.md`
+
 **Goal:** Add realtime warehouse job instance heartbeats and auditable operator actions for external streaming jobs.
 
 **Architecture:** Keep external Flink/Kafka/Doris jobs outside canvas-engine. Canvas persists job runtime state and action requests; external jobs call heartbeat and pending-action APIs. Status evaluation is deterministic and tenant scoped.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

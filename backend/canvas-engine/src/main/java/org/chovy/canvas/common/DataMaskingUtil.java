@@ -70,9 +70,18 @@ public final class DataMaskingUtil {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param sensitiveKeys sensitive keys 参数，用于 maskObject 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     public static Object maskObject(Object value, Set<String> sensitiveKeys) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> masked = new LinkedHashMap<>();
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 String key = String.valueOf(entry.getKey());
                 if (isSensitiveKey(key, sensitiveKeys)) {
@@ -93,19 +102,35 @@ public final class DataMaskingUtil {
         if (value instanceof String text) {
             return maskIdCard(maskPhone(maskJson(text, sensitiveKeys)));
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return value;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param text text 参数，用于 maskText 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     public static String maskText(String text) {
         Object masked = maskObject(text);
         return masked == null ? null : String.valueOf(masked);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param sensitiveKeys sensitive keys 参数，用于 isSensitiveKey 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean isSensitiveKey(String key, Set<String> sensitiveKeys) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (key == null) {
             return false;
         }
         String normalized = key.toLowerCase();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return sensitiveKeys.stream()
                 .map(String::toLowerCase)
                 .anyMatch(normalized::contains);

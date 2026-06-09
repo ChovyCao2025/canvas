@@ -10,10 +10,12 @@ describe('aiPredictionApi', () => {
     const api = createAiPredictionApi(http as any)
 
     await api.latestRun()
+    await api.readiness()
     await api.churnDistribution()
     await api.topRiskUsers(25)
 
     expect(http.get).toHaveBeenCalledWith('/ai/predictions/latest-run')
+    expect(http.get).toHaveBeenCalledWith('/ai/predictions/readiness')
     expect(http.get).toHaveBeenCalledWith('/ai/predictions/churn-distribution')
     expect(http.get).toHaveBeenCalledWith('/ai/predictions/top-risk-users', { params: { limit: 25 } })
   })

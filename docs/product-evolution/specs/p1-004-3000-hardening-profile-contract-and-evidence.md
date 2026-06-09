@@ -2,7 +2,7 @@
 
 Priority: P1
 Sequence: 004
-Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004-3000-hardening-profile-contract-and-evidence-plan.md`
 
 ## Implementation Status

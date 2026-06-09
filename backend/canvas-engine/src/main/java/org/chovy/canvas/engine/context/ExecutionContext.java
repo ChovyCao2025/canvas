@@ -149,10 +149,16 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * setNodeOutputs 处理 engine.context 场景的业务逻辑。
+     * @param nodeOutputs node outputs 参数，用于 setNodeOutputs 流程中的校验、计算或对象转换。
+     */
     public void setNodeOutputs(Map<String, Map<String, Object>> nodeOutputs) {
         synchronized (outputLock) {
             this.nodeOutputs.clear();
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (nodeOutputs != null) {
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 nodeOutputs.forEach((nodeId, output) -> {
                     if (nodeId != null) {
                         this.nodeOutputs.put(nodeId, immutableOutputSnapshot(output));
@@ -163,6 +169,12 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * getNodeOutput 查询 engine.context 场景的业务数据。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param fieldKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 getNodeOutput 流程生成的业务结果。
+     */
     public Object getNodeOutput(String nodeId, String fieldKey) {
         synchronized (outputLock) {
             Map<String, Object> output = nodeOutputs.get(nodeId);
@@ -170,14 +182,26 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * getTriggerPayload 查询 engine.context 场景的业务数据。
+     * @return 返回 getTriggerPayload 流程生成的业务结果。
+     */
     public Map<String, Object> getTriggerPayload() {
         return readOnlyMapSnapshot(triggerPayload);
     }
 
+    /**
+     * getFlatContext 查询 engine.context 场景的业务数据。
+     * @return 返回 getFlatContext 流程生成的业务结果。
+     */
     public Map<String, Object> getFlatContext() {
         return readOnlyMapSnapshot(flatContext);
     }
 
+    /**
+     * setTriggerPayload 处理 engine.context 场景的业务逻辑。
+     * @param triggerPayload trigger payload 参数，用于 setTriggerPayload 流程中的校验、计算或对象转换。
+     */
     public void setTriggerPayload(Map<String, Object> triggerPayload) {
         Map<String, Object> snapshot = mutableDeepCopyMap(triggerPayload);
         synchronized (outputLock) {
@@ -190,12 +214,19 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * putTriggerPayloadValues 处理 engine.context 场景的业务逻辑。
+     * @param values values 参数，用于 putTriggerPayloadValues 流程中的校验、计算或对象转换。
+     */
     public void putTriggerPayloadValues(Map<String, Object> values) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (values == null || values.isEmpty()) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         synchronized (outputLock) {
             Map<String, Object> candidate = mutableDeepCopyMap(triggerPayload);
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             mutableDeepCopyMap(values).forEach((key, value) -> {
                 if (value != null) {
                     candidate.put(key, value);
@@ -210,6 +241,10 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * exportContextValues 处理 engine.context 场景的业务逻辑。
+     * @return 返回 exportContextValues 流程生成的业务结果。
+     */
     public Map<String, Object> exportContextValues() {
         Map<String, Object> values = new LinkedHashMap<>(triggerPayload);
         values.putAll(latestOutputValues);
@@ -217,6 +252,10 @@ public class ExecutionContext {
         return values;
     }
 
+    /**
+     * setCallStack 处理 engine.context 场景的业务逻辑。
+     * @param callStack call stack 参数，用于 setCallStack 流程中的校验、计算或对象转换。
+     */
     public void setCallStack(List<Long> callStack) {
         this.callStack = callStack == null
                 ? new CopyOnWriteArrayList<>()
@@ -250,15 +289,29 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * 为节点输出创建不可变快照。
+     *
+     * @param output 原始节点输出
+     * @return 深拷贝后的只读输出快照
+     */
     private Map<String, Object> immutableOutputSnapshot(Map<String, Object> output) {
         return readOnlyMapSnapshot(output);
     }
 
+    /**
+     * 清理指定节点曾写入的扁平上下文字段。
+     *
+     * @param nodeId 节点 ID
+     */
     private void clearOwnedFlatKeys(String nodeId) {
         Set<String> previousKeys = nodeFlatKeys.remove(nodeId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (previousKeys == null || previousKeys.isEmpty()) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (String flatKey : previousKeys) {
             if (nodeId.equals(flatKeyOwners.get(flatKey))) {
                 flatContext.remove(flatKey);
@@ -267,39 +320,75 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * 写入由指定节点拥有的扁平上下文字段。
+     *
+     * @param nodeId 节点 ID
+     * @param key 扁平字段 key
+     * @param value 字段值
+     * @param writtenFlatKeys 当前节点本轮写入的字段集合
+     */
     private void putOwnedFlatKey(String nodeId, String key, Object value, Set<String> writtenFlatKeys) {
         flatContext.put(key, value);
         flatKeyOwners.put(key, nodeId);
         writtenFlatKeys.add(key);
     }
 
+    /**
+     * 生成节点输出的全限定字段 key。
+     *
+     * @param nodeId 节点 ID
+     * @param fieldKey 输出字段 key
+     * @return nodeId.fieldKey 形式的字段 key
+     */
     private String qualifiedOutputKey(String nodeId, String fieldKey) {
         return nodeId + "." + fieldKey;
     }
 
+    /**
+     * 计算当前节点输出和触发载荷的序列化大小。
+     *
+     * @return 当前上下文字节数
+     */
     private int currentNodeOutputSizeLocked() {
         return serializedContextSize(triggerPayload, nodeOutputs);
     }
 
+    /**
+     * 计算节点输出集合的 JSON 序列化大小。
+     *
+     * @param outputs 节点输出集合
+     * @return 序列化字节数，序列化失败时返回估算值
+     */
     private int serializedNodeOutputSize(Map<String, Map<String, Object>> outputs) {
         try {
             return SIZE_OBJECT_MAPPER.writeValueAsBytes(outputs).length;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ignored) {
             return estimatedNodeOutputSize(outputs);
         }
     }
 
+    /**
+     * 估算节点输出集合大小。
+     *
+     * @param outputs 节点输出集合
+     * @return 估算字节数
+     */
     private int estimatedNodeOutputSize(Map<String, Map<String, Object>> outputs) {
         long total = 0;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map<String, Object> output : outputs.values()) {
             for (Map.Entry<String, Object> entry : output.entrySet()) {
                 total += entry.getKey().length()
                         + (entry.getValue() != null ? entry.getValue().toString().length() : 4);
+                // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                 if (total > Integer.MAX_VALUE) {
                     return Integer.MAX_VALUE;
                 }
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return (int) total;
     }
 
@@ -307,6 +396,10 @@ public class ExecutionContext {
     @JsonIgnore
     public boolean isOversized() { return approxSizeBytes.get() > maxSizeBytes; }
 
+    /**
+     * isNearSizeLimit 校验或转换 engine.context 场景的数据。
+     * @return 返回布尔判断结果。
+     */
     @JsonIgnore
     public boolean isNearSizeLimit() { return approxSizeBytes.get() > warnSizeBytes; }
 
@@ -314,6 +407,11 @@ public class ExecutionContext {
     @JsonIgnore
     public int getApproxSizeBytes() { return approxSizeBytes.get(); }
 
+    /**
+     * 重新计算上下文序列化大小并刷新近似大小缓存。
+     *
+     * @return 当前上下文字节数
+     */
     public int calculateSerializedContextSize() {
         synchronized (outputLock) {
             int size = currentNodeOutputSizeLocked();
@@ -322,6 +420,9 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * rebuildDerivedState 处理 engine.context 场景的业务逻辑。
+     */
     public void rebuildDerivedState() {
         synchronized (outputLock) {
             rebuildDerivedStateLocked();
@@ -338,6 +439,11 @@ public class ExecutionContext {
      */
 // ── 读取上下文字段，O(1) ─────────────────────────────────────
 
+    /**
+     * getContextValue 查询 engine.context 场景的业务数据。
+     * @param fieldKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 getContextValue 流程生成的业务结果。
+     */
     public Object getContextValue(String fieldKey) {
         Object val = flatContext.get(fieldKey);
         // 节点输出优先于触发载荷，允许下游节点读取上游加工后的同名字段。
@@ -356,6 +462,11 @@ public class ExecutionContext {
         return legacyLatestOutput != null ? legacyLatestOutput : triggerPayload.get(fieldKey);
     }
 
+    /**
+     * setContextValue 处理 engine.context 场景的业务逻辑。
+     * @param fieldKey 业务键，用于在同一租户下定位资源。
+     * @param value 待处理值，用于规则计算或转换。
+     */
     public void setContextValue(String fieldKey, Object value) {
         Objects.requireNonNull(fieldKey, "fieldKey must not be null");
         if (value == null) {
@@ -377,6 +488,11 @@ public class ExecutionContext {
      */
 // ── 节点状态 ────────────────────────────────────────────────
 
+    /**
+     * setNodeStatus 处理 engine.context 场景的业务逻辑。
+     * @param nodeId 业务对象 ID，用于定位具体记录。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     */
     public void setNodeStatus(String nodeId, NodeStatus status) {
         nodeStatuses.put(nodeId, status);
     }
@@ -477,6 +593,11 @@ public class ExecutionContext {
         return nodeGates.computeIfAbsent(nodeId, k -> new NodeGate());
     }
 
+    /**
+     * 通过移除最老节点输出让候选上下文落在大小上限内。
+     *
+     * @param candidate 候选节点输出集合
+     */
     private void fitUnderLimit(LinkedHashMap<String, Map<String, Object>> candidate) {
         while (serializedContextSize(triggerPayload, candidate) > maxSizeBytes && candidate.size() > 1) {
             String oldestNodeId = candidate.keySet().iterator().next();
@@ -488,12 +609,31 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * 构造上下文超限异常。
+     *
+     * @param candidateSize 候选上下文字节数
+     * @return 上下文超限异常
+     */
     private ContextOverflowException contextOverflow(int candidateSize) {
         return new ContextOverflowException(
+                /**
+                 * 执行 bytes 流程，围绕 bytes 完成校验、计算或结果组装。
+                 *
+                 * @param maxSizeBytes max size bytes 参数，用于 bytes 流程中的校验、计算或对象转换。
+                 * @param candidateSize 时间参数，用于计算窗口、过期或审计时间。
+                 * @return 返回 bytes 流程生成的业务结果。
+                 */
                 "execution context exceeds max bytes (1MB default): " + candidateSize + " > " + maxSizeBytes,
                 candidateSize);
     }
 
+    /**
+     * 兼容读取 nodeId.fieldKey 形式的旧节点输出字段。
+     *
+     * @param fieldKey 字段 key
+     * @return 命中的节点输出值，未命中时返回 null
+     */
     private Object legacyNodeOutputValue(String fieldKey) {
         if (fieldKey == null) {
             return null;
@@ -510,13 +650,21 @@ public class ExecutionContext {
         }
     }
 
+    /**
+     * 从最新节点输出中兼容读取未限定字段。
+     *
+     * @param fieldKey 字段 key
+     * @return 最近一个包含该字段的节点输出值，未命中时返回 null
+     */
     private Object legacyLatestOutputValue(String fieldKey) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (fieldKey == null) {
             return null;
         }
         synchronized (outputLock) {
             List<Map<String, Object>> outputs = new ArrayList<>(nodeOutputs.values());
             ListIterator<Map<String, Object>> iterator = outputs.listIterator(outputs.size());
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             while (iterator.hasPrevious()) {
                 Object value = iterator.previous().get(fieldKey);
                 if (value != null) {
@@ -524,31 +672,51 @@ public class ExecutionContext {
                 }
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return null;
     }
 
+    /**
+     * 计算触发载荷和节点输出的组合序列化大小。
+     *
+     * @param payload 触发载荷
+     * @param outputs 节点输出
+     * @return 序列化字节数
+     */
     private int serializedContextSize(Map<String, Object> payload, Map<String, Map<String, Object>> outputs) {
         int payloadSize = payload == null || payload.isEmpty() ? 0 : serializedObjectSize(payload);
         return payloadSize + serializedNodeOutputSize(outputs);
     }
 
+    /**
+     * 计算任意对象的 JSON 序列化大小。
+     *
+     * @param value 待计算对象
+     * @return 序列化字节数，序列化失败时返回字符串估算长度
+     */
     private int serializedObjectSize(Object value) {
         try {
             return SIZE_OBJECT_MAPPER.writeValueAsBytes(value).length;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception ignored) {
             return value == null ? 4 : value.toString().length();
         }
     }
 
+    /**
+     * 根据节点输出重建扁平上下文、最新输出和字段归属索引。
+     */
     private void rebuildDerivedStateLocked() {
         flatContext.clear();
         flatKeyOwners.clear();
         nodeFlatKeys.clear();
         latestOutputValues.clear();
         latestOutputOwners.clear();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         nodeOutputs.forEach((nodeId, output) -> {
             Set<String> writtenFlatKeys = new HashSet<>();
             output.forEach((key, value) -> {
+                // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                 if (value != null) {
                     putOwnedFlatKey(nodeId, qualifiedOutputKey(nodeId, key), value, writtenFlatKeys);
                     latestOutputValues.put(key, value);
@@ -562,29 +730,52 @@ public class ExecutionContext {
         approxSizeBytes.set(currentNodeOutputSizeLocked());
     }
 
+    /**
+     * 对 Map 做可变深拷贝。
+     *
+     * @param source 原始 Map
+     * @return 可变深拷贝 Map
+     */
     private Map<String, Object> mutableDeepCopyMap(Map<String, Object> source) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (source == null || source.isEmpty()) {
             return new LinkedHashMap<>();
         }
         Map<String, Object> snapshot = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         source.forEach((key, value) -> {
             if (key != null) {
                 snapshot.put(key, deepCopyValue(value));
             }
         });
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return snapshot;
     }
 
+    /**
+     * 创建只读 Map 快照。
+     *
+     * @param source 原始 Map
+     * @return 不可变深拷贝 Map
+     */
     private Map<String, Object> readOnlyMapSnapshot(Map<String, Object> source) {
         return Collections.unmodifiableMap(mutableDeepCopyMap(source));
     }
 
+    /**
+     * 深拷贝上下文中的值。
+     *
+     * @param value 原始值
+     * @return 对 Map、集合和数组进行不可变深拷贝后的值
+     */
     private Object deepCopyValue(Object value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null) {
             return null;
         }
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> copy = new LinkedHashMap<>();
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             map.forEach((key, nestedValue) -> {
                 if (key != null) {
                     copy.put(String.valueOf(key), deepCopyValue(nestedValue));
@@ -606,6 +797,7 @@ public class ExecutionContext {
             }
             return Collections.unmodifiableList(copy);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return value;
     }
 }

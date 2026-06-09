@@ -10,6 +10,8 @@
 
 **Implementation status (2026-06-06):** Completed. The actual Flyway migration is `V325__monitoring_anomaly_detection.sql`. Focused anomaly tests passed 8/8, and monitoring regression passed 44/44.
 
+Status: Completed on 2026-06-06.
+
 ---
 
 ## Scope

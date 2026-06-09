@@ -1,5 +1,9 @@
 # CDP Warehouse Quality And Reconciliation Implementation Plan
 
+Spec: `../specs/p2-026-cdp-warehouse-quality-and-reconciliation.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add durable, tenant-scoped data-quality checks for CDP warehouse ODS count reconciliation and aggregate watermark lag.
 
 **Architecture:** Keep P2-022/P2-024/P2-025 execution paths unchanged. Add a quality service above MySQL, Doris JDBC, and warehouse watermarks. Each check records a durable ledger row and returns a compact DTO for APIs and schedulers.

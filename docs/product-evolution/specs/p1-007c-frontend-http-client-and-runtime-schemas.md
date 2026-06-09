@@ -2,8 +2,10 @@
 
 Priority: P1
 Sequence: 007C
-Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/production-readiness-checklist.md`
+Source: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/archive/production-readiness-checklist.md`
 Implementation plan: `../plans/p1-007c-frontend-http-client-and-runtime-schemas-plan.md`
+
+Status: Historical plan evidence records implementation and verification; commit and merge status was not verified in this docs-only audit.
 
 ## Goal
 

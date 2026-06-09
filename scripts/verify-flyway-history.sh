@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Verifies the known Flyway history repair window without mutating the database.
+#
+# The checker compares applied V91/V92/V93/V272/V273/V354/V356 rows with the expected
+# post-merge migration sequence and returns repair guidance through failures.
 set -euo pipefail
 
 INPUT_FILE=""
@@ -10,7 +14,7 @@ DB_PASSWORD="${DB_PASSWORD:-${MYSQL_PASSWORD:-}}"
 
 usage() {
   cat <<'USAGE'
-Verify Flyway history for the V91/V92 migration merge repair.
+Verify Flyway history for the V91/V92/V272/V273/V354/V356 migration merge repair.
 
 By default this connects to MySQL and reads flyway_schema_history.
 
@@ -33,6 +37,7 @@ Exit codes:
 USAGE
 }
 
+# Print usage together with an invalid invocation error.
 fail_usage() {
   echo "ERROR: $*" >&2
   usage >&2
@@ -63,6 +68,7 @@ normalize_description() {
     | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//'
 }
 
+# Read applied Flyway history from either a fixture file or the configured MySQL schema.
 history_rows() {
   if [[ -n "$INPUT_FILE" ]]; then
     [[ -f "$INPUT_FILE" ]] || fail_usage "input file does not exist: $INPUT_FILE"
@@ -76,7 +82,7 @@ history_rows() {
   fi
 
   local query
-  query="SELECT version, description, success FROM flyway_schema_history WHERE version IN ('91','92','93','272','273') ORDER BY installed_rank;"
+  query="SELECT version, description, success FROM flyway_schema_history WHERE version IN ('91','92','93','272','273','354','356') ORDER BY installed_rank;"
   MYSQL_PWD="$DB_PASSWORD" mysql \
     --batch \
     --raw \
@@ -88,6 +94,7 @@ history_rows() {
     --execute "$query"
 }
 
+# Validate applied rows against the repaired migration sequence and flag old conflicting entries.
 verify_rows() {
   local rows="$1"
   local failures=()
@@ -97,6 +104,8 @@ verify_rows() {
   local seen_93=""
   local seen_272=""
   local seen_273=""
+  local seen_354=""
+  local seen_356=""
 
   while IFS=$'\t' read -r version description success _rest; do
     [[ -n "${version:-}" ]] || continue
@@ -133,14 +142,30 @@ verify_rows() {
         ;;
       272)
         seen_272="$normalized"
-        if [[ "$normalized" != "sanitize demo datasource credentials" ]]; then
+        if [[ "$normalized" == "sanitize demo datasource credentials" ]]; then
+          failures+=("V272 contains old conflicting sanitize migration")
+        elif [[ "$normalized" != "github oauth integration" ]]; then
           failures+=("V272 has unexpected description: ${description:-<missing>}")
         fi
         ;;
       273)
         seen_273="$normalized"
-        if [[ "$normalized" != "enforce core tenant not null" ]]; then
+        if [[ "$normalized" == "enforce core tenant not null" ]]; then
+          failures+=("V273 contains old conflicting tenant-not-null migration")
+        elif [[ "$normalized" != "add filesystem read capability" ]]; then
           failures+=("V273 has unexpected description: ${description:-<missing>}")
+        fi
+        ;;
+      354)
+        seen_354="$normalized"
+        if [[ "$normalized" != "sanitize demo datasource credentials" ]]; then
+          failures+=("V354 has unexpected description: ${description:-<missing>}")
+        fi
+        ;;
+      356)
+        seen_356="$normalized"
+        if [[ "$normalized" != "enforce core tenant not null" ]]; then
+          failures+=("V356 has unexpected description: ${description:-<missing>}")
         fi
         ;;
       *)
@@ -150,15 +175,15 @@ verify_rows() {
   done <<< "$rows"
 
   if [[ "$seen_count" -eq 0 ]]; then
-    echo "PASS: no V91/V92/V93/V272/V273 Flyway history rows exist yet"
+    echo "PASS: no V91/V92/V93/V272/V273/V354/V356 Flyway history rows exist yet"
     return 0
   fi
 
-  if [[ -n "$seen_272" && -z "$seen_91" ]]; then
-    failures+=("V272 is present but V91 is absent; inspect migration history ordering")
+  if [[ -n "$seen_354" && -z "$seen_91" ]]; then
+    failures+=("V354 is present but V91 is absent; inspect migration history ordering")
   fi
-  if [[ -n "$seen_273" && -z "$seen_92" ]]; then
-    failures+=("V273 is present but V92 is absent; inspect migration history ordering")
+  if [[ -n "$seen_356" && -z "$seen_92" ]]; then
+    failures+=("V356 is present but V92 is absent; inspect migration history ordering")
   fi
   if [[ -n "$seen_93" && ( -z "$seen_91" || -z "$seen_92" ) ]]; then
     failures+=("V93 is present without both resolved V91 and V92 rows")

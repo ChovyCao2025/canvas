@@ -83,11 +83,20 @@ public class AudienceController {
     private final AudienceComputeTaskRunner computeTaskRunner;
     /** 通知服务，用于发送人群任务通知。 */
     private final NotificationService notificationService;
+    /** 承接受众来源和 CDP 画像数据之间的转换查询。 */
     private final CdpAudienceSourceService cdpAudienceSourceService;
+    /** 解析当前请求的租户上下文，保证接口按租户隔离读写。 */
     private final TenantContextResolver tenantContextResolver;
+    /** 封装租户作用域切换，保证后台受众任务携带正确租户身份。 */
     private final TenantScopeSupport tenantScopeSupport;
+    /** 执行受众后台计算任务，避免长耗时计算阻塞请求线程。 */
     private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
 
+    /**
+     * 执行 setBackgroundExecutor 流程，围绕 set background executor 完成校验、计算或结果组装。
+     *
+     * @param backgroundExecutor 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     @Autowired(required = false)
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
         this.backgroundExecutor = backgroundExecutor;
@@ -144,10 +153,13 @@ public class AudienceController {
     @GetMapping("/ready")
     @Operation(operationId = "listReadyAudiences", summary = "List ready audiences")
     public Mono<R<List<AudienceDefinitionDO>>> listReady() {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return tenantContextResolver.currentOrError().flatMap(context ->
                 Mono.fromCallable(() -> {
+                    // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                     List<AudienceStatDO> readyStats = statMapper.selectList(new LambdaQueryWrapper<AudienceStatDO>()
                             .eq(AudienceStatDO::getStatus, "READY"));
+                    // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                     if (readyStats.isEmpty()) {
                         return R.ok(List.<AudienceDefinitionDO>of());
                     }
@@ -180,6 +192,7 @@ public class AudienceController {
     @PutMapping("/{id}")
     @Operation(operationId = "updateAudience", summary = "Update audience definition")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody AudienceDefinitionDO body) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
                 Mono.fromCallable(() -> {
                     String operator = tuple.getT1();
@@ -188,7 +201,9 @@ public class AudienceController {
                     body.setId(id);
                     applyTenantForWrite(body, context);
                     normalizeDefaultSnapshotMode(body);
+                    // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                     boolean updated = computeService.update(body);
+                    // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                     if (!updated) {
                         throw new IllegalArgumentException("Audience not found: " + id);
                     }
@@ -216,10 +231,12 @@ public class AudienceController {
     @Operation(operationId = "computeAudience", summary = "Compute audience")
     public Mono<R<ComputeTaskResp>> compute(@PathVariable Long id, @RequestBody(required = false) ComputeReq req) {
         String perfRunId = extractPerfRunId(req);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (perfRunId != null) {
             String perfInputId = req == null || req.getPerfInputId() == null || req.getPerfInputId().isBlank()
                     ? null
                     : req.getPerfInputId();
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             return tenantContextResolver.currentOrError().flatMap(context ->
                     Mono.fromCallable(() -> {
                         requireAudience(id, context);
@@ -236,6 +253,7 @@ public class AudienceController {
                     if (definition.getEnabled() == null || definition.getEnabled() == 0) {
                         throw new IllegalStateException("Audience disabled: " + id);
                     }
+                    // 汇总前面计算出的状态和明细，返回给调用方。
                     return R.ok(enqueueCompute(definition, tuple.getT1()));
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -264,13 +282,11 @@ public class AudienceController {
     }
 
     /**
-     * 执行 enqueue Compute 对应的业务逻辑。
+     * 执行 enqueueCompute 流程，围绕 enqueue compute 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param definition definition 方法执行所需的业务参数
-     * @param operator operator 操作人标识
-     * @return 方法执行后的业务结果
+     * @param definition definition 参数，用于 enqueueCompute 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回 enqueueCompute 流程生成的业务结果。
      */
     private ComputeTaskResp enqueueCompute(AudienceDefinitionDO definition, String operator) {
         String audienceId = String.valueOf(definition.getId());
@@ -310,6 +326,11 @@ public class AudienceController {
         String title = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus()) ? "人群计算完成" : "人群计算失败";
         String detail = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus())
                 ? "任务已完成"
+                /**
+                 * 按默认值规则处理输入值。
+                 *
+                 * @return 返回 defaultIfBlank 流程生成的业务结果。
+                 */
                 : defaultIfBlank(task.getErrorMsg(), "计算失败");
         try {
             notificationService.createForTask(
@@ -320,12 +341,19 @@ public class AudienceController {
                     displayName + " · " + detail,
                     "/audiences?highlight=" + audienceId + "&taskId=" + task.getTaskId(),
                     task.getTaskId());
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             log.error("[AUDIENCE] failed to create catch-up notification taskId={} user={}: {}",
                     task.getTaskId(), operator, e.getMessage(), e);
         }
     }
 
+    /**
+     * 执行 audienceQuery 流程，围绕 audience query 完成校验、计算或结果组装。
+     *
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 audienceQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<AudienceDefinitionDO> audienceQuery(TenantContext context) {
         return tenantScopeSupport.applyTenantFilter(
                 new LambdaQueryWrapper<>(),
@@ -333,6 +361,13 @@ public class AudienceController {
                 context);
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 requireAudience 流程生成的业务结果。
+     */
     private AudienceDefinitionDO requireAudience(Long id, TenantContext context) {
         AudienceDefinitionDO definition = definitionMapper.selectOne(audienceQuery(context)
                 .eq(AudienceDefinitionDO::getId, id)
@@ -343,6 +378,12 @@ public class AudienceController {
         return definition;
     }
 
+    /**
+     * 应用请求中的业务字段或租户约束。
+     *
+     * @param body 待处理业务值，用于规则计算、转换或外部调用。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     */
     private void applyTenantForWrite(AudienceDefinitionDO body, TenantContext context) {
         if (context.tenantId() != null) {
             body.setTenantId(context.tenantId());
@@ -351,17 +392,20 @@ public class AudienceController {
         tenantScopeSupport.applyTenantFilter(new LambdaQueryWrapper<>(), AudienceDefinitionDO::getTenantId, context);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param body 待处理业务值，用于规则计算、转换或外部调用。
+     */
     private void normalizeDefaultSnapshotMode(AudienceDefinitionDO body) {
         body.setDefaultSnapshotMode(AudienceSnapshotMode.normalize(body.getDefaultSnapshotMode()).name());
     }
 
     /**
-     * 判断 is Terminal 相关的业务数据。
+     * 判断业务条件是否成立。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param status status 状态值或状态筛选条件
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回布尔判断结果。
      */
     private boolean isTerminal(String status) {
         return AsyncTaskStatus.SUCCEEDED.name().equals(status)
@@ -370,11 +414,9 @@ public class AudienceController {
     }
 
     /**
-     * 执行 current User 对应的业务逻辑。
+     * 获取当前请求的登录上下文或租户信息。
      *
-     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
-     *
-     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     * @return 返回 current user 生成的文本或业务键。
      */
     private Mono<String> currentUser() {
         return ReactiveSecurityContextHolder.getContext()
@@ -389,50 +431,42 @@ public class AudienceController {
     }
 
     /**
-     * 执行 display Name 对应的业务逻辑。
+     * 执行 displayName 流程，围绕 display name 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param definition definition 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param definition definition 参数，用于 displayName 流程中的校验、计算或对象转换。
+     * @return 返回 display name 生成的文本或业务键。
      */
     private String displayName(AudienceDefinitionDO definition) {
         return defaultIfBlank(definition.getName(), "人群 " + definition.getId());
     }
 
     /**
-     * 执行 default If Blank 对应的业务逻辑。
+     * 按默认值规则处理输入值。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param fallback fallback 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultIfBlank 流程中的校验、计算或对象转换。
+     * @return 返回 default if blank 生成的文本或业务键。
      */
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }
 
     /**
-     * 执行 perf Task Id 对应的业务逻辑。
+     * 执行 perfTaskId 流程，围绕 perf task id 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param perfRunId perfRunId 对应的业务主键或标识
-     * @param perfInputId perfInputId 对应的业务主键或标识
-     * @return 转换或查询得到的字符串结果
+     * @param perfRunId 业务对象 ID，用于定位具体记录。
+     * @param perfInputId 业务对象 ID，用于定位具体记录。
+     * @return 返回 perf task id 生成的文本或业务键。
      */
     private String perfTaskId(String perfRunId, String perfInputId) {
         return "perf:" + defaultIfBlank(perfInputId, perfRunId);
     }
 
     /**
-     * 执行 extract Perf Run Id 对应的业务逻辑。
+     * 执行 extractPerfRunId 流程，围绕 extract perf run id 完成校验、计算或结果组装。
      *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param req 请求对象，承载调用方提交的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param req 请求对象，承载本次操作的输入参数。
+     * @return 返回 extract perf run id 生成的文本或业务键。
      */
     private String extractPerfRunId(ComputeReq req) {
         if (req == null) {
@@ -444,6 +478,9 @@ public class AudienceController {
     }
 
     @Data
+    /**
+     * ComputeReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     static class ComputeReq {
         /** 压测运行 ID。 */
         private String perfRunId;

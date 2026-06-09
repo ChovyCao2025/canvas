@@ -5,6 +5,8 @@ Sequence: 043
 Source: `docs/product-evolution/specs/p2-027-cdp-warehouse-catalog-and-lineage.md`, `docs/product-evolution/specs/p2-041-cdp-warehouse-metric-lineage-and-impact.md`
 Implementation plan: `../plans/p2-043-cdp-warehouse-transitive-lineage-impact-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Extend warehouse catalog lineage from direct edges to bounded transitive impact traversal so operators can answer which upstream sources feed a dataset and which downstream datasets may be affected by a change.

@@ -5,6 +5,8 @@ Sequence: 035
 Source: `docs/product-evolution/specs/p2-021-cdp-olap-audience-materialization.md`, `docs/product-evolution/specs/p2-024-cdp-warehouse-operations-api-and-scheduler.md`
 Implementation plan: `../plans/p2-035-cdp-warehouse-audience-materialization-operations-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a production operations surface for OLAP-backed audience materialization so CDP behavior audiences can be manually materialized and their run history inspected without duplicating the P2-021 materialization engine.

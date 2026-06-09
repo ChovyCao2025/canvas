@@ -80,6 +80,15 @@ public class AudienceComputeTaskRunner {
         this.lockRetryWaiter = null;
     }
 
+    /**
+     * 初始化 AudienceComputeTaskRunner 实例。
+     *
+     * @param computeService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param asyncTaskService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param notificationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param lockRetryDelay lock retry delay 参数，用于 AudienceComputeTaskRunner 流程中的校验、计算或对象转换。
+     * @param lockRetryWaiter lock retry waiter 参数，用于 AudienceComputeTaskRunner 流程中的校验、计算或对象转换。
+     */
     AudienceComputeTaskRunner(
             AudienceBatchComputeService computeService,
             AsyncTaskService asyncTaskService,
@@ -95,6 +104,11 @@ public class AudienceComputeTaskRunner {
     }
 
     @Autowired(required = false)
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param backgroundExecutor 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
         this.backgroundExecutor = backgroundExecutor;
     }
@@ -135,6 +149,7 @@ public class AudienceComputeTaskRunner {
 
     /** 同步执行指定租户内的人群计算任务并落地任务状态。 */
     public void runNow(String taskId, Long audienceId, String audienceName, String operator, Long tenantId) {
+        // 准备本次处理所需的上下文和中间变量。
         asyncTaskService.markRunning(taskId);
         AudienceComputeResult result;
         try {
@@ -163,6 +178,7 @@ public class AudienceComputeTaskRunner {
                     "人群计算完成",
                     displayName(result, audienceName, audienceId) + " · " + result.estimatedSize() + " 人",
                     targetUrl(audienceId, taskId));
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         String error = result.errorMsg() == null ? "计算失败" : result.errorMsg();
@@ -249,11 +265,13 @@ public class AudienceComputeTaskRunner {
      * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
      */
     private void sleepBeforeLockRetry() throws InterruptedException {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (lockRetryDelay.isZero() || lockRetryDelay.isNegative()) {
             return;
         }
         if (lockRetryWaiter != null) {
             lockRetryWaiter.accept(lockRetryDelay);
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         LockSupport.parkNanos(lockRetryDelay.toNanos());
@@ -321,7 +339,9 @@ public class AudienceComputeTaskRunner {
         LinkedHashSet<String> recipients = new LinkedHashSet<>();
         try {
             List<String> subscribers = asyncTaskService.subscribers(taskId);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (subscribers != null) {
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 subscribers.stream()
                         .filter(this::hasText)
                         .forEach(recipients::add);
@@ -332,6 +352,7 @@ public class AudienceComputeTaskRunner {
         if (recipients.isEmpty() && hasText(fallbackOperator)) {
             recipients.add(fallbackOperator);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return List.copyOf(recipients);
     }
 

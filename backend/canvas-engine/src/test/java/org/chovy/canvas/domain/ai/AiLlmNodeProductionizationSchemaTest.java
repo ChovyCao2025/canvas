@@ -38,4 +38,19 @@ class AiLlmNodeProductionizationSchemaTest {
                 .contains("completion_tokens")
                 .contains("idx_ai_audit_runtime");
     }
+
+    @Test
+    void registryFollowUpExposesSafeLlmOverrides() throws Exception {
+        String sql = Files.readString(Path.of(
+                "src/main/resources/db/migration/V360__ai_llm_registry_safe_overrides.sql"));
+
+        assertThat(sql)
+                .contains("schemaOverride")
+                .contains("maxTokens")
+                .contains("outlet_schema")
+                .contains("\"id\":\"success\"")
+                .contains("UPDATE node_type_registry")
+                .contains("WHERE type_key = 'AI_LLM'")
+                .doesNotContain("failNodeId");
+    }
 }

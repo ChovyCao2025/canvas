@@ -88,7 +88,7 @@ Reference URLs:
 
 ## Implementation Status
 
-Completed on 2026-06-05.
+Status: Completed on 2026-06-05; broader Maven test execution is still blocked by unrelated `RedisBiQueryResultCacheTest` testCompile failures.
 
 - `MarketingPolicyService.previewFrequency` reads the existing frequency bucket without increment/decrement/expire mutations.
 - `ContactabilityExplainerService` returns ordered checks for consent, suppression, channel availability, quiet hours, and frequency preview.

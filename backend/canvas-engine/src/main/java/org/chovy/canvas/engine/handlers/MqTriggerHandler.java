@@ -23,6 +23,10 @@ public class MqTriggerHandler implements NodeHandler {
     /** MQ 消息定义服务，用于按 messageCode 解析实际订阅 topic。 */
     private final MqMessageDefinitionService mqMessageDefinitionService;
 
+    /**
+     * 创建 MqTriggerHandler 实例并注入 engine.handlers 场景依赖。
+     * @param mqMessageDefinitionService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public MqTriggerHandler(MqMessageDefinitionService mqMessageDefinitionService) {
         this.mqMessageDefinitionService = mqMessageDefinitionService;
     }

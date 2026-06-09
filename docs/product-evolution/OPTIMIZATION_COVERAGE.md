@@ -8,8 +8,8 @@ This file records how `docs/optimization` was filtered into executable product-e
 
 Reviewed source groups:
 
-- Concurrency and production readiness: `docs/optimization/3000-concurrency-hardening-checklist.md`, `docs/optimization/4000-concurrency-readiness-checklist.md`, `docs/optimization/production-readiness-checklist.md`, `docs/optimization/production-design-gaps.md`
-- Product and UX audit: `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/optimization_list_v7.md`
+- Concurrency and production readiness: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`, `docs/optimization/archive/4000-concurrency-readiness-checklist.md`, `docs/optimization/archive/production-readiness-checklist.md`, `docs/optimization/archive/production-design-gaps.md`
+- Product and UX audit: `docs/optimization/archive/bmad-product-review-2026-05.md`, `docs/optimization/archive/optimization_list_v7.md`
 - Marketing, CDP, and AI capability gaps: `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/todo/cdp_gap_analysis.md`, `docs/optimization/todo/2026-05-30-marketing-platform-roadmap.md`, `docs/optimization/todo/2026-05-30-cdp-roadmap.md`, `docs/optimization/todo/2026-05-30-cdp-sdk-design.md`, `docs/optimization/todo/2026-05-31-ai-capability-roadmap.md`
 - Market and competitor research: `docs/optimization/todo/competitor-analysis-report.md`, `docs/optimization/todo/market-research-report.md`, `docs/optimization/todo/2026-05-31-evolution-directions.md`
 - Architecture and old plan handoffs: `docs/optimization/todo/plan-review-findings.md`, `docs/optimization/todo/specs/*.md`, `docs/optimization/todo/plans/*.md`

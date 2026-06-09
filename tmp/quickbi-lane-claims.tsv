@@ -1,0 +1,6 @@
+active	2026-06-08T08:40:14.773Z	codex-runtime-state	deeper runtime-state editor	normalQuickBiSlice	scripts/verify-quickbi-focus.sh	runtime editor controls
+released	2026-06-08T08:55:16.895Z	codex-runtime-state	deeper runtime-state editor	normalQuickBiSlice	scripts/verify-quickbi-focus.sh	runtime editor controls
+active	2026-06-08T09:02:59.615Z	codex-graph-join	full graph-canvas relationship modeling hardening for more complex Join expressions	normalQuickBiSlice	scripts/verify-quickbi-focus.sh	complex graph join expressions
+released	2026-06-08T09:25:21.899Z	codex-graph-join	full graph-canvas relationship modeling hardening for more complex Join expressions	normalQuickBiSlice	scripts/verify-quickbi-focus.sh	complex graph join expressions
+active	2026-06-08T09:27:47.803Z	codex-019ea51b-8010-70c0-99ee-a9be102961bc	spreadsheet/big-screen mobile layout variants and formula/pivot advanced editing	normalQuickBiSlice	scripts/verify-quickbi-focus.sh	continue remaining spreadsheet/big-screen formula pivot mobile variants
+released	2026-06-08T09:39:22.423Z	codex-019ea51b-8010-70c0-99ee-a9be102961bc	spreadsheet/big-screen mobile layout variants and formula/pivot advanced editing	normalQuickBiSlice	scripts/verify-quickbi-focus.sh	continue remaining spreadsheet/big-screen formula pivot mobile variants

@@ -36,6 +36,9 @@ import java.util.Optional;
 
 @Slf4j
 @Service
+/**
+ * DeliveryOutboxService 参与画布执行引擎流程，封装节点、调度或运行时处理能力。
+ */
 public class DeliveryOutboxService {
 
     public static final String STATUS_PENDING = "PENDING";
@@ -55,6 +58,16 @@ public class DeliveryOutboxService {
     private final boolean mqPublishEnabled;
 
     @Autowired
+    /**
+     * 初始化 DeliveryOutboxService 实例。
+     *
+     * @param jdbcTemplate jdbc template 参数，用于 DeliveryOutboxService 流程中的校验、计算或对象转换。
+     * @param recordMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param rocketMQTemplateProvider rocket mqtemplate provider 参数，用于 DeliveryOutboxService 流程中的校验、计算或对象转换。
+     * @param outboxTopic outbox topic 参数，用于 DeliveryOutboxService 流程中的校验、计算或对象转换。
+     * @param mqPublishEnabled mq publish enabled 参数，用于 DeliveryOutboxService 流程中的校验、计算或对象转换。
+     */
     public DeliveryOutboxService(JdbcTemplate jdbcTemplate,
                                  MessageSendRecordMapper recordMapper,
                                  ObjectMapper objectMapper,
@@ -69,6 +82,13 @@ public class DeliveryOutboxService {
         this.mqPublishEnabled = mqPublishEnabled;
     }
 
+    /**
+     * 初始化 DeliveryOutboxService 实例。
+     *
+     * @param jdbcTemplate jdbc template 参数，用于 DeliveryOutboxService 流程中的校验、计算或对象转换。
+     * @param recordMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public DeliveryOutboxService(JdbcTemplate jdbcTemplate,
                                  MessageSendRecordMapper recordMapper,
                                  ObjectMapper objectMapper) {
@@ -76,6 +96,12 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 enqueue 流程生成的业务结果。
+     */
     public DeliveryOutboxDO enqueue(ReachDeliveryService.DeliveryRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         Optional<DeliveryOutboxDO> existing = findByIdempotencyKey(request.tenantId(), request.idempotencyKey());
@@ -100,6 +126,13 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param workerId 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 claimNext 流程生成的业务结果。
+     */
     public Optional<DeliveryOutboxDO> claimNext(String workerId, LocalDateTime now) {
         LocalDateTime effectiveNow = now == null ? LocalDateTime.now() : now;
         List<DeliveryOutboxDO> candidates = findClaimCandidates(effectiveNow, 10);
@@ -121,9 +154,19 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param outboxId 业务对象 ID，用于定位具体记录。
+     * @param providerMessageId 业务对象 ID，用于定位具体记录。
+     * @param MapString map string 参数，用于 markSent 流程中的校验、计算或对象转换。
+     * @param response response 参数，用于 markSent 流程中的校验、计算或对象转换。
+     */
     public void markSent(Long outboxId, String providerMessageId, Map<String, Object> response) {
+        // 准备本次处理所需的上下文和中间变量。
         LocalDateTime now = LocalDateTime.now();
         String responseJson = toJson(response == null ? Map.of() : response);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         jdbcTemplate.update("""
                 UPDATE delivery_outbox
                 SET status = ?, provider_message_id = ?, provider_response_json = ?,
@@ -142,6 +185,13 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param outboxId 业务对象 ID，用于定位具体记录。
+     * @param errorMessage error message 参数，用于 markRetry 流程中的校验、计算或对象转换。
+     * @param nextRetryAt 时间参数，用于计算窗口、过期或审计时间。
+     */
     public void markRetry(Long outboxId, String errorMessage, LocalDateTime nextRetryAt) {
         LocalDateTime now = LocalDateTime.now();
         jdbcTemplate.update("""
@@ -153,8 +203,16 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param outboxId 业务对象 ID，用于定位具体记录。
+     * @param errorMessage error message 参数，用于 markDead 流程中的校验、计算或对象转换。
+     */
     public void markDead(Long outboxId, String errorMessage) {
+        // 准备本次处理所需的上下文和中间变量。
         LocalDateTime now = LocalDateTime.now();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         jdbcTemplate.update("""
                 UPDATE delivery_outbox
                 SET status = ?, attempt_count = attempt_count + 1, next_retry_at = NULL,
@@ -172,6 +230,13 @@ public class DeliveryOutboxService {
         });
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param before before 参数，用于 findStalePending 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<DeliveryOutboxDO> findStalePending(LocalDateTime before, int limit) {
         return jdbcTemplate.query("""
                 SELECT * FROM delivery_outbox
@@ -183,6 +248,13 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param before before 参数，用于 requeueStalePending 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 requeue stale pending 计算得到的数量、金额或指标值。
+     */
     public int requeueStalePending(LocalDateTime before, int limit) {
         int count = 0;
         for (DeliveryOutboxDO row : findStalePending(before, limit)) {
@@ -197,6 +269,12 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param outboxId 业务对象 ID，用于定位具体记录。
+     * @return 返回 replay dead 的布尔判断结果。
+     */
     public boolean replayDead(Long outboxId) {
         int updated = jdbcTemplate.update("""
                 UPDATE delivery_outbox
@@ -208,6 +286,12 @@ public class DeliveryOutboxService {
     }
 
     @Transactional
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public DeliveryReceiptLog recordReceipt(DeliveryReceiptRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         DeliveryOutboxDO outbox = findByProviderMessageId(request.provider(), request.providerMessageId())
@@ -236,6 +320,12 @@ public class DeliveryOutboxService {
                         .build());
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public Optional<DeliveryOutboxDO> findById(Long id) {
         List<DeliveryOutboxDO> rows = jdbcTemplate.query(
                 "SELECT * FROM delivery_outbox WHERE id = ? LIMIT 1",
@@ -244,6 +334,13 @@ public class DeliveryOutboxService {
         return rows.stream().findFirst();
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param idempotencyKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public Optional<DeliveryOutboxDO> findByIdempotencyKey(Long tenantId, String idempotencyKey) {
         List<DeliveryOutboxDO> rows = jdbcTemplate.query("""
                 SELECT * FROM delivery_outbox
@@ -253,6 +350,13 @@ public class DeliveryOutboxService {
         return rows.stream().findFirst();
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param provider provider 参数，用于 findByProviderMessageId 流程中的校验、计算或对象转换。
+     * @param providerMessageId 业务对象 ID，用于定位具体记录。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public Optional<DeliveryOutboxDO> findByProviderMessageId(String provider, String providerMessageId) {
         List<DeliveryOutboxDO> rows = jdbcTemplate.query("""
                 SELECT * FROM delivery_outbox
@@ -263,6 +367,12 @@ public class DeliveryOutboxService {
         return rows.stream().findFirst();
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param criteria criteria 参数，用于 search 流程中的校验、计算或对象转换。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public PageResult<DeliveryOutboxDO> search(DeliverySearchCriteria criteria) {
         DeliverySearchCriteria c = criteria == null ? DeliverySearchCriteria.defaults() : criteria.normalized();
         List<Object> args = new ArrayList<>();
@@ -283,6 +393,12 @@ public class DeliveryOutboxService {
         return PageResult.of(total, rows);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param outboxId 业务对象 ID，用于定位具体记录。
+     * @return 返回 receipt history 汇总后的集合、分页或映射视图。
+     */
     public List<DeliveryReceiptLog> receiptHistory(Long outboxId) {
         return jdbcTemplate.query("""
                 SELECT * FROM delivery_receipt_log
@@ -291,6 +407,13 @@ public class DeliveryOutboxService {
                 """, receiptRowMapper(), outboxId);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     protected List<DeliveryOutboxDO> findClaimCandidates(LocalDateTime now, int limit) {
         return jdbcTemplate.query("""
                 SELECT * FROM delivery_outbox
@@ -301,10 +424,18 @@ public class DeliveryOutboxService {
                 """, rowMapper(), STATUS_PENDING, STATUS_RETRY, now, normalizeLimit(limit));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 prepareMessageRecord 流程生成的业务结果。
+     */
     protected MessageSendRecordDO prepareMessageRecord(ReachDeliveryService.DeliveryRequest request) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         MessageSendRecordDO existing = recordMapper.selectOne(new LambdaQueryWrapper<MessageSendRecordDO>()
                 .eq(MessageSendRecordDO::getIdempotencyKey, request.idempotencyKey())
                 .last("LIMIT 1"));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (existing != null) {
             return existing;
         }
@@ -330,15 +461,24 @@ public class DeliveryOutboxService {
                     .eq(MessageSendRecordDO::getIdempotencyKey, request.idempotencyKey())
                     .last("LIMIT 1"));
             if (duplicateRecord != null) {
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return duplicateRecord;
             }
             throw duplicate;
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @param messageSendRecordId 业务对象 ID，用于定位具体记录。
+     * @return 返回 insert outbox 计算得到的数量、金额或指标值。
+     */
     protected Long insertOutbox(ReachDeliveryService.DeliveryRequest request, Long messageSendRecordId) {
         LocalDateTime now = LocalDateTime.now();
         KeyHolder keyHolder = new GeneratedKeyHolder();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement("""
                     INSERT INTO delivery_outbox
@@ -366,11 +506,22 @@ public class DeliveryOutboxService {
         if (key != null) {
             return key.longValue();
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return findByIdempotencyKey(request.tenantId(), request.idempotencyKey())
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .map(DeliveryOutboxDO::getId)
                 .orElseThrow(() -> new IllegalStateException("delivery outbox insert did not return a key"));
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param outbox outbox 参数，用于 insertReceipt 流程中的校验、计算或对象转换。
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @param idempotencyKey 业务键，用于在同一租户下定位资源。
+     * @param rawJson JSON 字符串，承载结构化配置或明细。
+     * @param receivedAt 时间参数，用于计算窗口、过期或审计时间。
+     */
     private void insertReceipt(DeliveryOutboxDO outbox,
                                DeliveryReceiptRequest request,
                                String idempotencyKey,
@@ -387,6 +538,13 @@ public class DeliveryOutboxService {
                 rawJson, idempotencyKey, receivedAt, LocalDateTime.now());
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param idempotencyKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private Optional<DeliveryReceiptLog> findReceiptByIdempotencyKey(Long tenantId, String idempotencyKey) {
         List<DeliveryReceiptLog> rows = jdbcTemplate.query("""
                 SELECT * FROM delivery_receipt_log
@@ -396,18 +554,34 @@ public class DeliveryOutboxService {
         return rows.stream().findFirst();
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param outbox outbox 参数，用于 updateCurrentReceiptStatus 流程中的校验、计算或对象转换。
+     * @param receiptType 类型标识，用于选择对应处理分支。
+     * @param receivedAt 时间参数，用于计算窗口、过期或审计时间。
+     */
     private void updateCurrentReceiptStatus(DeliveryOutboxDO outbox, String receiptType, LocalDateTime receivedAt) {
+        // 准备本次处理所需的上下文和中间变量。
         String status = normalizeStatus(receiptType);
         MessageSendRecordDO record = new MessageSendRecordDO();
         record.setId(outbox.getMessageSendRecordId());
         record.setStatus(status);
         record.setExternalMessageId(outbox.getProviderMessageId());
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         record.setUpdatedAt(receivedAt);
         recordMapper.updateById(record);
         jdbcTemplate.update("UPDATE delivery_outbox SET status = ?, updated_at = ? WHERE id = ?",
                 status, receivedAt, outbox.getId());
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param criteria criteria 参数，用于 buildWhere 流程中的校验、计算或对象转换。
+     * @param args 命令行参数，用于读取运行配置。
+     * @return 返回组装或转换后的结果对象。
+     */
     private String buildWhere(DeliverySearchCriteria criteria, List<Object> args) {
         List<String> clauses = new ArrayList<>();
         if (criteria.tenantId() != null) {
@@ -427,6 +601,14 @@ public class DeliveryOutboxService {
         return clauses.isEmpty() ? "" : "WHERE " + String.join(" AND ", clauses) + " ";
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param clauses clauses 参数，用于 addStringFilter 流程中的校验、计算或对象转换。
+     * @param args 命令行参数，用于读取运行配置。
+     * @param column column 参数，用于 addStringFilter 流程中的校验、计算或对象转换。
+     * @param value 待处理值，用于规则计算或转换。
+     */
     private void addStringFilter(List<String> clauses, List<Object> args, String column, String value) {
         if (value != null && !value.isBlank()) {
             clauses.add(column + " = ?");
@@ -434,6 +616,12 @@ public class DeliveryOutboxService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param outbox outbox 参数，用于 payloadAsMap 流程中的校验、计算或对象转换。
+     * @return 返回 payloadAsMap 流程生成的业务结果。
+     */
     public Map<String, Object> payloadAsMap(DeliveryOutboxDO outbox) {
         if (outbox == null || outbox.getPayloadJson() == null || outbox.getPayloadJson().isBlank()) {
             return Map.of();
@@ -445,7 +633,13 @@ public class DeliveryOutboxService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @return 返回 row mapper 汇总后的集合、分页或映射视图。
+     */
     private RowMapper<DeliveryOutboxDO> rowMapper() {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return (rs, rowNum) -> DeliveryOutboxDO.builder()
                 .id(rs.getLong("id"))
                 .tenantId(rs.getLong("tenant_id"))
@@ -467,10 +661,16 @@ public class DeliveryOutboxService {
                 .providerResponseJson(rs.getString("provider_response_json"))
                 .lastError(rs.getString("last_error"))
                 .createdAt(toLocalDateTime(rs.getTimestamp("created_at")))
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 .updatedAt(toLocalDateTime(rs.getTimestamp("updated_at")))
                 .build();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 receipt row mapper 汇总后的集合、分页或映射视图。
+     */
     private RowMapper<DeliveryReceiptLog> receiptRowMapper() {
         return (rs, rowNum) -> DeliveryReceiptLog.builder()
                 .id(rs.getLong("id"))
@@ -486,10 +686,22 @@ public class DeliveryOutboxService {
                 .build();
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param timestamp 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回组装或转换后的结果对象。
+     */
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -498,6 +710,12 @@ public class DeliveryOutboxService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 receipt idempotency key 生成的文本或业务键。
+     */
     private String receiptIdempotencyKey(DeliveryReceiptRequest request) {
         if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
             return request.idempotencyKey();
@@ -511,28 +729,62 @@ public class DeliveryOutboxService {
                 + ":" + normalizeStatus(request.receiptType()) + ":" + Integer.toHexString(toJson(request.rawPayload()).hashCode());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 eventId 流程中的校验、计算或对象转换。
+     * @param rawPayload raw payload 参数，用于 eventId 流程中的校验、计算或对象转换。
+     * @return 返回 eventId 流程生成的业务结果。
+     */
     private Object eventId(Map<String, Object> rawPayload) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (rawPayload == null || rawPayload.isEmpty()) {
             return null;
         }
         Object eventId = rawPayload.get("eventId");
         if (eventId == null) eventId = rawPayload.get("event_id");
         if (eventId == null) eventId = rawPayload.get("id");
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return eventId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenantId(Long tenantId) {
         return tenantId == null ? 1L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param provider provider 参数，用于 normalizeProvider 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeProvider(String provider) {
         return provider == null || provider.isBlank() ? "REACH" : provider.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeStatus(String status) {
         return status == null || status.isBlank() ? "UNKNOWN" : status.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param maxLength max length 参数，用于 truncate 流程中的校验、计算或对象转换。
+     * @return 返回 truncate 生成的文本或业务键。
+     */
     private String truncate(String value, int maxLength) {
         if (value == null) {
             return null;
@@ -540,10 +792,21 @@ public class DeliveryOutboxService {
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int normalizeLimit(int limit) {
         return Math.max(1, Math.min(limit, 500));
     }
 
+    /**
+     * 执行业务决策动作，并同步后续状态。
+     *
+     * @param outbox outbox 参数，用于 publishAfterCommit 流程中的校验、计算或对象转换。
+     */
     private void publishAfterCommit(DeliveryOutboxDO outbox) {
         if (!mqPublishEnabled || rocketMQTemplate == null || outbox == null || outbox.getId() == null) {
             return;
@@ -563,6 +826,9 @@ public class DeliveryOutboxService {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
+                /**
+                 * 根据方法职责完成对应的业务处理流程。
+                 */
                 public void afterCommit() {
                     publisher.run();
                 }
@@ -572,6 +838,9 @@ public class DeliveryOutboxService {
         publisher.run();
     }
 
+    /**
+     * DeliverySearchCriteria 参与画布执行引擎流程，封装节点、调度或运行时处理能力。
+     */
     public record DeliverySearchCriteria(
             Long tenantId,
             Long canvasId,
@@ -584,10 +853,20 @@ public class DeliveryOutboxService {
             int page,
             int size
     ) {
+        /**
+         * 生成默认值或兜底结果，保证调用链稳定。
+         *
+         * @return 返回 defaults 流程生成的业务结果。
+         */
         static DeliverySearchCriteria defaults() {
             return new DeliverySearchCriteria(null, null, null, null, null, null, null, null, 1, 20);
         }
 
+        /**
+         * 解析、归一化或保护输入值，生成安全可用的中间结果。
+         *
+         * @return 返回解析、归一化或安全处理后的值。
+         */
         DeliverySearchCriteria normalized() {
             return new DeliverySearchCriteria(
                     tenantId,
@@ -603,11 +882,23 @@ public class DeliveryOutboxService {
             );
         }
 
+        /**
+         * 解析、归一化或保护输入值，生成安全可用的中间结果。
+         *
+         * @param value 待处理值，用于规则计算或转换。
+         * @return 返回解析、归一化或安全处理后的值。
+         */
         private static String normalizeUpper(String value) {
             String normalized = blankToNull(value);
             return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
         }
 
+        /**
+         * 解析、归一化或保护输入值，生成安全可用的中间结果。
+         *
+         * @param value 待处理值，用于规则计算或转换。
+         * @return 返回解析、归一化或安全处理后的值。
+         */
         private static String blankToNull(String value) {
             return value == null || value.isBlank() ? null : value.trim();
         }

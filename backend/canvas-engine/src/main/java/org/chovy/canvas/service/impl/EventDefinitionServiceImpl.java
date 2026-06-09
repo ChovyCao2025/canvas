@@ -61,6 +61,11 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
     private CanvasAttributionService canvasAttributionService;
 
     @Autowired(required = false)
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param canvasAttributionService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     void setCanvasAttributionService(CanvasAttributionService canvasAttributionService) {
         this.canvasAttributionService = canvasAttributionService;
     }
@@ -103,6 +108,11 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
         return resumeWaitsAndBuildResult(req, payload, eventId, eventLog, canvasIds);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param eventLog event log 参数，用于 attributeConversion 流程中的校验、计算或对象转换。
+     */
     private void attributeConversion(EventLogDO eventLog) {
         if (canvasAttributionService == null) {
             return;

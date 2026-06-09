@@ -5,6 +5,8 @@ Sequence: 038
 Source: `docs/product-evolution/specs/p2-037-cdp-warehouse-readiness-incident-automation.md`, `docs/product-evolution/specs/p2-028-cdp-warehouse-scheduler-lease.md`
 Implementation plan: `../plans/p2-038-cdp-warehouse-readiness-incident-scheduler-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a guarded scheduler that can automatically run readiness incident scans in production without duplicate work across service instances.

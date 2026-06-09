@@ -26,6 +26,11 @@ public class CanvasConfigCache {
             .expireAfterAccess(java.time.Duration.ofHours(2))
             .build();
 
+    /**
+     * 创建 CanvasConfigCache 实例并注入 infrastructure.cache 场景依赖。
+     * @param graphJsonCache 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param dagParser dag parser 参数，用于 CanvasConfigCache 流程中的校验、计算或对象转换。
+     */
     public CanvasConfigCache(@Qualifier("canvasConfigGraphJsonCache") TieredCache<Long, String> graphJsonCache,
                              DagParser dagParser) {
         this.graphJsonCache = graphJsonCache;
@@ -73,10 +78,13 @@ public class CanvasConfigCache {
         // Compatibility hook for old tests/integrations. SDK invalidation handles L1 + L2 together.
     }
 
+    /**
+     * ParsedGraphKey record.
+     * @param versionId 画布版本 ID，用于限定解析缓存归属.
+     * @param graphJson 参与解析缓存命中的 DAG JSON 内容.
+     */
     private record ParsedGraphKey(
-            /** 画布版本 ID，用于限定解析缓存归属。 */
-            Long versionId,
-            /** 参与解析缓存命中的 DAG JSON 内容。 */
-            String graphJson
+        Long versionId,
+        String graphJson
     ) {}
 }

@@ -427,7 +427,8 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-005a-cdp-event-log-and-idempotent-track.md`
 - Read: `docs/product-evolution/plans/p1-005a-cdp-event-log-and-idempotent-track-plan.md`
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

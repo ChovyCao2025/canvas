@@ -1,10 +1,14 @@
 # CDP Warehouse Physical Table Governance Implementation Plan
 
+Spec: `../specs/p2-031-cdp-warehouse-physical-table-governance.md`
+
 **Goal:** Make Doris physical table design a durable, inspectable warehouse contract rather than unchecked SQL assets.
 
 **Architecture:** Store built-in and tenant-specific table contracts in MySQL. Inspect configured DDL assets against each contract and append inspection evidence. Keep inspection read-only: this slice detects drift and production-readiness gaps, while later slices can add live Doris introspection and ALTER remediation.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, Doris DDL assets, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

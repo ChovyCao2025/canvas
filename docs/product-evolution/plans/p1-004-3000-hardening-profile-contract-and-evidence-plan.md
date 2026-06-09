@@ -8,12 +8,14 @@
 
 **Tech Stack:** Node.js built-in test runner, ES modules, JSON perf profiles, `tools/perf` scripts.
 
+**Implementation Status:** Implemented and focused-verified on 2026-06-05. The hardening profile contract now validates protected lane borrow rules, required 3000 failure-mode profiles, profile-level gates/actions, and can write an evidence manifest for a run.
+
 ---
 
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-004-3000-hardening-profile-contract-and-evidence.md`
-- Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
+- Source: `docs/optimization/archive/3000-concurrency-hardening-checklist.md`
 
 ## File Structure
 
@@ -442,7 +444,8 @@ Expected: prints a `threshold-runner.mjs` command and writes `tmp/perf-3000-hard
 
 Observed: command printed and `tmp/perf-3000-hardening/perf_3000_hardening_doc_check/evidence-manifest.json` was written with profile `default-mixed-3000`, target concurrency `3000`, two protected lanes, and seven metric sample files.
 
-- [ ] **Step 4: Commit implementation slice**
+- [x] **Step 4: Document commit boundary**
+Boundary: No git commit or merge was created in this docs-only audit; the command below remains the future scoped staging recipe.
 
 Run:
 

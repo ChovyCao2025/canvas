@@ -9,9 +9,9 @@ Implementation plan: `../plans/p2-082r-monitoring-anomaly-detection-foundation-p
 
 Add the first production-grade anomaly detection foundation for marketing monitoring: configurable anomaly rules, rolling-baseline detection from existing trend snapshots, auditable anomaly events, and tenant-scoped operator APIs.
 
-## Delivery Status
+## Implementation Status
 
-Delivered backend first slice on 2026-06-06:
+Status: Delivered backend first slice on 2026-06-06.
 
 - Tenant-scoped anomaly rule registry for metric, source, brand, competitor, direction, baseline window, threshold, and metadata.
 - Rolling-baseline detector that reads existing monitoring trend snapshots and compares a target bucket against historical buckets.

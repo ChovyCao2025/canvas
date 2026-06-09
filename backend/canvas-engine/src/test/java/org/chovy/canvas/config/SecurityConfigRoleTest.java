@@ -63,6 +63,6 @@ class SecurityConfigRoleTest {
         assertThat(SecurityConfig.publicDocumentationEnabled(new MockEnvironment()
                 .withProperty("spring.profiles.active", "prod"))).isFalse();
         assertThat(SecurityConfig.DOCUMENTATION_ROUTES)
-                .contains("/swagger-ui/**", "/v3/api-docs/**");
+                .contains("/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**");
     }
 }

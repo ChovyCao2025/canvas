@@ -30,16 +30,34 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/channels/connectors")
+/**
+ * ChannelConnectorController 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+ */
 public class ChannelConnectorController {
 
     private final Service service;
     private final TenantContextResolver tenantContextResolver;
 
+    /**
+     * 初始化 ChannelConnectorController 实例。
+     *
+     * @param service 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public ChannelConnectorController(Service service) {
         this(service, null);
     }
 
     @Autowired
+    /**
+     * 初始化 ChannelConnectorController 实例。
+     *
+     * @param connectorMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param limitMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param decisionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dedupeRecordMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fallbackService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     public ChannelConnectorController(ChannelConnectorMapper connectorMapper,
                                       ChannelProviderLimitMapper limitMapper,
                                       ChannelFallbackDecisionMapper decisionMapper,
@@ -50,24 +68,47 @@ public class ChannelConnectorController {
                 tenantContextResolver);
     }
 
+    /**
+     * 初始化 ChannelConnectorController 实例。
+     *
+     * @param service 依赖组件，用于完成数据访问或外部能力调用。
+     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     private ChannelConnectorController(Service service, TenantContextResolver tenantContextResolver) {
         this.service = service;
         this.tenantContextResolver = tenantContextResolver;
     }
 
     @GetMapping
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @return 返回符合条件的数据列表或视图。
+     */
     public Mono<R<List<ConnectorRow>>> list() {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> R.ok(service.list(tenantId)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
     @GetMapping("/limits")
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     public Mono<R<List<LimitRow>>> limits() {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> R.ok(service.listLimits(tenantId)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
     @PostMapping("/{id}/mode")
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param req 请求对象，承载本次操作的输入参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public Mono<R<Void>> updateMode(@PathVariable Long id, @RequestBody ModeUpdateReq req) {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> {
             service.updateMode(tenantId, id, req.mode(), req.reason());
@@ -76,55 +117,137 @@ public class ChannelConnectorController {
     }
 
     @PostMapping("/{id}/health-test")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @return 返回 testHealth 流程生成的业务结果。
+     */
     public Mono<R<HealthResult>> testHealth(@PathVariable Long id) {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> R.ok(service.testHealth(tenantId, id)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
     @PostMapping("/fallback/validate")
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param req 请求对象，承载本次操作的输入参数。
+     * @return 返回布尔判断结果。
+     */
     public Mono<R<ValidationResult>> validateFallback(@RequestBody FallbackPolicyReq req) {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> R.ok(service.validateFallback(tenantId, req)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
     @GetMapping("/fallback/decisions")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 decisions 汇总后的集合、分页或映射视图。
+     */
     public Mono<R<List<FallbackDecisionRow>>> decisions() {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> R.ok(service.listDecisions(tenantId)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
     @GetMapping("/dedupe-records")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 dedupe records 汇总后的集合、分页或映射视图。
+     */
     public Mono<R<List<DedupeRecordRow>>> dedupeRecords() {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> R.ok(service.listDedupeRecords(tenantId)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 current tenant id 计算得到的数量、金额或指标值。
+     */
     private Mono<Long> currentTenantId() {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (tenantContextResolver == null) {
             return Mono.just(0L);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return tenantContextResolver.current()
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .map(context -> context.tenantId() == null ? 0L : context.tenantId())
                 .defaultIfEmpty(0L)
                 .map(tenantId -> tenantId == null ? 0L : tenantId);
     }
 
+    /**
+     * Service 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public interface Service {
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         List<ConnectorRow> list(Long tenantId);
 
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         List<LimitRow> listLimits(Long tenantId);
 
+        /**
+         * 写入或更新业务数据，并保持关联状态一致。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param id 业务对象 ID，用于定位具体记录。
+         * @param mode mode 参数，用于 updateMode 流程中的校验、计算或对象转换。
+         * @param reason 原因说明，用于记录状态变化的业务依据。
+         */
         void updateMode(Long tenantId, Long id, String mode, String reason);
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param id 业务对象 ID，用于定位具体记录。
+         * @return 返回 testHealth 流程生成的业务结果。
+         */
         HealthResult testHealth(Long tenantId, Long id);
 
+        /**
+         * 校验输入、权限或业务前置条件。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param req 请求对象，承载本次操作的输入参数。
+         * @return 返回布尔判断结果。
+         */
         ValidationResult validateFallback(Long tenantId, FallbackPolicyReq req);
 
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         List<FallbackDecisionRow> listDecisions(Long tenantId);
 
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         List<DedupeRecordRow> listDedupeRecords(Long tenantId);
     }
 
+    /**
+     * ConnectorRow 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record ConnectorRow(
             Long id,
             String connectorKey,
@@ -135,6 +258,9 @@ public class ChannelConnectorController {
             String healthMessage) {
     }
 
+    /**
+     * LimitRow 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record LimitRow(
             String channel,
             String provider,
@@ -145,18 +271,33 @@ public class ChannelConnectorController {
             String updatedAt) {
     }
 
+    /**
+     * ModeUpdateReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record ModeUpdateReq(String mode, String reason) {
     }
 
+    /**
+     * HealthResult 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record HealthResult(String status, String message) {
     }
 
+    /**
+     * FallbackPolicyReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record FallbackPolicyReq(String channel, String provider, String fallbackChannel, String fallbackProvider) {
     }
 
+    /**
+     * ValidationResult 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record ValidationResult(boolean valid, String message) {
     }
 
+    /**
+     * FallbackDecisionRow 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record FallbackDecisionRow(
             String originalChannel,
             String originalProvider,
@@ -166,9 +307,15 @@ public class ChannelConnectorController {
             String createdAt) {
     }
 
+    /**
+     * DedupeRecordRow 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     public record DedupeRecordRow(String dedupeGroup, String contentHash, String channel, String userId, String expiresAt) {
     }
 
+    /**
+     * MapperBackedService 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+     */
     private static class MapperBackedService implements Service {
 
         private final ChannelConnectorMapper connectorMapper;
@@ -177,6 +324,15 @@ public class ChannelConnectorController {
         private final ChannelDedupeRecordMapper dedupeRecordMapper;
         private final ChannelFallbackService fallbackService;
 
+        /**
+         * 初始化 MapperBackedService 实例。
+         *
+         * @param connectorMapper 依赖组件，用于完成数据访问或外部能力调用。
+         * @param limitMapper 依赖组件，用于完成数据访问或外部能力调用。
+         * @param decisionMapper 依赖组件，用于完成数据访问或外部能力调用。
+         * @param dedupeRecordMapper 依赖组件，用于完成数据访问或外部能力调用。
+         * @param fallbackService 依赖组件，用于完成数据访问或外部能力调用。
+         */
         private MapperBackedService(ChannelConnectorMapper connectorMapper,
                                     ChannelProviderLimitMapper limitMapper,
                                     ChannelFallbackDecisionMapper decisionMapper,
@@ -190,6 +346,12 @@ public class ChannelConnectorController {
         }
 
         @Override
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         public List<ConnectorRow> list(Long tenantId) {
             return connectorMapper.selectList(new LambdaQueryWrapper<ChannelConnectorDO>()
                             .in(tenantId != null && tenantId != 0L, ChannelConnectorDO::getTenantId, List.of(0L, tenantId))
@@ -208,6 +370,12 @@ public class ChannelConnectorController {
         }
 
         @Override
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         public List<LimitRow> listLimits(Long tenantId) {
             return limitMapper.selectList(new LambdaQueryWrapper<ChannelProviderLimitDO>()
                             .in(tenantId != null && tenantId != 0L, ChannelProviderLimitDO::getTenantId, List.of(0L, tenantId))
@@ -226,6 +394,14 @@ public class ChannelConnectorController {
         }
 
         @Override
+        /**
+         * 写入或更新业务数据，并保持关联状态一致。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param id 业务对象 ID，用于定位具体记录。
+         * @param mode mode 参数，用于 updateMode 流程中的校验、计算或对象转换。
+         * @param reason 原因说明，用于记录状态变化的业务依据。
+         */
         public void updateMode(Long tenantId, Long id, String mode, String reason) {
             ChannelConnectorDO row = requireConnector(tenantId, id);
             ChannelConnector.ConnectorMode parsedMode = parseMode(mode);
@@ -235,6 +411,13 @@ public class ChannelConnectorController {
         }
 
         @Override
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param id 业务对象 ID，用于定位具体记录。
+         * @return 返回 testHealth 流程生成的业务结果。
+         */
         public HealthResult testHealth(Long tenantId, Long id) {
             ChannelConnectorDO row = requireConnector(tenantId, id);
             ChannelConnector.ConnectorMode mode = parseMode(row.getMode());
@@ -256,6 +439,13 @@ public class ChannelConnectorController {
         }
 
         @Override
+        /**
+         * 校验输入、权限或业务前置条件。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param req 请求对象，承载本次操作的输入参数。
+         * @return 返回布尔判断结果。
+         */
         public ValidationResult validateFallback(Long tenantId, FallbackPolicyReq req) {
             try {
                 fallbackService.validateCandidate(tenantId, req.channel(), req.provider(), req.fallbackChannel(), req.fallbackProvider());
@@ -266,6 +456,12 @@ public class ChannelConnectorController {
         }
 
         @Override
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         public List<FallbackDecisionRow> listDecisions(Long tenantId) {
             return decisionMapper.selectList(new LambdaQueryWrapper<ChannelFallbackDecisionDO>()
                             .in(tenantId != null && tenantId != 0L, ChannelFallbackDecisionDO::getTenantId, List.of(0L, tenantId))
@@ -284,6 +480,12 @@ public class ChannelConnectorController {
         }
 
         @Override
+        /**
+         * 查询并组装符合条件的业务数据。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @return 返回符合条件的数据列表或视图。
+         */
         public List<DedupeRecordRow> listDedupeRecords(Long tenantId) {
             return dedupeRecordMapper.selectList(new LambdaQueryWrapper<ChannelDedupeRecordDO>()
                             .in(tenantId != null && tenantId != 0L, ChannelDedupeRecordDO::getTenantId, List.of(0L, tenantId))
@@ -300,6 +502,13 @@ public class ChannelConnectorController {
                     .toList();
         }
 
+        /**
+         * 校验输入、权限或业务前置条件。
+         *
+         * @param tenantId 租户 ID，用于限定数据隔离范围。
+         * @param id 业务对象 ID，用于定位具体记录。
+         * @return 返回 requireConnector 流程生成的业务结果。
+         */
         private ChannelConnectorDO requireConnector(Long tenantId, Long id) {
             ChannelConnectorDO row = connectorMapper.selectById(id);
             if (row == null) {
@@ -312,6 +521,12 @@ public class ChannelConnectorController {
             return row;
         }
 
+        /**
+         * 解析、归一化或保护输入值，生成安全可用的中间结果。
+         *
+         * @param mode mode 参数，用于 parseMode 流程中的校验、计算或对象转换。
+         * @return 返回解析、归一化或安全处理后的值。
+         */
         private static ChannelConnector.ConnectorMode parseMode(String mode) {
             if (mode == null || mode.isBlank()) {
                 return ChannelConnector.ConnectorMode.DISABLED;
@@ -319,6 +534,12 @@ public class ChannelConnectorController {
             return ChannelConnector.ConnectorMode.valueOf(mode.trim().toUpperCase());
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @param value 待处理值，用于规则计算或转换。
+         * @return 返回 format 生成的文本或业务键。
+         */
         private static String format(LocalDateTime value) {
             return value == null ? null : value.toString();
         }

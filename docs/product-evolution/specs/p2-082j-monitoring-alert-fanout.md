@@ -9,7 +9,7 @@ Implementation plan: `../plans/p2-082j-monitoring-alert-fanout-plan.md`
 
 Close the next monitoring gap by delivering external alert fanout for sentiment and competitor alerts. P2-082G creates alert workflow rows, P2-082H lets operators triage them, and P2-082I ingests mentions from signed public webhooks. This slice makes open monitoring alerts reach real operating channels through auditable outbound notifications.
 
-## Delivery Status
+## Implementation Status
 
 Delivered backend first slice:
 

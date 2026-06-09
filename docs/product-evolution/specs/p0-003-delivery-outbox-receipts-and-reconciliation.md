@@ -2,7 +2,7 @@
 
 Priority: P0
 Sequence: 003
-Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/bmad-product-review-2026-05.md`
+Source: `docs/optimization/archive/production-design-gaps.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/archive/bmad-product-review-2026-05.md`
 Implementation plan: `../plans/p0-003-delivery-outbox-receipts-and-reconciliation-plan.md`
 
 ## Implementation Status

@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Button, Card, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, BarChartOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cdpApi, type CdpUserCanvasSummary, type CdpUserDetail, type CdpUserTag, type CdpUserTagHistory } from '../../services/cdpApi'
 import { contactabilityApi, type ContactabilityReport } from '../../services/contactabilityApi'
@@ -92,6 +92,13 @@ export default function CdpUserDetailPage() {
   }
 
   const contactabilityStatus = contactability ? contactabilityStatusView(contactability) : null
+  const openAnalyticsTimeline = () => {
+    const endDate = new Date().toISOString().slice(0, 10)
+    const start = new Date()
+    start.setDate(start.getDate() - 6)
+    const startDate = start.toISOString().slice(0, 10)
+    navigate(`/analytics?userId=${encodeURIComponent(userId)}&startDate=${startDate}&endDate=${endDate}`)
+  }
 
   return (
     <div>
@@ -109,6 +116,9 @@ export default function CdpUserDetailPage() {
           <Text type="secondary">最近活跃: {formatDateTime(detail?.lastSeenAt)}</Text>
           <Text type="secondary">手机号: {detail?.phone || '-'}</Text>
           <Text type="secondary">邮箱: {detail?.email || '-'}</Text>
+          <Button size="small" icon={<BarChartOutlined />} onClick={openAnalyticsTimeline}>
+            查看事件时间线
+          </Button>
         </Space>
       </Card>
 

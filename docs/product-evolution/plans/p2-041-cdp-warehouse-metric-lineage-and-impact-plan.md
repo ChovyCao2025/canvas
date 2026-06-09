@@ -1,10 +1,14 @@
 # CDP Warehouse Metric Lineage And Impact Implementation Plan
 
+Spec: `../specs/p2-041-cdp-warehouse-metric-lineage-and-impact.md`
+
 **Goal:** Add read-only metric impact analysis using existing semantic metric contracts, dataset lineage, BI charts, and BI dashboards.
 
 **Architecture:** `CdpWarehouseMetricLineageService` resolves the metric through `BiDatasetSpecResolver`, derives field dependencies from the metric expression and allowed dimensions, then optionally reads catalog lineage, chart resources, and dashboard resources.
 
 **Tech Stack:** Java 21, Spring Boot, JUnit 5, Mockito, AssertJ.
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
 
 ## Scope
 

@@ -5,6 +5,8 @@ Sequence: 009
 Source: `todo/p2/product-opportunities-from-filtered-scope.md#product-usage-analytics-and-feedback-loop`
 Implementation plan: `../plans/p2-009-product-usage-analytics-feedback-loop-plan.md`
 
+Status: Open execution plan; implementation is not complete in this docs-only audit because the plan retains unchecked execution tasks.
+
 ## Goal
 
 Track product usage, collect feedback, manage feature flags, and define product alert rules.

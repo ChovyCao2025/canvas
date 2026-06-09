@@ -27,6 +27,13 @@ public interface AudienceDefinitionMapper extends BaseMapper<AudienceDefinitionD
             ORDER BY updated_at ASC, id ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<AudienceDefinitionDO> selectMaterializationCandidates(@Param("tenantId") Long tenantId,
                                                                @Param("limit") int limit);
 

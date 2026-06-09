@@ -10,6 +10,9 @@ import org.chovy.canvas.dal.dataobject.CdpWarehouseSyntheticDataPathProbeRunDO;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * CdpWarehouseSyntheticDataPathProbeRunMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface CdpWarehouseSyntheticDataPathProbeRunMapper
         extends BaseMapper<CdpWarehouseSyntheticDataPathProbeRunDO> {
@@ -28,6 +31,12 @@ public interface CdpWarehouseSyntheticDataPathProbeRunMapper
             WHERE tenant_id = #{row.tenantId}
               AND id = #{row.id}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int updateCompletion(@Param("row") CdpWarehouseSyntheticDataPathProbeRunDO row);
 
     @Select("""
@@ -39,6 +48,13 @@ public interface CdpWarehouseSyntheticDataPathProbeRunMapper
             ORDER BY started_at DESC, id DESC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<CdpWarehouseSyntheticDataPathProbeRunDO> listRecent(@Param("tenantId") Long tenantId,
                                                              @Param("limit") int limit);
 }

@@ -1,5 +1,9 @@
 # CDP Warehouse External Realtime Job Probe Evidence Implementation Plan
 
+Spec: `../specs/p2-070-cdp-warehouse-external-realtime-job-probe-evidence.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Feed real external realtime job health into the existing warehouse realtime job control plane.

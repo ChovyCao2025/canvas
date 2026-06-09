@@ -11,6 +11,9 @@ import java.time.LocalDateTime;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+/**
+ * DeliveryReconciliationJob 参与画布执行引擎流程，封装节点、调度或运行时处理能力。
+ */
 public class DeliveryReconciliationJob {
 
     private final DeliveryOutboxService outboxService;
@@ -25,6 +28,9 @@ public class DeliveryReconciliationJob {
     private int limit;
 
     @Scheduled(fixedDelayString = "${canvas.delivery.outbox.reconciliation.fixed-delay-ms:60000}")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     */
     public void reconcileScheduled() {
         if (!enabled) {
             return;
@@ -35,6 +41,11 @@ public class DeliveryReconciliationJob {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 reconcile 计算得到的数量、金额或指标值。
+     */
     public int reconcile() {
         return outboxService.requeueStalePending(LocalDateTime.now().minusSeconds(staleSeconds), limit);
     }

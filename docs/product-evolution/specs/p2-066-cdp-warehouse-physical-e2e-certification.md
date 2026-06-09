@@ -5,6 +5,8 @@ Sequence: 066
 Source: `docs/product-evolution/specs/p2-051-cdp-warehouse-live-doris-ddl-drift.md`, `docs/product-evolution/specs/p2-055-cdp-warehouse-data-availability-gates.md`, `docs/product-evolution/specs/p2-060-cdp-warehouse-consumer-availability-contracts.md`, `docs/product-evolution/specs/p2-065-cdp-warehouse-production-readiness-proof.md`
 Implementation plan: `../plans/p2-066-cdp-warehouse-physical-e2e-certification-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a tenant-scoped physical E2E certification API that proves the CDP/OLAP warehouse is not only logically ready, but also backed by reachable Doris infrastructure and live physical table contracts.

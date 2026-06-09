@@ -69,6 +69,9 @@ public class ChurnPredictionService {
     }
 
     public PredictionRunView recompute(Long tenantId, RecomputeRequest request) {
+        if (!properties.isEnabled()) {
+            throw new IllegalStateException("canvas.ai.prediction.enabled must be true to recompute predictions");
+        }
         Long scopedTenantId = tenantId == null ? 0L : tenantId;
         LocalDate runDate = request == null || request.runDate() == null ? LocalDate.now(clock) : request.runDate();
         String modelVersion = modelVersion();
@@ -157,6 +160,15 @@ public class ChurnPredictionService {
 
     public Optional<PredictionRunView> latestRun(Long tenantId) {
         return latestRunDO(tenantId == null ? 0L : tenantId).map(this::toRunView);
+    }
+
+    public PredictionReadinessView readiness(Long tenantId) {
+        boolean enabled = properties.isEnabled();
+        return new PredictionReadinessView(
+                enabled,
+                enabled ? null : "canvas.ai.prediction.enabled must be true to recompute predictions",
+                modelVersion(),
+                properties.getBatchSize());
     }
 
     public List<RiskDistributionItem> churnDistribution(Long tenantId) {
@@ -302,6 +314,13 @@ public class ChurnPredictionService {
     }
 
     public record RecomputeRequest(boolean force, LocalDate runDate, Integer limit) {
+    }
+
+    public record PredictionReadinessView(
+            boolean recomputeEnabled,
+            String disabledReason,
+            String modelVersion,
+            int batchSize) {
     }
 
     public record Prediction(

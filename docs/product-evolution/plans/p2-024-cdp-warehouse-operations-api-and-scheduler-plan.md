@@ -1,5 +1,9 @@
 # CDP Warehouse Operations API And Scheduler Implementation Plan
 
+Spec: `../specs/p2-024-cdp-warehouse-operations-api-and-scheduler.md`
+
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 **Goal:** Add a production operations surface around the P2-022 CDP warehouse jobs with manual trigger APIs, status APIs, and gated incremental scheduling.
 
 **Architecture:** Keep P2-022 backfill and aggregation as execution primitives. Add an operations service that computes bounded defaults from watermarks, a controller for operator use, and a scheduler guarded by configuration and in-process overlap protection.

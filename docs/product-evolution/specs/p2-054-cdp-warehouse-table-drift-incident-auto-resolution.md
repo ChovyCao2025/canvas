@@ -5,6 +5,8 @@ Sequence: 054
 Source: `docs/product-evolution/specs/p2-052-cdp-warehouse-table-drift-incident-automation.md`, `docs/product-evolution/specs/p2-053-cdp-warehouse-table-drift-remediation-planning.md`
 Implementation plan: `../plans/p2-054-cdp-warehouse-table-drift-incident-auto-resolution-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Close the table drift incident lifecycle by resolving stable `TABLE_DRIFT:{TABLE_KEY}` incidents when a later table inspection passes.

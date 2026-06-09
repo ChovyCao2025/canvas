@@ -5,6 +5,8 @@ Sequence: 056
 Source: `docs/product-evolution/specs/p2-021-cdp-olap-audience-materialization.md`, `docs/product-evolution/specs/p2-035-cdp-warehouse-audience-materialization-operations.md`, `docs/product-evolution/specs/p2-055-cdp-warehouse-data-availability-gates.md`
 Implementation plan: `../plans/p2-056-cdp-warehouse-audience-materialization-availability-gate-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Wire warehouse data availability gates into audience materialization operations so operators can block OLAP audience refreshes when the requested warehouse window is not safe to consume.

@@ -5,6 +5,8 @@ Sequence: 017B
 Source: `docs/optimization/todo/marketing_platform_gap_analysis.md`
 Implementation plan: `../plans/p2-017b-user-input-and-wait-event-ux-plan.md`
 
+Status: Current implementation and focused verification passed on 2026-06-09; commit and merge status remain unverified in this audit.
+
 ## Goal
 
 Add user input nodes and richer wait-for-event configuration with completed and timeout branches.

@@ -5,6 +5,8 @@ Sequence: 089
 Source: user-requested marketing activity and referral closed-loop design, local capability audit, and official market references
 Implementation plan: `../plans/p2-089-growth-activity-center-plan.md`
 
+Status: Historical plan evidence records implementation and verification; runtime verification plus commit and merge status was not verified in this docs-only audit.
+
 ## Goal
 
 Add a tenant-scoped Growth Activity Center that turns the existing marketing middle-platform capabilities into launchable, measurable growth activities. The center owns activity type, rules, reward pools, participants, grant ledger, referral relations, activity readiness, and performance closure. It does not replace the journey canvas, campaign master ledger, coupon provider, loyalty account module, content hub, delivery outbox, risk engine, or BI workbench.

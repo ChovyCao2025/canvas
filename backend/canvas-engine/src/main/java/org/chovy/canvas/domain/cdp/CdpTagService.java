@@ -127,10 +127,12 @@ public class CdpTagService {
 
     /** 查询指定租户内用户当前生效标签。 */
     public List<CdpUserTagDTO> listCurrentTags(Long tenantId, String userId) {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return userTagMapper.selectList(userTagQuery(tenantId)
                         .eq(CdpUserTagDO::getUserId, requireText(userId, "userId"))
                         .eq(CdpUserTagDO::getStatus, "ACTIVE")
                         .orderByDesc(CdpUserTagDO::getUpdatedAt))
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .stream()
                 .map(tag -> new CdpUserTagDTO(tag.getTagCode(), tag.getTagCode(), tag.getTagValue(),
                         tag.getValueType(), tag.getSourceType(), tag.getStatus(),
@@ -198,10 +200,13 @@ public class CdpTagService {
 
     /** 按标签定义的值类型校验并规范化标签值。 */
     private String normalizeValue(String valueType, String value) {
+        // 准备本次处理所需的上下文和中间变量。
         String type = valueType == null || valueType.isBlank() ? "STRING" : valueType;
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null) {
             return null;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return switch (type) {
             case "BOOLEAN" -> {
                 if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
@@ -230,6 +235,12 @@ public class CdpTagService {
         return value.trim();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 userTagQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<CdpUserTagDO> userTagQuery(Long tenantId) {
         LambdaQueryWrapper<CdpUserTagDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {
@@ -238,6 +249,12 @@ public class CdpTagService {
         return query;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 tagHistoryQuery 流程生成的业务结果。
+     */
     private LambdaQueryWrapper<CdpUserTagHistoryDO> tagHistoryQuery(Long tenantId) {
         LambdaQueryWrapper<CdpUserTagHistoryDO> query = new LambdaQueryWrapper<>();
         if (tenantId != null) {

@@ -20,6 +20,9 @@ public final class TriggerType {
     public static final String SUB_FLOW_REF = "SUB_FLOW_REF";
     public static final String TRANSFER_JOURNEY = "TRANSFER_JOURNEY";
 
+    /**
+     * 初始化 TriggerType 实例。
+     */
     private TriggerType() {
     }
 }
