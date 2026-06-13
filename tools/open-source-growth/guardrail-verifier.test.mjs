@@ -7,6 +7,16 @@ import test from 'node:test'
 
 import { verifyOpenSourceGrowthGuardrails } from './guardrail-verifier.mjs'
 
+const BRIDGE_DECLARATION = [
+  'Bridge Declaration required before editing old canvas-engine files:',
+  '  exact old service/API:',
+  '  exact old files:',
+  '  final DDD owner module:',
+  '  idempotency rule:',
+  '  removal gate:',
+  '  rollback path:',
+]
+
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'osg-guardrails-'))
   mkdirSync(path.join(root, 'docs/open-source-growth/contracts'), { recursive: true })
@@ -14,6 +24,7 @@ async function fixture() {
   mkdirSync(path.join(root, 'backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin'), { recursive: true })
   mkdirSync(path.join(root, 'backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler'), { recursive: true })
   mkdirSync(path.join(root, 'backend/canvas-engine/src/main/java/org/chovy/canvas/engine/template'), { recursive: true })
+  mkdirSync(path.join(root, 'backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/plugin'), { recursive: true })
 
   mkdirSync(path.join(root, 'docs/program-coordination'), { recursive: true })
 
@@ -42,6 +53,28 @@ async function fixture() {
     'idempotency rule',
     'removal gate',
     'rollback path',
+    '',
+    '### OSG-W02: Demo Shell And Mock Catalog',
+    '',
+    '```text',
+    'Program: Open Source Growth',
+    'Task id: OSG-W02',
+    'Target backend state: DOCS_ONLY or CURRENT_ENGINE_BRIDGE for demo seed only',
+    ...BRIDGE_DECLARATION,
+    'Allowed write scope:',
+    '  backend/canvas-engine/src/main/resources/application-demo.yml only when the Bridge Declaration assigns this exact file',
+    '```',
+    '',
+    '### OSG-W10: Canvas DSL Backend',
+    '',
+    '```text',
+    'Program: Open Source Growth',
+    'Task id: OSG-W10',
+    'Target backend state: DDD_FINAL_MODULE, or CURRENT_ENGINE_BRIDGE only with a complete Bridge Declaration',
+    ...BRIDGE_DECLARATION,
+    'Allowed write scope:',
+    '  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/dsl/**',
+    '```',
   ].join('\n'))
   writeFileSync(path.join(root, '.github/CODEOWNERS'), '/docs/open-source-growth/ @photonpay\n/tools/open-source-growth/ @photonpay\n')
   writeFileSync(path.join(root, '.github/pull_request_template.md'), [
@@ -204,6 +237,20 @@ test('rejects source code that introduces runtime plugin classloader dependencie
   assert.match(result.errors.join('\n'), /forbidden runtime plugin loading keyword URLClassLoader/)
 })
 
+test('rejects runtime plugin classloader dependencies in DDD-final backend modules', async () => {
+  const root = await fixture()
+  writeFileSync(
+    path.join(root, 'backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/plugin/RuntimeLoader.java'),
+    'class RuntimeLoader { PF4J pluginManager; }',
+  )
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /canvas-context-execution/)
+  assert.match(result.errors.join('\n'), /forbidden runtime plugin loading keyword PF4J/)
+})
+
 test('rejects missing pull request anti-drift checklist', async () => {
   const root = await fixture()
   writeFileSync(path.join(root, '.github/pull_request_template.md'), 'plain template')
@@ -263,4 +310,34 @@ test('rejects missing bridge declaration in worker packets', async () => {
   assert.equal(result.ok, false)
   assert.match(result.errors.join('\n'), /subagent-worker-packets\.md must reference Bridge Declaration/)
   assert.match(result.errors.join('\n'), /subagent-worker-packets\.md must reference final DDD owner module/)
+})
+
+test('rejects OSG worker sections that allow old-engine bridge work without a complete section bridge declaration', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'docs/program-coordination/subagent-worker-packets.md'), [
+    'Bridge Declaration',
+    'exact old service/API',
+    'exact old files',
+    'final DDD owner module',
+    'idempotency rule',
+    'removal gate',
+    'rollback path',
+    '',
+    '### OSG-W02: Demo Shell And Mock Catalog',
+    '',
+    '```text',
+    'Program: Open Source Growth',
+    'Task id: OSG-W02',
+    'Target backend state: DOCS_ONLY or CURRENT_ENGINE_BRIDGE for demo seed only',
+    'Allowed write scope:',
+    '  backend/canvas-engine/src/main/resources/application-demo.yml only when the Bridge Declaration assigns this exact file',
+    '```',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /OSG-W02/)
+  assert.match(result.errors.join('\n'), /section must include exact old service\/API/)
+  assert.match(result.errors.join('\n'), /section must include rollback path/)
 })

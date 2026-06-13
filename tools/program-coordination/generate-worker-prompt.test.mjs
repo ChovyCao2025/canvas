@@ -7,9 +7,16 @@ import test from 'node:test'
 
 import { generateWorkerPrompt } from './generate-worker-prompt.mjs'
 
-async function fixture({ state }) {
+async function fixture({ state, withBackupManifest = false }) {
   const root = await mkdtemp(path.join(tmpdir(), 'worker-prompt-'))
   mkdirSync(path.join(root, 'docs/program-coordination'), { recursive: true })
+  if (withBackupManifest) {
+    mkdirSync(path.join(root, 'docs/program-coordination/evidence'), { recursive: true })
+    writeFileSync(
+      path.join(root, 'docs/program-coordination/evidence/pre-rewrite-backup-manifest.md'),
+      '# Pre-Rewrite Backup Manifest\n',
+    )
+  }
   writeFileSync(
     path.join(root, 'docs/program-coordination/dispatch-state.json'),
     `${JSON.stringify(state, null, 2)}\n`,
@@ -201,8 +208,32 @@ test('requires an active dispatch row for code-writing worker prompts', async ()
 
 test('generates a code-writing worker prompt from state and packet section', async () => {
   const root = await fixture({
+    withBackupManifest: true,
     state: state({
       activeDispatches: [dispatch()],
+      workerBoard: [
+        {
+          taskId: 'DDD-E01',
+          status: 'READY',
+          mode: 'read-only',
+          gate: 'R0',
+          writeScope: [],
+        },
+        {
+          taskId: 'DDD-W01',
+          status: 'RESERVED',
+          mode: 'code-writing',
+          gate: 'G4',
+          writeScope: ['backend/canvas-platform/**'],
+        },
+        {
+          taskId: 'OSG-W07B',
+          status: 'NOT_STARTED',
+          mode: 'code-writing',
+          gate: 'G9/G10 plus OSG-C07',
+          writeScope: ['backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/message/**'],
+        },
+      ],
       recoveryAudit: {
         status: 'active dispatch registered',
         activeDispatches: 1,
@@ -220,6 +251,47 @@ test('generates a code-writing worker prompt from state and packet section', asy
   assert.match(prompt, /verification output summary\/path:/)
 })
 
+test('requires the pre-rewrite backup manifest before code-writing worker prompts', async () => {
+  const root = await fixture({
+    state: state({
+      activeDispatches: [dispatch()],
+      workerBoard: [
+        {
+          taskId: 'DDD-E01',
+          status: 'READY',
+          mode: 'read-only',
+          gate: 'R0',
+          writeScope: [],
+        },
+        {
+          taskId: 'DDD-W01',
+          status: 'RESERVED',
+          mode: 'code-writing',
+          gate: 'G4',
+          writeScope: ['backend/canvas-platform/**'],
+        },
+        {
+          taskId: 'OSG-W07B',
+          status: 'NOT_STARTED',
+          mode: 'code-writing',
+          gate: 'G9/G10 plus OSG-C07',
+          writeScope: ['backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/message/**'],
+        },
+      ],
+      recoveryAudit: {
+        status: 'active dispatch registered',
+        activeDispatches: 1,
+        commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing', 'G1', 'G2'],
+      },
+    }),
+  })
+
+  assert.throws(
+    () => generateWorkerPrompt(root, 'DDD-W01'),
+    /pre-rewrite backup manifest/,
+  )
+})
+
 test('allows read-only explorer prompts without a code-writing dispatch row', async () => {
   const root = await fixture({ state: state() })
 
@@ -232,8 +304,25 @@ test('allows read-only explorer prompts without a code-writing dispatch row', as
 
 test('generates a prompt for a shared packet worker row', async () => {
   const root = await fixture({
+    withBackupManifest: true,
     state: state({
       activeDispatches: [pluginDispatch()],
+      workerBoard: [
+        {
+          taskId: 'DDD-E01',
+          status: 'READY',
+          mode: 'read-only',
+          gate: 'R0',
+          writeScope: [],
+        },
+        {
+          taskId: 'OSG-W07B',
+          status: 'RESERVED',
+          mode: 'code-writing',
+          gate: 'G9/G10 plus OSG-C07',
+          writeScope: ['backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/message/**'],
+        },
+      ],
       recoveryAudit: {
         status: 'active dispatch registered',
         activeDispatches: 1,

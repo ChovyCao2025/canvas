@@ -1,0 +1,35 @@
+{
+  "apiVersion": "canvas/v1",
+  "kind": "Journey",
+  "metadata": {
+    "name": "new-user-welcome"
+  },
+  "spec": {
+    "trigger": {
+      "type": "webhook",
+      "event": "user.registered"
+    },
+    "nodes": [
+      {
+        "id": "segment",
+        "type": "condition",
+        "config": {
+          "expression": "user.level == 'new'"
+        }
+      },
+      {
+        "id": "send-message",
+        "type": "message",
+        "config": {
+          "template": "welcome"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "segment",
+        "to": "send-message"
+      }
+    ]
+  }
+}

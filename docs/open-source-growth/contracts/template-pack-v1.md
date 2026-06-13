@@ -74,6 +74,9 @@ Final owner:
 - Template import and draft creation: `canvas-context-canvas`.
 - Plugin dependency and dry-run validation: `canvas-context-execution`.
 - Public template docs: `docs/open-source/templates/**`.
+- DDD-C07 template boundary: `TemplateValidationPort`.
+- DDD-C07 publish definition boundary: `PublishedCanvasDefinition`.
+- DDD-C07 dry-run boundary: `ExecutionDryRunFacade`.
 
 Allowed adapters:
 
@@ -91,3 +94,5 @@ Verification:
 - Import never writes database tables directly.
 - Missing or disabled plugins block import before draft creation.
 - At least three templates dry-run through the execution API.
+- Template validation checks dependencies before draft creation and calls
+  execution only through public validation/dry-run APIs, never adapters.

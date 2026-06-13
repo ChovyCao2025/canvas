@@ -164,6 +164,45 @@ function listFiles(dir) {
   return out
 }
 
+function listSourceRoots(root) {
+  const roots = []
+  const backendDir = path.join(root, 'backend')
+  if (existsSync(backendDir)) {
+    for (const entry of readdirSync(backendDir)) {
+      const candidate = path.join(backendDir, entry, 'src/main/java')
+      if (existsSync(candidate) && statSync(candidate).isDirectory()) {
+        roots.push(candidate)
+      }
+    }
+  }
+  const frontendSrc = path.join(root, 'frontend/src')
+  if (existsSync(frontendSrc)) {
+    roots.push(frontendSrc)
+  }
+  return roots
+}
+
+function extractTaskSections(content, headingPrefix) {
+  const sections = []
+  const headingPattern = /^### ([^\n]+)$/gm
+  let match
+  while ((match = headingPattern.exec(content)) !== null) {
+    if (!match[1].startsWith(headingPrefix)) {
+      continue
+    }
+    const start = match.index
+    const bodyStart = headingPattern.lastIndex
+    const nextMatch = /^### /gm
+    nextMatch.lastIndex = bodyStart
+    const next = nextMatch.exec(content)
+    sections.push({
+      heading: match[1],
+      body: content.slice(start, next ? next.index : undefined),
+    })
+  }
+  return sections
+}
+
 function requireContains(errors, fileLabel, content, needle) {
   if (!content.includes(needle)) {
     errors.push(`${fileLabel} must reference ${needle}`)
@@ -187,6 +226,23 @@ function requireBackendPathAuthority(errors, fileLabel, content) {
     'owner module',
   ]) {
     requireContains(errors, fileLabel, content, reference)
+  }
+}
+
+function requireSectionBridgeDeclarations(errors, workerPackets) {
+  const sections = extractTaskSections(workerPackets, 'OSG-W')
+  for (const section of sections) {
+    if (!section.body.includes('backend/canvas-engine')) {
+      continue
+    }
+    if (!section.body.includes('CURRENT_ENGINE_BRIDGE')) {
+      continue
+    }
+    for (const reference of BRIDGE_DECLARATION_REFERENCES) {
+      if (!section.body.includes(reference)) {
+        errors.push(`${section.heading} section must include ${reference}`)
+      }
+    }
   }
 }
 
@@ -290,6 +346,7 @@ export function verifyOpenSourceGrowthGuardrails(rootDir = process.cwd()) {
   for (const reference of BRIDGE_DECLARATION_REFERENCES) {
     requireContains(errors, 'subagent-worker-packets.md', workerPackets, reference)
   }
+  requireSectionBridgeDeclarations(errors, workerPackets)
 
   const phaseGates = readIfExists(path.join(osgDir, 'phase-gates.md'))
   for (const gate of PHASE_GATES) {
@@ -313,12 +370,8 @@ export function verifyOpenSourceGrowthGuardrails(rootDir = process.cwd()) {
     }
   }
 
-  const sourceRoots = [
-    'backend/canvas-engine/src/main/java',
-    'frontend/src',
-  ]
-  for (const sourceRoot of sourceRoots) {
-    for (const file of listFiles(path.join(root, sourceRoot))) {
+  for (const sourceRoot of listSourceRoots(root)) {
+    for (const file of listFiles(sourceRoot)) {
       const content = readIfExists(file)
       for (const keyword of FORBIDDEN_RUNTIME_LOADING) {
         if (content.includes(keyword)) {

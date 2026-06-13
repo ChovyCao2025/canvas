@@ -17,7 +17,18 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>canvas-common</module>
         <module>canvas-cache-sdk</module>
+        <module>canvas-context-canvas</module>
+        <module>canvas-context-execution</module>
+        <module>canvas-context-marketing</module>
+        <module>canvas-context-cdp</module>
+        <module>canvas-context-bi</module>
+        <module>canvas-context-risk</module>
+        <module>canvas-context-conversation</module>
+        <module>canvas-platform</module>
+        <module>canvas-web</module>
+        <module>canvas-boot</module>
         <module>canvas-engine</module>
         <module>canvas-flink-jobs</module>
     </modules>

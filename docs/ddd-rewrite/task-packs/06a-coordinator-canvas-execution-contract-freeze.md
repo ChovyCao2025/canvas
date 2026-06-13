@@ -84,6 +84,7 @@ docs/ddd-rewrite/inventory/persistence-ownership.md
 - `PublishedCanvasDefinition`
 - `PublishedCanvasNodeDefinition`
 - `PublishedCanvasEdgeDefinition`
+- `PublishedCanvasDefinitionProvider`
 - `ExecutionPublicationPort`
 - `CanvasExecutionFacade`
 - `NodeMetadataView`
@@ -94,6 +95,8 @@ docs/ddd-rewrite/inventory/persistence-ownership.md
 - `AiJourneyDraftProposal`
 - `PublishedCanvasDefinitionTest`
 - `ExecutionPublicationPortContractTest`
+- `CanvasPublishApplicationServiceTest`
+- `ExecutionPublicationApplicationServiceTest`
 - `NodeMetadataContractTest`
 - `PluginEnablementContractTest`
 - `ExecutionDryRunContractTest`
@@ -120,6 +123,7 @@ docs/ddd-rewrite/inventory/persistence-ownership.md
 test -f backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/PublishedCanvasDefinition.java
 test -f backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/PublishedCanvasNodeDefinition.java
 test -f backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/PublishedCanvasEdgeDefinition.java
+test -f backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/PublishedCanvasDefinitionProvider.java
 test -f backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/ExecutionPublicationPort.java
 test -f backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/api/CanvasExecutionFacade.java
 test -f backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/api/node/NodeMetadataView.java
@@ -128,9 +132,9 @@ test -f backend/canvas-context-execution/src/main/java/org/chovy/canvas/executio
 test -f backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/api/trace/ExecutionTraceView.java
 test -f backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/template/TemplateValidationPort.java
 test -f backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/ai/AiJourneyDraftProposal.java
-(cd backend && mvn test -pl canvas-context-canvas,canvas-context-execution -Dtest='PublishedCanvasDefinitionTest,ExecutionPublicationPortContractTest,NodeMetadataContractTest,PluginEnablementContractTest,ExecutionDryRunContractTest,ExecutionTraceContractTest,TemplateValidationContractTest,AiJourneyDraftBoundaryContractTest')
+(cd backend && mvn test -pl canvas-context-canvas,canvas-context-execution -Dtest='PublishedCanvasDefinitionTest,ExecutionPublicationPortContractTest,CanvasPublishApplicationServiceTest,ExecutionPublicationApplicationServiceTest,NodeMetadataContractTest,PluginEnablementContractTest,ExecutionDryRunContractTest,ExecutionTraceContractTest,TemplateValidationContractTest,AiJourneyDraftBoundaryContractTest')
 bash docs/ddd-rewrite/guardrails/checks/ddd-guardrail-checks.sh .
-rg -n "PublishedCanvasDefinition|PublishedCanvasNodeDefinition|PublishedCanvasEdgeDefinition|ExecutionPublicationPort|NodeMetadataView|PluginEnablementView|ExecutionDryRunFacade|ExecutionTraceView|TemplateValidationPort|AiJourneyDraftProposal|Backend Placement / Owner" docs/ddd-rewrite docs/open-source-growth docs/program-coordination
+rg -n "PublishedCanvasDefinition|PublishedCanvasNodeDefinition|PublishedCanvasEdgeDefinition|PublishedCanvasDefinitionProvider|ExecutionPublicationPort|CanvasPublishApplicationServiceTest|ExecutionPublicationApplicationServiceTest|NodeMetadataView|PluginEnablementView|ExecutionDryRunFacade|ExecutionTraceView|TemplateValidationPort|AiJourneyDraftProposal|Backend Placement / Owner" docs/ddd-rewrite docs/open-source-growth docs/program-coordination
 ```
 
 ## Rollback

@@ -1,0 +1,34 @@
+ M backend/pom.xml
+ M docs/ddd-rewrite/inventory/README.md
+ M docs/ddd-rewrite/inventory/check-inventory-readiness.sh
+ M docs/ddd-rewrite/task-packs/06a-coordinator-canvas-execution-contract-freeze.md
+ M docs/program-coordination/checks/program-coordination-checks.sh
+ M docs/program-coordination/checks/program-coordination-checks.test.mjs
+ M docs/program-coordination/dispatch-state.json
+ M docs/program-coordination/gate-verification-matrix.md
+ M docs/program-coordination/progress-ledger.md
+ M tools/open-source-growth/guardrail-verifier.mjs
+ M tools/open-source-growth/guardrail-verifier.test.mjs
+ M tools/program-coordination/check-dispatch-state.mjs
+ M tools/program-coordination/check-dispatch-state.test.mjs
+ M tools/program-coordination/generate-worker-prompt.test.mjs
+?? backend/canvas-boot/
+?? backend/canvas-common/
+?? backend/canvas-context-bi/
+?? backend/canvas-context-canvas/
+?? backend/canvas-context-cdp/
+?? backend/canvas-context-conversation/
+?? backend/canvas-context-execution/
+?? backend/canvas-context-marketing/
+?? backend/canvas-context-risk/
+?? backend/canvas-platform/
+?? backend/canvas-web/
+?? docs/ddd-rewrite/inventory/check-inventory-readiness.test.mjs
+?? docs/ddd-rewrite/inventory/cross-context-dependencies.md
+?? docs/ddd-rewrite/inventory/http-api-inventory.md
+?? docs/ddd-rewrite/inventory/persistence-ownership.md
+?? docs/ddd-rewrite/inventory/service-ownership.md
+?? docs/ddd-rewrite/inventory/test-ownership.md
+?? docs/program-coordination/evidence/baseline-ddd-c00-20260609-222624/
+?? docs/program-coordination/evidence/dispatch-DDD-W01-platform-20260609-232451/
+?? docs/program-coordination/evidence/pre-rewrite-backup-manifest.md

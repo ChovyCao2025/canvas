@@ -244,8 +244,14 @@ Demo Workspace 是用户首次体验入口。
 
 建议路径：
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/`
+- `backend/canvas-platform/**`：DDD final plugin registry metadata、
+  manifest、permissions、compatibility、persistence 和 enablement。
+- `backend/canvas-context-execution/**`：DDD final handler binding、node
+  metadata、runtime validation 和 trace failure path。
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/`：
+  temporary bridge only when a worker packet declares `CURRENT_ENGINE_BRIDGE`。
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/`：
+  temporary bridge only when a worker packet declares `CURRENT_ENGINE_BRIDGE`。
 - `frontend/src/components/config-panel/`
 - `frontend/src/components/node-panel/`
 

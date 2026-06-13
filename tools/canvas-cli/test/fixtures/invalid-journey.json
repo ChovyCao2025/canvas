@@ -1,0 +1,12 @@
+{
+  "apiVersion": "canvas/v2",
+  "kind": "Journey",
+  "metadata": {},
+  "spec": {
+    "nodes": [
+      {
+        "id": "missing-type"
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest a capability, template, plugin, or documentation improvement.
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or operator problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the smallest useful version of the feature.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Journey canvas
+        - Template catalog
+        - Plugin ecosystem
+        - MarketingOps as Code or CLI
+        - AI operations
+        - Demo workspace
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workaround or smaller change could help?
+  - type: textarea
+    id: phase
+    attributes:
+      label: Phase gate or readiness notes
+      description: If this touches backend plugin/template/DSL/CLI/AI APIs, note any G10 or contract dependency you know about.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the open-source growth plan and phase gates.
+          required: true
+        - label: I am not asking to bypass production/staging safety or G10-gated API stability.
+          required: true

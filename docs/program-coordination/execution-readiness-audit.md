@@ -28,8 +28,8 @@ Execution is acceptable only if workers follow the readiness gates below.
 | R2: Foundation Ready | DDD module skeletons, root Maven wiring, `canvas-common`, `canvas-web`, and `canvas-boot` shells exist. | First DDD context wave: platform, risk, marketing. | CDP/BI/conversation wave; canvas/execution implementation. | `mvn -q -DskipTests install`, `mvn test -pl canvas-boot -Dtest=ModularArchitectureTest`, and DDD guardrails pass. |
 | R3: First Context Wave Integrated | Platform, risk, and marketing workers returned acceptable status and were integrated. | CDP, BI, conversation workers. | Canvas/execution implementation before contract freeze. | Context module tests and guardrails pass. |
 | R4: Canvas/Execution Contract Frozen | Published canvas definition, execution publication port, node metadata, plugin enablement, template import, DSL, dry-run, trace, and AI draft boundaries are frozen. | Canvas worker, then execution worker after canvas integration. | Parallel canvas and execution code-writing workers. | Child spec and mirrored OSG contracts are updated and reviewed. |
-| R5: Context Rewrite Integrated | All DDD contexts compile and pass architecture guardrails. | OSG backend ecosystem work after G10 public extension/API stability gate: plugin runtime, template import, DSL backend, CLI API commands, AI backend. | Final cutover. | Module tests, contract tests, and OSG phase gates pass. |
-| R6: Cutover Ready | DDD and OSG ecosystem work are integrated. | Web/boot cutover and final verification. | Old `canvas-engine` removal before full verification. | Full backend build, frontend build/tests, compatibility tests, demo smoke, CLI tests. |
+| R5: Context Rewrite Integrated | All DDD contexts compile and pass architecture guardrails. | OSG backend ecosystem work after G10 public extension/API stability gate: plugin runtime, template import, DSL backend, CLI API commands, AI backend. | Final cutover. | Module tests, contract tests, mirrored demo profile placement, and OSG phase gates pass. |
+| R6: Cutover Ready | DDD and OSG ecosystem work are integrated. | Web/boot cutover and final verification. | Old `canvas-engine` removal before full verification. | Full backend build, frontend build/tests, compatibility tests, demo profile smoke/golden path, production-safety scan, CLI tests. |
 
 ## Preflight Commands
 
@@ -69,6 +69,8 @@ Use this decision table before every subagent dispatch:
 | Code-writing work would start before the backup manifest exists | No | Run G0B and create `docs/program-coordination/evidence/pre-rewrite-backup-manifest.md`. |
 | Worker has isolated workspace and disjoint write scope | Yes | Dispatch according to the max parallel plan. |
 | Worker shares the same workspace with other code-writing workers | Only if it is the only writer | Keep other agents read-only or reviewers. |
+| Code-writing work is ready and subagent tooling is available | Yes | Spawn the worker before marking the dispatch `RUNNING`, and record the actual worker id/nickname. |
+| Code-writing work is ready but subagent tooling is unavailable | Only with explicit fallback | Keep status `RESERVED` until the coordinator records `fallback reason:` for inline execution. |
 | OSG backend work targets old `canvas-engine` without `CURRENT_ENGINE_BRIDGE` | No | Rewrite prompt or wait for DDD final module ownership. |
 | Worker only changes docs/examples/prompts and declares `DOCS_ONLY` | Yes | Dispatch if file ownership is disjoint. |
 

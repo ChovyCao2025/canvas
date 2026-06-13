@@ -1,5 +1,9 @@
 ## Summary
 
+- Problem:
+- Solution:
+- User-visible impact:
+
 ## Traceability
 
 - OSG requirement:
@@ -7,6 +11,14 @@
 - Plan task:
 - Phase gate:
 - Evidence:
+
+## Scope
+
+- [ ] Docs only
+- [ ] Frontend only
+- [ ] Backend current-engine bridge
+- [ ] Backend DDD final module
+- [ ] Public contract or API surface
 
 ## Guardrail Checklist
 
@@ -19,6 +31,7 @@
 - [ ] I did not put demo mock settings into production profile.
 - [ ] I did not add real secrets or provider credentials.
 - [ ] I updated contracts, traceability, or decision log if behavior changed.
+- [ ] I did not bypass the G10 public extension/API stability gate.
 
 ## Verification
 
@@ -35,5 +48,10 @@ Additional focused tests:
 
 ```
 
+## Screenshots
+
+Add screenshots or recordings for visible UI changes.
+
 ## Rollback
 
+Describe the exact files or migration path to revert.

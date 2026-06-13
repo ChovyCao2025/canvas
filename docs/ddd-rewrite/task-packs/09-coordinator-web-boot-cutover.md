@@ -77,7 +77,63 @@ Workers that discover missing API or compatibility behavior must return
 docs/ddd-rewrite/inventory/http-api-inventory.md
 docs/ddd-rewrite/inventory/persistence-ownership.md
 docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+docs/open-source-growth/contracts/demo-profile-contract.md
 all worker final responses
+```
+
+---
+
+## Demo Profile Cutover Contract
+
+The demo profile is assembled in `canvas-boot` during cutover. It must stay
+explicitly demo-only and must not alter production or staging defaults.
+
+Final placement:
+
+- `canvas-boot` owns profile activation, demo configuration, demo account and
+  tenant bootstrap orchestration, and calls into context APIs for seed setup.
+- `canvas-platform` owns plugin manifest metadata and enablement consumed by
+  demo seeds.
+- `canvas-context-canvas` owns official template import, draft creation, publish
+  precheck inputs, and Canvas DSL export used by the demo golden path.
+- `canvas-context-execution` owns demo dry-run, execution validation, trace
+  persistence/readback, and mock-mode execution evidence.
+- `docs/open-source/**` owns playground and golden-path evidence records.
+
+Required demo defaults:
+
+- Demo activation is explicit through `docker-compose.demo.yml` or an
+  equivalent `demo` profile only.
+- Mock provider wiring may cover message, email, approval, coupon, webhook, and
+  AI providers, but real provider secrets must not be required for the demo
+  golden path.
+- Default demo credentials are sample-only, tenant-scoped, and must not create
+  a global admin bypass.
+- Demo seeds must be idempotent and must enter through public context APIs,
+  not direct database writes, unless a coordinator-approved bridge already
+  names the exact old-engine files and removal gate.
+
+Production safety:
+
+- Production and staging profiles must not default to mock providers, demo
+  accounts, demo secrets, or demo seed data.
+- Demo setup must keep authentication, authorization, tenant isolation, plugin
+  enablement, publish rules, execution rules, trace persistence, and audit
+  behavior enabled.
+- Mock AI/risk output is preview or draft evidence only; it must not publish or
+  overwrite a published canvas.
+
+Golden-path APIs to verify before release:
+
+```text
+login with default demo account and tenant
+import official template as draft canvas
+run publish precheck
+run dry-run with sample payload
+read execution trace
+export Canvas DSL
+run CLI validate against exported DSL
+run mock AI risk audit without publishing
 ```
 
 ---
@@ -92,6 +148,10 @@ all worker final responses
 - [ ] Move Flyway resources into `canvas-boot` without renaming existing
       migrations.
 - [ ] Configure mapper scanning for context `adapter.persistence` packages.
+- [ ] Wire demo-only profile/config assembly in `canvas-boot` without changing
+      production or staging defaults.
+- [ ] Prove demo seed orchestration uses context APIs and remains idempotent
+      and tenant-scoped.
 - [ ] Create or port compatibility contract tests under
       `backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/`:
       `CanvasApiCompatibilityTest`, `ExecutionApiCompatibilityTest`,
@@ -103,6 +163,7 @@ all worker final responses
 - [ ] Run backend full build.
 - [ ] Run frontend build and tests.
 - [ ] Run compatibility contract test plan.
+- [ ] Run demo compose config and record the demo golden path evidence.
 - [ ] Remove old `canvas-engine` from active reactor only after all checks pass.
 
 ---
@@ -151,6 +212,8 @@ Cutover is allowed only when:
 - [ ] Controller compatibility tests pass.
 - [ ] Full backend build passes.
 - [ ] Frontend build and tests pass.
+- [ ] Demo profile config, mock provider wiring, seed idempotency, tenant
+      scoping, and golden path evidence pass.
 - [ ] Old `canvas-engine` is not a compile dependency.
 - [ ] Operations run command points to `canvas-boot`.
 

@@ -156,13 +156,15 @@ Required operations:
 
 ```text
 ExecutionResultView trigger(ExecutionRequestCommand command)
-ExecutionTraceView trace(Long tenantId, Long executionId)
+ExecutionTraceView trace(Long tenantId, String executionId)
 ```
 
 Rules:
 
 - web uses this facade for runtime operations
 - canvas does not use execution internals
+- `executionId` is frozen as a string because the current runtime exposes UUID
+  style execution IDs through dry-run, trace, rerun, and frontend workflows.
 
 ### `NodeMetadataView`
 
@@ -246,6 +248,13 @@ Rules:
 - dry-run uses execution validation and trace logic
 - dry-run must not publish or mutate a canvas
 - demo shortcuts must not bypass tenant, auth, trace, or audit behavior
+- demo mock mode must be explicitly requested by the demo profile or dry-run
+  command, and production/staging defaults must not enable mock providers
+- demo dry-run output is evidence only; it must not publish, overwrite, or
+  mutate a published canvas
+- demo seeds and sample payloads must still resolve tenant, canvas, version,
+  plugin enablement, execution validation, trace, and audit boundaries through
+  the same public APIs used outside demo mode
 
 ### `ExecutionTraceView`
 
@@ -272,6 +281,9 @@ Rules:
 
 - trace is execution-owned
 - AI failure explanation reads trace views, not persistence adapters
+- node results must preserve the frontend-observed fields `nodeId`,
+  `nodeType`, `status`, `error`, and output data without exposing
+  `CanvasExecutionTraceDO`.
 
 ### `TemplateValidationPort`
 
@@ -344,6 +356,54 @@ ExecutionPublicationApplicationService
   registers schedules through CanvasSchedulerApplicationService
   updates execution runtime cache through execution-owned adapter
 ```
+
+---
+
+## Frozen API Decisions
+
+DDD-C07 freezes these compile-time API artifacts as the handoff from canvas
+authoring to execution runtime:
+
+```text
+canvas-context-canvas:
+  PublishedCanvasDefinition
+  PublishedCanvasNodeDefinition
+  PublishedCanvasEdgeDefinition
+  PublishedCanvasDefinitionProvider
+  ExecutionPublicationPort
+  TemplateValidationPort
+  AiJourneyDraftProposal
+
+canvas-context-execution:
+  CanvasExecutionFacade
+  ExecutionDryRunFacade
+  ExecutionTraceView
+  NodeMetadataView
+  PluginEnablementView
+```
+
+Field mapping from the current implementation:
+
+- `PublishedCanvasDefinition` carries tenant/canvas/version identity, raw
+  `graphJson`, parsed node/edge views, `publishedAt`, and an
+  `executionOptions` map for legacy publish/runtime options such as trigger
+  type, schedule cron, valid window, control group, max total, per-user limits,
+  cooldown, and attribution settings.
+- `PublishedCanvasNodeDefinition` keeps node configuration as JSON text and
+  generic metadata. It must not depend on handler-specific Java config classes.
+- `PublishedCanvasEdgeDefinition` is frozen as the authoring/runtime boundary,
+  but DDD-W07 and DDD-W08 must decide whether frontend `edges` are execution
+  significant or authoring metadata because the current runtime derives most
+  routing from node config.
+- `ExecutionTraceView.executionId` and dry-run result execution IDs are strings.
+  No DDD worker should introduce a numeric execution ID contract unless a
+  separate migration is approved.
+- Publish review and runtime manual approval are separate concerns: canvas owns
+  publish review before version publication; execution owns runtime pause,
+  manual approve/reject, wait, and resume.
+- Legacy `/canvas/templates` routes remain bridge-compatible HTTP surface.
+  Final template import ownership is `canvas-context-canvas`; dependency and
+  dry-run validation use `canvas-context-execution`.
 
 ---
 

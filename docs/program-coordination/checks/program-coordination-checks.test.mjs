@@ -76,6 +76,9 @@ function coordinatorPack({ task, readiness, target }) {
     'tests run:',
     'guardrail checks:',
     '```',
+    'PublishedCanvasDefinitionProvider',
+    'CanvasPublishApplicationServiceTest',
+    'ExecutionPublicationApplicationServiceTest',
   ].join('\n')
 }
 
@@ -185,7 +188,13 @@ async function fixture() {
     ].join('\n'),
     'max-parallel-subagent-execution-plan.md': 'Shared workspace mode\nbackup-and-rollback-runbook.md\nG0B\nDispatch id:\nbase commit:\nhead commit:\nverification output summary/path:\nevidence artifact paths:\nledger update:\nDDD-C00\nOSG-W01\nOSG-W05A\nOSG-C05B',
     'subagent-worker-packets.md': workerPacket,
-    'execution-readiness-audit.md': 'R0: Documentation Ready\nR1: Backup And Baseline Captured\nR6: Cutover Ready',
+    'execution-readiness-audit.md': [
+      'R0: Documentation Ready',
+      'R1: Backup And Baseline Captured',
+      'R6: Cutover Ready',
+      'record the actual worker id/nickname',
+      'fallback reason:',
+    ].join('\n'),
     'collaboration-and-recovery-protocol.md': [
       '# Collaboration And Recovery Protocol',
       'dispatch-state.json',
@@ -204,6 +213,9 @@ async function fixture() {
       'verification output summary/path:',
       'evidence artifact paths:',
       'exact reserved files:',
+      '`RUNNING` means the handoff was actually sent',
+      'fallback reason:',
+      'must have a matching active dispatch row',
     ].join('\n'),
     'progress-ledger.md': [
       '# Program Progress Ledger',
@@ -215,6 +227,11 @@ async function fixture() {
       'node tools/program-coordination/check-dispatch-state.mjs .',
       'node --test tools/program-coordination/*.test.mjs',
       'Reopen Checklist',
+      'git status --short',
+      'git worktree list',
+      'Compare active dispatch registry rows with actual branches, worktrees, and changed paths',
+      'Record the recovery audit',
+      'fallback reason:',
       'Current Snapshot',
       'Active Dispatch Registry',
       'Last Verified Evidence',
@@ -243,9 +260,12 @@ async function fixture() {
       'G0B: Backup and rollback checkpoint captured',
       'pre-rewrite-backup-manifest.md',
       'PublishedCanvasDefinition.java',
+      'PublishedCanvasDefinitionProvider.java',
       'PublishedCanvasNodeDefinition.java',
       'PublishedCanvasEdgeDefinition.java',
       'ExecutionPublicationPort.java',
+      'CanvasPublishApplicationServiceTest',
+      'ExecutionPublicationApplicationServiceTest',
       'CanvasExecutionFacade.java',
       'NodeMetadataView.java',
       'PluginEnablementView.java',
@@ -307,6 +327,13 @@ async function fixture() {
         writeScope: ['README.md'],
       },
       {
+        taskId: 'OSG-W02',
+        status: 'READY',
+        mode: 'code-writing',
+        gate: 'G0/G1',
+        writeScope: ['docker-compose.demo.yml', 'wiremock/**', 'docs/open-source/playground.md'],
+      },
+      {
         taskId: 'OSG-W07F',
         status: 'NOT_STARTED',
         mode: 'code-writing',
@@ -351,6 +378,12 @@ async function fixture() {
   writeFileSync(path.join(root, 'docs/ddd-rewrite/2026-06-08-ddd-modular-rewrite-spec.md'), 'Dispatch Scope Clarification')
   writeFileSync(path.join(root, 'docs/ddd-rewrite/child-specs/canvas-execution-contract-spec.md'), 'PluginEnablementView\nAiJourneyDraftBoundaryContractTest')
   writeFileSync(path.join(root, 'docs/ddd-rewrite/guardrails/checks/ddd-guardrail-checks.sh'), 'check_package_prefix')
+  writeFileSync(path.join(root, 'docs/ddd-rewrite/inventory/README.md'), [
+    '142 backend controllers',
+    '284 persistence data objects',
+    '283 MyBatis mappers',
+    '731 backend tests',
+  ].join('\n'))
   writeFileSync(path.join(root, 'docs/ddd-rewrite/inventory/check-inventory-readiness.sh'), 'old class:\ntarget module:')
   mkdirSync(path.join(root, 'docs/ddd-rewrite/task-packs'), { recursive: true })
   writeFileSync(path.join(root, 'docs/ddd-rewrite/task-packs/00-coordinator-foundation.md'), coordinatorPack({
@@ -438,6 +471,38 @@ test('program coordination checks reject missing progress ledger write rule', as
   assert.match(`${result.stdout}\n${result.stderr}`, /progress-ledger\.md must contain: The coordinator is the single writer for this file\./)
 })
 
+test('program coordination checks reject incomplete ledger recovery checklist', async () => {
+  const root = await fixture()
+  const ledgerPath = path.join(root, 'docs/program-coordination/progress-ledger.md')
+  writeFileSync(ledgerPath, readFileSync(ledgerPath, 'utf8').replace(
+    'git status --short',
+    'status command omitted',
+  ))
+
+  const result = runCheck(root)
+  assert.notEqual(result.status, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /progress-ledger\.md must contain: git status --short/)
+})
+
+test('program coordination checks reject active worker board rows when active registry is none', async () => {
+  const root = await fixture()
+  const ledgerPath = path.join(root, 'docs/program-coordination/progress-ledger.md')
+  const ledger = readFileSync(ledgerPath, 'utf8')
+    .replace('Active Dispatch Registry', '## Active Dispatch Registry\n```text\nnone\n```')
+    .replace('Worker Board', [
+      '## Worker Board',
+      '| Task | Status | Gate |',
+      '| --- | --- | --- |',
+      '| OSG-W08 template content/catalog | RUNNING | G0/G1 |',
+    ].join('\n'))
+    .replace('Reviewer Board', '## Reviewer Board')
+  writeFileSync(ledgerPath, ledger)
+
+  const result = runCheck(root)
+  assert.notEqual(result.status, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /Active Dispatch Registry is none but Worker Board contains active worker status/)
+})
+
 test('program coordination checks reject missing collaboration recovery protocol', async () => {
   const root = await fixture()
   writeFileSync(path.join(root, 'docs/program-coordination/collaboration-and-recovery-protocol.md'), 'missing protocol sections')
@@ -499,4 +564,43 @@ test('program coordination checks reject invalid dispatch state', async () => {
   assert.notEqual(result.status, 0)
   assert.match(`${result.stdout}\n${result.stderr}`, /dispatch-state\.json failed machine validation/)
   assert.match(`${result.stdout}\n${result.stderr}`, /progress-ledger\.md cannot be reserved/)
+})
+
+test('program coordination checks reject stale OSG-W02 demo doc dispatch scope', async () => {
+  const root = await fixture()
+  const statePath = path.join(root, 'docs/program-coordination/dispatch-state.json')
+  writeFileSync(statePath, readFileSync(statePath, 'utf8').replace(
+    'docs/open-source/playground.md',
+    'docs/open-source/demo.md',
+  ))
+
+  const result = runCheck(root)
+  assert.notEqual(result.status, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /stale OSG-W02 demo\.md path/)
+})
+
+test('program coordination checks reject incomplete G7 contract evidence', async () => {
+  const root = await fixture()
+  const matrixPath = path.join(root, 'docs/program-coordination/gate-verification-matrix.md')
+  writeFileSync(matrixPath, readFileSync(matrixPath, 'utf8').replace(
+    'PublishedCanvasDefinitionProvider.java',
+    'PublishedCanvasDefinitionProvider omitted',
+  ))
+
+  const result = runCheck(root)
+  assert.notEqual(result.status, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /gate-verification-matrix\.md must contain: PublishedCanvasDefinitionProvider\.java/)
+})
+
+test('program coordination checks reject stale DDD inventory README snapshot counts', async () => {
+  const root = await fixture()
+  const inventoryReadmePath = path.join(root, 'docs/ddd-rewrite/inventory/README.md')
+  writeFileSync(inventoryReadmePath, readFileSync(inventoryReadmePath, 'utf8').replace(
+    '142 backend controllers',
+    '141 backend controllers',
+  ))
+
+  const result = runCheck(root)
+  assert.notEqual(result.status, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /inventory\/README\.md must contain: 142 backend controllers/)
 })

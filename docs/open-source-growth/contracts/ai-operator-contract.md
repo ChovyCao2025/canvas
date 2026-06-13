@@ -61,6 +61,9 @@ Final owner:
 - Risk decision checks: `canvas-context-risk`.
 - Trace explanation input: `canvas-context-execution`.
 - AI provider calls: adapter external package in the owning context.
+- DDD-C07 journey draft boundary: `AiJourneyDraftProposal`.
+- DDD-C07 trace input boundary: `ExecutionTraceView` with string
+  `executionId`.
 
 Allowed adapters:
 
@@ -80,3 +83,5 @@ Verification:
 - AI never publishes or overwrites a published canvas.
 - Trace explanation reads execution trace through an execution API, not direct
   persistence access.
+- AI journey proposals may reference risk findings and trace IDs, but they must
+  not carry published canvas mutation fields.

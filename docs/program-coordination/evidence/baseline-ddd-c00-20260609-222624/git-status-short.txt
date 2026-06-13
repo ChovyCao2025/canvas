@@ -1,0 +1,16 @@
+ M docs/ddd-rewrite/inventory/README.md
+ M docs/ddd-rewrite/inventory/check-inventory-readiness.sh
+ M docs/ddd-rewrite/task-packs/06a-coordinator-canvas-execution-contract-freeze.md
+ M docs/program-coordination/checks/program-coordination-checks.sh
+ M docs/program-coordination/checks/program-coordination-checks.test.mjs
+ M docs/program-coordination/dispatch-state.json
+ M docs/program-coordination/gate-verification-matrix.md
+ M docs/program-coordination/progress-ledger.md
+ M tools/open-source-growth/guardrail-verifier.mjs
+ M tools/open-source-growth/guardrail-verifier.test.mjs
+ M tools/program-coordination/check-dispatch-state.mjs
+ M tools/program-coordination/check-dispatch-state.test.mjs
+ M tools/program-coordination/generate-worker-prompt.test.mjs
+?? docs/ddd-rewrite/inventory/check-inventory-readiness.test.mjs
+?? docs/program-coordination/evidence/baseline-ddd-c00-20260609-222624/
+?? docs/program-coordination/evidence/pre-rewrite-backup-manifest.md

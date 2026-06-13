@@ -125,6 +125,33 @@ require_ddd_worker_task_pack_fields() {
   require_contains "$file" "Do not return a shorter"
 }
 
+validate_progress_ledger_runtime_consistency() {
+  local file="docs/program-coordination/progress-ledger.md"
+  if [ ! -f "$file" ]; then
+    fail "$file is required before checking runtime consistency"
+    return
+  fi
+
+  local active_section
+  active_section="$(awk '
+    /^## Active Dispatch Registry$/ { in_section = 1; next }
+    /^Latest closed dispatch:$/ { exit }
+    in_section { print }
+  ' "$file")"
+
+  local worker_section
+  worker_section="$(awk '
+    /^## Worker Board$/ { in_section = 1; next }
+    /^## Reviewer Board$/ { exit }
+    in_section { print }
+  ' "$file")"
+
+  if grep -Eq '^[[:space:]]*none[[:space:]]*$' <<<"$active_section" \
+    && grep -Eq '\|[^|]+\|[[:space:]]*(RESERVED|RUNNING|RETURNED|REVIEWING|NEEDS_CONTEXT|BLOCKED)[[:space:]]*\|' <<<"$worker_section"; then
+    fail "progress-ledger.md Active Dispatch Registry is none but Worker Board contains active worker status"
+  fi
+}
+
 for file in \
   docs/program-coordination/README.md \
   docs/program-coordination/progress-ledger.md \
@@ -174,6 +201,11 @@ require_contains docs/program-coordination/progress-ledger.md "machine-readable"
 require_contains docs/program-coordination/progress-ledger.md "node tools/program-coordination/check-dispatch-state.mjs ."
 require_contains docs/program-coordination/progress-ledger.md "node --test tools/program-coordination/*.test.mjs"
 require_contains docs/program-coordination/progress-ledger.md "Reopen Checklist"
+require_contains docs/program-coordination/progress-ledger.md "git status --short"
+require_contains docs/program-coordination/progress-ledger.md "git worktree list"
+require_contains docs/program-coordination/progress-ledger.md "Compare active dispatch registry rows with actual branches, worktrees, and changed paths"
+require_contains docs/program-coordination/progress-ledger.md "Record the recovery audit"
+require_contains docs/program-coordination/progress-ledger.md "fallback reason:"
 require_contains docs/program-coordination/progress-ledger.md "Current Snapshot"
 require_contains docs/program-coordination/progress-ledger.md "Active Dispatch Registry"
 require_contains docs/program-coordination/progress-ledger.md "Last Verified Evidence"
@@ -199,6 +231,7 @@ require_contains docs/program-coordination/dispatch-state.json "\"parallelGroups
 require_contains docs/program-coordination/dispatch-state.json "\"P1-immediate-shell\""
 require_contains docs/program-coordination/dispatch-state.json "\"P7-plugin-burst\""
 require_contains docs/program-coordination/dispatch-state.json "\"OSG-W07F\""
+require_contains docs/program-coordination/dispatch-state.json "\"docs/open-source/playground.md\""
 require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "# Collaboration And Recovery Protocol"
 require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "dispatch-state.json"
 require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "backup-and-rollback-runbook.md"
@@ -216,6 +249,9 @@ require_contains docs/program-coordination/collaboration-and-recovery-protocol.m
 require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "verification output summary/path:"
 require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "evidence artifact paths:"
 require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "exact reserved files:"
+require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "\`RUNNING\` means the handoff was actually sent"
+require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "fallback reason:"
+require_contains docs/program-coordination/collaboration-and-recovery-protocol.md "must have a matching active dispatch row"
 require_contains docs/program-coordination/execution-sequencing.md "CURRENT_ENGINE_BRIDGE or DDD_FINAL_MODULE or DOCS_ONLY"
 require_contains docs/program-coordination/execution-sequencing.md "Gate E: Wave Closure"
 require_contains docs/program-coordination/backup-and-rollback-runbook.md "# Backup And Rollback Runbook"
@@ -272,7 +308,10 @@ require_worker_packet_fields "DDD-W08" "Execution Worker"
 require_contains docs/program-coordination/execution-readiness-audit.md "R0: Documentation Ready"
 require_contains docs/program-coordination/execution-readiness-audit.md "R1: Backup And Baseline Captured"
 require_contains docs/program-coordination/execution-readiness-audit.md "R6: Cutover Ready"
+require_contains docs/program-coordination/execution-readiness-audit.md "record the actual worker id/nickname"
+require_contains docs/program-coordination/execution-readiness-audit.md "fallback reason:"
 require_contains docs/program-coordination/gate-verification-matrix.md "PublishedCanvasDefinition.java"
+require_contains docs/program-coordination/gate-verification-matrix.md "PublishedCanvasDefinitionProvider.java"
 require_contains docs/program-coordination/gate-verification-matrix.md "node tools/program-coordination/check-dispatch-state.mjs ."
 require_contains docs/program-coordination/gate-verification-matrix.md "G0B: Backup and rollback checkpoint captured"
 require_contains docs/program-coordination/gate-verification-matrix.md "pre-rewrite-backup-manifest.md"
@@ -282,6 +321,8 @@ require_contains docs/program-coordination/gate-verification-matrix.md "node --t
 require_contains docs/program-coordination/gate-verification-matrix.md "PublishedCanvasNodeDefinition.java"
 require_contains docs/program-coordination/gate-verification-matrix.md "PublishedCanvasEdgeDefinition.java"
 require_contains docs/program-coordination/gate-verification-matrix.md "ExecutionPublicationPort.java"
+require_contains docs/program-coordination/gate-verification-matrix.md "CanvasPublishApplicationServiceTest"
+require_contains docs/program-coordination/gate-verification-matrix.md "ExecutionPublicationApplicationServiceTest"
 require_contains docs/program-coordination/gate-verification-matrix.md "CanvasExecutionFacade.java"
 require_contains docs/program-coordination/gate-verification-matrix.md "NodeMetadataView.java"
 require_contains docs/program-coordination/gate-verification-matrix.md "PluginEnablementView.java"
@@ -303,6 +344,7 @@ require_contains docs/program-coordination/evidence/README.md "commands.txt"
 require_contains docs/program-coordination/evidence/README.md "worker-return.txt"
 require_contains docs/program-coordination/evidence/README.md "reviewer-return.txt"
 require_contains docs/program-coordination/evidence/README.md "rollback.txt"
+validate_progress_ledger_runtime_consistency
 
 if ! node tools/program-coordination/check-dispatch-state.mjs .; then
   fail "dispatch-state.json failed machine validation"
@@ -328,7 +370,14 @@ require_contains docs/ddd-rewrite/guardrails/README.md "gate-verification-matrix
 require_contains docs/ddd-rewrite/2026-06-08-ddd-modular-rewrite-spec.md "Dispatch Scope Clarification"
 require_contains docs/ddd-rewrite/child-specs/canvas-execution-contract-spec.md "PluginEnablementView"
 require_contains docs/ddd-rewrite/child-specs/canvas-execution-contract-spec.md "AiJourneyDraftBoundaryContractTest"
+require_contains docs/ddd-rewrite/task-packs/06a-coordinator-canvas-execution-contract-freeze.md "PublishedCanvasDefinitionProvider"
+require_contains docs/ddd-rewrite/task-packs/06a-coordinator-canvas-execution-contract-freeze.md "CanvasPublishApplicationServiceTest"
+require_contains docs/ddd-rewrite/task-packs/06a-coordinator-canvas-execution-contract-freeze.md "ExecutionPublicationApplicationServiceTest"
 require_contains docs/ddd-rewrite/guardrails/checks/ddd-guardrail-checks.sh "check_package_prefix"
+require_contains docs/ddd-rewrite/inventory/README.md "142 backend controllers"
+require_contains docs/ddd-rewrite/inventory/README.md "284 persistence data objects"
+require_contains docs/ddd-rewrite/inventory/README.md "283 MyBatis mappers"
+require_contains docs/ddd-rewrite/inventory/README.md "731 backend tests"
 require_contains docs/ddd-rewrite/inventory/check-inventory-readiness.sh "old class:"
 require_contains docs/ddd-rewrite/inventory/check-inventory-readiness.sh "target module:"
 
@@ -346,6 +395,10 @@ fi
 
 if rg -n "matching test package|matching test|backend tests named|tests named by worker packet" docs/program-coordination -g "*.md"; then
   fail "docs/program-coordination contains ambiguous test ownership text"
+fi
+
+if rg -n '"docs/open-source/demo\.md"' docs/program-coordination/dispatch-state.json; then
+  fail "dispatch-state.json contains stale OSG-W02 demo.md path; use docs/open-source/playground.md"
 fi
 
 if rg -n "CanvasPluginRegistry" docs/program-coordination docs/open-source-growth docs/ddd-rewrite -g "*.md" \

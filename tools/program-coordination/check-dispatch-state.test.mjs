@@ -7,13 +7,20 @@ import test from 'node:test'
 
 import { checkDispatchState } from './check-dispatch-state.mjs'
 
-async function fixture(state) {
+async function fixture(state, { withBackupManifest = false } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'dispatch-state-'))
   mkdirSync(path.join(root, 'docs/program-coordination'), { recursive: true })
   writeFileSync(
     path.join(root, 'docs/program-coordination/dispatch-state.json'),
     `${JSON.stringify(state, null, 2)}\n`,
   )
+  if (withBackupManifest) {
+    mkdirSync(path.join(root, 'docs/program-coordination/evidence'), { recursive: true })
+    writeFileSync(
+      path.join(root, 'docs/program-coordination/evidence/pre-rewrite-backup-manifest.md'),
+      '# Pre-Rewrite Backup Manifest\n',
+    )
+  }
   return root
 }
 
@@ -209,6 +216,161 @@ test('rejects incomplete active dispatch records', async () => {
 
   assert.equal(result.ok, false)
   assert.match(result.errors.join('\n'), /baseSha/)
+})
+
+test('rejects active dispatch status that disagrees with the worker board', async () => {
+  const root = await fixture(baseState({
+    activeDispatches: [dispatch({ status: 'RUNNING' })],
+    workerBoard: [
+      ...baseState().workerBoard,
+      {
+        taskId: 'DDD-W01',
+        status: 'READY',
+        mode: 'code-writing',
+        gate: 'G4',
+        writeScope: ['backend/canvas-platform/**'],
+      },
+    ],
+    recoveryAudit: {
+      status: 'active dispatch registered',
+      activeDispatches: 1,
+      commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing', 'G1', 'G2'],
+    },
+  }), { withBackupManifest: true })
+
+  const result = checkDispatchState(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /workerBoard status READY must match active dispatch status RUNNING/)
+})
+
+test('rejects active code-writing dispatches without the pre-rewrite backup manifest', async () => {
+  const root = await fixture(baseState({
+    activeDispatches: [dispatch()],
+    workerBoard: [
+      ...baseState().workerBoard,
+      {
+        taskId: 'DDD-W01',
+        status: 'RUNNING',
+        mode: 'code-writing',
+        gate: 'G4',
+        writeScope: ['backend/canvas-platform/**'],
+      },
+    ],
+    recoveryAudit: {
+      status: 'active dispatch registered',
+      activeDispatches: 1,
+      commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing', 'G1', 'G2'],
+    },
+  }))
+
+  const result = checkDispatchState(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /pre-rewrite backup manifest/)
+})
+
+test('accepts active code-writing dispatches after the pre-rewrite backup manifest exists', async () => {
+  const root = await fixture(baseState({
+    activeDispatches: [dispatch()],
+    workerBoard: [
+      ...baseState().workerBoard,
+      {
+        taskId: 'DDD-W01',
+        status: 'RUNNING',
+        mode: 'code-writing',
+        gate: 'G4',
+        writeScope: ['backend/canvas-platform/**'],
+      },
+    ],
+    recoveryAudit: {
+      status: 'active dispatch registered',
+      activeDispatches: 1,
+      commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing', 'G1', 'G2'],
+    },
+  }), { withBackupManifest: true })
+
+  const result = checkDispatchState(root)
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.errors, [])
+})
+
+test('rejects active worker board rows without matching active dispatches', async () => {
+  const root = await fixture(baseState({
+    workerBoard: [
+      ...baseState().workerBoard,
+      {
+        taskId: 'DDD-W01',
+        status: 'RUNNING',
+        mode: 'code-writing',
+        gate: 'G4',
+        writeScope: ['backend/canvas-platform/**'],
+      },
+    ],
+    recoveryAudit: {
+      status: 'stale worker board fixture',
+      activeDispatches: 0,
+      commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing', 'G1', 'G2'],
+    },
+  }))
+
+  const result = checkDispatchState(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /DDD-W01 is RUNNING but has no matching active dispatch/)
+})
+
+test('rejects generic RUNNING code-writing worker names', async () => {
+  const root = await fixture(baseState({
+    activeDispatches: [dispatch({ worker: 'multi_agent_v1-worker' })],
+    workerBoard: [
+      ...baseState().workerBoard,
+      {
+        taskId: 'DDD-W01',
+        status: 'RUNNING',
+        mode: 'code-writing',
+        gate: 'G4',
+        writeScope: ['backend/canvas-platform/**'],
+      },
+    ],
+    recoveryAudit: {
+      status: 'active dispatch registered',
+      activeDispatches: 1,
+      commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing', 'G1', 'G2'],
+    },
+  }), { withBackupManifest: true })
+
+  const result = checkDispatchState(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /must name the actual spawned worker id\/nickname/)
+})
+
+test('accepts explicit inline fallback reason when a code-writing worker is running', async () => {
+  const root = await fixture(baseState({
+    activeDispatches: [dispatch({ worker: 'main-agent-inline fallback reason: multi_agent_v1 unavailable in this runtime' })],
+    workerBoard: [
+      ...baseState().workerBoard,
+      {
+        taskId: 'DDD-W01',
+        status: 'RUNNING',
+        mode: 'code-writing',
+        gate: 'G4',
+        writeScope: ['backend/canvas-platform/**'],
+      },
+    ],
+    recoveryAudit: {
+      status: 'active dispatch registered',
+      activeDispatches: 1,
+      commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing', 'G1', 'G2'],
+    },
+  }), { withBackupManifest: true })
+
+  const result = checkDispatchState(root)
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.errors, [])
 })
 
 test('rejects old canvas-engine writes without a complete bridge declaration', async () => {

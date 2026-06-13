@@ -1,0 +1,170 @@
+{
+  "mappings": [
+    {
+      "name": "demo-template-catalog",
+      "request": {
+        "method": "GET",
+        "url": "/mock/demo/templates"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "SUCCESS",
+          "templates": [
+            {
+              "key": "new-user-welcome",
+              "title": "New user welcome journey",
+              "riskLevel": "LOW",
+              "requiredPlugins": ["message", "coupon"],
+              "docs": "docs/open-source/templates/new-user-welcome.md"
+            },
+            {
+              "key": "coupon-approval-release",
+              "title": "Coupon approval release",
+              "riskLevel": "HIGH",
+              "requiredPlugins": ["coupon", "approval", "message"],
+              "docs": "docs/open-source/templates/coupon-approval-release.md"
+            },
+            {
+              "key": "risk-blocked-outreach",
+              "title": "Risk-blocked outreach",
+              "riskLevel": "HIGH",
+              "requiredPlugins": ["risk-check", "message"],
+              "docs": "docs/open-source/templates/risk-blocked-outreach.md"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "demo-plugin-enablements",
+      "request": {
+        "method": "GET",
+        "url": "/mock/demo/plugins"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "SUCCESS",
+          "plugins": [
+            { "key": "webhook", "enabled": true, "mode": "mock" },
+            { "key": "message", "enabled": true, "mode": "mock" },
+            { "key": "coupon", "enabled": true, "mode": "mock" },
+            { "key": "approval", "enabled": true, "mode": "mock" },
+            { "key": "ai", "enabled": true, "mode": "mock" },
+            { "key": "risk-check", "enabled": true, "mode": "mock" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "demo-golden-path",
+      "request": {
+        "method": "GET",
+        "url": "/mock/demo/golden-path"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "SUCCESS",
+          "steps": [
+            "start demo dependencies",
+            "log in with the default local account",
+            "review the new-user-welcome template",
+            "run mock dry-run inputs",
+            "inspect trace expectations",
+            "validate DSL locally",
+            "review mock AI risk audit"
+          ],
+          "g10Limit": "Backend template import, dry-run, DSL export, and AI audit APIs remain gated by G10."
+        }
+      }
+    },
+    {
+      "name": "demo-sms-send",
+      "request": {
+        "method": "POST",
+        "url": "/mock/message/sms"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "SUCCESS",
+          "messageId": "SMS_DEMO_001",
+          "provider": "wiremock"
+        }
+      }
+    },
+    {
+      "name": "demo-email-send",
+      "request": {
+        "method": "POST",
+        "url": "/mock/message/email"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "SUCCESS",
+          "messageId": "EMAIL_DEMO_001",
+          "provider": "wiremock"
+        }
+      }
+    },
+    {
+      "name": "demo-approval-start",
+      "request": {
+        "method": "POST",
+        "url": "/mock/approval/start"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "PENDING",
+          "approvalId": "APPROVAL_DEMO_001",
+          "assignee": "demo-approver"
+        }
+      }
+    },
+    {
+      "name": "demo-ai-risk-audit",
+      "request": {
+        "method": "POST",
+        "url": "/mock/ai/audit"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "status": "SUCCESS",
+          "mode": "mock",
+          "riskLevel": "LOW",
+          "findings": [
+            "Uses mock provider only",
+            "Requires human review before high-risk coupon release",
+            "No real customer credentials or model keys are required"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -59,12 +59,17 @@
 
 ### Required Evidence
 
-- `PluginRegistryService` 被复用或明确扩展。
+- OSG-C07 owner split 已被实现或具名桥接：`canvas-platform` owns registry
+  metadata/manifest/permissions/enablement，`canvas-context-execution` owns
+  handler binding/node metadata/runtime validation。
+- 旧 `PluginRegistryService` 语义被复用、迁移或通过完整
+  `CURRENT_ENGINE_BRIDGE` declaration 保留。
 - 没有新建第二套平行插件注册中心。
 - 插件 manifest contract 已更新。
 - 禁用插件后，依赖该插件的模板导入或发布校验失败。
-- 插件 handler 仍通过 `NodeHandler` 和 `@NodeHandlerType` 接入。
-- 聚焦后端测试通过。
+- 插件 handler 仍通过 `NodeHandler`、`@NodeHandlerType` 和 execution-owned
+  handler registry 接入。
+- G10 聚焦后端测试通过。
 
 ### Stop Conditions
 

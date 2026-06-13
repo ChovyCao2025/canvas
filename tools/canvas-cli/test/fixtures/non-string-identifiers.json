@@ -1,0 +1,19 @@
+{
+  "apiVersion": "canvas/v1",
+  "kind": "Journey",
+  "metadata": {
+    "name": 123
+  },
+  "spec": {
+    "trigger": {
+      "type": "webhook",
+      "event": "user.registered"
+    },
+    "nodes": [
+      {
+        "id": 456,
+        "type": true
+      }
+    ]
+  }
+}

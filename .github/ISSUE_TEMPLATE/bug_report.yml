@@ -1,0 +1,85 @@
+name: Bug report
+description: Report a reproducible problem in Marketing Canvas.
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please keep secrets, customer data, and provider credentials out of the issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include commands, inputs, canvas/template details, and any local services used.
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Frontend canvas UI
+        - Backend engine
+        - Local Docker or infrastructure
+        - Templates
+        - Plugin or extension contract
+        - DSL or CLI
+        - AI or risk workflow
+        - Documentation
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Java, Maven, Node.js, Docker, browser, and relevant commit.
+      placeholder: |
+        Commit:
+        OS:
+        Java:
+        Maven:
+        Node:
+        Docker:
+        Browser:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste only sanitized logs. Remove secrets, tokens, and personal data.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and docs.
+          required: true
+        - label: I removed secrets, tokens, and customer data from this report.
+          required: true

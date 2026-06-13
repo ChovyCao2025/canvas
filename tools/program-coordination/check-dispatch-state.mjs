@@ -4,6 +4,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const DISPATCH_STATE_PATH = 'docs/program-coordination/dispatch-state.json'
+export const BACKUP_MANIFEST_PATH = 'docs/program-coordination/evidence/pre-rewrite-backup-manifest.md'
 
 const KNOWN_STATUSES = new Set([
   'NOT_STARTED',
@@ -31,6 +32,14 @@ const RESERVATION_STATUSES = new Set([
 
 const WRITE_MODES = new Set(['code-writing', 'coordinator'])
 const READ_ONLY_MODES = new Set(['read-only', 'review'])
+
+const GENERIC_RUNNING_CODE_WORKERS = new Set([
+  'main-agent-inline',
+  'multi_agent_v1-worker',
+  'pending',
+  'pending-spawn',
+  'unassigned',
+])
 
 const INTEGRATION_TARGETS = new Set([
   'NO_CODE',
@@ -158,6 +167,18 @@ function isReservationActive(dispatch) {
 
 function isWriteReservation(dispatch) {
   return isReservationActive(dispatch) && !READ_ONLY_MODES.has(dispatch.mode)
+}
+
+function requiresPreRewriteBackup(dispatch) {
+  if (!isWriteReservation(dispatch)) {
+    return false
+  }
+  if (dispatch.mode === 'code-writing') {
+    return true
+  }
+  return dispatch.mode === 'coordinator'
+    && dispatch.integrationTarget !== 'NO_CODE'
+    && dispatch.integrationTarget !== 'DOCS_ONLY'
 }
 
 export function loadDispatchState(rootDir = process.cwd()) {
@@ -363,11 +384,24 @@ function validateDispatch(dispatch, index, workerByTaskId, errors) {
   if (dispatch.taskId && workerByTaskId && !workerByTaskId.has(dispatch.taskId)) {
     errors.push(`${label} references taskId not present in workerBoard: ${dispatch.taskId}`)
   }
+  const worker = dispatch.taskId && workerByTaskId?.get(dispatch.taskId)
+  if (worker && isReservationActive(dispatch) && worker.status !== dispatch.status) {
+    errors.push(`${label}: workerBoard status ${worker.status} must match active dispatch status ${dispatch.status}`)
+  }
   if (dispatch.status && !KNOWN_STATUSES.has(dispatch.status)) {
     errors.push(`${label} has unknown status: ${dispatch.status}`)
   }
   if (dispatch.mode && !WRITE_MODES.has(dispatch.mode) && !READ_ONLY_MODES.has(dispatch.mode)) {
     errors.push(`${label} has unknown mode: ${dispatch.mode}`)
+  }
+  if (dispatch.status === 'RUNNING' && dispatch.mode === 'code-writing') {
+    const workerName = String(dispatch.worker ?? '').trim()
+    if (GENERIC_RUNNING_CODE_WORKERS.has(workerName)) {
+      errors.push(`${label}: RUNNING code-writing dispatch must name the actual spawned worker id/nickname, or an inline fallback with an explicit reason`)
+    }
+    if (/^main-agent-inline\b/.test(workerName) && !/fallback reason:/i.test(workerName)) {
+      errors.push(`${label}: inline code-writing fallback must include "fallback reason:" in worker`)
+    }
   }
   if (dispatch.integrationTarget && !INTEGRATION_TARGETS.has(dispatch.integrationTarget)) {
     errors.push(`${label} has unknown integrationTarget: ${dispatch.integrationTarget}`)
@@ -430,6 +464,25 @@ function validateOverlaps(activeDispatches, errors) {
   }
 }
 
+function validateWorkerBoardActiveDispatches(state, errors) {
+  if (!Array.isArray(state.workerBoard) || !Array.isArray(state.activeDispatches)) {
+    return
+  }
+  for (const [index, worker] of state.workerBoard.entries()) {
+    if (!isObject(worker) || !RESERVATION_STATUSES.has(worker.status)) {
+      continue
+    }
+    const hasActiveDispatch = state.activeDispatches.some(dispatch =>
+      isObject(dispatch)
+        && dispatch.taskId === worker.taskId
+        && isReservationActive(dispatch),
+    )
+    if (!hasActiveDispatch) {
+      errors.push(`workerBoard[${index}] ${worker.taskId} is ${worker.status} but has no matching active dispatch`)
+    }
+  }
+}
+
 function validateRecoveryAudit(state, errors) {
   if (!isObject(state.recoveryAudit)) {
     return
@@ -449,11 +502,24 @@ function validateRecoveryAudit(state, errors) {
   }
 }
 
+function validateBackupManifest(rootDir, state, errors) {
+  if (!Array.isArray(state.activeDispatches)) {
+    return
+  }
+  if (!state.activeDispatches.some(requiresPreRewriteBackup)) {
+    return
+  }
+  if (!existsSync(path.join(rootDir, BACKUP_MANIFEST_PATH))) {
+    errors.push(`${BACKUP_MANIFEST_PATH} pre-rewrite backup manifest is required before active code-writing dispatches`)
+  }
+}
+
 export function checkDispatchState(rootDir = process.cwd()) {
   const errors = []
+  const root = path.resolve(rootDir)
   let state
   try {
-    state = loadDispatchState(rootDir)
+    state = loadDispatchState(root)
   } catch (error) {
     return {
       ok: false,
@@ -466,6 +532,7 @@ export function checkDispatchState(rootDir = process.cwd()) {
   validateParallelGroups(state, workerByTaskId, errors)
   validateEvidence(state, errors)
   validateRecoveryAudit(state, errors)
+  validateBackupManifest(root, state, errors)
 
   if (Array.isArray(state.activeDispatches)) {
     for (const [index, dispatch] of state.activeDispatches.entries()) {
@@ -473,6 +540,7 @@ export function checkDispatchState(rootDir = process.cwd()) {
     }
     validateOverlaps(state.activeDispatches, errors)
   }
+  validateWorkerBoardActiveDispatches(state, errors)
 
   return {
     ok: errors.length === 0,

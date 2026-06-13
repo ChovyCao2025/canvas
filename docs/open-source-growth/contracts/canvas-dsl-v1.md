@@ -83,6 +83,10 @@ Final owner:
 - Runtime validation for enabled node types and dry-run: `canvas-context-execution`.
 - HTTP endpoints: `canvas-web`.
 - CLI package: `tools/canvas-cli`.
+- DDD-C07 canvas publication boundary: `PublishedCanvasDefinition`,
+  `PublishedCanvasNodeDefinition`, and `PublishedCanvasEdgeDefinition`.
+- DDD-C07 execution validation boundary: `NodeMetadataView`,
+  `PluginEnablementView`, and `ExecutionDryRunFacade`.
 
 Allowed adapters:
 
@@ -103,3 +107,5 @@ Verification:
 - Backend import/export does not bind final implementation to old
   `CanvasService` internals.
 - DSL v1 unsupported nodes remain in graph JSON and are not downgraded.
+- DSL import/export maps to the existing `graphJson` shape and does not replace
+  full graph JSON semantics in the first public contract.

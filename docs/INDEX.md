@@ -96,6 +96,10 @@
 
 ## 四、代码审查与审计
 
+### Java 注释规范
+- [java-commenting/README.md](./java-commenting/README.md) — Java 全量注释规范、goal 写法、字段/方法 Javadoc 格式和行为不变护栏
+- [java-commenting/subagent-packets.md](./java-commenting/subagent-packets.md) — 按 Maven 模块和包拆分的 Java 注释子代理执行包模板
+
 ### 深度代码审计（13 轮）
 - [code-review/deep-code-audit-all-rounds-summary.md](./code-review/deep-code-audit-all-rounds-summary.md) — 13 轮完整汇总：覆盖 7 大维度
 - [code-review/deep-code-audit-round2.md](./code-review/deep-code-audit-round2.md) — Round 2：并发安全、Reactor 合规、数据正确性、异常处理、资源泄漏

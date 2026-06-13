@@ -1,0 +1,17 @@
+/Users/photonpay/project/canvas                                                      01aac65 [main]
+/Users/photonpay/project/canvas/.worktrees/homepage-material-ops-dashboard           8fff710 [feat/homepage-material-ops-dashboard] prunable
+/Users/photonpay/project/canvas/.worktrees/homepage-restructure                      55fa7ff [feat/homepage-restructure] prunable
+/Users/photonpay/project/canvas/.worktrees/integration-hub-control-plane             2afe708 [feat/integration-hub-control-plane] prunable
+/Users/photonpay/project/canvas/.worktrees/marketing-ops-platform-suite              2afe708 [feat/marketing-ops-platform-suite] prunable
+/Users/photonpay/project/canvas/.worktrees/olap-candidate-verify                     2afe708 (detached HEAD) prunable
+/Users/photonpay/project/canvas/.worktrees/optimization-todo-implementation          c35d24b [optimization-todo-implementation] prunable
+/Users/photonpay/project/canvas/.worktrees/p0-reactive-boundaries                    496478b [p0-reactive-boundaries] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-015-4000-readiness                     68fab91 [p2-015-4000-readiness] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-016-analytics-trace-sink               68fab91 [p2-016-analytics-trace-sink] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-016b-analytics-retention               68fab91 [p2-016b-analytics-retention] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-016d-frontend-analytics                68fab91 [p2-016d-frontend-analytics] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-019-ai-llm-production                  68fab91 [p2-019-ai-llm-production] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-020-churn-smart-timing                 68fab91 [p2-020-churn-smart-timing] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-022-warehouse-closeout                 68fab91 [p2-022-warehouse-closeout] prunable
+/Users/photonpay/project/canvas/.worktrees/p2-080-conversational-session-foundation  2afe708 [p2-080-conversational-session-foundation] prunable
+/Users/photonpay/project/canvas/.worktrees/risk-control-rule-engine                  2afe708 [feat/risk-control-rule-engine] prunable

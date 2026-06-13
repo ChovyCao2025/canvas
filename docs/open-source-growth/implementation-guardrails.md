@@ -111,12 +111,18 @@ sed -n '1,220p' backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plug
 - `JdbcPluginRepository` 已存在。
 - `built_in_plugin_registry` 表已存在。
 - `PluginRegistryController` 已存在。
+- OSG-C07 已决策：`canvas-platform` 是 DDD final plugin registry metadata、
+  manifest、permissions、compatibility、persistence 和 enablement owner；
+  `canvas-context-execution` 是 handler binding、node metadata、runtime
+  validation、trace failure path 和 `PluginEnablementView` consumption owner。
 
 执行约束：
 
 - 不要直接新建平行的 `CanvasPluginRegistry` 作为第二套注册中心。
-- 首选做法是扩展 `PluginRegistryService`，增加 manifest、extension point、permissions、node metadata 等能力。
-- 如果确实需要新类，必须说明它和 `PluginRegistryService` 的职责边界。
+- 首选做法是承接旧 `PluginRegistryService`、`JdbcPluginRepository` 和
+  `built_in_plugin_registry` 语义，并迁移/桥接到 DDD final owner。
+- 如果确实需要新类，必须说明它和 `PluginRegistryService` 的职责边界、
+  所属 final DDD module、bridge removal gate 和 rollback path。
 
 ### 3.3 节点 handler 任务搜索
 
@@ -249,15 +255,17 @@ PR 大小限制：
 
 允许：
 
-- 扩展 `PluginRegistryService`。
+- 在 `canvas-platform` 承接并迁移/桥接 `PluginRegistryService` 语义。
 - 扩展 `built_in_plugin_registry` 表，新增迁移。
 - 增加 manifest 字段。
 - 增加插件权限声明。
 - 将插件启停接入发布校验。
+- 在 `canvas-context-execution` 的 execution-owned handler registry 路径接入
+  插件 handler、node metadata 和 trace failure path。
 
 禁止：
 
-- 新建第二套插件注册中心取代 `PluginRegistryService`。
+- 新建第二套插件注册中心取代或绕开 `PluginRegistryService` 语义。
 - classloader 热加载。
 - 插件运行时安装。
 - 插件执行任意脚本。

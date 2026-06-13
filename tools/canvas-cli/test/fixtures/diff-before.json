@@ -1,0 +1,33 @@
+{
+  "apiVersion": "canvas/v1",
+  "kind": "Journey",
+  "metadata": {
+    "name": "diff-before"
+  },
+  "spec": {
+    "trigger": {
+      "type": "webhook",
+      "event": "user.registered"
+    },
+    "nodes": [
+      {
+        "id": "segment",
+        "type": "condition",
+        "config": {
+          "expression": "user.level == 'new'"
+        }
+      },
+      {
+        "id": "send-message",
+        "type": "message",
+        "config": {
+          "template": "welcome-a"
+        }
+      },
+      {
+        "id": "old-coupon",
+        "type": "coupon"
+      }
+    ]
+  }
+}

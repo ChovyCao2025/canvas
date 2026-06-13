@@ -1,0 +1,91 @@
+# Open-source demo dependencies.
+# Start from the repository root:
+#   docker compose -f docker-compose.demo.yml up -d
+#
+# This compose file intentionally starts mock/dependency services only. Run the
+# backend and frontend from source so the demo path uses the same code as local
+# development while backend public API work remains gated by G10.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: canvas-demo-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: canvas_db
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - canvas-demo-mysql-data:/var/lib/mysql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --binlog-row-image=FULL
+
+  redis:
+    image: redis:7-alpine
+    container_name: canvas-demo-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - canvas-demo-redis-data:/data
+
+  wiremock:
+    image: wiremock/wiremock:3.3.1
+    container_name: canvas-demo-wiremock
+    command:
+      - "--global-response-templating"
+      - "--verbose"
+    ports:
+      - "8099:8080"
+    volumes:
+      - ./wiremock:/home/wiremock:ro
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.1
+    container_name: canvas-demo-rocketmq-namesrv
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+
+  rocketmq-init:
+    image: apache/rocketmq:5.3.1
+    user: root
+    command: >
+      sh -c "mkdir -p /home/rocketmq/logs /home/rocketmq/store
+      && chown -R 3000:3000 /home/rocketmq/logs /home/rocketmq/store"
+    volumes:
+      - canvas-demo-rocketmq-logs:/home/rocketmq/logs
+      - canvas-demo-rocketmq-store:/home/rocketmq/store
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.1
+    container_name: canvas-demo-rocketmq-broker
+    command: sh mqbroker -c /home/rocketmq/rocketmq-5.3.1/conf/broker.conf
+    environment:
+      - NAMESRV_ADDR=rocketmq-namesrv:9876
+      - JAVA_OPT_EXT=-Xms512m -Xmx512m
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-init:
+        condition: service_completed_successfully
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+    volumes:
+      - ./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.3.1/conf/broker.conf:ro
+      - canvas-demo-rocketmq-logs:/home/rocketmq/logs
+      - canvas-demo-rocketmq-store:/home/rocketmq/store
+
+volumes:
+  canvas-demo-mysql-data:
+  canvas-demo-redis-data:
+  canvas-demo-rocketmq-logs:
+  canvas-demo-rocketmq-store:

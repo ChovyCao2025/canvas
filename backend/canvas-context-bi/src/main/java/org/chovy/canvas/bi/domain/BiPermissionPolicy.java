@@ -1,0 +1,79 @@
+package org.chovy.canvas.bi.domain;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+public class BiPermissionPolicy {
+
+    public BiAccessDecision evaluate(BiAccessRequest request, List<BiPermissionGrant> grants) {
+        if (request == null) {
+            throw new IllegalArgumentException("access request is required");
+        }
+        List<BiPermissionGrant> matching = grants == null ? List.of() : grants.stream()
+                .filter(grant -> request.tenantId().equals(grant.tenantId()))
+                .filter(grant -> request.workspaceId().equals(grant.workspaceId()))
+                .filter(grant -> request.resourceType().equals(grant.resourceType()))
+                .filter(grant -> request.resourceId().equals(grant.resourceId()))
+                .filter(grant -> actionMatches(grant.actionKey(), request.actionKey()))
+                .filter(grant -> subjectMatches(grant, request))
+                .sorted(Comparator.comparingInt(this::subjectRank))
+                .toList();
+        BiPermissionGrant deny = matching.stream()
+                .filter(grant -> "DENY".equals(grant.effect()))
+                .findFirst()
+                .orElse(null);
+        if (deny != null) {
+            return decision(request, deny, false, "explicit BI permission deny matched");
+        }
+        BiPermissionGrant allow = matching.stream()
+                .filter(grant -> "ALLOW".equals(grant.effect()))
+                .findFirst()
+                .orElse(null);
+        if (allow != null) {
+            return decision(request, allow, true, "BI permission allow matched");
+        }
+        return new BiAccessDecision(false, "DENY", null, null, "no BI permission grant matched",
+                "bi-permission:v1:%d:%d:%s:%d:%s:DENY:NONE:none".formatted(
+                        request.tenantId(),
+                        request.workspaceId(),
+                        request.resourceType(),
+                        request.resourceId(),
+                        request.actionKey()));
+    }
+
+    private BiAccessDecision decision(BiAccessRequest request, BiPermissionGrant grant, boolean allowed, String reason) {
+        return new BiAccessDecision(allowed, grant.effect(), grant.subjectType(), grant.subjectId(), reason,
+                "bi-permission:v1:%d:%d:%s:%d:%s:%s:%s:%s".formatted(
+                        request.tenantId(),
+                        request.workspaceId(),
+                        request.resourceType(),
+                        request.resourceId(),
+                        request.actionKey(),
+                        grant.effect(),
+                        grant.subjectType(),
+                        grant.subjectId()));
+    }
+
+    private boolean actionMatches(String grantAction, String requestedAction) {
+        return "*".equals(grantAction) || grantAction.equals(requestedAction);
+    }
+
+    private boolean subjectMatches(BiPermissionGrant grant, BiAccessRequest request) {
+        return switch (grant.subjectType()) {
+            case "ALL" -> "*".equals(grant.subjectId()) || "ALL".equals(grant.subjectId());
+            case "USER" -> grant.subjectId().equals(request.actor());
+            case "ROLE" -> request.roles().contains(grant.subjectId().toUpperCase(Locale.ROOT));
+            default -> false;
+        };
+    }
+
+    private int subjectRank(BiPermissionGrant grant) {
+        return switch (grant.subjectType()) {
+            case "USER" -> 0;
+            case "ROLE" -> 1;
+            case "ALL" -> 2;
+            default -> 3;
+        };
+    }
+}

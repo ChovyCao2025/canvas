@@ -37,9 +37,20 @@ machine-readable companion for active dispatches, reservations, recovery audit,
 and verified evidence.
 
 The coordinator owns both files. If the Markdown ledger and JSON state disagree,
-stop dispatch, reconcile both files from actual worktree evidence, and run
-`node tools/program-coordination/check-dispatch-state.mjs .` before assigning
-new work.
+do not treat the mismatch as an automatic `NEEDS_CONTEXT`. First classify the
+state:
+
+- `CONTINUE`: ledger, JSON state, evidence, and changed paths agree.
+- `RECOVER`: one record is stale, but actual worktree evidence, worker return
+  files, command output, or session logs make the correct state clear. The
+  coordinator must make the smallest ledger/JSON recovery edit, run
+  `node tools/program-coordination/check-dispatch-state.mjs .`, and continue.
+- `NEEDS_CONTEXT`: the correct state cannot be proven, continuing could
+  overwrite unowned changes, active reservations overlap, or the next step needs
+  destructive rollback.
+
+Only `NEEDS_CONTEXT` stops implementation. `RECOVER` is coordinator work, not a
+reason to hand the problem back to the user.
 
 The ledger must record:
 
@@ -87,6 +98,18 @@ Registry rules:
 - A reservation can cover exact files or directories named in a worker packet.
 - The JSON record is authoritative for machine checks; the Markdown row is the
   readable handoff summary.
+- `RESERVED` means the coordinator has created the reservation but has not yet
+  sent a worker handoff. `RUNNING` means the handoff was actually sent.
+- Before moving a code-writing dispatch from `RESERVED` to `RUNNING`, the
+  coordinator must check for available subagent tooling in the current runtime.
+  If subagents are available, spawn the worker and record the actual worker
+  nickname or id in the registry. Do not leave a running code-writing dispatch
+  as `main-agent-inline`, `multi_agent_v1-worker`, `pending`, or another generic
+  placeholder.
+- Inline code-writing is allowed only when subagent tooling is unavailable or
+  the coordinator is intentionally taking a local critical-path task. The
+  registry `worker` field must include `fallback reason:` and the recovery audit
+  must record why no real worker was spawned.
 - A broad directory reservation is valid only when no other active reservation
   can write inside that directory.
 - Coordinator-owned files cannot be reserved for workers unless the handoff
@@ -97,6 +120,9 @@ Registry rules:
 - If two active reservations overlap, stop the newer worker before it edits.
 - Run `node tools/program-coordination/check-dispatch-state.mjs .` after adding,
   changing, or closing any active dispatch row.
+- A worker board row in `RESERVED`, `RUNNING`, `RETURNED`, `REVIEWING`,
+  `NEEDS_CONTEXT`, or `BLOCKED` must have a matching active dispatch row. If the
+  active registry is `none`, no worker board row may remain active.
 
 ## Worker State Machine
 
@@ -132,6 +158,13 @@ Allowed transitions:
 | any active state | `NEEDS_CONTEXT` | coordinator or worker | missing field, missing file, unclear owner, or failed gate |
 | any active state | `BLOCKED` | coordinator | repeated blocker needs external decision |
 | any active state | `ABORTED` | coordinator | reservation is cancelled and rollback path recorded |
+
+The coordinator must not repeatedly wait on one worker without doing recovery
+work. After one meaningful `wait_agent` timeout, inspect the worker return,
+session log, changed paths, and evidence directory. If the worker already
+produced verifiable output, record `RETURNED` or close it. If it has not, either
+continue a disjoint task, keep only read-only reviewers active, or mark the
+dispatch `NEEDS_CONTEXT` with a specific missing fact.
 
 `DONE_WITH_CONCERNS` is not enough to open a downstream gate unless the gate row
 explicitly names the accepted concern and the owner of the follow-up.

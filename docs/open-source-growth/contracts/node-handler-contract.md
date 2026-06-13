@@ -12,7 +12,8 @@
 
 - `NodeHandler`
 - `@NodeHandlerType`
-- `HandlerRegistry`
+- legacy `HandlerRegistry`
+- DDD-final `NodeHandlerRegistry`
 - `node_type_registry`
 
 插件节点必须承接该机制。
@@ -23,13 +24,14 @@
 - 插件节点必须声明唯一 `@NodeHandlerType`。
 - 插件节点 type 必须与 `node_type_registry.type_key` 或插件 manifest 中的节点声明一致。
 - 插件节点必须通过 Spring Bean 注册。
-- `HandlerRegistry` 是唯一运行时 handler 获取入口。
+- DDD-final runtime lookup must go through `NodeHandlerRegistry`; old
+  `HandlerRegistry` is a `CURRENT_ENGINE_BRIDGE` input only.
 - 插件被禁用时，依赖该插件的节点不能通过发布校验。
 - 插件被禁用时，已有草稿可以保留，但不能发布或 dry-run。
 
 ## Forbidden
 
-- 绕过 `HandlerRegistry` 直接执行插件 handler。
+- 绕过 execution-owned handler registry 直接执行插件 handler。
 - 在插件中直接修改画布版本状态。
 - 在插件中绕过执行 trace 写入。
 - 在插件中绕过权限或租户上下文。
@@ -62,6 +64,8 @@ Final owner:
 - Plugin enablement metadata: `canvas-platform` for registry state, consumed by
   `canvas-context-execution`.
 - Public HTTP exposure of node metadata: `canvas-web`.
+- DDD-C07 public read model: `NodeMetadataView`.
+- DDD-C07 runtime entry point: `CanvasExecutionFacade`.
 
 Allowed adapters:
 
@@ -77,6 +81,9 @@ Mirror documents:
 
 Verification:
 
-- `HandlerRegistry` remains the only runtime lookup path.
+- `NodeHandlerRegistry` remains the only DDD-final runtime lookup path; old
+  `HandlerRegistry` may appear only in a named bridge.
 - Disabled plugin nodes cannot publish or dry-run.
 - Handler failures enter execution trace through execution-owned failure paths.
+- Canvas, templates, DSL, CLI, and AI read node capability data through
+  `NodeMetadataView`; they must not mutate handler registry state.

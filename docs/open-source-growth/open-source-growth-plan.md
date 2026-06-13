@@ -44,8 +44,9 @@
 
 - Task 2 的 demo seed service：只能作为 `CURRENT_ENGINE_BRIDGE`，且必须使用
   `application-demo.yml` 或 demo-only 配置，不得修改 production/staging 默认语义。
-- Task 3 插件 registry backend：等待 OSG-C07，必须扩展
-  `PluginRegistryService`，不得新建第二套 registry。
+- Task 3 插件 registry backend：等待 OSG-C07 和 G10；必须承接旧
+  `PluginRegistryService` 语义并迁移/桥接到 DDD final owner，不得新建第二套
+  registry。
 - Task 4 官方插件 runtime：等待 execution extension points 编译通过。
 - Task 6 TemplateImportService：等待 canvas draft/version API 明确。
 - Task 7 Canvas DSL backend import/export：等待 canvas API 和 web API 明确。
@@ -104,17 +105,24 @@ local CLI validation 或 example 工作。
 
 ### 1.3 Plugin Registry
 
-本节后端文件是 Month 2 产品目标，不是无条件立即可写范围。执行前必须通过
-OSG-C07，并在 worker packet 中声明 `DDD_FINAL_MODULE` 或
-`CURRENT_ENGINE_BRIDGE`。
+本节后端文件是 Month 2 产品目标，不是无条件立即可写范围。OSG-C07 已决策
+最终 owner：`canvas-platform` 承接 registry metadata、manifest、permissions、
+compatibility、persistence 和 enablement；`canvas-context-execution` 承接 handler
+binding、node metadata、runtime validation 和 trace failure path。执行前仍必须通过
+G10，并在 worker packet 中声明 `DDD_FINAL_MODULE` 或 `CURRENT_ENGINE_BRIDGE`。
 
-- Create `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/CanvasPlugin.java`：插件接口。
-- Create `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/CanvasPluginManifest.java`：manifest 模型。
-- Modify `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java`：扩展现有插件注册表能力。
-- Modify `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/JdbcPluginRepository.java`：承接 manifest、extension point 和 permission 持久化。
-- Create `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginPermission.java`：插件权限枚举。
-- Create `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginValidationService.java`：manifest 校验。
-- Modify `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/HandlerRegistry.java`：支持插件贡献 handler。
+- Create final `backend/canvas-platform/**` plugin manifest/registry/permission
+  model and services：插件接口、manifest 模型、权限枚举、manifest 校验和启停
+  metadata。
+- Modify final `backend/canvas-platform/**` persistence adapters：承接
+  `PluginRegistryService`、`JdbcPluginRepository` 和 `built_in_plugin_registry`
+  语义；如字段不足，新增 Flyway migration，不修改旧迁移。
+- Modify final `backend/canvas-context-execution/**` plugin adapter/API：
+  handler binding、node metadata、publish/dry-run validation 和
+  `PluginEnablementView` consumption。
+- Legacy bridge only: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java`。
+- Legacy bridge only: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/JdbcPluginRepository.java`。
+- Legacy bridge only: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/HandlerRegistry.java`。
 - Create `frontend/src/plugins/pluginRegistry.ts`：前端插件注册入口。
 - Create `frontend/src/plugins/pluginManifest.ts`：前端 manifest 类型。
 - Modify `frontend/src/components/node-panel/nodeLibrary.ts`：合并后端节点元数据和前端插件展示信息。
@@ -271,30 +279,36 @@ cd frontend && npm run build
 **目标：** 建立轻量插件体系，支持构建期插件 + 配置启停 + manifest 校验。
 
 **Backend Gate：** 未通过 OSG-C07 前只能做 contract/docs/examples。后端实现
-必须声明 `DDD_FINAL_MODULE` 或 `CURRENT_ENGINE_BRIDGE`，不得在旧
-`canvas-engine` 下形成最终实现。
+必须声明 `DDD_FINAL_MODULE` 或 `CURRENT_ENGINE_BRIDGE`，且 G10 通过前不得启动
+backend ecosystem code-writing worker。旧 `canvas-engine` 路径只能作为 source rows
+或临时 bridge，不得形成最终实现。
 
 **Files:**
 
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/CanvasPlugin.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/CanvasPluginManifest.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/JdbcPluginRepository.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginPermission.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginValidationService.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/HandlerRegistry.java`
-- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/plugin/PluginRegistryServiceTest.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/plugin/PluginValidationServiceTest.java`
+- Create/modify: `backend/canvas-platform/**` plugin registry metadata,
+  manifest, permission, validation, compatibility, persistence, and enablement
+  files.
+- Create/modify: `backend/canvas-context-execution/**` plugin handler binding,
+  node metadata, publish/dry-run validation, trace integration, and
+  `PluginEnablementView` adapter files.
+- Legacy bridge only with complete declaration:
+  `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java`
+- Legacy bridge only with complete declaration:
+  `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/JdbcPluginRepository.java`
+- Legacy bridge only with complete declaration:
+  `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/HandlerRegistry.java`
 
 **Steps:**
 
-- [ ] 定义 `CanvasPlugin` 接口，包含 `manifest()`、`nodeHandlers()`、`providers()`、`templatePacks()`。
+- [ ] 在 final owner 模块定义插件接口/manifest 模型，包含 `manifest()`、`nodeHandlers()`、`providers()`、`templatePacks()`。
 - [ ] 定义 `CanvasPluginManifest`，字段包括 id、name、version、coreVersion、extensionPoints、permissions、nodes、templates。
 - [ ] 定义插件权限枚举，覆盖外部 HTTP、写 context、发消息、发优惠券、注册 webhook、读用户属性。
-- [ ] 扩展 `PluginRegistryService`，从 Spring Bean 收集构建期插件并按配置启停。
-- [ ] 扩展 `JdbcPluginRepository`，让内置插件注册数据可以承载 manifest、extension point、permissions 和 node metadata。
+- [ ] 在 `canvas-platform` 承接旧 `PluginRegistryService` 语义，从 Spring Bean 收集构建期插件并按配置启停。
+- [ ] 在 `canvas-platform` persistence adapter 承接旧 `JdbcPluginRepository` 和
+  `built_in_plugin_registry` 语义，让内置插件注册数据可以承载 manifest、
+  extension point、permissions 和 node metadata。
 - [ ] 实现 manifest 校验：id 格式、版本格式、节点 type 唯一、权限声明完整。
-- [ ] 修改 `HandlerRegistry`，合并核心 handler 和插件 handler，冲突时启动失败。
+- [ ] 在 `canvas-context-execution` 的 `NodeHandlerRegistry` 路径合并核心 handler 和插件 handler，冲突时启动失败；旧 `HandlerRegistry` 只用于 bridge。
 - [ ] 添加单元测试覆盖启停、冲突、非法 manifest。
 
 **验收：**
@@ -307,7 +321,7 @@ cd frontend && npm run build
 **验证命令：**
 
 ```bash
-cd backend && mvn -pl canvas-engine -Dtest=PluginRegistryServiceTest,PluginValidationServiceTest test
+cd backend && mvn test -pl canvas-platform,canvas-context-execution -Dtest='*Plugin*Test'
 ```
 
 ### Task 4: 官方插件最小闭环

@@ -4,12 +4,13 @@ This directory tracks the inventory needed before code-writing workers start.
 The inventory is the bridge between the architecture documents and executable
 subagent task packs.
 
-The current repository snapshot has roughly:
+The 2026-06-09 repository snapshot has:
 
 ```text
-141 backend controllers under org.chovy.canvas.web
-279 persistence data objects under org.chovy.canvas.dal.dataobject
-278 MyBatis mappers under org.chovy.canvas.dal.mapper
+142 backend controllers under org.chovy.canvas.web
+284 persistence data objects under org.chovy.canvas.dal.dataobject
+283 MyBatis mappers under org.chovy.canvas.dal.mapper
+731 backend tests under backend/canvas-engine/src/test/java
 ```
 
 That scale is large enough that worker agents must not infer ownership from
