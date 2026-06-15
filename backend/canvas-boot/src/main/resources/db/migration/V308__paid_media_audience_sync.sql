@@ -1,0 +1,63 @@
+CREATE TABLE IF NOT EXISTS paid_media_audience_destination (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  provider VARCHAR(64) NOT NULL,
+  destination_key VARCHAR(128) NOT NULL,
+  display_name VARCHAR(256) NOT NULL,
+  account_id VARCHAR(128) NULL,
+  external_audience_id VARCHAR(128) NULL,
+  identifier_types_json JSON NULL,
+  consent_channel VARCHAR(64) NOT NULL DEFAULT 'PAID_MEDIA',
+  enforce_consent TINYINT NOT NULL DEFAULT 1,
+  enabled TINYINT NOT NULL DEFAULT 1,
+  metadata_json JSON NULL,
+  created_by VARCHAR(128) NULL,
+  created_at DATETIME NULL,
+  updated_at DATETIME NULL,
+  UNIQUE KEY uk_paid_media_destination (tenant_id, provider, destination_key),
+  KEY idx_paid_media_destination_provider (tenant_id, provider, enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Paid-media audience sync destinations';
+
+CREATE TABLE IF NOT EXISTS paid_media_audience_sync_run (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  destination_id BIGINT NOT NULL,
+  audience_id BIGINT NOT NULL,
+  provider VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  requested_count INT NOT NULL DEFAULT 0,
+  eligible_count INT NOT NULL DEFAULT 0,
+  skipped_count INT NOT NULL DEFAULT 0,
+  failed_count INT NOT NULL DEFAULT 0,
+  external_operation_id VARCHAR(256) NULL,
+  error_message VARCHAR(1000) NULL,
+  metadata_json JSON NULL,
+  created_by VARCHAR(128) NULL,
+  started_at DATETIME NULL,
+  finished_at DATETIME NULL,
+  created_at DATETIME NULL,
+  updated_at DATETIME NULL,
+  KEY idx_paid_media_sync_run_destination (tenant_id, destination_id, created_at),
+  KEY idx_paid_media_sync_run_audience (tenant_id, audience_id, created_at),
+  KEY idx_paid_media_sync_run_status (tenant_id, status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Paid-media audience sync run ledger';
+
+CREATE TABLE IF NOT EXISTS paid_media_audience_member (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  run_id BIGINT NOT NULL,
+  destination_id BIGINT NOT NULL,
+  audience_id BIGINT NOT NULL,
+  provider VARCHAR(64) NOT NULL,
+  user_id VARCHAR(128) NOT NULL,
+  identifier_type VARCHAR(64) NOT NULL,
+  identifier_hash VARCHAR(128) NULL,
+  eligibility_status VARCHAR(32) NOT NULL,
+  reason VARCHAR(256) NULL,
+  synced_at DATETIME NULL,
+  created_at DATETIME NULL,
+  updated_at DATETIME NULL,
+  UNIQUE KEY uk_paid_media_member_run_user_identifier (run_id, user_id, identifier_type),
+  KEY idx_paid_media_member_run_status (tenant_id, run_id, eligibility_status),
+  KEY idx_paid_media_member_destination (tenant_id, destination_id, audience_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Paid-media audience sync member eligibility and hash audit';

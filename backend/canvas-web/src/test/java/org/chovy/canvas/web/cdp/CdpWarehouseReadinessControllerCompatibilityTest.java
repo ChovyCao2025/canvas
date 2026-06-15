@@ -3,6 +3,7 @@ package org.chovy.canvas.web.cdp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.List;
 
 import org.chovy.canvas.cdp.api.CdpWarehouseReadinessFacade;
@@ -64,18 +65,51 @@ class CdpWarehouseReadinessControllerCompatibilityTest {
         assertThat(facade.calls).containsExactly(42L);
     }
 
+    @Test
+    void scanIncidentsPreservesLegacyReadinessIncidentRouteAndTenantHeader() {
+        RecordingReadinessFacade facade = new RecordingReadinessFacade();
+
+        webClient(facade)
+                .post()
+                .uri("/warehouse/readiness/incidents/scan")
+                .header("X-Tenant-Id", "9")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data.tenantId").isEqualTo(9)
+                .jsonPath("$.data.incidentCount").isEqualTo(1)
+                .jsonPath("$.data.incidents[0].section").isEqualTo("realtime_pipelines");
+
+        assertThat(facade.scanCalls).containsExactly(9L);
+    }
+
     private static WebTestClient webClient(CdpWarehouseReadinessFacade facade) {
         return WebTestClient.bindToController(new CdpWarehouseReadinessController(facade)).build();
     }
 
     private static final class RecordingReadinessFacade implements CdpWarehouseReadinessFacade {
         private final java.util.ArrayList<Long> calls = new java.util.ArrayList<>();
+        private final java.util.ArrayList<Long> scanCalls = new java.util.ArrayList<>();
         private CdpWarehouseReadinessView view;
 
         @Override
         public CdpWarehouseReadinessView readiness(Long tenantId) {
             calls.add(tenantId);
             return view;
+        }
+
+        @Override
+        public Map<String, Object> scanIncidents(Long tenantId) {
+            scanCalls.add(tenantId);
+            return Map.of(
+                    "tenantId", tenantId,
+                    "incidentCount", 1,
+                    "incidents", List.of(Map.of("section", "realtime_pipelines", "status", "FAIL")));
         }
     }
 }

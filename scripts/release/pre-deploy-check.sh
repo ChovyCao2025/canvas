@@ -45,6 +45,14 @@ check_tcp() {
   (echo > "/dev/tcp/$host/$port") >/dev/null 2>&1 || fail "$name is not reachable at $host:$port"
 }
 
+validate_image_tag() {
+  local image_tag="$1"
+  [[ -n "$image_tag" ]] || fail "CANVAS_IMAGE_TAG is required"
+  [[ "$image_tag" != "latest" ]] || fail "CANVAS_IMAGE_TAG must be immutable and must not be latest"
+  [[ "$image_tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] \
+    || fail "CANVAS_IMAGE_TAG must be a Docker tag, not a full image reference: $image_tag"
+}
+
 if [[ "$DRY_RUN" == "true" ]]; then
   # Static release gates can run in CI before secrets and network access are available.
   bash "$ROOT_DIR/scripts/release/validate-production-profile.sh"
@@ -56,8 +64,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
 fi
 
 # Require immutable image and migration backup evidence before any dependency probe runs.
-[[ -n "${CANVAS_IMAGE_TAG:-}" ]] || fail "CANVAS_IMAGE_TAG is required"
-[[ "$CANVAS_IMAGE_TAG" != "latest" ]] || fail "CANVAS_IMAGE_TAG must be immutable and must not be latest"
+validate_image_tag "${CANVAS_IMAGE_TAG:-}"
 [[ -n "${CANVAS_MIGRATION_BACKUP_EVIDENCE:-}" ]] || fail "CANVAS_MIGRATION_BACKUP_EVIDENCE is required"
 [[ -e "$CANVAS_MIGRATION_BACKUP_EVIDENCE" ]] || fail "migration backup evidence path does not exist: $CANVAS_MIGRATION_BACKUP_EVIDENCE"
 

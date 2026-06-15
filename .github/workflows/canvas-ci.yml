@@ -15,7 +15,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - run: cd backend && mvn test
+      - run: cd backend && mvn -pl canvas-boot -am test
 
   backend-integration-tests:
     runs-on: ubuntu-latest
@@ -25,7 +25,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - run: cd backend && mvn -pl canvas-engine -am -P integration-tests -Dtest=*IntegrationTest test
+      - run: cd backend && mvn -pl canvas-boot -am -P integration-tests -Dtest=*IntegrationTest test
 
   frontend-tests:
     runs-on: ubuntu-latest
@@ -55,7 +55,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - run: bash scripts/release/check-flyway-migration.sh
-      - run: cd backend && mvn -pl canvas-engine -am -Dtest=FlywayMigrationPolicyTest test
+      - run: cd backend && mvn -pl canvas-boot -am -Dtest=FlywayMigrationPolicyTest test
 
   open-source-growth-guardrails:
     runs-on: ubuntu-latest
@@ -67,11 +67,25 @@ jobs:
       - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs
       - run: node tools/open-source-growth/guardrail-verifier.mjs
 
+  cutover-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node tools/program-coordination/check-dispatch-state.mjs .
+      - run: node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs
+      - run: node tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready
+
   deployment-config:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
       - run: bash -n scripts/release/*.sh
+      - run: bash scripts/release/verify-helm-render.sh
+      - run: CANVAS_IMAGE_TAG=${{ github.sha }} bash scripts/release/build-image.sh --dry-run --image canvas-boot
       - run: bash scripts/release/pre-deploy-check.sh --dry-run
       - run: bash scripts/release/post-deploy-check.sh --dry-run
       - run: bash scripts/release/rollback-drill.sh --dry-run
@@ -88,6 +102,7 @@ jobs:
       - profile-validation
       - flyway-migration-policy
       - open-source-growth-guardrails
+      - cutover-preflight
       - deployment-config
     steps:
       - uses: actions/checkout@v4
@@ -95,4 +110,4 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - run: CANVAS_IMAGE_TAG=${{ github.sha }} bash scripts/release/build-image.sh
+      - run: CANVAS_IMAGE_TAG=${{ github.sha }} bash scripts/release/build-image.sh --image canvas-boot

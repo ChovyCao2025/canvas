@@ -14,7 +14,7 @@
 ```bash
 JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home \
 PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" \
-mvn -f backend/pom.xml -pl canvas-engine test \
+mvn -f backend/pom.xml -pl canvas-boot -am test \
   -Dtest=DagCostProfilerTest,ExecutionLaneResolverTest,LaneWorkerIsolationTest,AdaptiveRetryBackoffPolicyTest,DownstreamBulkheadRegistryTest,CanvasExecutionRequestExecutorTest,RedisRoleConfigurationTest
 ```
 

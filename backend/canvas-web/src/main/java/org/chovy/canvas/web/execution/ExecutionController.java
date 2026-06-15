@@ -54,6 +54,24 @@ public class ExecutionController {
         });
     }
 
+    @PostMapping("/canvas/execute/dry-run/{canvasId}")
+    public Mono<CompatibilityEnvelope<ExecutionResultView>> dryRun(
+            @PathVariable Long canvasId,
+            @RequestBody(required = false) DirectExecutionRequest request) {
+        return Mono.fromCallable(() -> {
+            DirectExecutionRequest body = request == null ? DirectExecutionRequest.empty() : request;
+            ExecutionRequestCommand command = new ExecutionRequestCommand(
+                    DEFAULT_TENANT_ID,
+                    canvasId,
+                    null,
+                    DIRECT_CALL,
+                    isBlank(body.userId()) ? "system" : body.userId(),
+                    body.inputParams(),
+                    true);
+            return CompatibilityEnvelope.ok(facade.trigger(command));
+        });
+    }
+
     @GetMapping("/canvas/{canvasId}/execution/{executionId}/trace")
     public Mono<CompatibilityEnvelope<List<Map<String, Object>>>> trace(
             @PathVariable Long canvasId,
@@ -108,14 +126,15 @@ public class ExecutionController {
     private record DirectExecutionRequest(
             String userId,
             Map<String, Object> inputParams,
-            String idempotencyKey) {
+            String idempotencyKey,
+            String graphJson) {
 
         private DirectExecutionRequest {
             inputParams = Map.copyOf(inputParams == null ? Map.of() : inputParams);
         }
 
         private static DirectExecutionRequest empty() {
-            return new DirectExecutionRequest(null, Map.of(), null);
+            return new DirectExecutionRequest(null, Map.of(), null, null);
         }
     }
 

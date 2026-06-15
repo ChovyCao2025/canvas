@@ -1,0 +1,33 @@
+CREATE TABLE IF NOT EXISTS `marketing_integration_contract_probe_run` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `tenant_id` BIGINT NOT NULL,
+  `contract_id` BIGINT NOT NULL,
+  `contract_key` VARCHAR(128) NOT NULL,
+  `provider_family` VARCHAR(64) NOT NULL,
+  `probe_key` VARCHAR(128) NOT NULL,
+  `environment` VARCHAR(32) NOT NULL DEFAULT 'PRODUCTION',
+  `status` VARCHAR(32) NOT NULL DEFAULT 'PASS',
+  `http_status_code` INT NULL,
+  `latency_ms` BIGINT NULL,
+  `error_type` VARCHAR(255) NULL,
+  `problem_type_uri` VARCHAR(512) NULL,
+  `problem_title` VARCHAR(255) NULL,
+  `problem_detail` VARCHAR(1000) NULL,
+  `error_message` VARCHAR(1000) NULL,
+  `summary` VARCHAR(512) NULL,
+  `observed_at` DATETIME NOT NULL,
+  `evidence_json` JSON NULL,
+  `created_by` VARCHAR(128) NULL,
+  `updated_by` VARCHAR(128) NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_marketing_integration_probe_latest` (`tenant_id`, `contract_id`, `probe_key`),
+  KEY `idx_marketing_integration_probe_contract` (`tenant_id`, `contract_id`, `observed_at`),
+  KEY `idx_marketing_integration_probe_status` (`tenant_id`, `environment`, `status`, `observed_at`),
+  KEY `idx_marketing_integration_probe_provider` (`tenant_id`, `provider_family`, `status`, `observed_at`),
+  KEY `idx_marketing_integration_probe_key` (`tenant_id`, `contract_key`, `probe_key`, `observed_at`),
+  CONSTRAINT `fk_marketing_integration_probe_contract`
+    FOREIGN KEY (`contract_id`) REFERENCES `marketing_integration_contract` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Runtime probe evidence for marketing integration contracts';

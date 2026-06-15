@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MIGRATION_DIR="$ROOT_DIR/backend/canvas-engine/src/main/resources/db/migration"
+MIGRATION_DIR="$ROOT_DIR/backend/canvas-boot/src/main/resources/db/migration"
 NOTES_DIR="$ROOT_DIR/docs/architecture/evidence/migrations"
 BASELINE_FILE="$NOTES_DIR/released-baseline.version"
 
@@ -57,7 +57,7 @@ if git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   missing_tracked_migrations=()
   while IFS= read -r tracked_migration; do
     [[ -f "$ROOT_DIR/$tracked_migration" ]] || missing_tracked_migrations+=("$tracked_migration")
-  done < <(git -C "$ROOT_DIR" ls-files 'backend/canvas-engine/src/main/resources/db/migration/V*.sql')
+  done < <(git -C "$ROOT_DIR" ls-files 'backend/canvas-boot/src/main/resources/db/migration/V*.sql')
 
   if [[ ${#missing_tracked_migrations[@]} -gt 0 ]]; then
     printf 'ERROR: tracked Flyway migration files are missing from the worktree:\n' >&2

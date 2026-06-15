@@ -20,7 +20,7 @@ docker compose -f docker-compose.local.yml up -d
 cd backend
 CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
 JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
+mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
 
 cd ../frontend
 npm install
@@ -79,7 +79,8 @@ Use these entry points:
 
 ```text
 frontend/                 React 18, Vite, Ant Design, React Flow
-backend/canvas-engine/    current Spring Boot application
+backend/canvas-boot/      Spring Boot runtime assembly
+backend/canvas-engine/    legacy runtime/source reference until removal
 backend/canvas-cache-sdk/ reusable tiered cache module
 docs/open-source/         public-facing docs, templates, and quickstart
 docs/open-source-growth/  contracts, guardrails, traceability, phase gates
@@ -97,8 +98,8 @@ Backend:
 cd backend
 mvn clean install -DskipTests
 mvn clean install
-mvn -f canvas-engine/pom.xml spring-boot:run
-mvn test -pl canvas-engine -Dtest=StartHandlerTest
+mvn -f canvas-boot/pom.xml spring-boot:run
+mvn -pl canvas-boot -am -Dtest=ModularArchitectureTest test
 ```
 
 Frontend:

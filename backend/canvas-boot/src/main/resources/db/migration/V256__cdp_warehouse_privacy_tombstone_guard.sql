@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_privacy_subject_tombstone (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    subject_type VARCHAR(64) NOT NULL DEFAULT 'USER_ID',
+    subject_hash VARCHAR(128) NOT NULL,
+    subject_ref_masked VARCHAR(128) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    source_request_id BIGINT DEFAULT NULL,
+    source_request_key VARCHAR(128) DEFAULT NULL,
+    reason VARCHAR(1000) NOT NULL,
+    blocked_event_count BIGINT NOT NULL DEFAULT 0,
+    last_blocked_at DATETIME DEFAULT NULL,
+    created_by VARCHAR(128) NOT NULL DEFAULT 'system',
+    revoked_by VARCHAR(128) DEFAULT NULL,
+    revoked_at DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_cdp_warehouse_privacy_tombstone_subject (tenant_id, subject_type, subject_hash),
+    INDEX idx_cdp_warehouse_privacy_tombstone_status (tenant_id, status, created_at),
+    INDEX idx_cdp_warehouse_privacy_tombstone_blocked (tenant_id, last_blocked_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse privacy subject tombstones for ingestion guard';

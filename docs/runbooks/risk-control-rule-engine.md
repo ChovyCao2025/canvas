@@ -458,7 +458,7 @@ After implementation, the following focused verification commands must pass befo
 
 ```bash
 cd backend
-mvn test -pl canvas-engine \
+mvn test -pl canvas-boot -am \
   -Dtest=RiskRuleParserTest,RiskRuleValidatorTest,RiskRuleEvaluatorTest,RiskStrategyCompilerTest,RiskDecisionMergerTest,RiskDecisionServiceTest,RiskListMatcherTest,RiskDecisionControllerTest,RiskDecisionHandlerTest,RiskMetricsTest \
   -DfailIfNoTests=false
 ```

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROD_PROFILE="$ROOT_DIR/backend/canvas-engine/src/main/resources/application-prod.yml"
-STAGING_PROFILE="$ROOT_DIR/backend/canvas-engine/src/main/resources/application-staging.yml"
+PROD_PROFILE="$ROOT_DIR/backend/canvas-boot/src/main/resources/application-prod.yml"
+STAGING_PROFILE="$ROOT_DIR/backend/canvas-boot/src/main/resources/application-staging.yml"
 
 fail() {
   echo "ERROR: $*" >&2

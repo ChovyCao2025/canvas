@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:http'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as joinPath } from 'node:path'
 import test from 'node:test'
@@ -54,12 +54,6 @@ function runCliAsync(args, options = {}) {
   })
 }
 
-function sendJson(response, status, body) {
-  response.statusCode = status
-  response.setHeader('content-type', 'application/json')
-  response.end(JSON.stringify(body))
-}
-
 async function withApiServer(handler, run) {
   const requests = []
   const server = createServer(async (request, response) => {
@@ -95,17 +89,19 @@ async function withApiServer(handler, run) {
   }
 }
 
-test('help lists local and backend API commands with API URL configuration', () => {
+test('help exposes only local commands before G10 backend API stability', () => {
   const result = runCli(['--help'])
 
   assert.equal(result.status, 0)
   assert.match(result.stdout, /validate <file>/)
   assert.match(result.stdout, /diff <before> <after>/)
-  assert.match(result.stdout, /import <file>/)
-  assert.match(result.stdout, /export <canvasId>/)
-  assert.match(result.stdout, /publish <canvasId>/)
-  assert.match(result.stdout, /--api-url <url>/)
-  assert.match(result.stdout, /CANVAS_API_URL/)
+  assert.match(result.stdout, /import, export, and publish are blocked until G10/)
+  assert.match(result.stdout, /local-only and do not call backend APIs/)
+  assert.doesNotMatch(result.stdout, /import <file>/)
+  assert.doesNotMatch(result.stdout, /export <canvasId>/)
+  assert.doesNotMatch(result.stdout, /publish <canvasId>/)
+  assert.doesNotMatch(result.stdout, /--api-url <url>/)
+  assert.doesNotMatch(result.stdout, /CANVAS_API_URL/)
   assert.equal(result.stderr, '')
 })
 
@@ -117,111 +113,27 @@ test('validate accepts a valid Canvas DSL v1 journey', () => {
   assert.equal(result.stderr, '')
 })
 
-test('import posts a Canvas DSL document to the backend map preview endpoint', async () => {
-  const document = JSON.parse(readFileSync(fixture('valid-journey.json'), 'utf8'))
-  const responseBody = {
-    canvasId: 'preview-123',
-    status: 'mapped'
-  }
-
+test('backend API commands are G10-gated and do not make network requests', async () => {
   await withApiServer((request, response) => {
-    sendJson(response, 200, responseBody)
+    response.statusCode = 500
+    response.end(`unexpected request: ${request.method} ${request.url}`)
   }, async (apiUrl, requests) => {
-    const result = await runCliAsync([
-      '--api-url',
-      apiUrl,
-      'import',
-      fixture('valid-journey.json')
-    ])
+    for (const args of [
+      ['--api-url', apiUrl, 'import', fixture('valid-journey.json')],
+      ['--api-url', apiUrl, 'export', 'canvas-123'],
+      ['--api-url', apiUrl, 'publish', 'canvas-123'],
+    ]) {
+      const result = await runCliAsync(args, {
+        env: {
+          CANVAS_API_URL: apiUrl
+        }
+      })
 
-    assert.equal(result.status, 0)
-    assert.deepEqual(JSON.parse(result.stdout), responseBody)
-    assert.equal(result.stderr, '')
-    assert.equal(requests.length, 1)
-    assert.equal(requests[0].method, 'POST')
-    assert.equal(requests[0].url, '/canvas/dsl/map')
-    assert.match(requests[0].headers['content-type'], /application\/json/)
-    assert.deepEqual(JSON.parse(requests[0].body), { document })
-  })
-})
-
-test('export uses CANVAS_API_URL to GET a Canvas DSL document and print JSON', async () => {
-  const responseBody = {
-    apiVersion: 'canvas/v1',
-    kind: 'Journey',
-    metadata: {
-      name: 'exported'
+      assert.notEqual(result.status, 0)
+      assert.equal(result.stdout, '')
+      assert.match(result.stderr, /Backend API commands are gated until G10 public extension\/API stability passes/)
     }
-  }
-
-  await withApiServer((request, response) => {
-    sendJson(response, 200, responseBody)
-  }, async (apiUrl, requests) => {
-    const result = await runCliAsync(['export', 'canvas-123'], {
-      env: {
-        CANVAS_API_URL: apiUrl
-      }
-    })
-
-    assert.equal(result.status, 0)
-    assert.deepEqual(JSON.parse(result.stdout), responseBody)
-    assert.equal(result.stderr, '')
-    assert.equal(requests.length, 1)
-    assert.equal(requests[0].method, 'GET')
-    assert.equal(requests[0].url, '/canvas/dsl/export/canvas-123')
-    assert.equal(requests[0].body, '')
-  })
-})
-
-test('--api-url overrides CANVAS_API_URL when publishing a canvas', async () => {
-  const responseBody = {
-    canvasId: 'canvas-123',
-    status: 'published'
-  }
-
-  await withApiServer((request, response) => {
-    sendJson(response, 200, responseBody)
-  }, async (apiUrl, requests) => {
-    const result = await runCliAsync([
-      '--api-url',
-      apiUrl,
-      'publish',
-      'canvas-123'
-    ], {
-      env: {
-        CANVAS_API_URL: 'http://127.0.0.1:1'
-      }
-    })
-
-    assert.equal(result.status, 0)
-    assert.deepEqual(JSON.parse(result.stdout), responseBody)
-    assert.equal(result.stderr, '')
-    assert.equal(requests.length, 1)
-    assert.equal(requests[0].method, 'POST')
-    assert.equal(requests[0].url, '/canvas/canvas-123/publish')
-    assert.equal(requests[0].body, '')
-  })
-})
-
-test('API commands report non-2xx responses with method, path, status, and body', async () => {
-  await withApiServer((request, response) => {
-    sendJson(response, 422, {
-      message: 'DAG validation failed',
-      errors: ['spec.edges[0].to is unknown']
-    })
-  }, async (apiUrl) => {
-    const result = await runCliAsync([
-      '--api-url',
-      apiUrl,
-      'import',
-      fixture('valid-journey.json')
-    ])
-
-    assert.notEqual(result.status, 0)
-    assert.equal(result.stdout, '')
-    assert.match(result.stderr, /API request failed: POST \/canvas\/dsl\/map returned 422/)
-    assert.match(result.stderr, /DAG validation failed/)
-    assert.match(result.stderr, /spec\.edges\[0\]\.to is unknown/)
+    assert.equal(requests.length, 0)
   })
 })
 

@@ -55,7 +55,7 @@ Open a second terminal:
 cd backend
 CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
 JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
+mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
 ```
 
 Backend URLs:
@@ -71,7 +71,7 @@ If Flyway reports duplicate migrations, clean stale build output:
 
 ```bash
 cd backend
-JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f canvas-engine/pom.xml clean
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f canvas-boot/pom.xml clean
 ```
 
 ## 3. Start The Frontend
@@ -109,7 +109,7 @@ Backend:
 cd backend
 mvn clean install -DskipTests
 mvn clean install
-mvn test -pl canvas-engine -Dtest=StartHandlerTest
+mvn -pl canvas-boot -am -Dtest=ModularArchitectureTest test
 ```
 
 Frontend:

@@ -60,7 +60,7 @@ echo "[5/6] 启动后端..."
   cd backend
   CANVAS_JWT_SECRET=${CANVAS_JWT_SECRET:-local-dev-jwt-secret-at-least-32-bytes} \
   JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-  mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
+  mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
@@ -128,7 +128,7 @@ echo "[5/6] 启动后端..."
   cd backend
   CANVAS_JWT_SECRET=${CANVAS_JWT_SECRET:-local-dev-jwt-secret-at-least-32-bytes} \
   JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-  mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
+  mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
@@ -201,7 +201,7 @@ Write-Host "[5/6] 启动后端..."
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
-    "`$env:CANVAS_JWT_SECRET = if (`$env:CANVAS_JWT_SECRET) { `$env:CANVAS_JWT_SECRET } else { 'local-dev-jwt-secret-at-least-32-bytes' }; cd `"$RootDir\backend`"; mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run"
+    "`$env:CANVAS_JWT_SECRET = if (`$env:CANVAS_JWT_SECRET) { `$env:CANVAS_JWT_SECRET } else { 'local-dev-jwt-secret-at-least-32-bytes' }; cd `"$RootDir\backend`"; mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run"
 )
 
 Write-Host "[6/6] 启动前端..."
@@ -243,7 +243,7 @@ docker exec canvas-mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS c
 
 ## 3. 安装本地 cache SDK
 
-`canvas-engine` 运行时会从本地 Maven 仓库解析 `canvas-cache-sdk` 的
+`canvas-boot` 运行时会从本地 Maven 仓库解析 `canvas-cache-sdk` 的
 `1.0.0-SNAPSHOT`。修改 SDK 后，先安装一次，避免启动时加载到旧的 snapshot jar。
 
 ```bash
@@ -258,8 +258,8 @@ cd /Users/photonpay/project/canvas/backend
 
 CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
 JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
-# 启动完成标志：Started CanvasEngineApplication
+mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
+# 启动完成标志：Started CanvasBootApplication
 # Swagger UI: http://localhost:8080/swagger-ui.html
 # 健康检查:   http://localhost:8080/actuator/health
 ```
@@ -269,7 +269,7 @@ mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
 
 ```bash
 cd /Users/photonpay/project/canvas/backend
-JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f canvas-engine/pom.xml clean
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f canvas-boot/pom.xml clean
 ```
 
 ## 5. 启动前端
@@ -303,5 +303,5 @@ SPRING_DATA_REDIS_HOST=host \
 ROCKETMQ_NAME_SERVER=host:9876 \
 CANVAS_JWT_SECRET=your-secret \
 JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
+mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
 ```

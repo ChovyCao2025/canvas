@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_stream_job_instance (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    pipeline_key VARCHAR(128) NOT NULL,
+    job_key VARCHAR(128) NOT NULL,
+    engine_type VARCHAR(64) NOT NULL,
+    engine_job_id VARCHAR(128) DEFAULT NULL,
+    deployment_ref VARCHAR(256) DEFAULT NULL,
+    runtime_status VARCHAR(32) NOT NULL DEFAULT 'UNKNOWN',
+    desired_status VARCHAR(32) NOT NULL DEFAULT 'RUNNING',
+    last_heartbeat_at DATETIME DEFAULT NULL,
+    heartbeat_payload_json JSON DEFAULT NULL,
+    last_error_message VARCHAR(1000) DEFAULT NULL,
+    owner_name VARCHAR(128) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_cdp_warehouse_stream_job_instance (tenant_id, pipeline_key, job_key),
+    INDEX idx_cdp_warehouse_stream_job_status (tenant_id, runtime_status, desired_status),
+    INDEX idx_cdp_warehouse_stream_job_heartbeat (tenant_id, last_heartbeat_at),
+    INDEX idx_cdp_warehouse_stream_job_engine (tenant_id, engine_type, engine_job_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse external realtime stream job runtime control state';
+
+CREATE TABLE IF NOT EXISTS cdp_warehouse_stream_job_action (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    pipeline_key VARCHAR(128) NOT NULL,
+    job_key VARCHAR(128) NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    requested_by VARCHAR(128) NOT NULL,
+    reason VARCHAR(512) NOT NULL,
+    requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    acknowledged_at DATETIME DEFAULT NULL,
+    completed_at DATETIME DEFAULT NULL,
+    result_message VARCHAR(1000) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_cdp_warehouse_stream_job_action_target (tenant_id, pipeline_key, job_key, status, requested_at),
+    INDEX idx_cdp_warehouse_stream_job_action_requester (tenant_id, requested_by, requested_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse external realtime stream job operator action audit';

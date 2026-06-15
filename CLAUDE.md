@@ -9,9 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd backend
 mvn clean install -DskipTests          # build all modules
 mvn clean install                      # build with tests
-cd canvas-engine && mvn spring-boot:run # start engine on :8080
-mvn test -pl canvas-engine -Dtest=ClassName    # run single test class
-mvn test -pl canvas-engine -Dtest=ClassName#methodName  # run single test method
+mvn -f canvas-boot/pom.xml spring-boot:run # start backend on :8080
+mvn test -pl canvas-boot -am -Dtest=ClassName    # run single test class
+mvn test -pl canvas-boot -am -Dtest=ClassName#methodName  # run single test method
 ```
 
 ### Frontend (React + Vite)
@@ -28,7 +28,7 @@ npm run test:watch # vitest watch mode
 ```bash
 docker compose up -d   # MySQL 8.0 (:3306), Redis (:6379), RocketMQ (:9876)
 ```
-Flyway migrations auto-run on startup (`backend/canvas-engine/src/main/resources/db/migration/`, 81 files V1–V81).
+Flyway migrations auto-run on startup from the current runtime resources (`backend/canvas-boot/src/main/resources/db/migration/`).
 
 ## Architecture
 

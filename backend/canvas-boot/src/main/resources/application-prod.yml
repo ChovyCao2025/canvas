@@ -1,0 +1,87 @@
+spring:
+  datasource:
+    # Production database credentials must come from Secret-backed environment variables.
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:33}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:8}
+  flyway:
+    # Production disables baseline-on-migrate by default to avoid masking unmanaged schemas.
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:false}
+    placeholder-replacement: false
+  data:
+    redis:
+      # Redis endpoint/password are required in production for route registry and runtime locks.
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD}
+
+canvas:
+  frontend:
+    # Used in generated links, CORS expectations, and frontend runtime configuration.
+    api-base-url: ${CANVAS_FRONTEND_API_BASE_URL}
+  cors:
+    # Production must provide explicit origins; wildcard is rejected by production guards.
+    allowed-origins: ${CANVAS_CORS_ALLOWED_ORIGINS}
+    allow-credentials: true
+  events:
+    # HMAC secret for public event ingestion.
+    report-secret: ${CANVAS_EVENT_REPORT_SECRET}
+  internal-api:
+    token: ${CANVAS_INTERNAL_API_TOKEN}
+  public-trigger:
+    secret: ${CANVAS_PUBLIC_TRIGGER_SECRET:${CANVAS_EVENT_REPORT_SECRET}}
+  secret-cipher:
+    key: ${CANVAS_SECRET_CIPHER_KEY}
+  jwt:
+    secret: ${CANVAS_JWT_SECRET}
+  marketing:
+    content:
+      asset-upload:
+        # Provider callbacks and S3 object storage are explicit prod integrations.
+        webhook-secret: ${CANVAS_MARKETING_ASSET_UPLOAD_WEBHOOK_SECRET}
+        webhook-tolerance-seconds: ${CANVAS_MARKETING_ASSET_UPLOAD_WEBHOOK_TOLERANCE_SECONDS:300}
+        s3:
+          enabled: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ENABLED:false}
+          endpoint: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ENDPOINT:}
+          region: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_REGION:us-east-1}
+          bucket: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_BUCKET:}
+          access-key: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ACCESS_KEY:}
+          secret-key: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_SECRET_KEY:}
+          key-prefix: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_KEY_PREFIX:}
+          path-style: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_PATH_STYLE:true}
+          public-base-url: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_PUBLIC_BASE_URL:}
+        cleanup:
+          enabled: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_ENABLED:false}
+          tenant-id: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_TENANT_ID:0}
+          limit: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_LIMIT:100}
+          fixed-delay-ms: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_FIXED_DELAY_MS:60000}
+          actor: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_ACTOR:asset-upload-cleanup-scheduler}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Prometheus is exposed for cluster scraping; sensitive details stay protected below.
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    # Public API docs are disabled in production.
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+rocketmq:
+  # RocketMQ nameserver and groups are environment-scoped to avoid cross-cluster consumption.
+  name-server: ${ROCKETMQ_NAME_SERVER}
+  producer:
+    group: ${ROCKETMQ_PRODUCER_GROUP:PID_CANVAS_ENGINE}
+  consumer:
+    group: ${ROCKETMQ_CONSUMER_GROUP:GID_CANVAS_ENGINE}

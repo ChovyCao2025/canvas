@@ -18,21 +18,21 @@
               "key": "new-user-welcome",
               "title": "New user welcome journey",
               "riskLevel": "LOW",
-              "requiredPlugins": ["message", "coupon"],
+              "requiredPlugins": ["canvas-plugin-webhook", "canvas-plugin-coupon", "canvas-plugin-message"],
               "docs": "docs/open-source/templates/new-user-welcome.md"
             },
             {
               "key": "coupon-approval-release",
               "title": "Coupon approval release",
               "riskLevel": "HIGH",
-              "requiredPlugins": ["coupon", "approval", "message"],
+              "requiredPlugins": ["canvas-plugin-coupon", "canvas-plugin-approval", "canvas-plugin-message"],
               "docs": "docs/open-source/templates/coupon-approval-release.md"
             },
             {
               "key": "risk-blocked-outreach",
               "title": "Risk-blocked outreach",
               "riskLevel": "HIGH",
-              "requiredPlugins": ["risk-check", "message"],
+              "requiredPlugins": ["canvas-plugin-risk", "canvas-plugin-message"],
               "docs": "docs/open-source/templates/risk-blocked-outreach.md"
             }
           ]
@@ -53,12 +53,12 @@
         "jsonBody": {
           "status": "SUCCESS",
           "plugins": [
-            { "key": "webhook", "enabled": true, "mode": "mock" },
-            { "key": "message", "enabled": true, "mode": "mock" },
-            { "key": "coupon", "enabled": true, "mode": "mock" },
-            { "key": "approval", "enabled": true, "mode": "mock" },
-            { "key": "ai", "enabled": true, "mode": "mock" },
-            { "key": "risk-check", "enabled": true, "mode": "mock" }
+            { "key": "canvas-plugin-webhook", "enabled": true, "mode": "mock" },
+            { "key": "canvas-plugin-message", "enabled": true, "mode": "mock" },
+            { "key": "canvas-plugin-coupon", "enabled": true, "mode": "mock" },
+            { "key": "canvas-plugin-approval", "enabled": true, "mode": "mock" },
+            { "key": "canvas-plugin-ai", "enabled": true, "mode": "mock" },
+            { "key": "canvas-plugin-risk", "enabled": true, "mode": "mock" }
           ]
         }
       }

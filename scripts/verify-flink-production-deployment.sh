@@ -146,18 +146,19 @@ require_secret_contract() {
   log "PASS runtime Secret key contract is present in example and static submitter"
 }
 
-# Confirm the Java cutover gate and runbook require the same pipeline set as deployment manifests.
+# Confirm the deployment gate surfaces require the same pipeline set.
 require_cutover_gate_pipelines() {
-  local service="backend/canvas-engine/src/main/java/org/chovy/canvas/domain/warehouse/CdpWarehouseRealtimeCutoverReadinessService.java"
   local runbook="docs/runbooks/flink-production-deployment.md"
+  local helm_values="deploy/helm/canvas/values.yaml"
+  local static_submitter="deploy/k8s/canvas-flink-job-submitter.yaml"
   for pipeline in "${REQUIRED_PIPELINES[@]}"; do
-    require_contains "${service}" "\"${pipeline}\""
+    require_contains "${helm_values}" "- ${pipeline}"
+    require_contains "${static_submitter}" "--pipeline-key=${pipeline}"
     require_contains "${runbook}" "pipelineKey=${pipeline}"
   done
-  require_contains "${service}" "DEFAULT_REQUIRED_PIPELINES"
   require_contains "${runbook}" "status=PASS"
   require_contains "${runbook}" "allowed=true"
-  log "PASS cutover gate and runbook require all realtime warehouse pipelines"
+  log "PASS deployment gate surfaces require all realtime warehouse pipelines"
 }
 
 # Check that production Flink alert rules cover liveness, checkpointing, and backpressure risks.
@@ -204,7 +205,6 @@ main() {
     "deploy/k8s/canvas-flink-job-submitter.yaml"
     "deploy/k8s/canvas-flink-secret.example.yaml"
     "deploy/observability/prometheus/canvas-flink-alert-rules.yml"
-    "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/warehouse/CdpWarehouseRealtimeCutoverReadinessService.java"
     "docs/runbooks/flink-production-deployment.md"
   )
   for file in "${required_files[@]}"; do

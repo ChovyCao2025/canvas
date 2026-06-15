@@ -78,35 +78,484 @@ When a new session starts:
 
 | Field | Value |
 | --- | --- |
-| Overall state | G10 public extension/API seed verified after G9 execution integration, OSG-C07 plugin registry ownership decision, OSG-W09/10/11/12 ecosystem backend closures, OSG-C05B demo profile mirror closure, OSG-W14 playground flow closure, DDD-E01/E02/E03/E04 read-only explorer wave closure, DDD-C09A cutover preflight tooling closure, DDD-C09B/C09C/C09D/C09E/C09F/C09G/C09H canvas-web compatibility test seed closures, DDD-C09I cutover route gap report tooling closure, DDD-C09J BI catalog production controller seed closure, DDD-C09L conversation production wiring recovery closeout, DDD-C09K conversation production controller seed closeout, DDD-C09M risk decision controller seed closeout, DDD-C09N marketing campaign controller seed closeout, DDD-C09O CDP user tag controller seed closeout, DDD-C09P execution controller seed recovery closeout, DDD-C09Q CDP warehouse readiness controller seed closeout, DDD-C09R Canvas project-folder metadata controller seed closeout, DDD-C09S Canvas version-read controller seed closeout, DDD-C09T Canvas lifecycle controller seed closeout, DDD-C09U Meta node-type catalog controller seed closeout, DDD-C09V Warehouse realtime cutover-readiness controller seed closeout, DDD-C09W Risk scene catalog controller seed recovery closeout, DDD-C09X Risk list catalog controller seed closeout, DDD-C09Y Risk strategy list controller seed closeout, DDD-C09Z BI dataset read controller seed closeout, DDD-C09AA BI chart read controller seed closeout, DDD-C09AB BI dashboard read controller seed closeout, DDD-C09AC BI query dataset catalog route seed coordinator recovery closeout, DDD-C09AD BI dashboard preset catalog route seed closeout, DDD-C09AE BI quick-engine capacity read route seed closeout, DDD-C09AF BI quick-engine capacity policy POST route seed closeout, DDD-C09AG BI chart reference impact route seed closeout, and DDD-C09AH paused for new-window strategy handoff |
-| Current readiness | R5 execution context integrated; G10 seed evidence is real for execution plugin, canvas DSL/template, and web compatibility named tests |
-| Current backend target | DDD-C09 final cutover remains blocked by production canvas-web controller/endpoint gaps, bridge decisions, and ownership rows; next action is strategy choice for BI favorites-only versus larger BI resource operations batch |
-| Current write mode | paused by user request; no code-writing worker is running; DDD-C09AH remains as NEEDS_CONTEXT handoff marker |
-| Next coordinator action | new window should read DDD-C09AH handoff evidence, decide whether to resume favorites-only or supersede with larger BI resource operations batch, then update state before writing code |
+| Overall state | DDD-C09 route parity advanced through DDD-C09DU Architecture migration candidate route closeout |
+| Current readiness | R5 execution context integrated; DDD-C09DU evidence verified for platform application/web compatibility and preflight movement |
+| Current backend target | DDD-C09 final cutover remains blocked by production canvas-web controller/endpoint gaps; next preflight top gap is `route:/canvas/batch` |
+| Current write mode | No active dispatch after DDD-C09DU closeout; next code-writing batch must reserve exact scope and spawn a real worker before RUNNING |
+| Next coordinator action | reserve the next clear preflight route batch after fresh coordination checks; keep worker sidecar bounded and coordinator critical path local |
 | Highest safe parallelism now | shared workspace mode allows one exact-scope code-writing worker plus read-only reviewers; do not start DDD-C09 until G12 blockers are resolved |
 
 ## Active Dispatch Registry
 
+none; `dispatch-state.json` activeDispatches is empty after DDD-C09DU closeout.
+
+Latest closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09DU-architecture-migration-candidates-route-20260615-075000
+task id: DDD-C09DU
+status: DONE_WITH_CONCERNS
+worker: Leibniz 019ec888-e5f9-76e2-82ba-233801418d27 timed out once, left no normal packet, was closed with previous_status running, and later emitted shutdown; coordinator completed exact scope locally
+mode: code-writing
+scope:
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/platform/TechnicalMigrationCandidateController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/platform/TechnicalMigrationCandidateControllerCompatibilityTest.java
+result: closed after adding final-module support for `POST /architecture/migration-candidates/evidence`; RED failed on missing controller; web compatibility test passed 2/2 with `-am`; platform application test passed 3/3; production compile passed; fresh preflight reports current canvas-web 89 controllers / 791 endpoints and next top gap `route:/canvas/batch`
+accepted concerns: no normal worker packet before shutdown; final controller is a compatibility route over existing platform application service; global cutover remains blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09DU-architecture-migration-candidates-route-20260615-075000/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09DT-ops-canvas-template-review-routes-20260615-074000
+task id: DDD-C09DT
+status: DONE_WITH_CONCERNS
+worker: Russell 019ec880-a323-7143-b937-eb9ccaf40c23 completed sidecar investigation and was closed; coordinator completed the true old OpsController canvas-template/review route remnants locally
+mode: code-writing
+scope:
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CanvasCompatibilityApplicationService.java
+  backend/canvas-context-canvas/src/test/java/org/chovy/canvas/canvas/application/CanvasCompatibilityApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CanvasController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/canvas/CanvasControllerCompatibilityTest.java
+  tools/program-coordination/cutover-compatibility-preflight.test.mjs
+result: closed after adding final-module support for `GET /canvas/templates`, `POST /canvas/{id}/save-as-template`, `POST /canvas/from-template/{templateId}`, and `GET /canvas/pending-reviews`; application test passed 4/4; web compatibility test passed 10/10 with `-am`; production compile passed; node preflight tests passed 7/7; fresh preflight reports current canvas-web 88 controllers / 790 endpoints and next top gap `route:/architecture`
+accepted concerns: deterministic in-memory template/review compatibility seed only; durable template persistence and approval workflow parity remain broader DDD work; global cutover remains blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09DT-ops-cache-invalidate-route-20260615-074000/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09DT-ops-canvas-template-review-routes-20260615-074000/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09DS-canvas-collaboration-summary-route-20260615-072900
+task id: DDD-C09DS
+status: DONE_WITH_CONCERNS
+worker: Hilbert 019ec876-e7bb-7d52-9e13-3cc6c173120d completed exact-scope implementation and was closed; Einstein 019ec876-275e-77d3-a8e9-2af5bcbe2024 completed read-only route contract analysis
+mode: code-writing
+scope:
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CanvasCollaborationFacade.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CanvasCollaborationApplicationService.java
+  backend/canvas-context-canvas/src/test/java/org/chovy/canvas/canvas/application/CanvasCollaborationApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CanvasCollaborationController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/canvas/CanvasCollaborationControllerCompatibilityTest.java
+result: closed after porting `GET /canvas/{canvasId}/collaboration/summary` into final modules; application test passed 2/2; web compatibility test passed 3/3 with `-am`; production compile passed; fresh preflight reports current canvas-web 88 controllers / 786 endpoints and next top gap `family:Ops`
+accepted concerns: deterministic in-memory collaboration summary seed only; durable old summary repository semantics and global route parity remain blocked; standalone `canvas-web` test without `-am` remains affected by existing dirty-tree module dependency state
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09DS-canvas-collaboration-summary-route-20260615-072900/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09DS-canvas-collaboration-summary-route-20260615-072900/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09DR-preflight-split-controller-coverage-20260615-072030
+task id: DDD-C09DR
+status: DONE_WITH_CONCERNS
+worker: Rawls 019ec870-8994-77e3-82e0-15e670ae591d completed and was closed; Pauli 019ec86f-fe68-7200-9f73-f817916be959 completed read-only route comparison and was closed
+mode: code-writing
+scope:
+  tools/program-coordination/cutover-compatibility-preflight.mjs
+  tools/program-coordination/cutover-compatibility-preflight.test.mjs
+result: closed after meaningful RED/GREEN tooling fix for split final controller route coverage; node preflight tests 6/6 passed; fresh preflight removed the false `family:Canvas` gap and now reports `family:CanvasCollaboration` as top gap with current canvas-web 87 controllers / 785 endpoints
+accepted concerns: global DDD-C09 cutover remains blocked by real controller/endpoint count gaps; static annotation scanner still does not cover complex constant-composed or runtime-registered routes
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09DR-preflight-split-controller-coverage-20260615-072030/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09DR-preflight-split-controller-coverage-20260615-072030/coordinator-closeout.md
+```
+
+```text
+dispatch id: dispatch-DDD-C09BP-public-ingress-routes-20260614-115134
+task id: DDD-C09BP
+status: DONE_WITH_CONCERNS
+worker: Herschel 019ec449-327a-7142-960b-87dd888bb8da returned DONE and was closed
+mode: code-writing
+scope:
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/PublicIngressFacade.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/PublicIngressApplicationService.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/PublicIngressCatalog.java
+  backend/canvas-platform/src/test/java/org/chovy/canvas/platform/application/PublicIngressApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/publicingress/PublicIngressController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/publicingress/PublicIngressControllerCompatibilityTest.java
+result: closed after Public Ingress application test 2/2, Public Ingress web controller test 3/3, production compile, preflight endpoint movement to canvas-web 559 with `route:/public` removed from top candidates, strict old-coupling scan clean, worker-return evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic Public Ingress compatibility seed only; durable marketing form persistence, WhatsApp verification/signature behavior, asset callback handling, monitoring ingestion, external provider behavior, and global route parity remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BP-public-ingress-routes-20260614-115134/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BP-public-ingress-routes-20260614-115134/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BP-public-ingress-routes-20260614-115134/coordinator-closeout.md
+```
+
+```text
+dispatch id: dispatch-DDD-C09BO-ops-routes-20260614-111207
+task id: DDD-C09BO
+status: DONE_WITH_CONCERNS
+worker: Plato 019ec421-7eb1-79e2-a8db-5747f4f29a74 returned DONE_WITH_CONCERNS; coordinator used actual tool id despite mismatched Sagan id in returned packet text
+mode: code-writing
+scope:
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/OpsFacade.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/OpsApplicationService.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/OpsCatalog.java
+  backend/canvas-platform/src/test/java/org/chovy/canvas/platform/application/OpsApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/ops/OpsController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/ops/OpsControllerCompatibilityTest.java
+result: closed after Ops application test 3/3, Ops web controller test 3/3, production compile, preflight endpoint movement to canvas-web 551 with `route:/ops` removed from top candidates, strict old-coupling scan clean, worker-return evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic Ops compatibility seed only; Plato packet included mismatched self-reported Sagan worker id; durable old cache/runtime/canvas lifecycle/audit/notification parity and global route parity remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BO-ops-routes-20260614-111207/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BO-ops-routes-20260614-111207/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BO-ops-routes-20260614-111207/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BN-webhooks-routes-20260614-104200
+task id: DDD-C09BN
+status: DONE_WITH_CONCERNS
+worker: Faraday 019ec406-f849-74d0-9c0f-db9a631c9464 returned DONE; coordinator integrated a small deliveries facade signature fix and reran fresh verification
+mode: code-writing
+scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWebhookFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWebhookApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWebhookCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpWebhookApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWebhookController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpWebhookControllerCompatibilityTest.java
+result: closed after Webhooks application test 2/2, Webhooks web controller test 3/3, production compile, preflight endpoint movement to canvas-web 542 with `route:/cdp/webhooks` removed from top candidates, strict old-coupling scan clean, worker-return evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic Webhooks compatibility seed only; durable webhook persistence/dispatcher/secret/delivery-log parity and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BN-webhooks-routes-20260614-104200/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BN-webhooks-routes-20260614-104200/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BN-webhooks-routes-20260614-104200/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BM-computed-tags-routes-20260614-102400
+task id: DDD-C09BM
+status: DONE_WITH_CONCERNS
+worker: Hegel 019ec3f6-6096-7c31-bd20-405a0cc78f1a timed out once with no normal packet; close_agent returned previous_status running and shutdown notification followed; coordinator kept critical path local without idle polling
+mode: code-writing
+scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpComputedTagFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpComputedTagApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpComputedTagCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpComputedTagApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpComputedTagController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpComputedTagControllerCompatibilityTest.java
+result: closed after Computed Tags application test 2/2, Computed Tags web controller test 3/3, production compile, preflight endpoint movement to canvas-web 533 with `route:/cdp/computed-tags` removed from top candidates, strict old-coupling scan clean, worker-return concern evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic Computed Tags compatibility seed only; no normal Hegel packet; durable computed tag persistence/scheduler/lineage parity and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BM-computed-tags-routes-20260614-102400/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BM-computed-tags-routes-20260614-102400/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BM-computed-tags-routes-20260614-102400/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500
+task id: DDD-C09BL
+status: DONE_WITH_CONCERNS
+worker: Dewey 019ec3e3-c2b2-7be2-80ff-881f2ed51558 timed out once with no normal packet; close_agent returned previous_status running and shutdown notification followed; coordinator kept critical path local without idle polling
+mode: code-writing
+scope:
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CreatorCollaborationFacade.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CreatorCollaborationApplicationService.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/domain/CreatorCollaborationCatalog.java
+  backend/canvas-context-canvas/src/test/java/org/chovy/canvas/canvas/application/CreatorCollaborationApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CreatorCollaborationController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/canvas/CreatorCollaborationControllerCompatibilityTest.java
+result: closed after Creator Collaboration application test 2/2, Creator Collaboration web controller test 3/3, production compile, preflight endpoint movement to canvas-web 524 with `route:/canvas/creator-collaboration` removed from top candidates, strict old-coupling scan clean, worker-return concern evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic Creator Collaboration compatibility seed only; no normal Dewey packet; durable collaboration/provider mutation persistence parity and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500
+task id: DDD-C09BK
+status: DONE_WITH_CONCERNS
+worker: Bernoulli 019ec3d3-7e2e-77e3-8bc2-23fa33accf98 timed out once with no normal packet; close_agent returned previous_status running and shutdown notification followed; coordinator kept critical path local without idle polling
+mode: code-writing
+scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehouseTableFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehouseTableApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehouseTableCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpWarehouseTableApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehouseTableController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpWarehouseTableControllerCompatibilityTest.java
+result: closed after Warehouse Tables application test 2/2, Warehouse Tables web controller test 3/3, production compile, preflight endpoint movement to canvas-web 515 with `route:/warehouse/tables` removed from top candidates, strict old-coupling scan clean, worker-return concern evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic Warehouse Tables compatibility seed only; no normal Bernoulli packet; durable table governance/drift parity and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800
+task id: DDD-C09BJ
+status: DONE_WITH_CONCERNS
+worker: Leibniz 019ec3ae-ca6e-74c3-948e-07a1ba744716 failed with platform concurrency stream-disconnect notification and no normal packet; coordinator kept critical path local without idle polling
+mode: code-writing
+scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/AbExperimentFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/AbExperimentApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/AbExperimentCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/AbExperimentApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/AbExperimentController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/AbExperimentControllerCompatibilityTest.java
+result: closed after AB Experiments application test 2/2, AB Experiments web controller test 3/3, production compile, preflight endpoint movement to canvas-web 506 with `route:/canvas/ab-experiments` removed from top candidates, strict old-coupling scan clean, worker-return concern evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic AB Experiments compatibility seed only; no normal Leibniz packet due account concurrency limit; durable AB persistence/governance parity and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000
+task id: DDD-C09BI
+status: DONE_WITH_CONCERNS
+worker: Averroes 019ec39f-b26f-79b2-a81d-3f31f026249a returned DONE via close_agent after one short wait timeout; coordinator kept critical path local without idle polling
+mode: code-writing
+scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/ProgrammaticDspFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/ProgrammaticDspApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/ProgrammaticDspCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/ProgrammaticDspApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/ProgrammaticDspController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/ProgrammaticDspControllerCompatibilityTest.java
+result: closed after Programmatic DSP application test 3/3, Programmatic DSP web controller test 3/3, production compile, preflight endpoint movement to canvas-web 497 with `route:/canvas/programmatic-dsp` removed from top candidates, strict old-coupling scan clean, worker-return evidence, and coordinator closeout evidence
+accepted concerns: compact deterministic Programmatic DSP compatibility seed only; durable DSP persistence/provider semantics and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BH-audience-routes-20260614-083805
+task id: DDD-C09BH
+status: DONE_WITH_CONCERNS
+worker: Turing 019ec392-b466-7330-b3bd-42e88eeaa730 returned matching packet and was closed; coordinator kept critical path local without idle polling
+mode: code-writing
+scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/AudienceFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/AudienceApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/AudienceCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/AudienceApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/AudienceController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/AudienceControllerCompatibilityTest.java
+result: closed after Audience application test 2/2, Audience web controller test 3/3, production compile, preflight endpoint movement to canvas-web 487 with `route:/canvas/audiences` removed from top candidates, strict old-coupling scan clean, and closeout evidence
+accepted concerns: compact deterministic audience compatibility seed only; durable audience persistence/compute/stat parity and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BH-audience-routes-20260614-083805/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BH-audience-routes-20260614-083805/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BG-analytics-routes-20260614-082400
+task id: DDD-C09BG
+status: DONE_WITH_CONCERNS
+worker: Jason 019ec388-0fb3-7302-8bfa-9c5d0b15b566 timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after sidecar worker dispatch, local RED/GREEN recovery without idle waiting, Analytics application test 2/2, Analytics web controller test 2/2, production compile, preflight endpoint movement to canvas-web 477 with `route:/analytics` removed from top candidates, strict old-coupling scan clean, and closeout evidence
+accepted concerns: no normal Jason worker-return packet; compact deterministic analytics compatibility seed only; durable analytics persistence and global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BG-analytics-routes-20260614-082400/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BG-analytics-routes-20260614-082400/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BF-marketing-integrations-routes-20260614-081400
+task id: DDD-C09BF
+status: DONE_WITH_CONCERNS
+worker: Hubble 019ec379-5f19-7993-86b9-eb6bed291425 timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after one bounded wait, reserved-path/evidence inspection instead of idle polling, local RED/GREEN recovery, Marketing integration application test 1/1, Marketing integration web controller test 2/2, production compile, preflight endpoint movement to canvas-web 467 with `route:/canvas/marketing-integrations` removed from top candidates, strict old-coupling scan clean, and closeout evidence
+accepted concerns: no normal Hubble worker-return packet; compact deterministic marketing integration compatibility seed only; durable contract/probe persistence and external provider parity remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BF-marketing-integrations-routes-20260614-081400/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BF-marketing-integrations-routes-20260614-081400/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09BE-warehouse-privacy-routes-20260614-080300
+task id: DDD-C09BE
+status: DONE_WITH_CONCERNS
+worker: Mendel 019ec36e-7f11-73f3-b17c-d0ec894d21f7 returned NEEDS_CONTEXT due missing inventory rows; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, Mendel NEEDS_CONTEXT with no edits, local RED/GREEN recovery, CDP privacy application test 1/1, CDP privacy web controller test 2/2, production compile, preflight endpoint movement to canvas-web 456 with `route:/warehouse/privacy` removed from top candidates, strict old-coupling scan clean, and closeout evidence
+accepted concerns: worker handoff missed exact inventory rows; compact deterministic warehouse privacy compatibility seed only; durable privacy erasure/tombstone persistence/execution parity and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09BE-warehouse-privacy-routes-20260614-080300/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09BE-warehouse-privacy-routes-20260614-080300/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AZ-warehouse-realtime-routes-20260614-063700
+task id: DDD-C09AZ
+status: DONE_WITH_CONCERNS
+worker: Einstein 019ec324-a1e0-7a10-ba6e-f901dbe261ca timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, one timeout followed by reserved-path/evidence inspection instead of idle polling, local TDD recovery, focused JDK 21 Maven 8/8, preflight endpoint movement to canvas-web 356 with route:/warehouse/realtime removed from top candidates, strict old-coupling scan clean, and closeout evidence
+accepted concerns: no normal Einstein worker-return packet; compact in-memory warehouse realtime compatibility seed only; durable realtime warehouse persistence/external engine control and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AZ-warehouse-realtime-routes-20260614-063700/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AZ-warehouse-realtime-routes-20260614-063700/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AY-admin-platform-routes-20260614-062800
+task id: DDD-C09AY
+status: DONE_WITH_CONCERNS
+worker: Descartes 019ec316-70c5-7341-b9de-9b7911bd91ad timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, one timeout followed by changed-path/evidence inspection instead of idle polling, RED compile failure confirmation, local TDD recovery, focused JDK 21 Maven 8/8, preflight endpoint movement to canvas-web 336 with route:/admin gap removed from top candidates, strict old-coupling scan clean, coordination validators, and closeout evidence
+accepted concerns: no normal Descartes worker-return packet; compact in-memory admin platform compatibility seed only; durable admin persistence/permissions/audit and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AY-admin-platform-routes-20260614-062800/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AY-admin-platform-routes-20260614-062800/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AX-marketing-content-routes-20260614-061200
+task id: DDD-C09AX
+status: DONE_WITH_CONCERNS
+worker: Planck 019ec30b-7810-7d83-ae44-e550acadd158 timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, one timeout followed by changed-path/evidence inspection instead of idle polling, RED compile failure confirmation, local TDD recovery, focused JDK 21 Maven 12/12, preflight endpoint movement to canvas-web 315 with route:/marketing gap removed from top candidates, strict old-coupling scan clean, coordination validators, and closeout evidence
+accepted concerns: no normal Planck worker-return packet; compact in-memory marketing content compatibility seed only; durable asset/template/entry/release persistence and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AX-marketing-content-routes-20260614-061200/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AX-marketing-content-routes-20260614-061200/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AW-ai-routes-20260614-060200
+task id: DDD-C09AW
+status: DONE_WITH_CONCERNS
+worker: Goodall 019ec2fe-f4c2-7242-8d30-a5bbc875a3c7 timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, one timeout followed by changed-path/evidence inspection instead of idle polling, RED compile failure confirmation, local TDD recovery, focused JDK 21 Maven 7/7, preflight endpoint movement to canvas-web 294 with /ai gap removed from top candidates, strict old-coupling scan clean, coordination validators, and closeout evidence
+accepted concerns: no normal Goodall worker-return packet; compact in-memory AI compatibility seed only; durable AI decision/prediction/template/provider/model registry semantics and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AW-ai-routes-20260614-060200/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AW-ai-routes-20260614-060200/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AV-search-marketing-routes-20260614-053900
+task id: DDD-C09AV
+status: DONE_WITH_CONCERNS
+worker: Ohm 019ec2ee-1c49-7290-987c-88cd59dbf8dc timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, one timeout followed by changed-path/evidence inspection instead of idle polling, local TDD recovery, focused JDK 21 Maven 15/15, preflight endpoint movement to canvas-web 271 with /canvas/search-marketing gap removed, strict old-coupling scan clean, coordination validators, and closeout evidence
+accepted concerns: no normal Ohm worker-return packet; compact in-memory search marketing seed only; durable provider/sync/mutation/reconciliation/impact parity and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AV-search-marketing-routes-20260614-053900/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AV-search-marketing-routes-20260614-053900/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AU-growth-activities-routes-20260614-052400
+task id: DDD-C09AU
+status: DONE_WITH_CONCERNS
+worker: Harvey 019ec2df-9cdb-7023-a6ab-5a0827cac555 timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, one timeout followed by changed-path/evidence inspection instead of idle polling, local recovery using Harvey's RED tests, focused JDK 21 Maven 14/14, preflight endpoint movement to canvas-web 247 with /canvas/growth-activities gap removed, strict old-coupling scan clean, coordination validators, and closeout evidence
+accepted concerns: no normal Harvey worker-return packet; compact in-memory growth activity seed only; durable reward/referral/task/provider parity and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AU-growth-activities-routes-20260614-052400/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AU-growth-activities-routes-20260614-052400/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AT-marketing-monitoring-routes-20260614-050218
+task id: DDD-C09AT
+status: DONE_WITH_CONCERNS
+worker: Fermat 019ec2cd-059f-7e00-9fd4-1ef13b4f9b95 timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: none; coordinator recovery with fresh verification
+result: closed after real worker dispatch, one timeout followed by changed-path/evidence inspection instead of idle polling, local TDD recovery, focused JDK 21 Maven 14/14, preflight endpoint movement to canvas-web 222 with /canvas/marketing-monitoring gap removed, strict old-coupling scan clean, coordination validators, and closeout evidence
+accepted concerns: no normal Fermat worker-return packet; compact in-memory marketing monitoring seed only; durable provider/polling/anomaly/webhook/external notification parity and broader global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AT-marketing-monitoring-routes-20260614-050218/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AT-marketing-monitoring-routes-20260614-050218/coordinator-recovery-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342
+task id: DDD-C09AN
+status: DONE_WITH_CONCERNS
+worker: Nietzsche 019ec243-f542-7333-a960-0488ee25d2ee returned DONE after coordinator RED feedback and verification
+reviewer: Kuhn 019ec253-33c6-72f0-89ed-288065f1f51e PASS
+result: closed after real worker dispatch, one timeout followed by useful coordinator inspection instead of idle polling, RED feedback loops, focused JDK 21 Maven 75/75, preflight endpoint movement to canvas-web 121 and route:/canvas/bi 81, strict old-coupling scan clean, coordination validators, scoped diff check, and Kuhn PASS review
+accepted concerns: compact in-memory chart lifecycle version catalog only; restore of archived charts remains outside this compact route seed; broader BI route/global cutover readiness remains blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342/quality-review.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AM-bi-permission-routes-20260614-011700
+task id: DDD-C09AM
+status: DONE_WITH_CONCERNS
+worker: Euclid 019ec209-6650-7c33-adfb-c924da6a59ae timed out/no final worker-return packet; coordinator recovered exact scope
+reviewer: Mencius 019ec224-8c75-7782-a22d-121e4fc367f3 spawned read-only review while coordinator continued evidence/state work
+result: closed after coordinator recovery from RED tests and partial implementation, Mencius review fixes, focused JDK 21 Maven 72/72, preflight endpoint movement to canvas-web 117 and route:/canvas/bi 77, strict old-coupling scan clean, coordination validators, and scoped diff check
+accepted concerns: no normal Euclid worker-return packet; compact in-memory BI permission administration/request seed only; durable old-engine persistence semantics and broader BI route/global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AM-bi-permission-routes-20260614-011700/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AM-bi-permission-routes-20260614-011700/coordinator-recovery.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523
+task id: DDD-C09AL
+status: DONE_WITH_CONCERNS
+worker: Schrodinger 019ec1ca-a93c-70b2-833f-d5fa3b704b42 timed out/no return packet; coordinator recovered exact scope
+reviewer: Arendt 019ec1e4-0dfa-75c1-a8af-e0d6e2f15c4b PASS_WITH_CONCERNS; coordinator resolved reviewer concerns before closeout
+result: closed after coordinator recovery, focused JDK 21 Maven 68/68, preflight endpoint movement to canvas-web 105 and route:/canvas/bi 65, strict old-coupling scan clean, coordination validators, scoped diff check, and Arendt review
+accepted concerns: no normal Schrodinger worker-return packet; compact in-memory BI spreadsheet lifecycle seed only; durable old-engine spreadsheet persistence/version semantics and broader BI route/global cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523/reservation-note.md; docs/program-coordination/evidence/dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523/coordinator-recovery.md; docs/program-coordination/evidence/dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523/quality-review.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931
+task id: DDD-C09AK
+status: DONE_WITH_CONCERNS
+worker: Aquinas 019ec19b-ddd6-7282-8800-79da809fbea2 timed out/no return packet; coordinator recovered exact scope
+reviewer: Sartre 019ec1b7-d109-7693-ac30-939bba86b28f PASS
+result: closed after coordinator recovery, focused JDK 21 Maven 65/65, preflight endpoint movement to canvas-web 98 and route:/canvas/bi 58, forbidden-coupling scan clean, coordination validators, scoped diff check, and Sartre PASS review
+accepted concerns: no normal Aquinas worker-return packet; compact deterministic BI AI seed only; no durable AI/LLM integration; broader BI routes and global DDD-C09 cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931/coordinator-recovery.md; docs/program-coordination/evidence/dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931/quality-review.md; docs/program-coordination/evidence/dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AJ-bi-portal-bigscreen-routes-20260613-223000
+task id: DDD-C09AJ
+status: DONE_WITH_CONCERNS
+worker: Beauvoir 019ec16c-f604-7a23-b1d9-3a066e8e36f8 DONE
+reviewer: Boyle 019ec184-e15f-7470-9f08-e9c49b80364c timed out/no return packet; coordinator recovery review PASS_WITH_CONCERNS
+result: closed after Beauvoir DONE packet, focused JDK 21 Maven 62/62, preflight endpoint movement to canvas-web 93 and route:/canvas/bi 53, forbidden-coupling scan clean, coordination validators, scoped diff check, and coordinator recovery review
+accepted concerns: no normal Boyle reviewer packet; compact in-memory portal/big-screen lifecycle seed only; durable persistence/audit/auth parity and global DDD-C09 cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AJ-bi-portal-bigscreen-routes-20260613-223000/worker-return.md; docs/program-coordination/evidence/dispatch-DDD-C09AJ-bi-portal-bigscreen-routes-20260613-223000/quality-review.md; docs/program-coordination/evidence/dispatch-DDD-C09AJ-bi-portal-bigscreen-routes-20260613-223000/coordinator-closeout.md
+```
+
+Previous closed dispatch:
+
+```text
+dispatch id: dispatch-DDD-C09AI-bi-resource-operations-routes-20260613-213000
+task id: DDD-C09AI
+status: DONE_WITH_CONCERNS
+worker: James 019ec139-50cd-7ad0-8d90-352889a6cd9b timed out/no return packet; coordinator recovered exact scope
+reviewer: Kierkegaard 019ec156-1a03-77e0-9668-9e921daa4cf7 PASS_WITH_CONCERNS
+result: closed after coordinator recovery, focused JDK 21 Maven 59/59, preflight endpoint movement to canvas-web 79 and route:/canvas/bi 39, forbidden-coupling scan clean, coordination validators, scoped diff check, and Kierkegaard review
+accepted concerns: compact in-memory final-module seed only; lock expiry/token/actor enforcement not proven; durable persistence/audit parity and global DDD-C09 cutover readiness remain blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AI-bi-resource-operations-routes-20260613-213000/coordinator-recovery.md; docs/program-coordination/evidence/dispatch-DDD-C09AI-bi-resource-operations-routes-20260613-213000/quality-review.md
+```
+
+Previous closed dispatch:
+
 ```text
 dispatch id: dispatch-DDD-C09AH-bi-resource-favorite-routes-20260613-200108
 task id: DDD-C09AH
-status: NEEDS_CONTEXT
-worker: paused by user request after Dalton timeout; Descartes read-only selector completed and was closed
-mode: code-writing
-branch: main
-worktree: /Users/photonpay/project/canvas
-base SHA: 01aac65697d524f4cf2e92d954db088895631004
-integration target: DDD_FINAL_MODULE
-exact reserved files: backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java; backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceFavoriteCommand.java; backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceFavoriteView.java; backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiResourceFavoriteCatalog.java; backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java; backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java; backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java; backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java; backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
-coordinator-owned exceptions: none
-gate at dispatch: R5 after DDD-C09AG BI chart reference impact route seed closeout; routeGapSummary top candidate remains route:/canvas/bi with 20 old controllers / 169 old endpoints and current canvas-web 1 controller / 22 endpoints
-last command/result: user instructed to stop goal execution and record current state for new-window recovery; Dalton code-writing worker was closed after timeout; Descartes read-only selector completed with DDD-C09AI BI resource operations recommendation and was closed
-evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AH-bi-resource-favorite-routes-20260613-200108/handoff-for-new-window.md
-next action: new window should first read handoff-for-new-window.md, decide whether to keep DDD-C09AH as favorites-only or supersede it with larger BI resource operations batch, then update dispatch-state/ledger before writing code
-rollback pointer: revert only the exact DDD-C09AH reserved BI API/domain/application/controller and BI test files
+status: DONE_WITH_CONCERNS
+worker: Dalton 019ec0e7-24a7-7261-adb2-883cc5e9dfa4 timed out/no return packet; coordinator recovered from current code evidence
+result: closed after current worktree proved favorites API/domain/application/controller/tests are present and focused JDK 21 Maven passed 56/56
+accepted concerns: no normal Dalton worker-return packet; attribution relies on current code, focused tests, and dispatch evidence; broader BI route parity remains blocked
+evidence path: docs/program-coordination/evidence/dispatch-DDD-C09AH-bi-resource-favorite-routes-20260613-200108/coordinator-recovery-closeout.md
 ```
 
-Latest closed dispatch:
+Previous closed dispatch:
 
 ```text
 dispatch id: dispatch-DDD-C09AG-bi-chart-reference-impact-route-20260613-191900
@@ -1269,6 +1718,157 @@ rollback pointer: backup/pre-ddd-osg-20260609-222054; revert DDD-C00 skeleton fi
 The following commands were last used to verify the coordination package:
 
 ```bash
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpWebhookApplicationServiceTest passed after DDD-C09BN with CdpWebhookApplicationServiceTest 2/2; BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpWebhookControllerCompatibilityTest test passed after DDD-C09BN with CdpWebhookControllerCompatibilityTest 3/3; reactor BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests passed after DDD-C09BN; reactor built through canvas-web production compile
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09BN with current canvas-web 33 controllers / 542 endpoints, route:/cdp/webhooks removed from reported top route gaps, route:/ops as next top gap, and cutoverReady false
+strict DDD-C09BN old-coupling rg scan over final Webhooks paths exited 1 with no matches for canvas-engine, legacy domain/dto/query/dal/engine packages, TenantContextResolver, old webhook services, old webhook mappers/DOs, or old webhook DTOs
+multi_agent_v1.close_agent Faraday 019ec406-f849-74d0-9c0f-db9a631c9464 returned previous_status DONE; coordinator integrated deliveries facade signature fix and reran verification
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpComputedTagApplicationServiceTest passed after DDD-C09BM with CdpComputedTagApplicationServiceTest 2/2; BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpComputedTagControllerCompatibilityTest test passed after DDD-C09BM with CdpComputedTagControllerCompatibilityTest 3/3; reactor BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests passed after DDD-C09BM; reactor built through canvas-web production compile
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09BM with current canvas-web 32 controllers / 533 endpoints, route:/cdp/computed-tags removed from reported top route gaps, route:/cdp/webhooks as next top gap, and cutoverReady false
+strict DDD-C09BM old-coupling rg scan over final Computed Tags paths exited 1 with no matches for canvas-engine, legacy domain/dto/query/dal/engine packages, TenantContextResolver, ComputedTagService, CdpLineageService, old computed tag DOs, or old computed tag mappers
+multi_agent_v1.wait_agent/close_agent Hegel 019ec3f6-6096-7c31-bd20-405a0cc78f1a: one bounded wait timed out; close_agent returned previous_status running and shutdown notification followed; no normal worker-return packet
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-canvas -Dtest=CreatorCollaborationApplicationServiceTest passed after DDD-C09BL with CreatorCollaborationApplicationServiceTest 2/2; BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CreatorCollaborationControllerCompatibilityTest test passed after DDD-C09BL with CreatorCollaborationControllerCompatibilityTest 3/3; reactor BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests passed after DDD-C09BL; reactor built through canvas-web production compile
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09BL with current canvas-web 31 controllers / 524 endpoints, route:/canvas/creator-collaboration removed from reported top route gaps, route:/cdp/computed-tags as next top gap, and cutoverReady false
+strict DDD-C09BL old-coupling rg scan over final Creator Collaboration paths exited 1 with no matches for canvas-engine, legacy domain/dto/query/dal/engine packages, TenantContextResolver, CreatorCollaborationService, or CreatorProviderMutationService
+multi_agent_v1.wait_agent/close_agent Dewey 019ec3e3-c2b2-7be2-80ff-881f2ed51558: one bounded wait timed out; close_agent returned previous_status running and shutdown notification followed; no normal worker-return packet
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpWarehouseTableApplicationServiceTest passed after DDD-C09BK with CdpWarehouseTableApplicationServiceTest 2/2; BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpWarehouseTableControllerCompatibilityTest test passed after DDD-C09BK with CdpWarehouseTableControllerCompatibilityTest 3/3; reactor BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests passed after DDD-C09BK; reactor built through canvas-web production compile
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09BK with current canvas-web 30 controllers / 515 endpoints, route:/warehouse/tables removed from reported top route gaps, route:/canvas/creator-collaboration as next top gap, and cutoverReady false
+strict DDD-C09BK old-coupling rg scan over final Warehouse Tables paths exited 1 with no matches for canvas-engine, legacy domain/dto/query/dal/engine packages, TenantContextResolver, or old warehouse table services
+multi_agent_v1.wait_agent/close_agent Bernoulli 019ec3d3-7e2e-77e3-8bc2-23fa33accf98: one bounded wait timed out; close_agent returned previous_status running and shutdown notification followed; no normal worker-return packet
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-marketing -Dtest=AbExperimentApplicationServiceTest passed after DDD-C09BJ with AbExperimentApplicationServiceTest 2/2; BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=AbExperimentControllerCompatibilityTest test passed after DDD-C09BJ with AbExperimentControllerCompatibilityTest 3/3; reactor BUILD SUCCESS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests passed after DDD-C09BJ; reactor built through canvas-web production compile
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09BJ with current canvas-web 29 controllers / 506 endpoints, route:/canvas/ab-experiments removed from reported top route gaps, route:/warehouse/tables as next top gap, and cutoverReady false
+strict DDD-C09BJ old-coupling rg scan over final AB Experiments paths exited 1 with no matches for canvas-engine, legacy domain/dto/query/dal/engine packages, TenantContextResolver, or old AB experiment services
+multi_agent_v1.close_agent Leibniz 019ec3ae-ca6e-74c3-948e-07a1ba744716 closed after subagent notification reported stream disconnected before completion due account concurrency limit; no normal worker-return packet
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-platform,canvas-web -am -Dtest=AdminPlatformApplicationServiceTest,AdminPlatformControllerCompatibilityTest test passed after DDD-C09AY coordinator recovery with AdminPlatformApplicationServiceTest 4/4 and AdminPlatformControllerCompatibilityTest 4/4; reactor BUILD SUCCESS
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AY with current canvas-web 21 controllers / 336 endpoints, route:/admin removed from top route gap candidates, and cutoverReady false
+strict DDD-C09AY old-coupling rg scan over final Admin Platform paths exited 1 with no matches for canvas-engine, legacy auth/domain/dto/query/dal packages, TenantContextResolver, or old admin services
+multi_agent_v1.close_agent Descartes 019ec316-70c5-7341-b9de-9b7911bd91ad returned previous_status running after one wait timeout and reserved-path/evidence inspection showed RED tests only and no normal worker-return packet
+multi_agent_v1.spawn_agent worker Descartes 019ec316-70c5-7341-b9de-9b7911bd91ad for DDD-C09AY spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AY . generated the canonical DDD-C09AY prompt successfully
+reserved dispatch-DDD-C09AY-admin-platform-routes-20260614-062800 with exact six-file Admin Platform route scope; worker spawn is next before RUNNING
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AY reservation after DDD-C09AX closeout with activeDispatches empty
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AX with current canvas-web 20 controllers / 315 endpoints and route:/admin 0/21 selected as next coarse gap
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=MarketingContentApplicationServiceTest,MarketingContentControllerCompatibilityTest,MarketingApiCompatibilityTest test passed after DDD-C09AX coordinator recovery with MarketingContentApplicationServiceTest 2/2, MarketingContentControllerCompatibilityTest 2/2, and MarketingApiCompatibilityTest 8/8; reactor BUILD SUCCESS
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AX with current canvas-web 20 controllers / 315 endpoints, route:/marketing removed from top route gap candidates, and cutoverReady false
+strict DDD-C09AX old-coupling rg scan over final Marketing Content context/web paths exited 1 with no matches for canvas-engine, legacy content domain/services, or TenantContextResolver references
+multi_agent_v1.close_agent Planck 019ec30b-7810-7d83-ae44-e550acadd158 returned previous_status running after one wait timeout and reserved-path/evidence inspection showed RED tests only and no normal worker-return packet
+multi_agent_v1.spawn_agent worker Planck 019ec30b-7810-7d83-ae44-e550acadd158 for DDD-C09AX spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AX . generated the canonical DDD-C09AX prompt successfully
+reserved dispatch-DDD-C09AX-marketing-content-routes-20260614-061200 with exact seven-file Marketing Content route scope; worker spawn is next before RUNNING
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AX reservation after DDD-C09AW closeout with activeDispatches empty
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AW with current canvas-web 19 controllers / 294 endpoints and route:/marketing 0/21 selected as next single-controller coarse gap
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-platform,canvas-web -am -Dtest=AiApplicationServiceTest,AiControllerCompatibilityTest test passed after DDD-C09AW coordinator recovery with AiApplicationServiceTest 3/3 and AiControllerCompatibilityTest 4/4; reactor BUILD SUCCESS
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AW with current canvas-web 19 controllers / 294 endpoints, /ai removed from top route gap candidates, and cutoverReady false
+strict DDD-C09AW old-coupling rg scan over final AI platform/web paths exited 1 with no matches for canvas-engine, legacy AI domain/services, or TenantContextResolver references
+node tools/program-coordination/check-dispatch-state.mjs . passed after DDD-C09AW coordinator recovery before state closeout
+bash docs/program-coordination/checks/program-coordination-checks.sh . passed after DDD-C09AW coordinator recovery before state closeout
+git diff --check -- DDD-C09AW reserved files and coordination files passed before state closeout
+multi_agent_v1.close_agent Goodall 019ec2fe-f4c2-7242-8d30-a5bbc875a3c7 returned previous_status running after one wait timeout and reserved-path/evidence inspection showed RED tests only and no normal worker-return packet
+multi_agent_v1.spawn_agent worker Goodall 019ec2fe-f4c2-7242-8d30-a5bbc875a3c7 for DDD-C09AW spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AW . generated the canonical DDD-C09AW prompt successfully
+reserved dispatch-DDD-C09AW-ai-routes-20260614-060200 with exact six-file AI route scope before worker spawn
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AW reservation after DDD-C09AV closeout with activeDispatches empty
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AV with current canvas-web 18 controllers / 271 endpoints and route:/ai 0/23 selected as next coarse gap
+exact AI target file absence checks returned missing for platform facade, application service, catalog, service test, web controller, and web compatibility test before reservation
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=SearchMarketingApplicationServiceTest,SearchMarketingControllerCompatibilityTest,MarketingApiCompatibilityTest test passed after DDD-C09AV coordinator recovery with 15/15 focused marketing tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AV with current canvas-web 18 controllers / 271 endpoints, /canvas/search-marketing removed from top route gap candidates, and cutoverReady false
+strict DDD-C09AV old-coupling rg scan over final search marketing context/web paths exited 1 with no matches for legacy marketing services, old domain package, canvas-engine, or TenantContextResolver references
+multi_agent_v1.close_agent Ohm 019ec2ee-1c49-7290-987c-88cd59dbf8dc returned previous_status running after one wait timeout and reserved-path/evidence inspection showed no worker file changes and no normal worker-return packet
+multi_agent_v1.spawn_agent worker Ohm 019ec2ee-1c49-7290-987c-88cd59dbf8dc for DDD-C09AV spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AV . generated the canonical DDD-C09AV prompt successfully
+reserved dispatch-DDD-C09AV-search-marketing-routes-20260614-053900 with exact seven-file Search Marketing route scope; worker spawn is next before RUNNING
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AV reservation after DDD-C09AU closeout with activeDispatches empty
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AU with current canvas-web 17 controllers / 247 endpoints and route:/canvas/search-marketing 0/24 selected as next coarse gap
+exact SearchMarketing target file absence checks returned missing for facade, application service, catalog, and web controller before reservation
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=GrowthActivityApplicationServiceTest,GrowthActivityControllerCompatibilityTest,MarketingApiCompatibilityTest test passed after DDD-C09AU coordinator recovery with 14/14 focused marketing tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AU with current canvas-web 17 controllers / 247 endpoints, /canvas/growth-activities removed from top route gap candidates, and cutoverReady false
+strict DDD-C09AU old-coupling rg scan over final growth activity context/web paths exited 1 with no matches for legacy marketing services, old domain package, canvas-engine, or TenantContextResolver references
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . plus scoped git diff --check passed before DDD-C09AU closeout state/ledger/evidence edits; rerun after state edit remains required before final claim
+multi_agent_v1.close_agent Harvey 019ec2df-9cdb-7023-a6ab-5a0827cac555 returned previous_status running after one wait timeout and reserved-path/evidence inspection showed tests only and no normal worker-return packet
+multi_agent_v1.spawn_agent worker Harvey 019ec2df-9cdb-7023-a6ab-5a0827cac555 for DDD-C09AU spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AU . generated the canonical DDD-C09AU prompt successfully
+reserved dispatch-DDD-C09AU-growth-activities-routes-20260614-052400 with exact seven-file Growth Activity route scope; worker spawn is next before RUNNING
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AU reservation
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed before DDD-C09AU reservation with current canvas-web 16 controllers / 222 endpoints and route:/canvas/growth-activities 0/25; cutoverReady false
+multi_agent_v1.spawn_agent explorer Carver 019ec2db-cf1f-7510-9ddb-e5163a47ff74 returned a read-only summary of all 25 legacy /canvas/growth-activities routes with no file edits
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=MarketingMonitoringApplicationServiceTest,MarketingMonitoringControllerCompatibilityTest,MarketingApiCompatibilityTest test passed after DDD-C09AT closeout edits with 14/14 focused marketing tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AT closeout edits with current canvas-web 16 controllers / 222 endpoints, /canvas/marketing-monitoring removed from top route gap candidates, and cutoverReady false
+strict DDD-C09AT old-coupling rg scan over final marketing context/web/test paths exited 1 with no matches after closeout edits
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . plus scoped git diff --check passed after DDD-C09AT closeout state/ledger/evidence edits
+multi_agent_v1.close_agent Fermat 019ec2cd-059f-7e00-9fd4-1ef13b4f9b95 returned previous_status running after one wait timeout and no reserved-file changes/evidence beyond reservation-note
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=MarketingMonitoringApplicationServiceTest,MarketingMonitoringControllerCompatibilityTest,MarketingApiCompatibilityTest test passed after DDD-C09AT coordinator recovery with 14/14 focused marketing tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed after DDD-C09AT coordinator recovery with current canvas-web 16 controllers / 222 endpoints, /canvas/marketing-monitoring removed from top route gap candidates, and cutoverReady false
+strict DDD-C09AT old-coupling rg scan over final marketing context/web/test paths found no legacy monitoring domain/service/TenantContextResolver references
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AT closeout state edit
+multi_agent_v1.spawn_agent worker Poincare 019ec27f-1092-70c0-bdb5-5a892a29f5be for DDD-C09AP spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AP . generated the canonical DDD-C09AP prompt successfully
+reserved dispatch-DDD-C09AP-bi-query-operations-routes-20260614-034200 with exact 35-file BI query operations route scope; worker spawn is next before RUNNING
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AP reservation
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed before DDD-C09AP reservation with current canvas-web 15 controllers / 136 endpoints and route:/canvas/bi 96 endpoints; cutoverReady false
+Godel 019ec272-d49b-7111-9e10-65aa370f4ada returned DDD-C09AO PASS_WITH_CONCERNS review with no code required fixes; evidence typo corrected
+DDD-C09AO active dispatch closed; dispatch-state activeDispatches cleared and workerBoard set DONE_WITH_CONCERNS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test passed during DDD-C09AO coordinator recovery with 77/77 focused tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed during DDD-C09AO coordinator recovery with current canvas-web 15 controllers / 136 endpoints and route:/canvas/bi 96 endpoints; cutoverReady false
+strict old-coupling scan for DDD-C09AO production BI paths found no old canvas-engine/domain/subscription/delivery service coupling
+multi_agent_v1.spawn_agent worker Boole 019ec264-48c0-7cb2-a55d-fb6ebbc367dd for DDD-C09AO spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AO . generated the canonical DDD-C09AO prompt successfully
+reserved dispatch-DDD-C09AO-bi-subscription-delivery-routes-20260614-030146 with exact nineteen-file BI subscription/delivery route scope; worker spawn is next before RUNNING
+G0B backup manifest check passed before DDD-C09AO reservation on main at 2a1cdec07ec27a5298958822014aa28d9312869c
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AO reservation
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed before DDD-C09AO reservation with current canvas-web 15 controllers / 121 endpoints and route:/canvas/bi 81 endpoints; cutoverReady false
+multi_agent_v1.close_agent Kuhn 019ec253-33c6-72f0-89ed-288065f1f51e returned PASS review for DDD-C09AN; quality-review.md saved
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test passed during DDD-C09AN closeout with 75/75 focused tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed during DDD-C09AN closeout with current canvas-web 15 controllers / 121 endpoints and route:/canvas/bi 81 endpoints; cutoverReady false
+strict old-coupling scan for DDD-C09AN production BI paths found no old canvas-engine/domain/chart service coupling
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed during DDD-C09AN review state
+multi_agent_v1.spawn_agent worker Nietzsche 019ec243-f542-7333-a960-0488ee25d2ee for DDD-C09AN spawned real code-writing worker before marking dispatch RUNNING
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AN . generated the canonical DDD-C09AN prompt successfully
+reserved dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342 with exact seven-file BI chart lifecycle route scope; worker spawn is next before RUNNING
+Raman 019ec236-57ed-78c1-96e8-eea7b3aef428 returned read-only selector recommendation for compact BI chart lifecycle publish/archive/versions/restore route batch
+node tools/program-coordination/check-dispatch-state.mjs . passed before DDD-C09AN reservation
+bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AN reservation
+multi_agent_v1.close_agent Beauvoir 019ec16c-f604-7a23-b1d9-3a066e8e36f8 returned DONE packet for DDD-C09AJ; worker-return.md saved
+reserved dispatch-DDD-C09AM-bi-permission-routes-20260614-011700 with exact seventeen-file BI permission administration/request route scope; worker spawn is next before RUNNING
+node tools/program-coordination/check-dispatch-state.mjs . passed before DDD-C09AM reservation
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed before DDD-C09AM reservation with current canvas-web 15 controllers / 105 endpoints and route:/canvas/bi 65 endpoints
+multi_agent_v1.spawn_agent worker Euclid 019ec209-6650-7c33-adfb-c924da6a59ae for DDD-C09AM spawned real code-writing worker before marking dispatch RUNNING
+multi_agent_v1.close_agent Aquinas 019ec19b-ddd6-7282-8800-79da809fbea2 closed after timeout and recovery prompt with previous_status running; coordinator-recovery.md saved
+multi_agent_v1.close_agent Arendt 019ec1e4-0dfa-75c1-a8af-e0d6e2f15c4b returned PASS_WITH_CONCERNS review for DDD-C09AL; quality-review.md saved and concerns resolved before closeout
+multi_agent_v1.close_agent Schrodinger 019ec1ca-a93c-70b2-833f-d5fa3b704b42 returned previous_status running after one wait timeout; coordinator-recovery.md saved for DDD-C09AL
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test passed during DDD-C09AL closeout with 68/68 tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed during DDD-C09AL recovery with current canvas-web 15 controllers / 105 endpoints and route:/canvas/bi 65 endpoints
+strict old-coupling scan for DDD-C09AL production BI paths found no old canvas-engine/domain/persistence/spreadsheet service coupling
+multi_agent_v1.spawn_agent reviewer Arendt 019ec1e4-0dfa-75c1-a8af-e0d6e2f15c4b for DDD-C09AL spawned read-only review after coordinator recovery; coordinator continued evidence/state work instead of blocking on long wait
+node tools/program-coordination/generate-worker-prompt.mjs DDD-C09AL . generated the canonical DDD-C09AL prompt successfully
+test -f docs/program-coordination/evidence/pre-rewrite-backup-manifest.md passed before DDD-C09AL spawn
+multi_agent_v1.spawn_agent worker Schrodinger 019ec1ca-a93c-70b2-833f-d5fa3b704b42 for DDD-C09AL spawned real code-writing worker before marking dispatch RUNNING
+reserved dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523 with exact ten-file BI spreadsheet lifecycle route scope; worker spawn is next before RUNNING
+G0B backup manifest check passed before DDD-C09AL reservation on main at 2a1cdec07ec27a5298958822014aa28d9312869c
+node tools/program-coordination/check-dispatch-state.mjs . passed before DDD-C09AL reservation
+multi_agent_v1.wait_agent Sartre 019ec1b7-d109-7693-ac30-939bba86b28f returned PASS review for DDD-C09AK with no findings
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test passed during DDD-C09AK closeout with 65/65 tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed during DDD-C09AK closeout with current canvas-web 15 controllers / 98 endpoints, route:/canvas/bi current 1 controller / 58 endpoints, and cutoverReady false
+scoped forbidden-coupling rg for DDD-C09AK production BI paths found no old canvas-engine/domain/persistence/old BI AI agent coupling
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AK closeout state update; scoped git diff --check passed
+multi_agent_v1.spawn_agent worker Aquinas 019ec19b-ddd6-7282-8800-79da809fbea2 for DDD-C09AK spawned real code-writing worker before marking dispatch RUNNING
+reserved dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931 with exact nine-file BI AI assistant route scope; worker spawn is next before RUNNING
+G0B backup manifest check passed before DDD-C09AK reservation on main at 2a1cdec07ec27a5298958822014aa28d9312869c
+node tools/program-coordination/check-dispatch-state.mjs . passed before DDD-C09AK reservation
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed before DDD-C09AK reservation with current canvas-web 15 controllers / 93 endpoints, route:/canvas/bi current 1 controller / 53 endpoints, and cutoverReady false
+multi_agent_v1.close_agent Boyle 019ec184-e15f-7470-9f08-e9c49b80364c closed after one wait timeout with previous_status running; coordinator recovery quality-review.md saved as PASS_WITH_CONCERNS
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test passed during DDD-C09AJ closeout with 62/62 tests
+node tools/program-coordination/cutover-compatibility-preflight.mjs . --json passed during DDD-C09AJ closeout with current canvas-web 15 controllers / 93 endpoints, route:/canvas/bi current 1 controller / 53 endpoints, and cutoverReady false
+scoped forbidden-coupling rg for DDD-C09AJ production BI paths found no old canvas-engine/domain/persistence coupling
+node tools/program-coordination/check-dispatch-state.mjs . plus bash docs/program-coordination/checks/program-coordination-checks.sh . passed before DDD-C09AJ closeout state update; scoped git diff --check passed
 multi_agent_v1.spawn_agent worker Hilbert 019ebe6d-4a7d-7853-a7ff-5486e87b2e1d for DDD-C09AC spawned real code-writing worker before marking dispatch RUNNING
 multi_agent_v1.wait_agent Confucius 019ebe65-bdfc-7d02-abd9-42234df83a0a returned READY_TO_DISPATCH recommending DDD-C09AC BI query dataset catalog routes GET /canvas/bi/datasets and GET /canvas/bi/datasets/{datasetKey}
 reserved dispatch-DDD-C09AC-bi-query-dataset-catalog-routes-20260613-100500 with exact ten-file scope; worker spawn is next before RUNNING
@@ -2199,6 +2799,13 @@ ABORTED
 | DDD-C09Y Risk strategy list production controller seed | DONE_WITH_CONCERNS | worker | R5 after DDD-C09X | Closed after Sagan DONE, coordinator verification 15/15, and Hegel review PASS; accepted concern is compact read-only strategy list seed only with broader risk strategy routes/global cutover readiness out of scope |
 | DDD-C09Z BI dataset read production controller seed | DONE_WITH_CONCERNS | worker | R5 after DDD-C09Y | Closed after Parfit DONE, coordinator recovery fixed default `marketing_canvas` workspace parity, local verification passed 20/20, and Raman review PASS; accepted concern is compact BI dataset list/detail seed only with broader BI routes/global cutover readiness out of scope |
 | DDD-C09AA BI chart read production controller seed | DONE_WITH_CONCERNS | worker | R5 after DDD-C09Z | Closed after Wegener DONE, coordinator verification 27/27, and Curie review PASS; accepted concern is compact BI chart list/detail seed only with broader BI routes/global cutover readiness out of scope |
+| DDD-C09AJ BI portal and big-screen lifecycle route batch | DONE_WITH_CONCERNS | worker | R5 after DDD-C09AI | Closed after Beauvoir DONE, coordinator verification 62/62, and coordinator recovery review because Boyle timed out; accepted concerns are no normal Boyle reviewer packet, compact in-memory lifecycle seed only, and broader BI route/global cutover readiness out of scope |
+| DDD-C09AK BI AI assistant route batch | DONE_WITH_CONCERNS | worker | R5 after DDD-C09AJ | Closed after Aquinas timeout/no worker-return packet, coordinator recovery, focused JDK 21 Maven 65/65, and Sartre PASS review; accepted concern is compact deterministic BI AI seed only with broader BI routes/global cutover readiness out of scope |
+| DDD-C09AL BI spreadsheet lifecycle route batch | DONE_WITH_CONCERNS | worker | R5 after DDD-C09AK | Closed after Schrodinger timeout/no worker-return packet, coordinator recovery, Arendt PASS_WITH_CONCERNS review with concerns resolved, focused JDK 21 Maven 68/68, preflight route:/canvas/bi 65 endpoints, and strict old-coupling scan clean |
+| DDD-C09AM BI permission administration route batch | DONE_WITH_CONCERNS | worker | R5 after DDD-C09AL | Closed after Euclid timeout/no final worker-return packet, coordinator recovery, focused JDK 21 Maven 72/72, preflight route:/canvas/bi 77 endpoints, and strict old-coupling scan clean; accepted concern is compact in-memory permission administration/request seed only with broader BI route/global cutover readiness out of scope |
+| DDD-C09AN BI chart lifecycle route batch | DONE_WITH_CONCERNS | worker | R5 after DDD-C09AM | Closed after Nietzsche DONE, coordinator verification 75/75, preflight route:/canvas/bi 81 endpoints, and Kuhn PASS review; accepted concern is compact in-memory chart lifecycle version seed only |
+| DDD-C09AO BI subscription and delivery route batch | DONE_WITH_CONCERNS | worker | R5 after DDD-C09AN | Closed after Boole timeout/no final worker-return packet, coordinator recovery, focused JDK 21 Maven 77/77, preflight route:/canvas/bi 96 endpoints, strict old-coupling scan clean, and Godel PASS_WITH_CONCERNS review; accepted concerns are compact in-memory delivery seed and broader BI/global cutover readiness out of scope |
+| DDD-C09AP BI query operations route batch | DONE_WITH_CONCERNS | worker | R5 after DDD-C09AO | Closed after Poincare timeout/no final worker-return packet, coordinator recovery, focused JDK 21 Maven 80/80, preflight route:/canvas/bi 119 endpoints, strict old-coupling scan clean, and active dispatch closure; accepted concerns are compact deterministic query/embed seed and broader BI/global cutover readiness out of scope |
 | DDD-C09B Canvas API compatibility test seed | DONE_WITH_CONCERNS | worker | R5 after DDD-C09A | Nietzsche returned DONE_WITH_CONCERNS; Turing spec review and Mencius quality review passed with concerns and no required fixes; target test passed 5/5, combined suite passed 14/14, preflight now sees 1/7 compatibility targets |
 | DDD-C09C Marketing API compatibility test seed | DONE_WITH_CONCERNS | worker | R5 after DDD-C09B | Arendt returned DONE_WITH_CONCERNS; Curie spec review PASS_WITH_CONCERNS and Rawls quality review PASS; target marketing test passed 6/6, combined canvas/marketing compatibility passed 11/11, and preflight now sees 2/7 compatibility targets |
 | DDD-C09D Conversation API compatibility test seed | DONE_WITH_CONCERNS | worker | R5 after DDD-C09C | Ptolemy returned DONE_WITH_CONCERNS; Boyle spec review and Feynman quality review passed with no required fixes; target conversation test passed 4/4, combined canvas/marketing/conversation compatibility passed 15/15, and preflight now sees 3/7 compatibility targets |
@@ -2330,6 +2937,336 @@ ledger update:
 Latest recovery audit:
 
 ```text
+date: 2026-06-14
+result: DDD-C09BN Webhooks route batch closed DONE_WITH_CONCERNS after normal Faraday return and coordinator integration fix
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Faraday returned DONE; coordinator fixed CdpWebhookFacade deliveries signature alignment, verified Webhooks application 2/2, Webhooks web controller 3/3, production compile, preflight current canvas-web 33 controllers / 542 endpoints with route:/cdp/webhooks out of top gaps, and strict old-coupling scan clean
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next clear preflight route batch only after fresh checks, spawn a real worker before RUNNING, and keep the coordinator critical path moving without idle polling
+
+date: 2026-06-14
+result: DDD-C09BM Computed Tags route batch closed DONE_WITH_CONCERNS after coordinator recovery from Hegel timeout
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Hegel timed out once with no normal packet; coordinator closed the agent, recovered exact scope locally, verified Computed Tags application 2/2, Computed Tags web controller 3/3, production compile, preflight current canvas-web 32 controllers / 533 endpoints with route:/cdp/computed-tags out of top gaps, and strict old-coupling scan clean
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next clear preflight route batch only after fresh checks, spawn a real worker before RUNNING, and keep the coordinator critical path moving without idle polling
+
+date: 2026-06-14
+result: DDD-C09BL Creator Collaboration route batch closed DONE_WITH_CONCERNS after coordinator recovery from Dewey timeout
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Dewey timed out once with no normal packet; coordinator closed the agent, recovered exact scope locally, verified Creator Collaboration application 2/2, Creator Collaboration web controller 3/3, production compile, preflight current canvas-web 31 controllers / 524 endpoints with route:/canvas/creator-collaboration out of top gaps, and strict old-coupling scan clean
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next clear preflight route batch only after fresh checks, spawn a real worker before RUNNING, and keep the coordinator critical path moving without idle polling
+
+date: 2026-06-14
+result: DDD-C09BK Warehouse Tables route batch closed DONE_WITH_CONCERNS after coordinator recovery from Bernoulli timeout
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Bernoulli timed out once with no normal packet; coordinator closed the agent, recovered exact scope locally, verified Warehouse Tables application 2/2, Warehouse Tables web controller 3/3, production compile, preflight current canvas-web 30 controllers / 515 endpoints with route:/warehouse/tables out of top gaps, and strict old-coupling scan clean
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next clear preflight route batch only after fresh checks, spawn a real worker before RUNNING, and keep the coordinator critical path moving without idle polling
+
+date: 2026-06-14
+result: DDD-C09BJ AB Experiments route batch closed DONE_WITH_CONCERNS after coordinator recovery from Leibniz concurrency error
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Leibniz failed with stream disconnected before completion due account concurrency limit and produced no normal packet; coordinator closed the agent, recovered exact scope locally, verified AB Experiments application 2/2, AB Experiments web controller 3/3, production compile, preflight current canvas-web 29 controllers / 506 endpoints with route:/canvas/ab-experiments out of top gaps, and strict old-coupling scan clean
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next clear preflight route batch only after fresh checks, spawn a real worker before RUNNING, and keep the coordinator critical path moving without idle polling
+
+date: 2026-06-14
+result: DDD-C09AY Admin Platform route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Descartes was closed with previous_status running after one timeout and reserved-path/evidence inspection found RED tests only; focused JDK 21 Maven passed 8/8; cutover preflight reports current canvas-web 21 controllers / 336 endpoints and route:/admin removed from top gap candidates; strict old-coupling scan, coordination validators, and scoped diff check passed before state edit
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next coarse batch only after fresh checks, spawn a real worker before RUNNING, and do not idle after a single wait timeout
+
+date: 2026-06-14
+result: DDD-C09AY Admin Platform route batch moved to RUNNING after real Descartes worker spawn
+active dispatch: dispatch-DDD-C09AY-admin-platform-routes-20260614-062800 in RUNNING; worker Descartes 019ec316-70c5-7341-b9de-9b7911bd91ad
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec316-70c5-7341-b9de-9b7911bd91ad; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator prep while Descartes runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AY Admin Platform route batch reserved
+active dispatch: dispatch-DDD-C09AY-admin-platform-routes-20260614-062800 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AX; dispatch-state verifier and program coordination checks passed; preflight reports current canvas-web 20 controllers / 315 endpoints and route:/admin 0/21 as the top route gap
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition
+
+date: 2026-06-14
+result: DDD-C09AX Marketing Content route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Planck was closed with previous_status running after one timeout and reserved-path/evidence inspection found RED tests only; focused JDK 21 Maven passed 12/12; cutover preflight reports current canvas-web 20 controllers / 315 endpoints and route:/marketing removed from top gap candidates; strict old-coupling scan, coordination validators, and scoped diff check passed before state edit
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next coarse batch only after fresh checks, spawn a real worker before RUNNING, and do not idle after a single wait timeout
+
+date: 2026-06-14
+result: DDD-C09AX Marketing Content route batch moved to RUNNING after real Planck worker spawn
+active dispatch: dispatch-DDD-C09AX-marketing-content-routes-20260614-061200 in RUNNING; worker Planck 019ec30b-7810-7d83-ae44-e550acadd158
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec30b-7810-7d83-ae44-e550acadd158; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator prep while Planck runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AX Marketing Content route batch reserved
+active dispatch: dispatch-DDD-C09AX-marketing-content-routes-20260614-061200 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AW; dispatch-state verifier and program coordination checks passed; preflight reports current canvas-web 19 controllers / 294 endpoints and route:/marketing 0/21 as the next single-controller coarse gap
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition
+
+date: 2026-06-14
+result: DDD-C09AW AI route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Goodall was closed with previous_status running after one timeout and reserved-path/evidence inspection found RED tests only; focused JDK 21 Maven passed 7/7; cutover preflight reports current canvas-web 19 controllers / 294 endpoints and /ai removed from top gap candidates; strict old-coupling scan, coordination validators, and scoped diff check passed before state edit
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next coarse batch only after fresh checks, spawn a real worker before RUNNING, and do not idle after a single wait timeout
+
+date: 2026-06-14
+result: DDD-C09AW AI route batch moved to RUNNING after real Goodall worker spawn
+active dispatch: dispatch-DDD-C09AW-ai-routes-20260614-060200 in RUNNING; worker Goodall 019ec2fe-f4c2-7242-8d30-a5bbc875a3c7
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec2fe-f4c2-7242-8d30-a5bbc875a3c7; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator prep while Goodall runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AW AI route batch reserved
+active dispatch: dispatch-DDD-C09AW-ai-routes-20260614-060200 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AV; dispatch-state verifier and program coordination checks passed; preflight reports current canvas-web 18 controllers / 271 endpoints and route:/ai 0/23 as the top route gap; exact AI target files were absent; canvas-web already depends on canvas-platform
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition
+
+date: 2026-06-14
+result: DDD-C09AV Search Marketing route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Ohm was closed with previous_status running after one timeout and reserved-path/evidence inspection; focused JDK 21 Maven passed 15/15; cutover preflight reports current canvas-web 18 controllers / 271 endpoints and /canvas/search-marketing removed from top gap candidates; strict old-coupling scan, coordination validators, and scoped diff check passed before state edit
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve the next coarse batch only after fresh checks, spawn a real worker before RUNNING, and do not idle after a single wait timeout
+
+date: 2026-06-14
+result: DDD-C09AV Search Marketing route batch moved to RUNNING after real Ohm worker spawn
+active dispatch: dispatch-DDD-C09AV-search-marketing-routes-20260614-053900 in RUNNING; worker Ohm 019ec2ee-1c49-7290-987c-88cd59dbf8dc
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec2ee-1c49-7290-987c-88cd59dbf8dc; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator prep while Ohm runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AV Search Marketing route batch reserved
+active dispatch: dispatch-DDD-C09AV-search-marketing-routes-20260614-053900 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AU; dispatch-state verifier and program coordination checks passed; preflight reports current canvas-web 17 controllers / 247 endpoints and route:/canvas/search-marketing 0/24 as the top route gap; exact SearchMarketing target files were absent
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition
+
+date: 2026-06-14
+result: DDD-C09AU Growth Activities route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Harvey was closed with previous_status running after one timeout and reserved-path/evidence inspection; focused JDK 21 Maven passed 14/14; cutover preflight reports current canvas-web 17 controllers / 247 endpoints and /canvas/growth-activities removed from top gap candidates; strict old-coupling scan, coordination validators, and scoped diff check passed before state edit
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve DDD-C09AV only after fresh checks, spawn a real worker before RUNNING, and do not idle after a single wait timeout
+
+date: 2026-06-14
+result: DDD-C09AU Growth Activities route batch moved to RUNNING after real Harvey worker spawn
+active dispatch: dispatch-DDD-C09AU-growth-activities-routes-20260614-052400 in RUNNING; worker Harvey 019ec2df-9cdb-7023-a6ab-5a0827cac555
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec2df-9cdb-7023-a6ab-5a0827cac555; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator prep while Harvey runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AU Growth Activities route batch reserved
+active dispatch: dispatch-DDD-C09AU-growth-activities-routes-20260614-052400 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AT; dispatch-state verifier and program coordination checks passed; preflight reports current canvas-web 16 controllers / 222 endpoints and route:/canvas/growth-activities 0/25; Carver returned read-only 25-route summary
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition
+
+date: 2026-06-14
+result: DDD-C09AT Marketing Monitoring route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Fermat was closed with previous_status running after one timeout and no worker output; focused JDK 21 Maven passed 14/14; cutover preflight reports current canvas-web 16 controllers / 222 endpoints and /canvas/marketing-monitoring removed from top gap candidates; strict old-coupling scan and coordination validators passed
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; reserve first, spawn a real worker, then mark RUNNING, and do not idle after a single wait timeout
+
+date: 2026-06-14
+result: DDD-C09AT Marketing Monitoring route batch moved to RUNNING after real Fermat worker spawn
+active dispatch: dispatch-DDD-C09AT-marketing-monitoring-routes-20260614-050218 in RUNNING; worker Fermat 019ec2cd-059f-7e00-9fd4-1ef13b4f9b95
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec2cd-059f-7e00-9fd4-1ef13b4f9b95; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator verification/prep while Fermat runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AT Marketing Monitoring route batch reserved
+active dispatch: dispatch-DDD-C09AT-marketing-monitoring-routes-20260614-050218 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AS; dispatch-state verifier and program coordination checks passed before reservation; preflight reports current canvas-web 15 controllers / 192 endpoints and route:/canvas/marketing-monitoring 0/30; selected all 30 legacy Marketing Monitoring routes
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition; coordinator will continue non-overlapping verification/prep and avoid idle wait loops
+
+date: 2026-06-14
+result: DDD-C09AS BI dashboard resource runtime route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Galileo was closed with previous_status running after one wait timeout; focused clean JDK 21 Maven passed 87/87; cutover preflight reports current canvas-web 15 controllers / 192 endpoints and route:/canvas/bi 152/169; strict old-coupling scan passed with no matches; scoped diff check passed
+next action: continue route parity work from an empty active dispatch registry; route:/canvas/marketing-monitoring remains top global blocker and route:/canvas/bi remains at 152/169
+
+date: 2026-06-14
+result: DDD-C09AS BI dashboard resource runtime route batch moved to RUNNING after real Galileo worker spawn
+active dispatch: dispatch-DDD-C09AS-bi-dashboard-runtime-routes-20260614-044600 in RUNNING; worker Galileo 019ec2be-6693-7670-b43c-203b4f57da51
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec2be-6693-7670-b43c-203b4f57da51; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator RED/verification work while Galileo runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AS BI dashboard resource runtime route batch reserved
+active dispatch: dispatch-DDD-C09AS-bi-dashboard-runtime-routes-20260614-044600 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AR; dispatch-state verifier and program coordination checks passed before reservation; preflight reports current canvas-web 15 controllers / 182 endpoints and route:/canvas/bi 142/169; selected 10 missing legacy BiDashboardController routes
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition; coordinator will continue non-overlapping work and avoid idle wait loops
+
+date: 2026-06-14
+result: DDD-C09AR BI self-service export route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Parfit was closed with previous_status running after timeout-driven coordinator recovery; focused JDK 21 Maven passed 86/86; cutover preflight reports current canvas-web 15 controllers / 182 endpoints and route:/canvas/bi 142/169; strict old-coupling scan passed with no matches; scoped diff check passed
+next action: continue route parity work from an empty active dispatch registry; route:/canvas/marketing-monitoring and route:/canvas/bi remain top global blockers
+
+date: 2026-06-14
+result: DDD-C09AR BI self-service export route batch moved to RUNNING after real Parfit worker spawn
+active dispatch: dispatch-DDD-C09AR-bi-self-service-export-routes-20260614-042536 in RUNNING; worker Parfit 019ec2ad-5226-7b53-b686-8df3694894c3
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec2ad-5226-7b53-b686-8df3694894c3; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator verification prep while Parfit runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AR BI self-service export route batch reserved
+active dispatch: dispatch-DDD-C09AR-bi-self-service-export-routes-20260614-042536 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AQ; G0B backup manifest exists on main at 2a1cdec07ec27a5298958822014aa28d9312869c; dispatch-state verifier and program coordination checks passed before reservation; preflight reports current canvas-web 15 controllers / 172 endpoints and route:/canvas/bi 132/169; selected 10 missing legacy BiSelfServiceController routes
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition
+
+date: 2026-06-14
+result: DDD-C09AQ BI datasource operations route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Darwin was closed with previous_status running after timeout-driven coordinator recovery; focused JDK 21 Maven passed 84/84; cutover preflight reports current canvas-web 15 controllers / 172 endpoints and route:/canvas/bi 132/169; strict old-coupling scan passed with no matches
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; global cutoverReady remains false due broader route parity blockers
+
+date: 2026-06-14
+result: DDD-C09AQ BI datasource operations route batch moved to RUNNING after real Darwin worker spawn
+active dispatch: dispatch-DDD-C09AQ-bi-datasource-operations-routes-20260614-040400 in RUNNING; worker Darwin 019ec299-11cf-74b1-bcce-22422635d20c
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec299-11cf-74b1-bcce-22422635d20c; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator verification prep while Darwin runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AQ BI datasource operations route batch reserved
+active dispatch: dispatch-DDD-C09AQ-bi-datasource-operations-routes-20260614-040400 in RESERVED; worker pending spawn
+verification: activeDispatches was empty after DDD-C09AP; dispatch-state verifier and program coordination checks passed before reservation; preflight reports current canvas-web 15 controllers / 159 endpoints and route:/canvas/bi 119/169; mapping diff selected 13 missing legacy BiDatasourceController routes
+next action: generate canonical worker prompt and spawn a real code-writing worker before RUNNING transition
+
+date: 2026-06-14
+result: DDD-C09AP BI query operations route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none; dispatch-state activeDispatches is empty
+verification: Poincare was closed with previous_status running after timeout-driven coordinator recovery; focused JDK 21 Maven passed 80/80; cutover preflight reports current canvas-web 15 controllers / 159 endpoints and route:/canvas/bi 119/169; strict old-coupling scan and scoped diff check passed
+next action: continue DDD-C09 route parity work from an empty active dispatch registry; global cutoverReady remains false due broader route parity blockers
+
+date: 2026-06-14
+result: DDD-C09AP BI query operations route batch moved to RUNNING after real Poincare worker spawn
+active dispatch: dispatch-DDD-C09AP-bi-query-operations-routes-20260614-034200 in RUNNING; worker Poincare 019ec27f-1092-70c0-bdb5-5a892a29f5be
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec27f-1092-70c0-bdb5-5a892a29f5be; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator verification prep while Poincare runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AP BI query operations route batch reserved
+active dispatch: dispatch-DDD-C09AP-bi-query-operations-routes-20260614-034200 in RESERVED; worker pending spawn
+verification: G0B backup manifest exists; dispatch-state verifier and program coordination checks passed; preflight reports current canvas-web 15 controllers / 136 endpoints and route:/canvas/bi 96 endpoints; exact 35-file scope recorded in dispatch-state.json and this ledger
+next action: generate canonical worker prompt, spawn real code-writing worker, record actual id, then move dispatch to RUNNING; after one wait timeout inspect changed paths/evidence/tests instead of idle polling
+
+date: 2026-06-14
+result: DDD-C09AO BI subscription and delivery route batch closed DONE_WITH_CONCERNS after coordinator recovery and Godel PASS_WITH_CONCERNS review
+active dispatch: none
+verification: focused Maven passed 77/77; cutover preflight reports current canvas-web 15 controllers / 136 endpoints and route:/canvas/bi 96 endpoints; strict old-coupling scan clean; dispatch-state verifier and program coordination checks passed; coordinator-recovery.md and quality-review.md saved; evidence typo corrected
+accepted concerns: no normal Boole worker-return packet; compact in-memory subscription/delivery seed only; durable delivery persistence/provider/scheduler parity and broader BI/global cutover readiness remain blocked
+next action: review route-gap preflight and select the next exact-scope route batch; keep main thread doing useful coordinator verification/recovery work while subagents run
+
+date: 2026-06-14
+result: DDD-C09AO BI subscription and delivery route batch moved to RUNNING after real Boole worker spawn
+active dispatch: dispatch-DDD-C09AO-bi-subscription-delivery-routes-20260614-030146 in RUNNING; worker Boole 019ec264-48c0-7cb2-a55d-fb6ebbc367dd
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec264-48c0-7cb2-a55d-fb6ebbc367dd; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator verification prep while Boole runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AO BI subscription and delivery route batch reserved
+active dispatch: dispatch-DDD-C09AO-bi-subscription-delivery-routes-20260614-030146 in RESERVED; worker pending spawn
+verification: G0B backup manifest exists; dispatch-state verifier and program coordination checks passed; preflight reports current canvas-web 15 controllers / 121 endpoints and route:/canvas/bi 81 endpoints; exact nineteen-file scope recorded in dispatch-state.json and this ledger
+next action: generate canonical worker prompt, spawn real code-writing worker, record actual id, then move dispatch to RUNNING; after one wait timeout inspect changed paths/evidence/tests instead of idle polling
+
+date: 2026-06-14
+result: DDD-C09AN BI chart lifecycle route batch closed DONE_WITH_CONCERNS after coordinator verification and Kuhn PASS review
+active dispatch: none
+verification: Nietzsche returned DONE; coordinator focused Maven passed 75/75; cutover preflight reports current canvas-web 15 controllers / 121 endpoints and route:/canvas/bi 81 endpoints; strict old-coupling scan clean; dispatch-state verifier and program coordination checks passed; worker-return.md and quality-review.md saved
+accepted concerns: compact in-memory chart lifecycle version catalog only; restore of archived charts remains outside this compact route seed; broader BI route/global cutover readiness remains blocked
+next action: review route-gap preflight and select the next exact-scope route batch; keep main thread doing coordinator verification/recovery work while subagents run
+
+date: 2026-06-14
+result: DDD-C09AN BI chart lifecycle route batch moved to REVIEWING after coordinator verification
+active dispatch at that time: dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342 in REVIEWING; worker Nietzsche returned DONE; reviewer Kuhn 019ec253-33c6-72f0-89ed-288065f1f51e running read-only review
+verification: focused Maven passed 75/75; cutover preflight reports route:/canvas/bi 81/169; strict old-coupling scan clean; coordination validators and scoped diff check passed
+next action: wait once for Kuhn only after useful local checks are complete
+
+date: 2026-06-14
+result: DDD-C09AN worker returned DONE after coordinator RED feedback loop
+active dispatch at that time: dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342 in RETURNED; worker Nietzsche 019ec243-f542-7333-a960-0488ee25d2ee
+verification: worker-return.md saved; first wait timeout was followed by changed-path inspection and Maven RED feedback rather than idle polling; subsequent focused Maven advanced from compile RED to one controller assertion RED and then to worker-reported PASS
+next action at that time: run coordinator verification before review
+
+date: 2026-06-14
+result: DDD-C09AN BI chart lifecycle route batch moved to RUNNING after real Nietzsche worker spawn
+active dispatch: dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342 in RUNNING; worker Nietzsche 019ec243-f542-7333-a960-0488ee25d2ee
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec243-f542-7333-a960-0488ee25d2ee; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator verification prep while Nietzsche runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AN BI chart lifecycle route batch reserved
+active dispatch: dispatch-DDD-C09AN-bi-chart-lifecycle-routes-20260614-022342 in RESERVED; worker pending spawn
+verification: Raman selector recommended compact chart lifecycle route batch; local route inspection confirmed legacy publish/archive/versions/restore gap; dispatch-state verifier and program coordination checks passed before reservation; reservation-note.md saved
+next action: generate canonical worker prompt, spawn real code-writing worker, record actual id, then move dispatch to RUNNING; after one wait timeout inspect changed paths/evidence/tests instead of idle polling
+
+date: 2026-06-14
+result: DDD-C09AM BI permission administration route batch closed DONE_WITH_CONCERNS after coordinator recovery
+active dispatch: none
+verification: focused JDK 21 Maven passed 72/72 after Mencius review fixes; cutover preflight reports current canvas-web 15 controllers / 117 endpoints and route:/canvas/bi 77 endpoints; strict old-coupling scan clean; dispatch-state verifier and program coordination checks passed; coordinator-recovery.md saved
+accepted concerns: no normal Euclid worker-return packet; compact in-memory BI permission administration/request seed only; durable old-engine persistence semantics and broader BI route/global cutover remain out of scope
+next action: review route-gap preflight and select the next exact-scope route batch; do not idle on background reviewers when local coordinator work is available
+
+date: 2026-06-14
+result: DDD-C09AM BI permission administration route batch moved to RUNNING after real Euclid worker spawn
+active dispatch: dispatch-DDD-C09AM-bi-permission-routes-20260614-011700 in RUNNING; worker Euclid 019ec209-6650-7c33-adfb-c924da6a59ae
+verification: canonical worker prompt generated; spawn returned actual worker id 019ec209-6650-7c33-adfb-c924da6a59ae; dispatch-state and ledger updated together
+next action: continue non-overlapping coordinator checks while Euclid runs; after one wait timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AM BI permission administration route batch reserved
+active dispatch: dispatch-DDD-C09AM-bi-permission-routes-20260614-011700 in RESERVED; worker pending spawn
+verification: dispatch-state verifier passed before reservation; cutover preflight reports current canvas-web 15 controllers / 105 endpoints and route:/canvas/bi 65 endpoints; exact seventeen-file scope recorded in dispatch-state.json and this ledger
+next action: generate canonical worker prompt, spawn a real code-writing worker, record actual id, then move dispatch to RUNNING
+
+date: 2026-06-14
+result: DDD-C09AL BI spreadsheet lifecycle route batch closed DONE_WITH_CONCERNS
+active dispatch: none
+verification: Arendt 019ec1e4-0dfa-75c1-a8af-e0d6e2f15c4b returned PASS_WITH_CONCERNS; coordinator resolved BiApiCompatibilityTest coverage and versions?limit concerns; focused JDK 21 Maven passed 68/68; cutover preflight reports current canvas-web 15 controllers / 105 endpoints and route:/canvas/bi 65 endpoints; strict old-coupling scan clean; scoped diff check clean; quality-review.md saved
+accepted concerns: no normal Schrodinger worker-return packet; compact in-memory spreadsheet lifecycle seed only; durable old-engine spreadsheet persistence/version semantics and broader BI route/global cutover remain out of scope
+next action: choose next compact route-parity dispatch from cutover preflight before starting another code-writing worker
+
+date: 2026-06-14
+result: historical DDD-C09AL coordinator recovery checkpoint before final closeout; moved to read-only review at that time
+active dispatch at that time: dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523 in REVIEWING; worker Schrodinger timed out and was closed; reviewer Arendt 019ec1e4-0dfa-75c1-a8af-e0d6e2f15c4b running read-only review
+verification: focused JDK 21 Maven passed 67/67 after recovery; cutover preflight reports current canvas-web 15 controllers / 105 endpoints and route:/canvas/bi 65 endpoints; strict old-coupling scan clean; scoped diff check clean; coordinator-recovery.md saved
+next action: continue non-overlapping coordinator verification/evidence work while Arendt runs; poll reviewer briefly only after useful local work is complete
+
+date: 2026-06-14
+result: DDD-C09AL BI spreadsheet lifecycle route batch moved to RUNNING after real Schrodinger worker spawn
+active dispatch: dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523 in RUNNING; worker Schrodinger 019ec1ca-a93c-70b2-833f-d5fa3b704b42
+verification: canonical worker prompt generated; G0B backup manifest exists; spawn returned actual worker id 019ec1ca-a93c-70b2-833f-d5fa3b704b42; dispatch-state and ledger updated together
+next action: wait once for Schrodinger; after one timeout inspect changed paths, evidence, and focused tests before any further wait
+
+date: 2026-06-14
+result: DDD-C09AL BI spreadsheet lifecycle route batch reserved
+active dispatch: dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523 in RESERVED; worker pending spawn
+verification: G0B backup manifest exists; branch main at 2a1cdec07ec27a5298958822014aa28d9312869c; dispatch-state verifier passed before reservation; cutover preflight last reports current canvas-web 15 controllers / 98 endpoints and route:/canvas/bi 58 endpoints; exact ten-file scope recorded in dispatch-state.json and this ledger
+next action: generate canonical worker prompt, spawn a real code-writing worker, record actual id, then move dispatch to RUNNING
+
+date: 2026-06-14
+result: DDD-C09AK BI AI assistant route batch closed DONE_WITH_CONCERNS after coordinator recovery and Sartre PASS review
+active dispatch: none
+verification: Aquinas 019ec19b-ddd6-7282-8800-79da809fbea2 spawned before RUNNING, timed out after one wait, received exact compiler failure, timed out again, and was closed with previous_status running; coordinator recovered exact scope; JDK 21 Maven reactor `mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test` passed 65/65; cutover preflight reports current canvas-web 15 controllers / 98 endpoints and route:/canvas/bi 58 endpoints; forbidden-coupling scan clean; dispatch-state verifier, program checks, and scoped diff check passed; Sartre 019ec1b7-d109-7693-ac30-939bba86b28f returned PASS review with no findings
+accepted concerns: no normal Aquinas worker-return packet; compact deterministic BI AI seed only; no durable AI/LLM integration; broader BI route parity and global DDD-C09 cutover remain out of scope
+next action: choose next compact route-parity dispatch from cutover preflight before starting another code-writing worker
+
+date: 2026-06-13
+result: DDD-C09AK BI AI assistant route batch moved to RUNNING after real Aquinas worker spawn
+active dispatch: dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931 in RUNNING; worker Aquinas 019ec19b-ddd6-7282-8800-79da809fbea2
+verification: canonical prompt generated successfully; Aquinas spawned with exact nine-file scope before RUNNING; dispatch-state and ledger updated with actual worker id
+next action: wait once for Aquinas; after timeout inspect changed paths/evidence/tests before any further wait
+
+date: 2026-06-13
+result: DDD-C09AK BI AI assistant route batch reserved
+active dispatch: dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931 in RESERVED; worker pending spawn
+verification: G0B backup manifest exists; branch main at 2a1cdec07ec27a5298958822014aa28d9312869c; dispatch-state verifier passed before reservation; cutover preflight reports current canvas-web 15 controllers / 93 endpoints and route:/canvas/bi 53 endpoints; exact nine-file scope recorded in dispatch-state.json and this ledger
+next action: generate canonical worker prompt, spawn a real code-writing worker, record actual id, then move dispatch to RUNNING
+
+date: 2026-06-13
+result: DDD-C09AJ BI portal and big-screen lifecycle route batch closed DONE_WITH_CONCERNS after Beauvoir DONE packet and coordinator recovery review
+active dispatch: none
+verification: Beauvoir 019ec16c-f604-7a23-b1d9-3a066e8e36f8 returned DONE when closed; Boyle 019ec184-e15f-7470-9f08-e9c49b80364c timed out once and was closed with previous_status running; coordinator verified exact-scope C09AJ output; JDK 21 Maven reactor `mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test` passed 62/62; cutover preflight reports current canvas-web 15 controllers / 93 endpoints and route:/canvas/bi 53 endpoints; forbidden-coupling scan clean; dispatch-state verifier, program checks, and scoped diff check passed
+accepted concerns: no normal Boyle reviewer packet; compact in-memory portal/big-screen lifecycle seed only; durable persistence/audit/auth parity and broader BI route parity remain out of scope
+next action: choose next compact route-parity dispatch from cutover preflight before starting another code-writing worker
+
 date: 2026-06-13
 result: DDD-C09AD BI dashboard preset catalog route seed closed DONE_WITH_CONCERNS after James timeout and Dewey PASS review
 active dispatch: none
@@ -2762,6 +3699,72 @@ commands rerun before dispatch: OSG-W11 closure coordination checks passed; back
 
 | Date | Actor | Event | Evidence |
 | --- | --- | --- | --- |
+| 2026-06-14 | coordinator | Closed DDD-C09BQ as DONE_WITH_CONCERNS after Avicenna COMPLETED return, local verification, and fresh preflight | `docs/program-coordination/evidence/dispatch-DDD-C09BQ-warehouse-availability-routes-20260614-123929/coordinator-closeout.md`; Warehouse Availability application 3/3; Warehouse Availability web controller 2/2; production compile; preflight `canvas-web` 567 endpoints |
+| 2026-06-14 | Avicenna | Returned DDD-C09BQ COMPLETED packet for the reserved Warehouse Availability scope | `docs/program-coordination/evidence/dispatch-DDD-C09BQ-warehouse-availability-routes-20260614-123929/worker-return.md`; worker id `019ec476-c5aa-7932-982f-8622f8032a88` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BQ worker Avicenna and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec476-c5aa-7932-982f-8622f8032a88`; exact six-file Warehouse Availability reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BQ Warehouse Availability route alias batch with exact six-file scope after preflight selected `route:/warehouse/availability` old 3/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BQ-warehouse-availability-routes-20260614-123929/reservation-note.md`; scheduler rule kept coordinator local |
+| 2026-06-14 | coordinator | Closed DDD-C09BP as DONE_WITH_CONCERNS after Herschel DONE return, local verification, and fresh preflight | `docs/program-coordination/evidence/dispatch-DDD-C09BP-public-ingress-routes-20260614-115134/coordinator-closeout.md`; Public Ingress application 2/2; Public Ingress web controller 3/3; production compile; preflight `canvas-web` 559 endpoints |
+| 2026-06-14 | Herschel | Returned DDD-C09BP DONE packet for the reserved Public Ingress scope | `docs/program-coordination/evidence/dispatch-DDD-C09BP-public-ingress-routes-20260614-115134/worker-return.md`; worker id `019ec449-327a-7142-960b-87dd888bb8da` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BP worker Herschel and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec449-327a-7142-960b-87dd888bb8da`; exact six-file Public Ingress reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BP Public Ingress route alias batch with exact six-file scope after preflight selected `route:/public` old 4/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BP-public-ingress-routes-20260614-115134/reservation-note.md`; scheduler rule kept coordinator local |
+| 2026-06-14 | coordinator | Closed DDD-C09BO as DONE_WITH_CONCERNS after Plato DONE_WITH_CONCERNS return, local verification, and fresh preflight | `docs/program-coordination/evidence/dispatch-DDD-C09BO-ops-routes-20260614-111207/coordinator-closeout.md`; Ops application 3/3; Ops web controller 3/3; production compile; preflight `canvas-web` 551 endpoints |
+| 2026-06-14 | Plato | Returned DDD-C09BO DONE_WITH_CONCERNS packet for the reserved Ops scope, with mismatched self-reported Sagan id noted as a concern | `docs/program-coordination/evidence/dispatch-DDD-C09BO-ops-routes-20260614-111207/worker-return.md`; actual worker id `019ec421-7eb1-79e2-a8db-5747f4f29a74` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BO worker Plato and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec421-7eb1-79e2-a8db-5747f4f29a74`; exact six-file Ops reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BO Ops route alias batch with exact six-file scope after preflight selected `route:/ops` old 9/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BO-ops-routes-20260614-111207/reservation-note.md`; worker spawn is next before RUNNING; scheduler rule keeps coordinator local |
+| 2026-06-14 | coordinator | Closed DDD-C09BN as DONE_WITH_CONCERNS after Faraday DONE return, local integration fix, and fresh verification | `docs/program-coordination/evidence/dispatch-DDD-C09BN-webhooks-routes-20260614-104200/coordinator-closeout.md`; Webhooks application 2/2; Webhooks web controller 3/3; production compile; preflight `canvas-web` 542 endpoints |
+| 2026-06-14 | Faraday | Returned normal DDD-C09BN DONE packet for the reserved Webhooks scope | `docs/program-coordination/evidence/dispatch-DDD-C09BN-webhooks-routes-20260614-104200/worker-return.md`; worker id `019ec406-f849-74d0-9c0f-db9a631c9464` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BN worker Faraday and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec406-f849-74d0-9c0f-db9a631c9464`; exact six-file Webhooks reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BN Webhooks route alias batch with exact six-file scope after preflight selected `route:/cdp/webhooks` old 9/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BN-webhooks-routes-20260614-104200/reservation-note.md`; DDD-C09BM closeout validators passed; worker spawn was next |
+| 2026-06-14 | coordinator | Closed DDD-C09BM as DONE_WITH_CONCERNS after local RED/GREEN critical path and Hegel timeout recovery | `docs/program-coordination/evidence/dispatch-DDD-C09BM-computed-tags-routes-20260614-102400/coordinator-closeout.md`; Computed Tags application 2/2; Computed Tags web controller 3/3; production compile; preflight `canvas-web` 533 endpoints |
+| 2026-06-14 | Hegel | Timed out without a normal DDD-C09BM packet and was closed by the coordinator | `docs/program-coordination/evidence/dispatch-DDD-C09BM-computed-tags-routes-20260614-102400/worker-return.md`; worker id `019ec3f6-6096-7c31-bd20-405a0cc78f1a` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BM worker Hegel and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec3f6-6096-7c31-bd20-405a0cc78f1a`; exact six-file Computed Tags reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BM Computed Tags route alias batch with exact six-file scope after preflight selected `route:/cdp/computed-tags` old 9/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BM-computed-tags-routes-20260614-102400/reservation-note.md`; DDD-C09BL closeout validators passed; worker spawn was next |
+| 2026-06-14 | coordinator | Closed DDD-C09BL as DONE_WITH_CONCERNS after local RED/GREEN critical path and Dewey timeout recovery | `docs/program-coordination/evidence/dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500/coordinator-closeout.md`; Creator Collaboration application 2/2; Creator Collaboration web controller 3/3; production compile; preflight `canvas-web` 524 endpoints |
+| 2026-06-14 | Dewey | Timed out without a normal DDD-C09BL packet and was closed by the coordinator | `docs/program-coordination/evidence/dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500/worker-return.md`; worker id `019ec3e3-c2b2-7be2-80ff-881f2ed51558` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BL worker Dewey and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec3e3-c2b2-7be2-80ff-881f2ed51558`; exact six-file Creator Collaboration reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BL Creator Collaboration route alias batch with exact six-file scope after preflight selected `route:/canvas/creator-collaboration` old 9/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500/reservation-note.md`; DDD-C09BK closeout validators passed; worker spawn was next |
+| 2026-06-14 | coordinator | Closed DDD-C09BK as DONE_WITH_CONCERNS after local RED/GREEN critical path and Bernoulli timeout recovery | `docs/program-coordination/evidence/dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500/coordinator-closeout.md`; Warehouse Tables application 2/2; Warehouse Tables web controller 3/3; production compile; preflight `canvas-web` 515 endpoints |
+| 2026-06-14 | Bernoulli | Timed out without a normal DDD-C09BK packet and was closed by the coordinator | `docs/program-coordination/evidence/dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500/worker-return.md`; worker id `019ec3d3-7e2e-77e3-8bc2-23fa33accf98` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BK worker Bernoulli and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec3d3-7e2e-77e3-8bc2-23fa33accf98`; exact six-file Warehouse Tables reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BK Warehouse Tables route alias batch with exact six-file scope after preflight selected `route:/warehouse/tables` old 9/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500/reservation-note.md`; DDD-C09BJ closeout validators passed; worker spawn was next |
+| 2026-06-14 | coordinator | Closed DDD-C09BJ as DONE_WITH_CONCERNS after local RED/GREEN critical path and Leibniz concurrency-error recovery | `docs/program-coordination/evidence/dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800/coordinator-closeout.md`; AB Experiments application 2/2; AB Experiments web controller 3/3; production compile; preflight `canvas-web` 506 endpoints |
+| 2026-06-14 | Leibniz | Failed to return a normal DDD-C09BJ packet because the agent stream disconnected due account concurrency limit | `docs/program-coordination/evidence/dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800/worker-return.md`; worker id `019ec3ae-ca6e-74c3-948e-07a1ba744716` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BJ worker Leibniz and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec3ae-ca6e-74c3-948e-07a1ba744716`; exact six-file AB Experiments reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BJ AB Experiments route alias batch with exact six-file scope after preflight selected `route:/canvas/ab-experiments` old 9/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800/reservation-note.md`; DDD-C09BI closeout validators passed; worker spawn is next |
+| 2026-06-14 | coordinator | Closed DDD-C09BI as DONE_WITH_CONCERNS after bounded Averroes harvest, local RED/GREEN critical path, focused Programmatic DSP verification, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000/coordinator-closeout.md`; Programmatic DSP application 3/3; Programmatic DSP web controller 3/3; production compile; preflight `canvas-web` 497 endpoints |
+| 2026-06-14 | Averroes | Returned DDD-C09BI DONE packet via `close_agent` after one short wait timeout | `docs/program-coordination/evidence/dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000/worker-return.md`; worker id `019ec39f-b26f-79b2-a81d-3f31f026249a` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BI worker Averroes and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec39f-b26f-79b2-a81d-3f31f026249a`; exact six-file Programmatic DSP reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BI Programmatic DSP route alias batch with exact six-file scope after preflight selected `route:/canvas/programmatic-dsp` old 10/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000/reservation-note.md`; DDD-C09BH closeout validators passed; worker spawn is next |
+| 2026-06-14 | coordinator | Closed DDD-C09BH as DONE_WITH_CONCERNS after bounded Turing harvest, local RED/GREEN critical path, focused Audience verification, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09BH-audience-routes-20260614-083805/coordinator-closeout.md`; Audience application 2/2; Audience web controller 3/3; production compile; preflight `canvas-web` 487 endpoints |
+| 2026-06-14 | Turing | Returned DDD-C09BH matching worker packet; coordinator closed the sidecar worker after one harvest | worker id `019ec392-b466-7330-b3bd-42e88eeaa730`; six reserved Audience files matched coordinator verification |
+| 2026-06-14 | coordinator | Spawned DDD-C09BH worker Turing and moved dispatch to RUNNING with actual worker id while keeping implementation on the coordinator critical path | worker id `019ec392-b466-7330-b3bd-42e88eeaa730`; exact six-file Audience reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BH Audience route alias batch with exact six-file scope after preflight selected `route:/canvas/audiences` old 10/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BH-audience-routes-20260614-083805/reservation-note.md`; DDD-C09BG closeout validators passed |
+| 2026-06-14 | coordinator | Closed DDD-C09BG as DONE_WITH_CONCERNS after bounded Jason timeout, local RED/GREEN recovery, focused Analytics verification, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09BG-analytics-routes-20260614-082400/coordinator-recovery-closeout.md`; Analytics application 2/2; Analytics web controller 2/2; production compile; preflight `canvas-web` 477 endpoints |
+| 2026-06-14 | coordinator | Closed DDD-C09BF as DONE_WITH_CONCERNS after one bounded Hubble wait, no worker return, local RED/GREEN recovery, focused Marketing integration verification, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09BF-marketing-integrations-routes-20260614-081400/coordinator-recovery-closeout.md`; Marketing integration application 1/1; Marketing integration web controller 2/2; production compile; preflight `canvas-web` 467 endpoints |
+| 2026-06-14 | coordinator | Spawned DDD-C09BF worker Hubble and moved dispatch to RUNNING with actual worker id | worker id `019ec379-5f19-7993-86b9-eb6bed291425`; exact six-file Marketing integrations reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BF Marketing integrations route alias batch with exact six-file scope after preflight selected `route:/canvas/marketing-integrations` old 11/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BF-marketing-integrations-routes-20260614-081400/reservation-note.md`; DDD-C09BE closeout validators passed; worker spawn is next |
+| 2026-06-14 | coordinator | Closed DDD-C09BE as DONE_WITH_CONCERNS after Mendel NEEDS_CONTEXT, local RED/GREEN recovery, focused CDP privacy verification, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09BE-warehouse-privacy-routes-20260614-080300/coordinator-recovery-closeout.md`; CDP privacy application 1/1; CDP privacy web controller 2/2; production compile; preflight `canvas-web` 456 endpoints |
+| 2026-06-14 | coordinator | Spawned DDD-C09BE worker Mendel and moved dispatch to RUNNING with actual worker id | worker id `019ec36e-7f11-73f3-b17c-d0ec894d21f7`; exact six-file Warehouse privacy reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BE Warehouse privacy route alias batch with exact six-file scope after preflight selected `route:/warehouse/privacy` old 15/current 0 | `docs/program-coordination/evidence/dispatch-DDD-C09BE-warehouse-privacy-routes-20260614-080300/reservation-note.md`; DDD-C09BD closeout validators passed; worker spawn is next |
+| 2026-06-14 | coordinator | Closed DDD-C09BD as DONE_WITH_CONCERNS after one bounded Hooke wait, no worker return, local RED/GREEN recovery, focused Conversation verification, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09BD-conversation-remaining-routes-20260614-074000/coordinator-recovery-closeout.md`; Conversation application 4/4; Conversation web controller 3/3; production compile; preflight `canvas-web` 441 endpoints |
+| 2026-06-14 | coordinator | Spawned DDD-C09BD worker Hooke and moved dispatch to RUNNING with actual worker id | worker id `019ec360-3356-7132-8260-d4a6fb976420`; exact four-file Conversation remaining route reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09BD Conversation remaining route alias batch with exact four-file scope after preflight selected `route:/canvas/conversations` old 24/current 7 | `docs/program-coordination/evidence/dispatch-DDD-C09BD-conversation-remaining-routes-20260614-074000/reservation-note.md`; `node tools/program-coordination/check-dispatch-state.mjs .`; preflight `canvas-web` 424 endpoints |
+| 2026-06-14 | coordinator | Closed DDD-C09BC as DONE_WITH_CONCERNS after one bounded Epicurus wait, coordinator integration fixes, focused BI/web verification, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09BC-bi-remaining-routes-20260614-072357/coordinator-closeout.md`; BI application 40/40; BI web controller 32/32; production compile; preflight `canvas-web` 424 endpoints |
+| 2026-06-14 | coordinator | Closed DDD-C09AM as DONE_WITH_CONCERNS after Euclid timeout recovery, focused verification, Mencius review fixes, preflight, and clean old-coupling scan | `docs/program-coordination/evidence/dispatch-DDD-C09AM-bi-permission-routes-20260614-011700/coordinator-recovery.md`; focused JDK 21 Maven 72/72; preflight `/canvas/bi` 77 endpoints |
+| 2026-06-14 | coordinator | Spawned DDD-C09AM worker Euclid and moved dispatch to RUNNING with actual worker id | worker id `019ec209-6650-7c33-adfb-c924da6a59ae`; exact seventeen-file BI permission administration route reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09AM BI permission administration route batch with exact seventeen-file scope | `docs/program-coordination/evidence/dispatch-DDD-C09AM-bi-permission-routes-20260614-011700/reservation-note.md`; next action is real worker spawn before RUNNING |
+| 2026-06-14 | coordinator | Closed DDD-C09AL as DONE_WITH_CONCERNS after recovery, Arendt review, concern resolution, and final verification | `docs/program-coordination/evidence/dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523/quality-review.md`; focused JDK 21 Maven 68/68; preflight `/canvas/bi` 65 endpoints |
+| 2026-06-14 | coordinator | Recovered DDD-C09AL after Schrodinger timed out, verified focused BI suite, and spawned Arendt read-only review | `docs/program-coordination/evidence/dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523/coordinator-recovery.md`; focused JDK 21 Maven 67/67; preflight `/canvas/bi` 65 endpoints |
+| 2026-06-14 | coordinator | Spawned DDD-C09AL worker Schrodinger and moved dispatch to RUNNING with actual worker id | worker id `019ec1ca-a93c-70b2-833f-d5fa3b704b42`; exact ten-file BI spreadsheet lifecycle route reservation |
+| 2026-06-14 | coordinator | Reserved DDD-C09AL BI spreadsheet lifecycle route batch with exact ten-file scope | `docs/program-coordination/evidence/dispatch-DDD-C09AL-bi-spreadsheet-routes-20260614-001523/reservation-note.md`; next action is real worker spawn before RUNNING |
+| 2026-06-14 | coordinator | Closed DDD-C09AK as DONE_WITH_CONCERNS and cleared active dispatch registry | `docs/program-coordination/evidence/dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931/coordinator-closeout.md`; focused JDK 21 Maven 65/65; preflight current canvas-web 15 controllers / 98 endpoints and `/canvas/bi` 58 endpoints |
+| 2026-06-13 | Sartre | Returned DDD-C09AK read-only review PASS with no findings | `docs/program-coordination/evidence/dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931/quality-review.md`; reviewer reran focused Maven 65/65 |
+| 2026-06-13 | coordinator | Recovered DDD-C09AK after Aquinas timed out without a return packet | `docs/program-coordination/evidence/dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931/coordinator-recovery.md`; added missing AI API records/catalog/helper/test double and reran focused Maven |
+| 2026-06-13 | coordinator | Spawned DDD-C09AK worker Aquinas and moved dispatch to RUNNING with actual worker id | worker id `019ec19b-ddd6-7282-8800-79da809fbea2`; exact nine-file BI AI assistant route reservation |
+| 2026-06-13 | coordinator | Reserved DDD-C09AK BI AI assistant route batch with exact nine-file scope | `docs/program-coordination/evidence/dispatch-DDD-C09AK-bi-ai-assistant-routes-20260613-231931/reservation-note.md`; next action is real worker spawn before RUNNING |
+| 2026-06-13 | coordinator | Closed DDD-C09AJ as DONE_WITH_CONCERNS and cleared active dispatch registry | `docs/program-coordination/evidence/dispatch-DDD-C09AJ-bi-portal-bigscreen-routes-20260613-223000/coordinator-closeout.md`; focused JDK 21 Maven 62/62; preflight current canvas-web 15 controllers / 93 endpoints and `/canvas/bi` 53 endpoints |
+| 2026-06-13 | coordinator | Recovered DDD-C09AJ quality review after Boyle timed out | `docs/program-coordination/evidence/dispatch-DDD-C09AJ-bi-portal-bigscreen-routes-20260613-223000/quality-review.md`; no blockers found in coordinator review; accepted reviewer-timeout concern |
+| 2026-06-13 | Beauvoir | Returned DDD-C09AJ DONE with BI portal and big-screen lifecycle routes | `docs/program-coordination/evidence/dispatch-DDD-C09AJ-bi-portal-bigscreen-routes-20260613-223000/worker-return.md`; 14 route batch under `/canvas/bi/portals/resources` and `/canvas/bi/big-screens/resources` |
 | 2026-06-13 | coordinator | Started DDD-C09AG read-only quality review with Lagrange after coordinator verification passed | reviewer id `019ec0ca-087b-7f60-8280-48383fc5b7c8`; exact DDD-C09AG files and evidence |
 | 2026-06-13 | coordinator | Moved DDD-C09AG to REVIEWING after Carson returned and coordinator verification passed | `docs/program-coordination/evidence/dispatch-DDD-C09AG-bi-chart-reference-impact-route-20260613-191900/worker-return.md`; focused JDK 21 Maven 53/53; preflight current canvas-web 15 controllers / 62 endpoints and `/canvas/bi` 22 endpoints |
 | 2026-06-13 | Carson | Returned DDD-C09AG complete with BI chart reference impact route and focused tests | `docs/program-coordination/evidence/dispatch-DDD-C09AG-bi-chart-reference-impact-route-20260613-191900/worker-return.md`; RED compile failure then GREEN focused Maven 53/53 |
@@ -3096,6 +4099,97 @@ commands rerun before dispatch: OSG-W11 closure coordination checks passed; back
 | 2026-06-08 | coordinator | Added dispatch-ready worker packets for DDD and OSG | `subagent-worker-packets.md` |
 | 2026-06-08 | reviewer | DDD packet review passed after section-aware checks | final read-only review result |
 | 2026-06-08 | reviewer | OSG/DDD integration review passed | final read-only review result |
+
+| 2026-06-14 | coordinator | Reserved DDD-C09BR Tag Definitions route aliases with exact six-file CDP/web scope after DDD-C09BQ closeout, clean reserved-path inspection, and pre-dispatch checks; worker spawn is next before RUNNING | `docs/program-coordination/evidence/dispatch-DDD-C09BR-tag-definitions-routes-20260614-131323/reservation-note.md`; preflight top gap `route:/canvas/tag-definitions`; no edits to `backend/canvas-engine/**` or `pom.xml` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BR worker Anscombe and moved dispatch to RUNNING with actual worker id; coordinator continues local critical-path TDD/verification without waiting | worker id `019ec490-7b72-75a0-8ce9-83e7bb1a3969`; `node tools/program-coordination/generate-worker-prompt.mjs DDD-C09BR .`; exact six-file Tag Definitions route reservation |
+| 2026-06-14 | coordinator | Closed DDD-C09BR as DONE_WITH_CONCERNS and cleared active dispatch registry after Anscombe return and local verification | `docs/program-coordination/evidence/dispatch-DDD-C09BR-tag-definitions-routes-20260614-131323/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BR-tag-definitions-routes-20260614-131323/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 37 controllers / 575 endpoints; strict old-coupling scan clean |
+| 2026-06-14 | coordinator | Reserved DDD-C09BS Computed Profile route aliases with exact six-file CDP/web scope after DDD-C09BR closeout, clean reserved-path inspection, and pre-dispatch checks; worker spawn is next before RUNNING | `docs/program-coordination/evidence/dispatch-DDD-C09BS-computed-profile-routes-20260614-134941/reservation-note.md`; preflight top gap `route:/cdp/computed-profile-attributes`; no edits to `backend/canvas-engine/**` or `pom.xml` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BS worker Ramanujan and moved dispatch to RUNNING with actual worker id; coordinator continues local critical-path TDD/verification without waiting | worker id `019ec4b2-c9b3-7742-b272-22ec2d848725`; `node tools/program-coordination/generate-worker-prompt.mjs DDD-C09BS .`; exact six-file Computed Profile route reservation |
+| 2026-06-14 | coordinator | Closed DDD-C09BS as DONE_WITH_CONCERNS and cleared active dispatch registry after Ramanujan return and local verification | `docs/program-coordination/evidence/dispatch-DDD-C09BS-computed-profile-routes-20260614-134941/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BS-computed-profile-routes-20260614-134941/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 38 controllers / 583 endpoints; strict old-coupling scan clean |
+| 2026-06-14 | coordinator | Reserved DDD-C09BT Canvas Stats route aliases with exact six-file canvas/web scope after DDD-C09BS closeout, clean preflight top gap identification, and no active dispatches; worker spawn is next before RUNNING | `docs/program-coordination/evidence/dispatch-DDD-C09BT-canvas-stats-routes-20260614-141402/reservation-note.md`; preflight top gap `family:CanvasStats`; no edits to `backend/canvas-engine/**` or `pom.xml` |
+| 2026-06-14 | coordinator | Closed DDD-C09BT as DONE_WITH_CONCERNS and cleared active dispatch registry after Banach return and coordinator verification | `docs/program-coordination/evidence/dispatch-DDD-C09BT-canvas-stats-routes-20260614-141402/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BT-canvas-stats-routes-20260614-141402/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 39 controllers / 590 endpoints; strict old-coupling scan clean; next top gap `route:/channels` |
+| 2026-06-14 | coordinator | Reserved DDD-C09BU Channel Connectors route aliases with exact six-file platform/web scope after fresh cold-start checks and route gap inspection; worker spawn is next before RUNNING | `docs/program-coordination/evidence/dispatch-DDD-C09BU-channel-connectors-routes-20260614-232715/reservation-note.md`; preflight top gap `route:/channels`; no edits to `backend/canvas-engine/**` or `pom.xml` |
+| 2026-06-14 | coordinator | Spawned DDD-C09BU worker Zeno and moved dispatch to RUNNING with actual worker id; user clarified no ceremonial tests, only meaningful compatibility coverage | worker id `019ec6bf-98e8-7b03-9d76-7f19c7e10176`; exact six-file Channel Connectors route reservation |
+| 2026-06-14 | coordinator | Closed DDD-C09BU as DONE_WITH_CONCERNS and cleared active dispatch registry after Zeno return and coordinator verification | `docs/program-coordination/evidence/dispatch-DDD-C09BU-channel-connectors-routes-20260614-232715/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BU-channel-connectors-routes-20260614-232715/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 40 controllers / 597 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/audiences` |
+| 2026-06-15 | coordinator | Closed DDD-C09BV Warehouse Audiences as DONE_WITH_CONCERNS after parallel worker implementation, read-only contract review, meaningful compatibility fix for default refresh limit, and coordinator verification | `docs/program-coordination/evidence/dispatch-DDD-C09BV-warehouse-audiences-routes-20260614-235205/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BV-warehouse-audiences-routes-20260614-235205/contract-review.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BV-warehouse-audiences-routes-20260614-235205/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 41 controllers / 604 endpoints; next top gap `route:/approvals` |
+| 2026-06-15 | coordinator | Closed DDD-C09BW Approvals as DONE_WITH_CONCERNS after Galileo return, parallel read-only reviews, and meaningful tenant/auth compatibility fixes | `docs/program-coordination/evidence/dispatch-DDD-C09BW-approvals-routes-20260615-000752/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BW-approvals-routes-20260615-000752/contract-review.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BW-approvals-routes-20260615-000752/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 42 controllers / 610 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/marketing-forms` |
+| 2026-06-15 | coordinator | Closed DDD-C09BX Marketing Forms as DONE_WITH_CONCERNS after stopping same-file worker conflict, keeping meaningful tests, and verifying six management routes | `docs/program-coordination/evidence/dispatch-DDD-C09BX-marketing-forms-routes-20260615-002500/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BX-marketing-forms-routes-20260615-002500/coordinator-closeout.md`; focused Maven 4/4 and 4/4; production compile; preflight current canvas-web 43 controllers / 616 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/mautic-insights` |
+| 2026-06-15 | coordinator | Closed DDD-C09BY Mautic Insights as DONE_WITH_CONCERNS after one bounded Bacon wait, sidecar shutdown without packet, and coordinator-owned meaningful compatibility verification | `docs/program-coordination/evidence/dispatch-DDD-C09BY-mautic-insights-routes-20260615-004000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BY-mautic-insights-routes-20260615-004000/coordinator-closeout.md`; focused Maven 5/5 and 4/4; production compile; preflight current canvas-web 44 controllers / 622 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/notifications` |
+| 2026-06-15 | coordinator | Closed DDD-C09BZ Notifications as DONE_WITH_CONCERNS after Laplace contract review, stopping Lorentz before same-file conflict, and meaningful route/state compatibility verification | `docs/program-coordination/evidence/dispatch-DDD-C09BZ-notifications-routes-20260615-004900/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BZ-notifications-routes-20260615-004900/contract-notes.md`; `docs/program-coordination/evidence/dispatch-DDD-C09BZ-notifications-routes-20260615-004900/coordinator-closeout.md`; focused Maven 4/4 and 4/4; production compile; preflight current canvas-web 45 controllers / 628 endpoints; strict old-coupling scan clean; next top gap `route:/test-users` |
+| 2026-06-15 | coordinator | Closed DDD-C09CA Test Users as DONE_WITH_CONCERNS after stopping Averroes same-file test conflict and verifying tenant/default/DO-field compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09CA-test-users-routes-20260615-010200/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CA-test-users-routes-20260615-010200/coordinator-closeout.md`; focused Maven 4/4 and 4/4; production compile; preflight current canvas-web 46 controllers / 634 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/e2e-certification` |
+| 2026-06-15 | coordinator | Closed DDD-C09CB Warehouse E2E Certification as DONE_WITH_CONCERNS after retaining useful Wegener code, normalizing tests, and verifying five route aliases | `docs/program-coordination/evidence/dispatch-DDD-C09CB-warehouse-e2e-certification-routes-20260615-011500/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CB-warehouse-e2e-certification-routes-20260615-011500/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 47 controllers / 639 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/data-sources` |
+| 2026-06-15 | coordinator | Closed DDD-C09CC Data Sources as DONE_WITH_CONCERNS after stopping Sartre same-file overwrite risk, keeping useful landed work, and verifying five data-source routes | `docs/program-coordination/evidence/dispatch-DDD-C09CC-data-sources-routes-20260615-013054/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CC-data-sources-routes-20260615-013054/coordinator-closeout.md`; focused Maven 4/4 and 3/3; production compile; preflight current canvas-web 48 controllers / 644 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/marketing-preferences` |
+| 2026-06-15 | coordinator | Closed DDD-C09CD Marketing Preferences as DONE_WITH_CONCERNS after stopping Parfit same-file overwrite risk, keeping typed final-module work, and verifying five preference-center routes | `docs/program-coordination/evidence/dispatch-DDD-C09CD-marketing-preferences-routes-20260615-014746/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CD-marketing-preferences-routes-20260615-014746/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 49 controllers / 649 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/tag-import-sources` |
+| 2026-06-15 | coordinator | Closed DDD-C09CE Tag Import Sources as DONE_WITH_CONCERNS after Nietzsche completed, coordinator corrected full PUT compatibility and module dependency boundary, and verified five source-management routes | `docs/program-coordination/evidence/dispatch-DDD-C09CE-tag-import-sources-routes-20260615-015841/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CE-tag-import-sources-routes-20260615-015841/coordinator-closeout.md`; focused Maven 3/3 and 4/4; production compile; preflight current canvas-web 50 controllers / 654 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/tag-imports` |
+| 2026-06-15 | coordinator | Closed DDD-C09CF Tag Imports as DONE_WITH_CONCERNS after stopping Carson same-file overwrite risk and verifying five import routes including template and multipart binding | `docs/program-coordination/evidence/dispatch-DDD-C09CF-tag-imports-routes-20260615-020911/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CF-tag-imports-routes-20260615-020911/coordinator-closeout.md`; focused Maven 3/3 and 4/4; production compile; preflight current canvas-web 51 controllers / 659 endpoints; strict old-coupling scan clean; next top gap `route:/message-deliveries` |
+| 2026-06-15 | coordinator | Closed DDD-C09CG Message Deliveries as DONE_WITH_CONCERNS after stopping Lovelace same-file overwrite risk, keeping useful typed tests, and verifying five delivery routes | `docs/program-coordination/evidence/dispatch-DDD-C09CG-message-deliveries-routes-20260615-021728/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CG-message-deliveries-routes-20260615-021728/coordinator-closeout.md`; focused Maven 2/2 and 4/4; production compile; preflight current canvas-web 52 controllers / 664 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/catalog` |
+| 2026-06-15 | coordinator | Closed DDD-C09CH Warehouse Catalog as DONE_WITH_CONCERNS after stopping/observing Lagrange no longer active to prevent same-file overwrite risk, retaining meaningful typed tests, and verifying five catalog/lineage routes | `docs/program-coordination/evidence/dispatch-DDD-C09CH-warehouse-catalog-routes-20260615-022850/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CH-warehouse-catalog-routes-20260615-022850/coordinator-closeout.md`; focused Maven 4/4 and 3/3; production compile; preflight current canvas-web 53 controllers / 669 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/enterprise-olap` |
+| 2026-06-15 | coordinator | Closed DDD-C09CI Warehouse Enterprise OLAP Evidence as DONE_WITH_CONCERNS after stopping Kuhn same-file overwrite risk, correcting useful tests to legacy operator-key/proof-order/limit behavior, and verifying five evidence routes | `docs/program-coordination/evidence/dispatch-DDD-C09CI-warehouse-enterprise-olap-routes-20260615-023800/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CI-warehouse-enterprise-olap-routes-20260615-023800/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 54 controllers / 674 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/metric-change-reviews` |
+| 2026-06-15 | coordinator | Closed DDD-C09CJ Warehouse Metric Change Reviews as DONE_WITH_CONCERNS after stopping Mill same-file overwrite risk, correcting useful tests to legacy filter/snapshot behavior, and verifying five review routes | `docs/program-coordination/evidence/dispatch-DDD-C09CJ-warehouse-metric-change-reviews-routes-20260615-024600/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CJ-warehouse-metric-change-reviews-routes-20260615-024600/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 55 controllers / 679 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/api-definitions` |
+| 2026-06-15 | coordinator | Closed DDD-C09CK Canvas API Definitions as DONE_WITH_CONCERNS after stopping Ramanujan same-file overwrite risk, retaining useful tests, and verifying four API definition routes | `docs/program-coordination/evidence/dispatch-DDD-C09CK-canvas-api-definitions-routes-20260615-030000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CK-canvas-api-definitions-routes-20260615-030000/coordinator-closeout.md`; focused Maven 3/3 and 2/2; production compile; preflight current canvas-web 56 controllers / 683 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/event-definitions` |
+| 2026-06-15 | coordinator | Closed DDD-C09CL Canvas Event Definitions as DONE_WITH_CONCERNS after one bounded Kierkegaard timeout, retaining meaningful tests, correcting page shape to legacy `total + list`, and verifying four event-definition routes | `docs/program-coordination/evidence/dispatch-DDD-C09CL-canvas-event-definitions-routes-20260615-030543/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CL-canvas-event-definitions-routes-20260615-030543/coordinator-closeout.md`; focused Maven 2/2 and 2/2; production compile; preflight current canvas-web 57 controllers / 687 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/identity-types` |
+| 2026-06-15 | coordinator | Closed DDD-C09CM Canvas Identity Types as DONE_WITH_CONCERNS after one bounded Anscombe timeout, retaining meaningful behavior tests, and verifying four identity-type routes | `docs/program-coordination/evidence/dispatch-DDD-C09CM-canvas-identity-types-routes-20260615-031413/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CM-canvas-identity-types-routes-20260615-031413/coordinator-closeout.md`; focused Maven 2/2 and 2/2; production compile; preflight current canvas-web 58 controllers / 691 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/loyalty` |
+| 2026-06-15 | coordinator | Closed DDD-C09CN Canvas Loyalty as DONE_WITH_CONCERNS after one bounded Meitner timeout, retaining meaningful loyalty state tests, and verifying four loyalty routes | `docs/program-coordination/evidence/dispatch-DDD-C09CN-canvas-loyalty-routes-20260615-032148/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CN-canvas-loyalty-routes-20260615-032148/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 59 controllers / 695 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/mq-definitions` |
+| 2026-06-15 | coordinator | Closed DDD-C09CO Canvas MQ Definitions as DONE_WITH_CONCERNS after one bounded Poincare timeout, coordinator-owned implementation, and verifying four MQ definition routes | `docs/program-coordination/evidence/dispatch-DDD-C09CO-canvas-mq-definitions-routes-20260615-032909/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CO-canvas-mq-definitions-routes-20260615-032909/coordinator-closeout.md`; focused Maven 3/3 and 2/2; production compile; preflight current canvas-web 60 controllers / 699 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/paid-media` |
+| 2026-06-15 | coordinator | Closed DDD-C09CP Canvas Paid Media as DONE_WITH_CONCERNS after one bounded Tesla timeout, retaining meaningful paid-media sync tests, and verifying four paid-media audience-sync routes | `docs/program-coordination/evidence/dispatch-DDD-C09CP-canvas-paid-media-routes-20260615-033625/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CP-canvas-paid-media-routes-20260615-033625/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 61 controllers / 703 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/policies` |
+| 2026-06-15 | coordinator | Closed DDD-C09CQ Canvas Policies as DONE_WITH_CONCERNS after one bounded Halley timeout, coordinator-owned implementation, and verifying four policy routes | `docs/program-coordination/evidence/dispatch-DDD-C09CQ-canvas-policies-routes-20260615-034405/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CQ-canvas-policies-routes-20260615-034405/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 62 controllers / 707 endpoints; strict old-coupling scan clean; next top gap `route:/cdp/tag-operations` |
+| 2026-06-15 | coordinator | Closed DDD-C09CR CDP Tag Operations as DONE_WITH_CONCERNS after one bounded Popper timeout, coordinator-owned implementation, and verifying four tag-operation routes | `docs/program-coordination/evidence/dispatch-DDD-C09CR-cdp-tag-operations-routes-20260615-035300/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CR-cdp-tag-operations-routes-20260615-035300/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 63 controllers / 711 endpoints; strict old-coupling scan clean; next top gap `route:/demo-sandboxes` |
+| 2026-06-15 | coordinator | Closed DDD-C09CS Demo Sandboxes as DONE_WITH_CONCERNS after one bounded Euclid timeout, coordinator-owned implementation, and verifying four demo sandbox routes | `docs/program-coordination/evidence/dispatch-DDD-C09CS-demo-sandboxes-routes-20260615-035930/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CS-demo-sandboxes-routes-20260615-035930/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 64 controllers / 715 endpoints; strict old-coupling scan clean; next top gap `family:CanvasUser` |
+| 2026-06-15 | coordinator | Closed DDD-C09CT Canvas Users as DONE_WITH_CONCERNS after one bounded Herschel timeout, coordinator-owned implementation, and verifying three canvas user routes | `docs/program-coordination/evidence/dispatch-DDD-C09CT-canvas-users-routes-20260615-041250/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CT-canvas-users-routes-20260615-041250/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 65 controllers / 718 endpoints; strict old-coupling scan clean; next top gap `route:/auth` |
+| 2026-06-15 | coordinator | Closed DDD-C09CU Auth as DONE_WITH_CONCERNS after Kant sidecar review, coordinator-owned implementation, and verifying three auth routes | `docs/program-coordination/evidence/dispatch-DDD-C09CU-auth-routes-20260615-041554/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CU-auth-routes-20260615-041554/coordinator-closeout.md`; focused Maven 4/4 and 3/3; production compile; preflight current canvas-web 66 controllers / 721 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/dlq` |
+| 2026-06-15 | coordinator | Closed DDD-C09CV DLQ as DONE_WITH_CONCERNS after Hypatia sidecar review, coordinator-owned implementation, and verifying three DLQ routes | `docs/program-coordination/evidence/dispatch-DDD-C09CV-dlq-routes-20260615-042247/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CV-dlq-routes-20260615-042247/coordinator-closeout.md`; focused Maven 4/4 and 3/3; production compile; preflight current canvas-web 67 controllers / 724 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/execution-requests` |
+| 2026-06-15 | coordinator | Closed DDD-C09CW Execution Requests as DONE_WITH_CONCERNS after Hegel sidecar review, coordinator-owned implementation, and verifying three execution request routes | `docs/program-coordination/evidence/dispatch-DDD-C09CW-execution-requests-routes-20260615-042931/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CW-execution-requests-routes-20260615-042931/coordinator-closeout.md`; focused Maven 6/6 and 3/3; production compile; preflight current canvas-web 68 controllers / 727 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/mq-trigger-rejected` |
+| 2026-06-15 | coordinator | Closed DDD-C09CX MQ Trigger Rejected as DONE_WITH_CONCERNS after Cicero sidecar review, coordinator-owned implementation, and verifying three MQ rejected routes | `docs/program-coordination/evidence/dispatch-DDD-C09CX-mq-trigger-rejected-routes-20260615-044019/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CX-mq-trigger-rejected-routes-20260615-044019/coordinator-closeout.md`; focused Maven 5/5 and 3/3; production compile; preflight current canvas-web 69 controllers / 730 endpoints; strict old-coupling scan clean; next top gap `route:/cdp/audiences` |
+| 2026-06-15 | coordinator | Closed DDD-C09CY Realtime Audience as DONE_WITH_CONCERNS after Jason sidecar review, coordinator-owned implementation, and verifying six realtime audience routes | `docs/program-coordination/evidence/dispatch-DDD-C09CY-realtime-audience-routes-20260615-044707/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CY-realtime-audience-routes-20260615-044707/coordinator-closeout.md`; focused Maven 4/4 and 3/3; production compile; preflight current canvas-web 70 controllers / 736 endpoints; strict old-coupling scan clean; next top gap `route:/cdp/write-keys` |
+| 2026-06-15 | coordinator | Closed DDD-C09CZ CDP Write Keys as DONE_WITH_CONCERNS after Ampere sidecar review, coordinator-owned implementation, and verifying three write-key routes | `docs/program-coordination/evidence/dispatch-DDD-C09CZ-cdp-write-keys-routes-20260615-050030/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09CZ-cdp-write-keys-routes-20260615-050030/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 71 controllers / 739 endpoints; strict old-coupling scan clean; next top gap `route:/execution-reruns` |
+| 2026-06-15 | coordinator | Closed DDD-C09DA Execution Reruns as DONE_WITH_CONCERNS after Gauss sidecar review, coordinator-owned implementation, and verifying three rerun routes | `docs/program-coordination/evidence/dispatch-DDD-C09DA-execution-reruns-routes-20260615-050810/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DA-execution-reruns-routes-20260615-050810/coordinator-closeout.md`; focused Maven 3/3 and 3/3; production compile; preflight current canvas-web 72 controllers / 742 endpoints; strict old-coupling scan clean; next top gap `route:/message-templates` |
+| 2026-06-15 | coordinator | Closed DDD-C09DB Message Templates as DONE_WITH_CONCERNS after Erdos sidecar review, coordinator-owned implementation, and verifying three legacy template routes | `docs/program-coordination/evidence/dispatch-DDD-C09DB-message-templates-routes-20260615-051423/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DB-message-templates-routes-20260615-051423/coordinator-closeout.md`; focused Maven 3/3 and 2/2; production compile; preflight current canvas-web 73 controllers / 745 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/e2e-certification-runs` |
+| 2026-06-15 | coordinator | Closed DDD-C09DC Warehouse E2E Certification Runs as DONE_WITH_CONCERNS after Hooke sidecar review, coordinator-owned alias implementation, and verifying three flat run routes | `docs/program-coordination/evidence/dispatch-DDD-C09DC-warehouse-e2e-certification-runs-routes-20260615-052000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DC-warehouse-e2e-certification-runs-routes-20260615-052000/coordinator-closeout.md`; focused Maven 2/2; production compile; preflight current canvas-web 74 controllers / 748 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/fields` |
+| 2026-06-15 | coordinator | Closed DDD-C09DD Warehouse Fields as DONE_WITH_CONCERNS after Confucius sidecar review, coordinator-owned implementation, and verifying three field governance routes | `docs/program-coordination/evidence/dispatch-DDD-C09DD-warehouse-fields-routes-20260615-052453/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DD-warehouse-fields-routes-20260615-052453/coordinator-closeout.md`; focused Maven 2/2 and 2/2; production compile; preflight current canvas-web 75 controllers / 751 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/incidents` |
+| 2026-06-15 | coordinator | Closed DDD-C09DE Warehouse Incidents as DONE_WITH_CONCERNS after Feynman sidecar contract review, coordinator-owned implementation, and verifying three incident routes | `docs/program-coordination/evidence/dispatch-DDD-C09DE-warehouse-incidents-routes-20260615-053407/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DE-warehouse-incidents-routes-20260615-053407/coordinator-closeout.md`; focused Maven 2/2 and 2/2; production compile; preflight current canvas-web 76 controllers / 754 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/quality` |
+| 2026-06-15 | coordinator | Closed DDD-C09DF Warehouse Quality as DONE_WITH_CONCERNS after Linnaeus sidecar contract review, coordinator-owned implementation, and verifying three quality routes | `docs/program-coordination/evidence/dispatch-DDD-C09DF-warehouse-quality-routes-20260615-054623/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DF-warehouse-quality-routes-20260615-054623/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 77 controllers / 757 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/slo-policies` |
+| 2026-06-15 | coordinator | Closed DDD-C09DG Warehouse SLO Policies as DONE_WITH_CONCERNS after Nash sidecar contract review, coordinator-owned implementation, and verifying three SLO policy routes | `docs/program-coordination/evidence/dispatch-DDD-C09DG-warehouse-slo-policies-routes-20260615-055437/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DG-warehouse-slo-policies-routes-20260615-055437/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 78 controllers / 760 endpoints; strict old-coupling scan clean; next top gap `route:/cdp/users` |
+| 2026-06-15 | coordinator | Closed DDD-C09DH CDP Users read routes as DONE_WITH_CONCERNS after Banach sidecar contract review, coordinator-owned implementation, and verifying three missing read routes | `docs/program-coordination/evidence/dispatch-DDD-C09DH-cdp-users-read-routes-20260615-060820/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DH-cdp-users-read-routes-20260615-060820/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 79 controllers / 763 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/async-tasks` |
+| 2026-06-15 | coordinator | Closed DDD-C09DI Canvas Async Tasks as DONE_WITH_CONCERNS after Darwin sidecar contract review, coordinator-owned implementation, and verifying two async task read routes | `docs/program-coordination/evidence/dispatch-DDD-C09DI-canvas-async-tasks-routes-20260615-061420/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DI-canvas-async-tasks-routes-20260615-061420/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 80 controllers / 765 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/execution` |
+| 2026-06-15 | coordinator | Closed DDD-C09DJ Canvas Execution approval routes as DONE_WITH_CONCERNS after Locke sidecar contract review, coordinator-owned implementation, and verifying approve/reject compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09DJ-canvas-execution-approval-routes-20260615-062120/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DJ-canvas-execution-approval-routes-20260615-062120/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 81 controllers / 767 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/message-send-records` |
+| 2026-06-15 | coordinator | Closed DDD-C09DK Canvas Message Send Records routes as DONE_WITH_CONCERNS after Helmholtz and Descartes sidecar contract reviews, coordinator-owned implementation, and verifying list/detail compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09DK-canvas-message-send-records-routes-20260615-063300/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DK-canvas-message-send-records-routes-20260615-063300/coordinator-closeout.md`; focused Maven 2/2 and 2/2; production compile; preflight current canvas-web 82 controllers / 769 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/plugins` |
+| 2026-06-15 | coordinator | Closed DDD-C09DL Canvas Plugins routes as DONE_WITH_CONCERNS after Hubble stopped on same-scope conflict and coordinator-owned implementation verified catalog/enable compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09DL-canvas-plugins-routes-20260615-064000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DL-canvas-plugins-routes-20260615-064000/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 83 controllers / 771 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/preferences` |
+| 2026-06-15 | coordinator | Closed DDD-C09DM Canvas Preferences routes as DONE_WITH_CONCERNS after Franklin sidecar shutdown and coordinator-owned verification of editor preference compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09DM-canvas-preferences-routes-20260615-064500/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DM-canvas-preferences-routes-20260615-064500/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 84 controllers / 773 endpoints; strict old-coupling scan clean; next top gap `route:/meta/ab-experiments` |
+| 2026-06-15 | coordinator | Closed DDD-C09DN Meta routes as DONE_WITH_CONCERNS after retaining useful Chandrasekhar marketing-context work, applying Socrates key/label contract review, and verifying meta option/AB/biz-line compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09DN-meta-routes-20260615-065000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DN-meta-routes-20260615-065000/contract-review.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DN-meta-routes-20260615-065000/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 85 controllers / 779 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/data-path-probes` |
+| 2026-06-15 | coordinator | Closed DDD-C09DO Warehouse Data Path Probes as DONE_WITH_CONCERNS after stopping Bernoulli same-scope collision, retaining meaningful old-service status tests, and verifying synthetic ODS probe route compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09DO-warehouse-data-path-probes-routes-20260615-065600/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DO-warehouse-data-path-probes-routes-20260615-065600/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 86 controllers / 781 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/offline-cycle` |
+| 2026-06-15 | coordinator | Closed DDD-C09DP Warehouse Offline Cycle and Retention as DONE_WITH_CONCERNS after one bounded Sagan timeout and coordinator-owned final-module implementation | `docs/program-coordination/evidence/dispatch-DDD-C09DP-warehouse-offline-retention-routes-20260615-070500/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DP-warehouse-offline-retention-routes-20260615-070500/coordinator-closeout.md`; focused Maven 2/2 and 2/2; production compile; preflight current canvas-web 87 controllers / 785 endpoints; strict old-coupling scan clean; next top gap `family:Canvas` |
+| 2026-06-15 | coordinator | Closed DDD-C09DQ Canvas project-folder metadata as DONE_WITH_CONCERNS after Faraday confirmed the concrete routes already existed in final modules | `docs/program-coordination/evidence/dispatch-DDD-C09DQ-canvas-project-folder-metadata-routes-20260615-071300/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DQ-canvas-project-folder-metadata-routes-20260615-071300/coordinator-closeout.md`; focused Maven 2/2 and 8/8; production compile; preflight current canvas-web 87 controllers / 785 endpoints; strict old-coupling scan clean; next action review `family:Canvas` preflight grouping or select a concrete missing route |
+| 2026-06-15 | coordinator | Closed DDD-C09DR Preflight split-controller coverage as DONE_WITH_CONCERNS after Rawls fixed the `family:Canvas` false positive and Pauli confirmed no true CanvasController endpoint gap | `docs/program-coordination/evidence/dispatch-DDD-C09DR-preflight-split-controller-coverage-20260615-072030/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DR-preflight-split-controller-coverage-20260615-072030/coordinator-closeout.md`; node preflight tests 6/6; fresh preflight current canvas-web 87 controllers / 785 endpoints; false `family:Canvas` gap removed; next top gap `family:CanvasCollaboration` |
+| 2026-06-15 | coordinator | Closed DDD-C09DS Canvas Collaboration summary route as DONE_WITH_CONCERNS after Hilbert implementation and Einstein read-only contract review | `docs/program-coordination/evidence/dispatch-DDD-C09DS-canvas-collaboration-summary-route-20260615-072900/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DS-canvas-collaboration-summary-route-20260615-072900/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 88 controllers / 786 endpoints; strict old-coupling scan clean; next top gap `family:Ops` |
+| 2026-06-15 | coordinator | Closed DDD-C09DT Ops canvas template/review routes as DONE_WITH_CONCERNS after Russell confirmed cache-invalidate coverage and coordinator ported the true remaining old OpsController canvas routes | `docs/program-coordination/evidence/dispatch-DDD-C09DT-ops-cache-invalidate-route-20260615-074000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09DT-ops-canvas-template-review-routes-20260615-074000/coordinator-closeout.md`; focused Maven 4/4 and 10/10; production compile; node preflight 7/7; preflight current canvas-web 88 controllers / 790 endpoints; strict old-coupling scan clean; next top gap `route:/architecture` |
+| 2026-06-15 | coordinator | Closed DDD-C09DU Architecture migration candidate route as DONE_WITH_CONCERNS after one bounded Leibniz timeout and coordinator-owned final web compatibility route | `docs/program-coordination/evidence/dispatch-DDD-C09DU-architecture-migration-candidates-route-20260615-075000/coordinator-closeout.md`; focused Maven 2/2 and 3/3; production compile; preflight current canvas-web 89 controllers / 791 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/batch` |
+| 2026-06-15 | coordinator | Closed DDD-C09DV Canvas batch route as DONE_WITH_CONCERNS after one bounded Schrodinger timeout and coordinator-owned final compatibility route | `docs/program-coordination/evidence/dispatch-DDD-C09DV-canvas-batch-route-20260615-080000/coordinator-closeout.md`; focused Maven 5/5 and 2/2; production compile; preflight current canvas-web 90 controllers / 792 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/contactability` |
+| 2026-06-15 | coordinator | Closed DDD-C09DW Canvas contactability route as DONE_WITH_CONCERNS after one bounded Beauvoir timeout and coordinator-owned final compatibility route | `docs/program-coordination/evidence/dispatch-DDD-C09DW-canvas-contactability-route-20260615-081000/coordinator-closeout.md`; focused Maven 2/2; production compile; preflight current canvas-web 91 controllers / 793 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/event-attributes` |
+| 2026-06-15 | coordinator | Closed DDD-C09DX Canvas event attributes route as DONE_WITH_CONCERNS after one bounded Planck timeout, integrating same-scope final CDP facade work, and recovering prior contactability compile mismatch | `docs/program-coordination/evidence/dispatch-DDD-C09DX-canvas-event-attributes-route-20260615-082000/coordinator-closeout.md`; focused Maven 2/2; production compile; preflight current canvas-web 92 controllers / 794 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/events` |
+| 2026-06-15 | coordinator | Closed DDD-C09DY Canvas events report route as DONE_WITH_CONCERNS after one bounded Bohr timeout and final-module raw-body facade route verification | `docs/program-coordination/evidence/dispatch-DDD-C09DY-canvas-events-route-20260615-083000/coordinator-closeout.md`; focused Maven 2/2; production compile; preflight current canvas-web 93 controllers / 795 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/home` |
+| 2026-06-15 | coordinator | Closed DDD-C09DZ Canvas home route as DONE_WITH_CONCERNS after one bounded McClintock timeout and final-module overview compatibility verification | `docs/program-coordination/evidence/dispatch-DDD-C09DZ-canvas-home-route-20260615-083200/coordinator-closeout.md`; focused Maven 1/1; production compile; preflight current canvas-web 94 controllers / 796 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/marketing-platform` |
+| 2026-06-15 | coordinator | Closed DDD-C09EA Canvas marketing-platform route as DONE_WITH_CONCERNS after one bounded Volta timeout, retaining useful tenant header coverage, and verifying final-module control-plane compatibility | `docs/program-coordination/evidence/dispatch-DDD-C09EA-canvas-marketing-platform-route-20260615-083700/coordinator-closeout.md`; focused Maven 2/2; production compile; preflight current canvas-web 95 controllers / 797 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/trigger` |
+| 2026-06-15 | coordinator | Closed DDD-C09EB Canvas trigger route as DONE_WITH_CONCERNS after one bounded Copernicus timeout and final-module behavior trigger compatibility verification | `docs/program-coordination/evidence/dispatch-DDD-C09EB-canvas-trigger-route-20260615-084500/coordinator-closeout.md`; focused Maven 2/2; production compile; preflight current canvas-web 96 controllers / 798 endpoints; strict old-coupling scan clean; next top gap `route:/cdp/events` |
+| 2026-06-15 | coordinator | Closed DDD-C09EC CDP event ingestion route as DONE_WITH_CONCERNS after one bounded Carver timeout and final-web controller compatibility verification | `docs/program-coordination/evidence/dispatch-DDD-C09EC-cdp-events-route-20260615-085200/coordinator-closeout.md`; focused Maven 2/2; production compile; preflight current canvas-web 97 controllers / 799 endpoints; strict old-coupling scan clean; next top gap `route:/delivery` |
+| 2026-06-15 | coordinator | Closed DDD-C09ED Delivery receipt route as DONE_WITH_CONCERNS after Raman completed the final-module port, coordinator added meaningful error-envelope coverage, and current CDP constructor/auth compile blocker was repaired | `docs/program-coordination/evidence/dispatch-DDD-C09ED-delivery-route-20260615-090000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09ED-delivery-route-20260615-090000/coordinator-closeout.md`; focused Maven 3/3 and CDP event ingestion 2/2; production compile; preflight current canvas-web 98 controllers / 800 endpoints; strict old-coupling scan clean; next top gap `route:/meta/ai-models` |
+| 2026-06-15 | coordinator | Closed DDD-C09EE remaining Meta option/schema routes as DONE_WITH_CONCERNS after one bounded Aquinas timeout and coordinator recovery of ten `/meta/*` route gaps | `docs/program-coordination/evidence/dispatch-DDD-C09EE-meta-remaining-routes-20260615-091200/coordinator-closeout.md`; RED 404 on `/meta/ai-models`; focused Maven 4/4; production compile; preflight current canvas-web 98 controllers / 810 endpoints; strict old-coupling scan clean; next top gap `route:/meta/message-codes` |
+| 2026-06-15 | coordinator | Closed DDD-C09EF Meta message/MQ/reach/tagger routes as DONE_WITH_CONCERNS after one bounded Ptolemy timeout and coordinator recovery of six legacy MetaController route gaps | `docs/program-coordination/evidence/dispatch-DDD-C09EF-meta-message-mq-tagger-routes-20260615-092300/coordinator-closeout.md`; focused Maven 5/5; production compile; preflight current canvas-web 98 controllers / 816 endpoints; strict old-coupling scan clean; next top gap `route:/platform` |
+| 2026-06-15 | coordinator | Closed DDD-C09EG Platform workstreams and DDD-C09EH User input submit routes as DONE_WITH_CONCERNS after one bounded parallel wait and coordinator integration of partial worker outputs | `docs/program-coordination/evidence/dispatch-DDD-C09EG-platform-workstreams-route-20260615-093200/coordinator-closeout.md`; `docs/program-coordination/evidence/dispatch-DDD-C09EH-user-input-submit-route-20260615-093200/coordinator-closeout.md`; focused Maven 1/1 and 2/2; production compile; preflight current canvas-web 100 controllers / 818 endpoints; strict old-coupling scan clean; next top gap `route:/warehouse/aggregate` |
+| 2026-06-15 | coordinator | Closed DDD-C09EI/EJ/EK/EL warehouse operation, metric lineage, production readiness, and semantic metrics routes as DONE_WITH_CONCERNS after one bounded parallel wait and coordinator verification | `docs/program-coordination/evidence/dispatch-DDD-C09EI-warehouse-operations-routes-20260615-094500/coordinator-closeout.md`; `docs/program-coordination/evidence/dispatch-DDD-C09EJ-warehouse-metric-lineage-route-20260615-094700/coordinator-closeout.md`; `docs/program-coordination/evidence/dispatch-DDD-C09EK-warehouse-production-readiness-route-20260615-094700/coordinator-closeout.md`; `docs/program-coordination/evidence/dispatch-DDD-C09EL-warehouse-semantic-metrics-route-20260615-094700/coordinator-closeout.md`; focused Maven 9/9; production compile; preflight current canvas-web 104 controllers / 824 endpoints; strict old-coupling scan clean; next top gap `route:/canvas/execute` |
+| 2026-06-15 | coordinator | Closed DDD-C09EM/EN/EO/EP as DONE_WITH_CONCERNS after final-module route parity recovery for warehouse readiness investigation, canvas execute dry-run, BI dashboard/dataset routes, and warehouse readiness incident scan | `docs/program-coordination/evidence/dispatch-DDD-C09EM-warehouse-readiness-route-20260615-101000/worker-return.md`; `docs/program-coordination/evidence/dispatch-DDD-C09EN-canvas-execute-route-20260615-101000/closeout.md`; `docs/program-coordination/evidence/dispatch-DDD-C09EO-bi-dashboard-dataset-routes-20260615-103000/coordinator-closeout.md`; `docs/program-coordination/evidence/dispatch-DDD-C09EP-warehouse-readiness-incidents-route-20260615-105000/coordinator-closeout.md`; production compile passed; focused Maven 43/43 passed; preflight current canvas-web 104 controllers / 837 endpoints with route gap candidates 0; strict old-coupling scan clean; activeDispatches cleared; remaining cutover blocker is raw controller-count gate |
+| 2026-06-15 | coordinator | Refined cutover compatibility preflight gate so normalized route coverage, not raw controller class count, drives readiness after modular aggregation | Epicurus `019ec946-4435-70e2-a5e3-5ea8210a607b` read-only review confirmed controller-count blocker was obsolete; RED/GREEN Node regression covers old 2-controller surface consolidated into 1 final controller with all endpoints covered; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` 8/8 passed; `node tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready --json` passed with `cutoverReady=true`, route gap candidates 0, blockers empty; dispatch-state verifier passed; scoped diff check passed |
+| 2026-06-15 | coordinator | Advanced DDD-C09 boot runtime resource cutover after preflight readiness by mirroring runtime config, Flyway, mapper, demo, and infrastructure resources into `canvas-boot` | Ohm `019ec94d-b6a4-79d0-a981-df4ffb57964c` read-only review identified boot resources as the next smallest code/runtime step; copied 304 files from `canvas-engine/src/main/resources` to `canvas-boot/src/main/resources` without editing engine or pom files; `diff -qr` resource parity clean; added `ModularArchitectureTest` resource parity smoke; `mvn -pl canvas-boot -am -Dtest=ModularArchitectureTest test` 3/3 passed; Node preflight tests 8/8 passed; real `--require-ready` preflight passed with boot dependency/scan gate and blockers empty |
+| 2026-06-15 | coordinator | Cut public local run commands over from `canvas-engine` to `canvas-boot` and expanded preflight to guard active run-command docs | Fermat `019ec961-e6b3-7ed1-ac33-4c747c1cfac1` and Boyle `019ec970-8eec-7131-9447-15dd6167c840` completed read-only residual reviews while coordinator updated README, CONTRIBUTING, AGENTS, CLAUDE, quickstarts, examples, runtime smoke docs, and preflight fixtures; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` 8/8 passed; real `node tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready --json` passed with `cutoverReady=true`, blockers empty, and all gated run-command files starting `canvas-boot`; active-doc negative `rg` scan found no `canvas-engine` spring-boot commands; scripts/release Docker image paths are deferred to packaged/runtime image cutover |
+| 2026-06-15 | coordinator | Advanced packaged/runtime cutover by moving release image defaults and live verifier packaging from `canvas-engine` artifacts to `canvas-boot` artifacts | Mendel `019ec977-87b5-7c61-b96a-3781ea172be6` completed read-only scope review; coordinator added `backend/canvas-boot/Dockerfile.perf`, allowed the boot jar through `.dockerignore`, switched `scripts/release/build-image.sh` defaults to `canvas-boot`, switched the Flink live verifier default boot jar/resource/package path to `canvas-boot`, and expanded preflight packaged-runtime gate; Java 21 `mvn -pl canvas-boot -am -DskipTests package` passed; Java 21 `mvn -pl canvas-boot -am -Dtest=ModularArchitectureTest,CanvasBootApplicationSmokeTest test` passed 5/5; Docker build `docker build -f backend/canvas-boot/Dockerfile.perf -t canvas-boot:boot-cutover-test .` passed; release dry-run, non-live verifier, bash syntax, real preflight, and artifact residual scan passed; deployment/service-name references remain deferred |
+| 2026-06-15 | coordinator | Cut CI Docker smoke, Helm backend image repository, and active release runbook image examples to `canvas-boot` while preserving service/DNS compatibility names | Euler `019ec980-66a6-7e21-87a5-467f6c6c3baa` completed read-only deployment/service-name review; coordinator switched `.github/workflows/ci.yml` Docker smoke to `scripts/release/build-image.sh --image canvas-boot`, changed Helm `backend.image.repository` to `registry.example.com/marketing-canvas/canvas-boot`, changed release runbook image examples to `registry.example.com/canvas-boot`, and expanded packaged-runtime preflight coverage; Node preflight tests 8/8 passed; real preflight passed with blockers empty; YAML parse passed for both workflows and Helm values; release dry-run passed; image residual scan only reports legacy/migration `-pl canvas-engine` test jobs, intentionally deferred because they are not runtime image entries |
+| 2026-06-15 | coordinator | Locked the service-name compatibility policy in preflight and added CI boot runtime tests while preserving legacy engine test jobs | Archimedes `019ec98a-206c-7570-801b-620e08864069` completed read-only cold-start recovery and recommended a service/DNS compatibility gate; coordinator added `.github/workflows/ci.yml` `canvas-boot` runtime test job, made Docker build depend on it, added `serviceNameCompatibility` preflight checks for Helm `canvas-boot` image plus stable `canvas-engine` backend/serviceAccount/runtime secret names, and added a regression that blocks mechanical `canvas-boot` renames of stable service names; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` 9/9 passed; real `--require-ready` preflight passed with blockers empty; Java 21 boot runtime Maven tests passed 5/5; workflow/Helm YAML parse and dispatch-state verifier passed; Helm CLI unavailable locally, so render verification remains a follow-up when Helm is installed |
+| 2026-06-15 | coordinator | Cut release profile and Flyway validation scripts from legacy engine resources to `canvas-boot` runtime resources and expanded packaged-runtime preflight coverage | Heisenberg `019ec999-6e31-7471-b749-c9ab26298dc2` was dispatched read-only for next-scope review; coordinator did not wait after one bounded timeout and advanced the verified release-resource cutover inline; `scripts/release/validate-production-profile.sh` now validates `backend/canvas-boot/src/main/resources/application-*.yml`; `scripts/release/check-flyway-migration.sh` now validates `backend/canvas-boot/src/main/resources/db/migration`; preflight packaged-runtime files now include both scripts; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` 9/9 passed; real `--require-ready` preflight passed; `bash -n scripts/release/*.sh scripts/verify-flink-realtime-warehouse-live.sh` passed; `bash scripts/release/validate-production-profile.sh` passed; `bash scripts/release/check-flyway-migration.sh --from-version 9999` passed against boot migration dir with 243 migrations and highest V360; scoped residual scan found no engine resource runtime paths in release/preflight scopes |
+| 2026-06-15 | coordinator | Closed the boot-packaged Flyway migration release evidence gate so pre-deploy dry-run passes against `canvas-boot` migrations | Heisenberg `019ec999-6e31-7471-b749-c9ab26298dc2` returned after the bounded timeout and identified missing high-risk migration notes as the active release blocker; coordinator generated 78 missing evidence notes under `docs/architecture/evidence/migrations` for high-risk boot migrations from V240 through V359 without bumping `released-baseline.version`; each note records touched tables, matched high-risk SQL, backup, restore, dry-run, and rollback owner guidance; `bash scripts/release/check-flyway-migration.sh` passed against `backend/canvas-boot/src/main/resources/db/migration` with baseline V185, highest V360, 243 migrations, and 123 new migrations; `bash scripts/release/pre-deploy-check.sh --dry-run` passed; migration note section audit checked 104 notes with missingCount 0; scoped diff check for migration notes passed |
+| 2026-06-15 | coordinator | Added non-ceremonial Helm/render and production preflight cutover gates for the `canvas-boot` runtime image path | Pascal `019ec9b4-9d8a-7a63-8249-c5e3479a0b0c`, Dalton `019ec9b8-fa63-7e03-b37d-a44b5e09dedf`, and Maxwell `019ec9b9-15eb-7d63-ac1e-59442fd9d8db` completed read-only reviews while coordinator kept the main thread on CI/release work; added `scripts/release/verify-helm-render.sh`, wired Helm render into both workflows, made `canvas-ci.yml` image dry-run/build commands explicit with `--image canvas-boot`, removed the legacy `backend/canvas-engine/src/main/java` anchor from `scripts/verify-flink-production-deployment.sh`, and expanded cutover preflight with CI Helm render plus production preflight regressions; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` 11/11 passed; real `--require-ready` preflight passed; `bash scripts/verify-flink-production-deployment.sh` passed with promtool/helm locally skipped; `CANVAS_IMAGE_TAG=test bash scripts/release/build-image.sh --dry-run --image canvas-boot` passed; bash syntax, dispatch-state verifier, scoped diff check, and restricted engine/pom diff checks passed |
+| 2026-06-15 | coordinator | Moved Flyway migration policy CI gate onto `canvas-boot` and hardened release image tag input validation | Singer the 2nd `019ec9cb-6670-7a53-9c8c-b90a3415119c` completed read-only next-gate review while coordinator fixed release image tag validation inline; added `backend/canvas-boot/src/test/java/org/chovy/canvas/migration/FlywayMigrationPolicyTest.java` with boot-runtime migration filename/version and tracked conflict-repair checks; changed both CI workflows to run `FlywayMigrationPolicyTest` with `-pl canvas-boot`; expanded cutover preflight to require the boot Flyway gate and block legacy engine Flyway CI; `scripts/release/build-image.sh` and `scripts/release/pre-deploy-check.sh` now reject full image references in `CANVAS_IMAGE_TAG`; release runbook examples now pass only the tag to `CANVAS_IMAGE_TAG` and the repository to `CANVAS_IMAGE_NAME`; Java 21 `mvn -f backend/pom.xml -pl canvas-boot -am -Dtest=FlywayMigrationPolicyTest test` passed 2/2; Node preflight tests passed 12/12; real `--require-ready` preflight passed; `bash scripts/release/check-flyway-migration.sh` and `bash scripts/release/pre-deploy-check.sh --dry-run` passed; full-image-reference negative checks for `build-image.sh` and `pre-deploy-check.sh` failed as expected; normal image dry-run with `CANVAS_IMAGE_TAG=abc123` passed; scoped diff check and restricted engine/pom diff checks passed |
+| 2026-06-15 | coordinator | Added meaningful OSG demo-readiness and active runtime runbook cutover gates without touching `canvas-engine` or pom files | Galileo the 2nd `019ec9e7-06f1-7041-9568-f717f3f72bc5`, Harvey the 2nd `019ec9e7-f979-7f50-9d09-fcbc34f7abe1`, and Locke the 2nd `019ec9e8-db0d-7dc1-8f68-019ea7036e09` completed read-only reviews while coordinator kept the main thread on verifier work; `tools/open-source-growth/guardrail-verifier.mjs` now validates demo compose services, WireMock demo endpoints, `new-user-welcome`, template docs paths, and required mock plugin enablement; `tools/program-coordination/cutover-compatibility-preflight.mjs` now blocks active runtime runbooks that still point operators at legacy `canvas-engine` Maven module or perf image; updated six active operator runbooks to use `canvas-boot`; `node --test tools/open-source-growth/guardrail-verifier.test.mjs` passed 14/14; `node tools/open-source-growth/guardrail-verifier.mjs` passed; `docker compose -f docker-compose.demo.yml config` passed; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` passed 13/13; real `--require-ready` preflight passed with `cutoverReady=true`, blockers empty, and all active runtime runbook checks on `canvas-boot`; active runbook legacy-command scan found no matches |
+| 2026-06-15 | coordinator | Closed active CI/developer command drift and public demo catalog consistency gaps for the `canvas-boot` cutover path | Ptolemy the 2nd `019eca02-7d62-7901-b9b4-de1b48445d73` identified active CI still running legacy `canvas-engine` Maven module; Volta the 2nd `019eca01-fda4-7bf2-96f6-62cbcba0bfce` identified WireMock/frontend/CLI golden-path drift; coordinator changed `.github/workflows/ci.yml` and `.github/workflows/canvas-ci.yml` backend jobs to `canvas-boot -am`, changed `CLAUDE.md` active test/migration guidance to `canvas-boot`, expanded cutover preflight to block active CI and developer docs using legacy engine Maven/migration paths, aligned WireMock demo plugin keys with frontend `new-user-welcome`, updated CLI `valid-journey.json` to `segment -> coupon -> message`, and expanded OSG verifier to compare WireMock required plugins with the frontend catalog plus CLI fixture trace shape; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` passed 15/15 during CI gate work and final preflight passed with blockers empty; `node --test tools/open-source-growth/guardrail-verifier.test.mjs` passed 16/16; `node tools/open-source-growth/guardrail-verifier.mjs` passed; `npm test` in `tools/canvas-cli` passed 10/10; `npm run test -- templateCloneFlow.test.ts` in `frontend` passed 1 file / 3 tests; Java 21 `mvn -f backend/pom.xml -pl canvas-boot -am -Dtest=ModularArchitectureTest,CanvasBootApplicationSmokeTest,FlywayMigrationPolicyTest test` passed 7/7; active command residual scan found no legacy `canvas-engine` Maven command matches in CI/public command docs |
+| 2026-06-15 | coordinator | Gated `canvas-cli` backend API commands until G10 and added OSG local-only drift coverage | Heisenberg the 2nd `019eca45-255c-7ed2-ad8b-b1c44f7f4ab8` reviewed CLI command/test drift while Pauli the 2nd `019eca45-25d1-71e1-89ea-49dc06068089` reviewed OSG/coordination gate gaps; coordinator rewrote CLI tests to assert help exposes only local commands and `import`/`export`/`publish` fail without network requests, added `guardrail-verifier.mjs` checks blocking CLI backend help/network/API paths before G10, and updated dispatch-state with program-coordination CI plus CLI local-only gates; `npm test` in `tools/canvas-cli` passed 7/7; `node --test tools/open-source-growth/guardrail-verifier.test.mjs` passed 17/17; `node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs` passed 16/16; manual `canvas-cli import` printed the G10 gate message with expected nonzero exit |
 
 ## Worker Result Recording Template
 

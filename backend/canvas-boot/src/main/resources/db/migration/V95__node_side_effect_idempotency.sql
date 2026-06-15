@@ -1,0 +1,20 @@
+CREATE TABLE `node_side_effect_idempotency` (
+  `id`              BIGINT        NOT NULL AUTO_INCREMENT,
+  `tenant_id`       BIGINT        NOT NULL DEFAULT 1,
+  `execution_id`    VARCHAR(64)   NOT NULL,
+  `canvas_id`       BIGINT        NOT NULL,
+  `node_id`         VARCHAR(64)   NOT NULL,
+  `node_type`       VARCHAR(64)   NOT NULL,
+  `operation_key`   VARCHAR(255)  NOT NULL,
+  `idempotency_key` VARCHAR(512)  NOT NULL,
+  `status`          VARCHAR(32)   NOT NULL,
+  `attempt_count`   INT           NOT NULL DEFAULT 0,
+  `output_json`     JSON          NULL,
+  `error_message`   VARCHAR(500)  NULL,
+  `created_at`      DATETIME      NOT NULL,
+  `updated_at`      DATETIME      NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_node_side_effect_tenant_key` (`tenant_id`, `idempotency_key`),
+  KEY `idx_node_side_effect_execution` (`execution_id`, `node_id`),
+  KEY `idx_node_side_effect_status_updated` (`status`, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DAG node side-effect idempotency records';

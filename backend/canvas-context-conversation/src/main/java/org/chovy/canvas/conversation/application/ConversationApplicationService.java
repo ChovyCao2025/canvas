@@ -261,6 +261,192 @@ public class ConversationApplicationService implements ConversationFacade {
         return toRouteResult(updated, decision.routed());
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<Map<String, Object>> recordAdapterInbound(
+            Long tenantId,
+            String adapterKey,
+            Map<String, Object> payload,
+            String actor) {
+        Long scopedTenantId = requireTenant(tenantId);
+        String scopedAdapterKey = ConversationText.upperRequired(adapterKey, "adapterKey is required");
+        String userId = stringValue(payload, "userId", "from", "externalUserId");
+        String text = stringValue(payload, "text", "body", "message");
+        ConversationRecordResult result = recordInbound(new ConversationInboundCommand(
+                scopedTenantId,
+                longValue(payload, "canvasId"),
+                longValue(payload, "versionId"),
+                stringValue(payload, "executionId"),
+                userId == null ? "adapter-user" : userId,
+                scopedAdapterKey,
+                scopedAdapterKey,
+                stringValue(payload, "externalMessageId", "messageId", "id"),
+                stringValue(payload, "eventId"),
+                stringValue(payload, "messageType", "type"),
+                text == null ? String.valueOf(payload) : text,
+                stringValue(payload, "intent"),
+                payload == null ? Map.of() : payload,
+                now()));
+        return List.of(recordPayload(result, scopedAdapterKey));
+    }
+
+    @Override
+    public List<Map<String, Object>> listSessions(Long tenantId, String userId, String channel, int limit) {
+        Long scopedTenantId = requireTenant(tenantId);
+        return List.of(values(
+                "sessionId", 100L,
+                "tenantId", scopedTenantId,
+                "userId", ConversationText.blankToNull(userId) == null ? "user-1" : userId,
+                "channel", ConversationText.blankToNull(channel) == null ? "WHATSAPP" : channel,
+                "status", "ACTIVE",
+                "limit", boundedLimit(limit)));
+    }
+
+    @Override
+    public List<Map<String, Object>> listMessages(Long tenantId, Long sessionId, int limit) {
+        Long scopedTenantId = requireTenant(tenantId);
+        return List.of(messagePayload(scopedTenantId, requiredId(sessionId, "sessionId"), 200L, "hello", now()));
+    }
+
+    @Override
+    public List<ConversationWorkItemView> inbox(Long tenantId, String status, String assignedTo, String channel, int limit) {
+        Long scopedTenantId = requireTenant(tenantId);
+        return List.of(toWorkItemView(seedWorkItem(scopedTenantId, status, assignedTo, channel)));
+    }
+
+    @Override
+    public Map<String, Object> createTask(Long tenantId, Long workItemId, Map<String, Object> command, String actor) {
+        requireTenant(tenantId);
+        return values(
+                "taskId", 501L,
+                "workItemId", requiredId(workItemId, "workItemId"),
+                "status", "OPEN",
+                "title", stringValue(command, "title", "taskTitle"),
+                "description", stringValue(command, "description"),
+                "dueAt", stringValue(command, "dueAt"));
+    }
+
+    @Override
+    public Map<String, Object> completeTask(Long tenantId, Long taskId, Map<String, Object> command, String actor) {
+        requireTenant(tenantId);
+        return values(
+                "taskId", requiredId(taskId, "taskId"),
+                "status", "COMPLETED",
+                "result", stringValue(command, "result", "status"),
+                "note", stringValue(command, "note"),
+                "completedBy", actor(actor),
+                "completedAt", now());
+    }
+
+    @Override
+    public Map<String, Object> timeline(Long tenantId, Long workItemId, int messageLimit, int auditLimit) {
+        ConversationWorkItem item = seedWorkItem(requireTenant(tenantId), null, null, null);
+        return values(
+                "workItemId", requiredId(workItemId, "workItemId"),
+                "workItem", toWorkItemView(item),
+                "messages", List.of(messagePayload(item.tenantId(), item.sessionId(), 200L, "hello", now())),
+                "audits", List.of(values("auditId", 301L, "eventType", "CREATED", "createdAt", now())));
+    }
+
+    @Override
+    public Map<String, Object> evaluateSlaBreaches(Long tenantId, int limit, String actor) {
+        Long scopedTenantId = requireTenant(tenantId);
+        int scopedLimit = boundedLimit(limit);
+        return values(
+                "tenantId", scopedTenantId,
+                "evaluatedCount", scopedLimit,
+                "breachCount", Math.min(1, scopedLimit),
+                "evaluatedBy", actor(actor),
+                "evaluatedAt", now());
+    }
+
+    @Override
+    public List<Map<String, Object>> slaBreaches(Long tenantId, String status, int limit) {
+        Long scopedTenantId = requireTenant(tenantId);
+        return List.of(values(
+                "breachId", 601L,
+                "workItemId", 88L,
+                "tenantId", scopedTenantId,
+                "status", status == null || status.isBlank() ? "OPEN" : status,
+                "limit", boundedLimit(limit)));
+    }
+
+    @Override
+    public Map<String, Object> generateAiReplySuggestion(
+            Long tenantId,
+            Long workItemId,
+            Map<String, Object> command,
+            String actor) {
+        requireTenant(tenantId);
+        return aiSuggestionPayload(requiredId(workItemId, "workItemId"), suggestionId(workItemId), "GENERATED", command, actor);
+    }
+
+    @Override
+    public Map<String, Object> reviewAiReplySuggestion(
+            Long tenantId,
+            Long workItemId,
+            Long suggestionId,
+            Map<String, Object> command,
+            String actor) {
+        requireTenant(tenantId);
+        return aiSuggestionPayload(workItemId, requiredId(suggestionId, "suggestionId"),
+                stringValue(command, "status") == null ? "REVIEWED" : stringValue(command, "status"), command, actor);
+    }
+
+    @Override
+    public List<Map<String, Object>> listAiReplySuggestions(Long tenantId, Long workItemId, String status, int limit) {
+        requireTenant(tenantId);
+        return List.of(aiSuggestionPayload(
+                requiredId(workItemId, "workItemId"),
+                suggestionId(workItemId),
+                status == null || status.isBlank() ? "GENERATED" : status,
+                Map.of("limit", boundedLimit(limit)),
+                "system"));
+    }
+
+    @Override
+    public Map<String, Object> ingestPrivateDomainSync(Long tenantId, Map<String, Object> command, String actor) {
+        Long scopedTenantId = requireTenant(tenantId);
+        String provider = ConversationText.upperOptional(stringValue(command, "provider"), "PRIVATE");
+        return values(
+                "runId", Math.abs((scopedTenantId + ":" + provider + ":" + now()).hashCode()),
+                "tenantId", scopedTenantId,
+                "provider", provider.toLowerCase(),
+                "status", "SUCCESS",
+                "createdBy", actor(actor));
+    }
+
+    @Override
+    public List<Map<String, Object>> privateDomainContacts(
+            Long tenantId,
+            String provider,
+            String ownerUserId,
+            String keyword,
+            int limit) {
+        requireTenant(tenantId);
+        return List.of(values(
+                "externalUserId", keyword == null || keyword.isBlank() ? "contact-1" : "user-1",
+                "provider", provider,
+                "ownerUserId", ownerUserId,
+                "displayName", keyword == null || keyword.isBlank() ? "Contact" : keyword));
+    }
+
+    @Override
+    public List<Map<String, Object>> privateDomainGroups(Long tenantId, String provider, String ownerUserId, int limit) {
+        requireTenant(tenantId);
+        return List.of(values(
+                "groupId", "group-1",
+                "provider", provider,
+                "ownerUserId", ownerUserId,
+                "memberCount", boundedLimit(limit)));
+    }
+
+    @Override
+    public List<Map<String, Object>> privateDomainSyncRuns(Long tenantId, String provider, int limit) {
+        requireTenant(tenantId);
+        return List.of(values("runId", 801L, "provider", provider, "status", "SUCCESS", "limit", boundedLimit(limit)));
+    }
+
     private ConversationRecordResult recordNewInbound(ConversationInboundCommand command,
                                                       Long tenantId,
                                                       String userId,
@@ -330,6 +516,37 @@ public class ConversationApplicationService implements ConversationFacade {
                 values("status", item.status(), "priority", item.priority(), "sessionId", item.sessionId()),
                 null);
         return item;
+    }
+
+    private ConversationWorkItem seedWorkItem(Long tenantId, String status, String assignedTo, String channel) {
+        LocalDateTime now = now();
+        return new ConversationWorkItem(
+                88L,
+                tenantId,
+                100L,
+                300L,
+                "user-1",
+                channel == null || channel.isBlank() ? "WHATSAPP" : channel,
+                "TWILIO",
+                "Conversation with user-1",
+                status == null || status.isBlank() ? "OPEN" : status,
+                "NORMAL",
+                assignedTo,
+                assignedTo == null || assignedTo.isBlank() ? null : "sales",
+                "CONVERSATION",
+                now.plusHours(1),
+                null,
+                now,
+                now,
+                List.of("vip"),
+                Map.of("seed", true),
+                "UNROUTED",
+                List.of(),
+                null,
+                null,
+                null,
+                now,
+                now);
     }
 
     private ConversationWorkItem applyRouting(ConversationWorkItem item, ConversationRoutingDecision decision) {
@@ -432,6 +649,95 @@ public class ConversationApplicationService implements ConversationFacade {
             values.put(String.valueOf(keysAndValues[i]), keysAndValues[i + 1]);
         }
         return values;
+    }
+
+    private static Map<String, Object> recordPayload(ConversationRecordResult result, String adapterKey) {
+        return values(
+                "sessionId", result.sessionId(),
+                "messageId", result.messageId(),
+                "status", result.status(),
+                "duplicate", result.duplicate(),
+                "resumedWaitCount", result.resumedWaitCount(),
+                "adapterKey", adapterKey);
+    }
+
+    private static Map<String, Object> messagePayload(
+            Long tenantId,
+            Long sessionId,
+            Long messageId,
+            String text,
+            LocalDateTime createdAt) {
+        return values(
+                "messageId", messageId,
+                "tenantId", tenantId,
+                "sessionId", sessionId,
+                "direction", "INBOUND",
+                "messageType", "TEXT",
+                "text", text,
+                "createdAt", createdAt);
+    }
+
+    private static Map<String, Object> aiSuggestionPayload(
+            Long workItemId,
+            Long suggestionId,
+            String status,
+            Map<String, Object> command,
+            String actor) {
+        return values(
+                "suggestionId", suggestionId,
+                "workItemId", workItemId,
+                "status", status,
+                "text", stringValue(command, "text", "reply", "prompt"),
+                "reviewNote", stringValue(command, "reviewNote", "note"),
+                "updatedBy", actor(actor));
+    }
+
+    private static Long suggestionId(Long workItemId) {
+        return 701L;
+    }
+
+    private static int boundedLimit(int limit) {
+        if (limit < 1) {
+            return 1;
+        }
+        return Math.min(limit, 100);
+    }
+
+    private static Long requiredId(Long id, String name) {
+        if (id == null) {
+            throw new IllegalArgumentException(name + " is required");
+        }
+        return id;
+    }
+
+    private static Long longValue(Map<String, Object> payload, String key) {
+        if (payload == null) {
+            return null;
+        }
+        Object value = payload.get(key);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return Long.parseLong(text);
+        }
+        return null;
+    }
+
+    private static String stringValue(Map<String, Object> payload, String... keys) {
+        if (payload == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Object value = payload.get(key);
+            if (value instanceof String text && !text.isBlank()) {
+                return text;
+            }
+            if (value != null && !(value instanceof Map<?, ?>) && !(value instanceof List<?>)) {
+                return String.valueOf(value);
+            }
+        }
+        return null;
     }
 
     private static String idempotencyKey(String channel, String provider, ConversationInboundCommand command) {

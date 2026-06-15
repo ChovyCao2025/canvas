@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class CdpWarehouseReadinessApplicationService implements CdpWarehouseReadinessFacade {
@@ -43,5 +45,27 @@ public class CdpWarehouseReadinessApplicationService implements CdpWarehouseRead
                         section.reason()))
                 .toList();
         return new CdpWarehouseReadinessView(report.tenantId(), report.status(), report.generatedAt(), sections);
+    }
+
+    @Override
+    public Map<String, Object> scanIncidents(Long tenantId) {
+        CdpWarehouseReadinessView view = readiness(tenantId);
+        List<Map<String, Object>> incidents = view.sections().stream()
+                .filter(section -> !"PASS".equals(section.status()))
+                .map(section -> {
+                    Map<String, Object> incident = new LinkedHashMap<>();
+                    incident.put("section", section.key());
+                    incident.put("status", section.status());
+                    incident.put("reason", section.reason());
+                    return incident;
+                })
+                .toList();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenantId", view.tenantId());
+        result.put("status", view.status());
+        result.put("scannedAt", view.generatedAt());
+        result.put("incidentCount", incidents.size());
+        result.put("incidents", incidents);
+        return result;
     }
 }

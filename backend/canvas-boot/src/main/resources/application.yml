@@ -1,0 +1,313 @@
+spring:
+  application:
+    name: canvas-engine
+  main:
+    # WebFlux/reactive runtime; blocking work is explicitly shifted to managed executors.
+    web-application-type: reactive
+  lifecycle:
+    # Gives graceful shutdown hooks time to drain in-flight executions.
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    url: jdbc:mysql://localhost:3306/canvas_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # Pool sizing is aligned with 3000-concurrency hardening profiles and Helm defaults.
+      maximum-pool-size: 33
+      minimum-idle: 8
+      connection-timeout: 3000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      keepalive-time: 60000
+  flyway:
+    # Local/dev migrations are enabled by default; production profile tightens baseline behavior.
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    placeholder-replacement: false
+  data:
+    redis:
+      # Local Redis backs route registry, idempotency keys, cache invalidation, and runtime locks.
+      host: localhost
+      port: 6379
+      timeout: 1000ms
+      # password: （无密码时注释掉）
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 32
+          min-idle: 8
+          max-wait: 100ms
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  mapper-locations: classpath*:mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: auto
+
+server:
+  port: 8080
+  shutdown: graceful
+
+canvas:
+  examples:
+    # Demo canvases can be hidden in hardened environments without removing seed data.
+    enabled: ${CANVAS_EXAMPLES_ENABLED:true}
+  ai:
+    prediction:
+      # Baseline prediction is disabled unless an environment explicitly enables the batch writer.
+      enabled: ${CANVAS_AI_PREDICTION_ENABLED:false}
+      batch-size: ${CANVAS_AI_PREDICTION_BATCH_SIZE:500}
+      default-best-send-hour: ${CANVAS_AI_PREDICTION_DEFAULT_BEST_SEND_HOUR:20}
+      sparse-history-min-events: ${CANVAS_AI_PREDICTION_SPARSE_HISTORY_MIN_EVENTS:3}
+      model-version: ${CANVAS_AI_PREDICTION_MODEL_VERSION:baseline_v1}
+  analytics:
+    retention:
+      min-days: ${CANVAS_ANALYTICS_RETENTION_MIN_DAYS:7}
+      max-days: ${CANVAS_ANALYTICS_RETENTION_MAX_DAYS:730}
+      default-days: ${CANVAS_ANALYTICS_RETENTION_DEFAULT_DAYS:90}
+      max-batch-size: ${CANVAS_ANALYTICS_RETENTION_MAX_BATCH_SIZE:1000}
+  jwt:
+    # Must be overridden outside local development; ProductionSecurityValidator enforces strength.
+    secret: ${CANVAS_JWT_SECRET:}
+    expiry-hours: 24
+  events:
+    # Shared HMAC secret for public event ingestion; local default is blocked by production profile.
+    report-secret: ${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}
+  cdp:
+    # Topic used when accepted CDP events are published back into the canvas event bus.
+    event-topic: ${CANVAS_CDP_EVENT_TOPIC:CDP_EVENT_INGESTED}
+    ingestion:
+      max-batch-size: ${CANVAS_CDP_INGESTION_MAX_BATCH_SIZE:100}
+  internal-api:
+    # Token protects internal callbacks such as Flink checkpoint reporting.
+    token: ${CANVAS_INTERNAL_API_TOKEN:}
+  public-trigger:
+    # Direct public trigger secret defaults to event secret locally for simpler smoke tests.
+    secret: ${CANVAS_PUBLIC_TRIGGER_SECRET:${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}}
+  secret-cipher:
+    # Base64 AES key for encrypting connector/provider credentials.
+    key: ${CANVAS_SECRET_CIPHER_KEY:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+  marketing:
+    content:
+      asset-upload:
+        # Webhook secret validates provider callbacks for async DAM upload completion.
+        webhook-secret: ${CANVAS_MARKETING_ASSET_UPLOAD_WEBHOOK_SECRET:}
+        webhook-tolerance-seconds: ${CANVAS_MARKETING_ASSET_UPLOAD_WEBHOOK_TOLERANCE_SECONDS:300}
+        s3:
+          # Optional object storage backend for uploaded marketing assets.
+          enabled: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ENABLED:false}
+          endpoint: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ENDPOINT:}
+          region: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_REGION:us-east-1}
+          bucket: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_BUCKET:}
+          access-key: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ACCESS_KEY:}
+          secret-key: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_SECRET_KEY:}
+          key-prefix: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_KEY_PREFIX:}
+          path-style: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_PATH_STYLE:true}
+          public-base-url: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_PUBLIC_BASE_URL:}
+        cleanup:
+          # Optional scheduler that expires stale upload intents for a tenant.
+          enabled: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_ENABLED:false}
+          tenant-id: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_TENANT_ID:0}
+          limit: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_LIMIT:100}
+          fixed-delay-ms: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_FIXED_DELAY_MS:60000}
+          actor: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_ACTOR:asset-upload-cleanup-scheduler}
+  cors:
+    # 生产环境必须改为实际前端域名，禁止用 * 上线
+    # 覆盖方式：CANVAS_CORS_ALLOWED_ORIGINS=https://canvas.yourcompany.com
+    allowed-origins: "*"
+    allow-credentials: true
+  redis:
+    key-prefix: canvas  # key 命名空间前缀（设计文档 25.3.1节），多环境共用 Redis 时修改
+    roles:
+      readiness-enabled: ${CANVAS_REDIS_ROLE_READINESS_ENABLED:false}
+      execution-state-url: ${CANVAS_REDIS_EXECUTION_STATE_URL:redis://localhost:6379/0}
+      route-cache-url: ${CANVAS_REDIS_ROUTE_CACHE_URL:redis://localhost:6379/0}
+      bitmap-url: ${CANVAS_REDIS_BITMAP_URL:redis://localhost:6379/0}
+      rate-limit-url: ${CANVAS_REDIS_RATE_LIMIT_URL:redis://localhost:6379/0}
+  doris:
+    enabled: ${CANVAS_DORIS_ENABLED:false}
+    jdbc-url: ${CANVAS_DORIS_JDBC_URL:jdbc:mysql://localhost:9030/canvas_dws?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${CANVAS_DORIS_USERNAME:root}
+    password: ${CANVAS_DORIS_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # Comma-separated Doris FE/BE /metrics endpoints used by enterprise OLAP evidence gates.
+    fe-metrics-urls: ${CANVAS_DORIS_FE_METRICS_URLS:}
+    be-metrics-urls: ${CANVAS_DORIS_BE_METRICS_URLS:}
+    query-slo-sql: ${CANVAS_DORIS_QUERY_SLO_SQL:}
+    stream-load-url: ${CANVAS_DORIS_STREAM_LOAD_URL:http://localhost:8040/api/canvas_ods/canvas_execution_trace/_stream_load}
+    stream-load-timeout-ms: ${CANVAS_DORIS_STREAM_LOAD_TIMEOUT_MS:3000}
+    pool:
+      size: ${CANVAS_DORIS_POOL_SIZE:10}
+  warehouse:
+    enterprise-olap-evidence-scheduler:
+      # Disabled by default because it probes external Doris/OLAP evidence endpoints.
+      enabled: ${CANVAS_ENTERPRISE_OLAP_EVIDENCE_SCHEDULER_ENABLED:false}
+      tenant-id: ${CANVAS_ENTERPRISE_OLAP_EVIDENCE_SCHEDULER_TENANT_ID:0}
+      fixed-delay-ms: ${CANVAS_ENTERPRISE_OLAP_EVIDENCE_SCHEDULER_FIXED_DELAY_MS:300000}
+      trigger-type: ${CANVAS_ENTERPRISE_OLAP_EVIDENCE_SCHEDULER_TRIGGER_TYPE:SCHEDULED}
+      actor: ${CANVAS_ENTERPRISE_OLAP_EVIDENCE_SCHEDULER_ACTOR:enterprise-olap-evidence-scheduler}
+      lease-ttl-seconds: ${CANVAS_ENTERPRISE_OLAP_EVIDENCE_SCHEDULER_LEASE_TTL_SECONDS:60}
+  version:
+    max-keep-count: 10  # 每个画布保留最近 N 个已发布版本（设计文档 17.2节）
+  validation:
+    max-node-count: ${CANVAS_VALIDATION_MAX_NODE_COUNT:1000}
+    max-goto-jumps: ${CANVAS_VALIDATION_MAX_GOTO_JUMPS:100}
+    max-loop-iterations: ${CANVAS_VALIDATION_MAX_LOOP_ITERATIONS:1000}
+  # Disruptor 无锁分发层（12.8节）
+  disruptor:
+    ring-buffer-size: 65536   # 必须是 2 的幂，2^16 ≈ 16MB
+    consumers: 0              # 0 = 自动使用 CPU 核数
+  # 执行引擎
+  execution:
+    # Global execution limits protect runtime lanes before per-canvas limits are applied.
+    global-timeout-sec: 600
+    shutdown-drain-timeout-ms: 10000
+    context-ttl-sec: 86400
+    max-concurrency: 3000
+    per-canvas-max-concurrent: 50
+    max-retry: 3
+    retry-base-delay-ms: 1000
+    retry-max-delay-ms: 30000
+    priority:
+      high: [DIRECT_CALL]
+      normal: [MQ, BEHAVIOR, EVENT, EVENT_TRIGGER, API_CALL]
+      low: [SCHEDULED]
+      low-ratio: 0.5
+      high-max-concurrency-ratio: 2.0
+      overflow-retry-delay-ms: 5000
+      overflow-max-retry: 3
+  execution-lane:
+    # Lane queues separate light, standard, heavy, and retry workloads for backpressure isolation.
+    light:
+      max-concurrency: 600
+      queue-limit: 2000
+    standard:
+      max-concurrency: 1800
+      queue-limit: 10000
+    heavy:
+      max-concurrency: 300
+      queue-limit: 1000
+    retry:
+      max-concurrency: 300
+      queue-limit: 3000
+  background-tasks:
+    # Shared cap for fire-and-forget work scheduled outside the main reactive request path.
+    max-in-flight: 1000
+    shutdown-timeout-ms: 5000
+  execution-request:
+    # Durable async request dispatcher settings for MQ/event/direct replay workflows.
+    dispatch-batch-size: 200
+    dispatch-fixed-delay-ms: 1000
+    retry-delay-ms: 5000
+    max-attempts: 5
+    running-stale-sec: 300
+    max-retry-delay-ms: 60000
+    heartbeat-interval-ms: 60000
+    per-canvas-batch-limit: 0
+    lane-isolation:
+      enabled: ${CANVAS_EXECUTION_REQUEST_LANE_ISOLATION_ENABLED:false}
+      light-workers: ${CANVAS_EXECUTION_REQUEST_LANE_LIGHT_WORKERS:800}
+      standard-workers: ${CANVAS_EXECUTION_REQUEST_LANE_STANDARD_WORKERS:2400}
+      heavy-workers: ${CANVAS_EXECUTION_REQUEST_LANE_HEAVY_WORKERS:400}
+      retry-workers: ${CANVAS_EXECUTION_REQUEST_LANE_RETRY_WORKERS:400}
+    replay:
+      single-per-minute: 60
+      batch-requests-per-minute: 1000
+  node:
+    timeout-ms: 3000
+  mq:
+    topic: CANVAS_MQ_TRIGGER
+    consume-thread-number: ${CANVAS_MQ_CONSUME_THREAD:20}
+  notifications:
+    websocket:
+      max-sessions-per-user: ${CANVAS_NOTIFICATION_WS_MAX_SESSIONS_PER_USER:5}
+      max-total-sessions: ${CANVAS_NOTIFICATION_WS_MAX_TOTAL_SESSIONS:1000}
+  delivery:
+    outbox:
+      # Outbox decouples message provider calls from node execution transactions.
+      topic: ${CANVAS_DELIVERY_OUTBOX_TOPIC:CANVAS_DELIVERY}
+      mq-publish-enabled: ${CANVAS_DELIVERY_OUTBOX_MQ_PUBLISH_ENABLED:false}
+      max-attempts: ${CANVAS_DELIVERY_OUTBOX_MAX_ATTEMPTS:3}
+      retry-base-delay-ms: ${CANVAS_DELIVERY_OUTBOX_RETRY_BASE_DELAY_MS:1000}
+      retry-max-delay-ms: ${CANVAS_DELIVERY_OUTBOX_RETRY_MAX_DELAY_MS:60000}
+      stale-seconds: ${CANVAS_DELIVERY_OUTBOX_STALE_SECONDS:300}
+      reconciliation:
+        # Reconciliation scans stale outbox rows and requeues provider delivery attempts.
+        enabled: ${CANVAS_DELIVERY_OUTBOX_RECONCILIATION_ENABLED:false}
+        limit: ${CANVAS_DELIVERY_OUTBOX_RECONCILIATION_LIMIT:100}
+        fixed-delay-ms: ${CANVAS_DELIVERY_OUTBOX_RECONCILIATION_FIXED_DELAY_MS:60000}
+    receipt:
+      secret: ${CANVAS_DELIVERY_RECEIPT_SECRET:}
+  scheduler:
+    # Jitter avoids thundering herds when many scheduled canvases become due at once.
+    jitter-max-ms: 300000
+    trigger-concurrency: 100
+  delay:
+    jitter-max-ms: 0
+  http-client:
+    # Shared WebClient limits for API_CALL, connected content, and provider integrations.
+    max-connections: 500
+    pending-acquire-max-count: 2000
+    pending-acquire-timeout-ms: 1000
+    connect-timeout-ms: 1000
+    response-timeout-ms: 3000
+    write-timeout-ms: 3000
+  # Groovy 沙箱（12.9节，预编译缓存）
+  groovy:
+    timeout-ms: 5000
+    max-output-kb: 64
+  # 熔断器（12.5节）
+  circuit-breaker:
+    default:
+      failure-threshold: 5
+      open-duration-sec: 30
+      half-open-attempts: 3
+    redis:
+      key-prefix: "cb:"
+      pub-sub-channel: circuit-breaker-events
+      local-cache-ttl-sec: 5
+  # 集成层外部系统 URL（dev 指向 WireMock）
+  integration:
+    coupon-service-url: http://localhost:8099/mock/coupon
+    tagger-service-url: http://localhost:8099/mock/tagger
+    reach-platform-url: http://localhost:8099/mock/reach
+    api-call-base-url: http://localhost:8099/mock/api
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: PID_CANVAS_ENGINE
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2
+  consumer:
+    group: GID_CANVAS_ENGINE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: canvas-engine
+
+# Nacos 动态配置（生产通过 spring.cloud.nacos.config 接入）
+# canvas.node.timeout-ms: 3000
+# canvas.execution.global-timeout-sec: 600
+# canvas.execution.max-retry: 3
+# canvas.groovy.timeout-ms: 5000

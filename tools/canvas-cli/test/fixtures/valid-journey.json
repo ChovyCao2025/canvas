@@ -14,21 +14,33 @@
         "id": "segment",
         "type": "condition",
         "config": {
-          "expression": "user.level == 'new'"
+          "expression": "user.lifecycleStage == \"new\""
         }
       },
       {
-        "id": "send-message",
+        "id": "coupon",
+        "type": "coupon.grant",
+        "config": {
+          "couponKey": "WELCOME_10"
+        }
+      },
+      {
+        "id": "message",
         "type": "message",
         "config": {
-          "template": "welcome"
+          "channel": "sms",
+          "template": "welcome_coupon"
         }
       }
     ],
     "edges": [
       {
         "from": "segment",
-        "to": "send-message"
+        "to": "coupon"
+      },
+      {
+        "from": "coupon",
+        "to": "message"
       }
     ]
   }

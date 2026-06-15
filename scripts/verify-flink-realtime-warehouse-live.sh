@@ -4,15 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="${ROOT_DIR}/backend"
 COMPOSE_FILE="${ROOT_DIR}/docker-compose.local.yml"
-CDP_DORIS_DDL="${ROOT_DIR}/backend/canvas-engine/src/main/resources/infrastructure/doris/cdp-audience-ddl.sql"
-TRACE_DORIS_DDL="${ROOT_DIR}/backend/canvas-engine/src/main/resources/infrastructure/doris/trace-ddl.sql"
+CDP_DORIS_DDL="${ROOT_DIR}/backend/canvas-boot/src/main/resources/infrastructure/doris/cdp-audience-ddl.sql"
+TRACE_DORIS_DDL="${ROOT_DIR}/backend/canvas-boot/src/main/resources/infrastructure/doris/trace-ddl.sql"
 
 RUN_LIVE="${CANVAS_RUN_LIVE_FLINK_E2E:-false}"
 BASE_URL="${CANVAS_BASE_URL:-http://localhost:8080}"
 CHECKPOINT_ENDPOINT="${CANVAS_LIVE_FLINK_CHECKPOINT_ENDPOINT:-http://host.docker.internal:8080/warehouse/realtime/pipelines/checkpoints}"
 START_ENGINE="${CANVAS_LIVE_START_ENGINE:-false}"
-ENGINE_LOG="${CANVAS_LIVE_ENGINE_LOG:-${ROOT_DIR}/tmp/flink-live-canvas-engine.log}"
-ENGINE_JAR="${CANVAS_LIVE_ENGINE_JAR:-${BACKEND_DIR}/canvas-engine/target/canvas-engine-1.0.0-SNAPSHOT.jar}"
+ENGINE_LOG="${CANVAS_LIVE_ENGINE_LOG:-${ROOT_DIR}/tmp/flink-live-canvas-boot.log}"
+ENGINE_JAR="${CANVAS_LIVE_ENGINE_JAR:-${BACKEND_DIR}/canvas-boot/target/canvas-boot-1.0.0-SNAPSHOT.jar}"
 TENANT_ID="${CANVAS_LIVE_TENANT_ID:-0}"
 MYSQL_CONTAINER="${CANVAS_LIVE_MYSQL_CONTAINER:-canvas-mysql}"
 DORIS_CLIENT_CONTAINER="${CANVAS_LIVE_DORIS_CLIENT_CONTAINER:-canvas-mysql}"
@@ -215,7 +215,7 @@ stop_rocketmq_after_engine_ready_if_requested() {
   if [[ "${STOP_ROCKETMQ_AFTER_ENGINE_READY}" != "true" ]]; then
     return 0
   fi
-  log "stopping RocketMQ services after canvas-engine is ready to free local Doris scan memory"
+  log "stopping RocketMQ services after canvas-boot is ready to free local Doris scan memory"
   docker compose -f "${COMPOSE_FILE}" stop rocketmq-broker rocketmq-namesrv >/dev/null
 }
 
@@ -364,10 +364,10 @@ start_canvas_engine_if_requested() {
     return 1
   fi
   mkdir -p "$(dirname "${ENGINE_LOG}")"
-  log "starting canvas-engine for live verification; log=${ENGINE_LOG}"
+  log "starting canvas-boot for live verification; log=${ENGINE_LOG}"
   (
     cd "${BACKEND_DIR}"
-    mvn -f canvas-engine/pom.xml -DskipTests -Dmaven.test.skip=true package || exit 1
+    mvn -f canvas-boot/pom.xml -DskipTests -Dmaven.test.skip=true package || exit 1
     CANVAS_DORIS_ENABLED=true \
       CANVAS_DORIS_JDBC_URL="jdbc:mysql://localhost:${DORIS_PORT}/canvas_ods?useSSL=false&allowPublicKeyRetrieval=true" \
       CANVAS_DORIS_USERNAME="${DORIS_USER}" \
@@ -448,16 +448,16 @@ docker exec "${FLINK_JM_CONTAINER}" test -s "${JOB_JAR}" \
   || fail "Flink job jar is missing in ${FLINK_JM_CONTAINER}:${JOB_JAR}"
 
 start_canvas_engine_if_requested \
-  || fail "Canvas engine is not reachable at ${BASE_URL}; start canvas-engine with CANVAS_DORIS_ENABLED=true or set CANVAS_LIVE_START_ENGINE=true"
+  || fail "Canvas backend is not reachable at ${BASE_URL}; start canvas-boot with CANVAS_DORIS_ENABLED=true or set CANVAS_LIVE_START_ENGINE=true"
 ensure_api_auth_header
 stop_rocketmq_after_engine_ready_if_requested
 
 source_table_count="$(mysql_exec "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${MYSQL_DB}' AND table_name='cdp_event_log';")"
 [[ "${source_table_count}" == "1" ]] \
-  || fail "MySQL ${MYSQL_DB}.cdp_event_log is missing; run canvas-engine/Flyway migrations first"
+  || fail "MySQL ${MYSQL_DB}.cdp_event_log is missing; run canvas-boot/Flyway migrations first"
 trace_source_table_count="$(mysql_exec "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${MYSQL_DB}' AND table_name='canvas_execution_trace';")"
 [[ "${trace_source_table_count}" == "1" ]] \
-  || fail "MySQL ${MYSQL_DB}.canvas_execution_trace is missing; run canvas-engine/Flyway migrations first"
+  || fail "MySQL ${MYSQL_DB}.canvas_execution_trace is missing; run canvas-boot/Flyway migrations first"
 
 submit_pipeline
 

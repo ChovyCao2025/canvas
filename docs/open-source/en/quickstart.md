@@ -26,7 +26,7 @@ Start the backend:
 cd backend
 CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
 JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
+mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
 ```
 
 Start the frontend:

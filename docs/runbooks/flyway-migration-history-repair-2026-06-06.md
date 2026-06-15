@@ -66,7 +66,7 @@ Repository gate:
 cd backend
 JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home \
 PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH \
-mvn -pl canvas-engine test -Dtest=FlywayMigrationPolicyTest,DataSecurityMigrationTest,CoreTenantNotNullMigrationTest,DemoDatasourceCredentialMigrationTest -DfailIfNoTests=false
+mvn -pl canvas-boot -am test -Dtest=FlywayMigrationPolicyTest,DataSecurityMigrationTest,CoreTenantNotNullMigrationTest,DemoDatasourceCredentialMigrationTest -DfailIfNoTests=false
 ```
 
 Expected:

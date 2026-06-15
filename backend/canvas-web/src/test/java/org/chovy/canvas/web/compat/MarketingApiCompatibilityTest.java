@@ -15,12 +15,16 @@ import org.chovy.canvas.marketing.api.MarketingCampaignLinkCommand;
 import org.chovy.canvas.marketing.api.MarketingCampaignLinkView;
 import org.chovy.canvas.marketing.api.MarketingCampaignReadinessView;
 import org.chovy.canvas.marketing.api.MarketingCampaignView;
+import org.chovy.canvas.marketing.application.MarketingContentApplicationService;
+import org.chovy.canvas.marketing.application.SearchMarketingApplicationService;
 import org.chovy.canvas.marketing.application.MarketingCampaignApplicationService;
 import org.chovy.canvas.marketing.domain.CampaignKey;
 import org.chovy.canvas.marketing.domain.CampaignStatus;
 import org.chovy.canvas.marketing.domain.MarketingCampaign;
 import org.chovy.canvas.marketing.domain.MarketingCampaignLink;
 import org.chovy.canvas.marketing.domain.MarketingCampaignRepository;
+import org.chovy.canvas.web.marketing.SearchMarketingController;
+import org.chovy.canvas.web.marketing.MarketingContentController;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -201,6 +205,135 @@ class MarketingApiCompatibilityTest {
 
         assertThat(repository.deletedLinkIds).containsExactly(20L);
         assertThat(repository.findLinkById(TENANT_ID, 20L)).isNull();
+    }
+
+    @Test
+    void searchMarketingRoutesPreserveCompactFinalModuleCompatibilityEnvelopeAndDefaults() {
+        WebTestClient client = WebTestClient.bindToController(
+                new SearchMarketingController(new SearchMarketingApplicationService())).build();
+
+        client.post()
+                .uri("/canvas/search-marketing/sources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"provider": "google", "channel": "organic", "enabled": true}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data.tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data.updatedBy").isEqualTo(ACTOR)
+                .jsonPath("$.data.provider").isEqualTo("GOOGLE")
+                .jsonPath("$.data.status").isEqualTo("ACTIVE");
+
+        client.post()
+                .uri("/canvas/search-marketing/sources/1/sync")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data.runType").isEqualTo("PERFORMANCE")
+                .jsonPath("$.data.status").isEqualTo("SUCCEEDED");
+
+        client.get()
+                .uri("/canvas/search-marketing/summary?startDate=2026-06-01&endDate=2026-06-14")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data.tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data.sourceCount").isEqualTo(1);
+    }
+
+    @Test
+    void marketingContentRoutesPreserveCompactFinalModuleCompatibilityEnvelopeAndDefaults() {
+        WebTestClient client = WebTestClient.bindToController(
+                new MarketingContentController(new MarketingContentApplicationService())).build();
+
+        client.post()
+                .uri("/marketing/content/asset-folders")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"folderName": "Hero Assets"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data.tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data.updatedBy").isEqualTo(ACTOR)
+                .jsonPath("$.data.folderKey").isEqualTo("folder-1");
+
+        client.post()
+                .uri("/marketing/content/assets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"assetName": "Hero", "assetType": "image"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data.assetKey").isEqualTo("asset-1")
+                .jsonPath("$.data.assetType").isEqualTo("IMAGE")
+                .jsonPath("$.data.status").isEqualTo("ACTIVE");
+
+        client.post()
+                .uri("/marketing/content/templates")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"templateName": "Welcome", "channel": "email", "body": "Hello {{name}}"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.templateKey").isEqualTo("template-1");
+
+        client.post()
+                .uri("/marketing/content/templates/template-1/preview")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"name": "Ada"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.renderedBody").isEqualTo("Hello Ada");
+
+        client.post()
+                .uri("/marketing/content/entries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"title": "Welcome copy", "contentType": "email", "templateKey": "template-1"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.entryKey").isEqualTo("entry-1");
+
+        client.post()
+                .uri("/marketing/content/releases/publish")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"sourceType": "entry", "sourceKey": "entry-1", "channel": "email"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.releaseKey").isEqualTo("release-1")
+                .jsonPath("$.data.status").isEqualTo("PUBLISHED");
     }
 
     private static WebTestClient webClient(MarketingCampaignFacade facade) {

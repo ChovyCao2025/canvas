@@ -6,9 +6,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DRY_RUN=false
 PUSH=false
 SKIP_PACKAGE="${CANVAS_RELEASE_SKIP_PACKAGE:-false}"
-IMAGE_NAME="${CANVAS_IMAGE_NAME:-canvas-engine}"
+IMAGE_NAME="${CANVAS_IMAGE_NAME:-canvas-boot}"
 IMAGE_TAG="${CANVAS_IMAGE_TAG:-local}"
-DOCKERFILE="${CANVAS_DOCKERFILE:-backend/canvas-engine/Dockerfile.perf}"
+DOCKERFILE="${CANVAS_DOCKERFILE:-backend/canvas-boot/Dockerfile.perf}"
 CONTEXT="${CANVAS_DOCKER_CONTEXT:-.}"
 
 fail() {
@@ -20,8 +20,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/release/build-image.sh [--dry-run] [--push] [--skip-package] [--tag TAG] [--image NAME]
 
-Builds the canvas-engine release image from a clean checkout. The default
-Dockerfile expects backend/canvas-engine/target/canvas-engine-*.jar, so the
+Builds the canvas-boot release image from a clean checkout. The default
+Dockerfile expects backend/canvas-boot/target/canvas-boot-*.jar, so the
 script packages the backend before docker build unless --skip-package is used.
 EOF
 }
@@ -63,9 +63,11 @@ done
 [[ -f "$ROOT_DIR/$DOCKERFILE" ]] || fail "Dockerfile is missing: $ROOT_DIR/$DOCKERFILE"
 [[ -d "$ROOT_DIR/$CONTEXT" ]] || fail "Docker context is missing: $ROOT_DIR/$CONTEXT"
 [[ "$IMAGE_TAG" != "latest" ]] || fail "release image tag must not be latest"
+[[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] \
+  || fail "release image tag must be a Docker tag, not a full image reference: $IMAGE_TAG"
 
 FULL_IMAGE="$IMAGE_NAME:$IMAGE_TAG"
-PACKAGE_CMD="cd backend && mvn -pl canvas-engine -am package -DskipTests"
+PACKAGE_CMD="cd backend && mvn -pl canvas-boot -am package -DskipTests"
 BUILD_CMD="docker build -f $DOCKERFILE -t $FULL_IMAGE $CONTEXT"
 PUSH_CMD="docker push $FULL_IMAGE"
 
@@ -92,13 +94,13 @@ case "$java_spec" in
 esac
 
 if [[ "$SKIP_PACKAGE" != "true" ]]; then
-  (cd "$ROOT_DIR/backend" && mvn -pl canvas-engine -am package -DskipTests)
+  (cd "$ROOT_DIR/backend" && mvn -pl canvas-boot -am package -DskipTests)
 fi
 
 shopt -s nullglob
-jars=("$ROOT_DIR"/backend/canvas-engine/target/canvas-engine-*.jar)
+jars=("$ROOT_DIR"/backend/canvas-boot/target/canvas-boot-*.jar)
 shopt -u nullglob
-[[ ${#jars[@]} -gt 0 ]] || fail "missing packaged canvas-engine jar; run backend Maven package first"
+[[ ${#jars[@]} -gt 0 ]] || fail "missing packaged canvas-boot jar; run backend Maven package first"
 
 (cd "$ROOT_DIR" && docker build -f "$DOCKERFILE" -t "$FULL_IMAGE" "$CONTEXT")
 

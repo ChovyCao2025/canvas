@@ -2,6 +2,7 @@ package org.chovy.canvas.web.cdp;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.chovy.canvas.cdp.api.CdpWarehouseReadinessFacade;
 import org.chovy.canvas.cdp.api.CdpWarehouseReadinessSectionView;
@@ -11,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,6 +34,12 @@ public class CdpWarehouseReadinessController {
             @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
         return envelope(() -> WarehouseReadinessCompatibilityView.from(
                 readinessFacade.readiness(tenantIdOrDefault(tenantId))));
+    }
+
+    @PostMapping("/warehouse/readiness/incidents/scan")
+    public Mono<CompatibilityEnvelope<Map<String, Object>>> scanIncidents(
+            @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
+        return envelope(() -> readinessFacade.scanIncidents(tenantIdOrDefault(tenantId)));
     }
 
     private static <T> Mono<CompatibilityEnvelope<T>> envelope(ThrowingSupplier<T> supplier) {

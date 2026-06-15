@@ -27,7 +27,7 @@ Expected: for each matched canvas, `canvas_execution_request` has exactly one ro
 Start the backend with a low per-user limit for an easy smoke test:
 
 ```bash
-CANVAS_NOTIFICATION_WS_MAX_SESSIONS_PER_USER=1 mvn -f backend/pom.xml -pl canvas-engine spring-boot:run
+CANVAS_NOTIFICATION_WS_MAX_SESSIONS_PER_USER=1 mvn -f backend/pom.xml -pl canvas-boot spring-boot:run
 ```
 
 In another shell, use a valid logged-in JWT:

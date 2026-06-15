@@ -20,10 +20,21 @@ import org.chovy.canvas.bi.api.BiDashboardView;
 import org.chovy.canvas.bi.api.BiDatasetCommand;
 import org.chovy.canvas.bi.api.BiDatasetFieldCommand;
 import org.chovy.canvas.bi.api.BiDatasetView;
+import org.chovy.canvas.bi.api.BiDatasourceOnboardingView;
 import org.chovy.canvas.bi.api.BiMetricCommand;
 import org.chovy.canvas.bi.api.BiPermissionDecisionView;
 import org.chovy.canvas.bi.api.BiPermissionGrantCommand;
 import org.chovy.canvas.bi.api.BiPermissionGrantView;
+import org.chovy.canvas.bi.api.BiColumnPermissionCommand;
+import org.chovy.canvas.bi.api.BiColumnPermissionView;
+import org.chovy.canvas.bi.api.BiPermissionAuditEntryView;
+import org.chovy.canvas.bi.api.BiPermissionRequestCommand;
+import org.chovy.canvas.bi.api.BiPermissionRequestReviewCommand;
+import org.chovy.canvas.bi.api.BiPermissionRequestView;
+import org.chovy.canvas.bi.api.BiResourcePermissionCommand;
+import org.chovy.canvas.bi.api.BiResourcePermissionView;
+import org.chovy.canvas.bi.api.BiRowPermissionCommand;
+import org.chovy.canvas.bi.api.BiRowPermissionView;
 import org.chovy.canvas.bi.api.BiQuickEngineCapacityAlertPolicyCommand;
 import org.chovy.canvas.bi.api.BiQuickEngineCapacityAlertPolicyView;
 import org.chovy.canvas.bi.api.BiQuickEngineCapacitySummaryView;
@@ -33,6 +44,9 @@ import org.chovy.canvas.bi.api.BiQuickEngineTenantPoolPolicyView;
 import org.chovy.canvas.bi.api.BiQueryDatasetView;
 import org.chovy.canvas.bi.api.BiResourceFavoriteCommand;
 import org.chovy.canvas.bi.api.BiResourceFavoriteView;
+import org.chovy.canvas.bi.api.BiResourceVersionView;
+import org.chovy.canvas.bi.api.BiSpreadsheetResourceCommand;
+import org.chovy.canvas.bi.api.BiSpreadsheetResourceView;
 import org.chovy.canvas.bi.api.BiWorkspaceCommand;
 import org.chovy.canvas.bi.api.BiWorkspaceView;
 import org.chovy.canvas.bi.application.BiCatalogApplicationService;
@@ -49,6 +63,7 @@ import org.chovy.canvas.bi.domain.BiResourceKey;
 import org.chovy.canvas.bi.domain.BiResourceStatus;
 import org.chovy.canvas.bi.domain.BiWorkspace;
 import org.chovy.canvas.bi.domain.BiWorkspaceRepository;
+import org.chovy.canvas.web.bi.BiCatalogController;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -224,6 +239,83 @@ class BiApiCompatibilityTest {
     }
 
     @Test
+    void chartLifecycleRoutesPreserveLegacyEnvelopeAndFinalModuleStateTransitions() {
+        TestFixture fixture = fixtureWithWorkspaceAndDataset("orders-daily", "published");
+        WebTestClient client = webClient(fixture.facade);
+
+        client.post()
+                .uri("/canvas/bi/charts/resources/orders-trend/draft")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(chartDraftJson("Orders trend", "orders-daily", "draft"))
+                .exchange()
+                .expectStatus().isOk();
+
+        client.post()
+                .uri("/canvas/bi/charts/resources/orders-trend/publish")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data.chartKey").isEqualTo("orders-trend")
+                .jsonPath("$.data.status").isEqualTo("PUBLISHED")
+                .jsonPath("$.data.createdBy").isEqualTo(ACTOR);
+
+        client.post()
+                .uri("/canvas/bi/charts/resources/orders-trend/draft")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(chartDraftJson("Orders by region", "orders-daily", "draft"))
+                .exchange()
+                .expectStatus().isOk();
+
+        client.get()
+                .uri("/canvas/bi/charts/resources/orders-trend/versions")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data[0].resourceType").isEqualTo("CHART")
+                .jsonPath("$.data[0].resourceKey").isEqualTo("orders-trend")
+                .jsonPath("$.data[0].version").isEqualTo(3)
+                .jsonPath("$.data[1].version").isEqualTo(2)
+                .jsonPath("$.data[2].version").isEqualTo(1);
+
+        client.post()
+                .uri("/canvas/bi/charts/resources/orders-trend/versions/1/restore")
+                .header("X-Actor", "restorer")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data.chartKey").isEqualTo("orders-trend")
+                .jsonPath("$.data.status").isEqualTo("DRAFT")
+                .jsonPath("$.data.name").isEqualTo("Orders trend")
+                .jsonPath("$.data.style.palette").isEqualTo("ops");
+
+        client.delete()
+                .uri("/canvas/bi/charts/resources/orders-trend")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data").doesNotExist();
+
+        client.get()
+                .uri("/canvas/bi/charts/resources/orders-trend")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.errorCode").isEqualTo("API_001")
+                .jsonPath("$.message").isEqualTo("BI chart not found");
+    }
+
+    @Test
     void datasetResourceReadRoutesPreserveCompactLegacyEnvelopeWithoutWorkspaceId() {
         TestFixture fixture = fixtureWithWorkspaceAndDataset("orders-daily", "published");
         WebTestClient client = webClient(fixture.facade);
@@ -273,7 +365,7 @@ class BiApiCompatibilityTest {
     @Test
     void queryDatasetCatalogRoutesPreserveLegacyEnvelopeAndCompactBuiltInCatalog() {
         TestFixture fixture = new TestFixture();
-        WebTestClient client = webClient(fixture.facade);
+        WebTestClient client = WebTestClient.bindToController(new BiCatalogController(fixture.facade)).build();
 
         client.get()
                 .uri("/canvas/bi/datasets")
@@ -319,6 +411,101 @@ class BiApiCompatibilityTest {
                 .jsonPath("$.errorCode").isEqualTo("API_001")
                 .jsonPath("$.message").isEqualTo("Unknown BI dataset: missing_dataset")
                 .jsonPath("$.data").doesNotExist();
+    }
+
+    @Test
+    void datasourceOperationsRoutesPreserveLegacyCompatibilityEnvelopeAndTenantScopedState() {
+        TestFixture fixture = new TestFixture();
+        WebTestClient client = WebTestClient.bindToController(new BiCatalogController(fixture.facade)).build();
+
+        client.get()
+                .uri("/canvas/bi/datasources/connectors")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data[*].connectorType").value(types ->
+                        assertThat(asStringList(types)).containsExactly("API_JSON", "FILE_CSV", "MYSQL", "POSTGRESQL"));
+
+        client.post()
+                .uri("/canvas/bi/datasources/onboarding")
+                .header("X-Tenant-Id", TENANT_ID.toString())
+                .header("X-Actor", ACTOR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "connectorType": " mysql ",
+                          "name": " Orders Warehouse ",
+                          "url": "jdbc:mysql://db.internal:3306/orders",
+                          "username": "report_user",
+                          "password": "secret",
+                          "description": "Primary warehouse",
+                          "enabled": true,
+                          "connectorConfig": {"schema": "dw"}
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data.id").isEqualTo(1)
+                .jsonPath("$.data.tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data.sourceKey").isEqualTo("orders-warehouse")
+                .jsonPath("$.data.connectorType").isEqualTo("MYSQL")
+                .jsonPath("$.data.maskedUrl").isEqualTo("jdbc:mysql://db.internal:****/orders")
+                .jsonPath("$.data.maskedUsername").isEqualTo("r***r");
+
+        client.get()
+                .uri("/canvas/bi/datasources/onboarding")
+                .header("X-Tenant-Id", TENANT_ID.toString())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].sourceKey").isEqualTo("orders-warehouse");
+
+        client.post()
+                .uri("/canvas/bi/datasources/1/connection-test")
+                .header("X-Tenant-Id", TENANT_ID.toString())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.success").isEqualTo(true)
+                .jsonPath("$.data.sourceKey").isEqualTo("orders-warehouse");
+
+        client.post()
+                .uri("/canvas/bi/datasources/1/schema-sync")
+                .header("X-Tenant-Id", TENANT_ID.toString())
+                .header("X-Actor", "syncer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"limit\": 2}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.syncStatus").isEqualTo("SUCCESS")
+                .jsonPath("$.data.syncedBy").isEqualTo("syncer")
+                .jsonPath("$.data.tables[0].columns[0].name").isEqualTo("id");
+
+        client.get()
+                .uri("/canvas/bi/datasources/1/schema-snapshots")
+                .header("X-Tenant-Id", TENANT_ID.toString())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].dataSourceConfigId").isEqualTo(1);
+
+        List<BiDatasourceOnboardingView> sources = fixture.facade.listDatasources(TENANT_ID);
+        assertThat(sources).extracting(BiDatasourceOnboardingView::sourceKey)
+                .containsExactly("orders-warehouse");
     }
 
     @Test
@@ -738,6 +925,91 @@ class BiApiCompatibilityTest {
     }
 
     @Test
+    void spreadsheetLifecycleRoutesPreserveAggregateCompatibilityAndVersionLimit() {
+        TestFixture fixture = new TestFixture();
+        WebTestClient client = webClient(fixture.facade);
+
+        client.post()
+                .uri("/canvas/bi/spreadsheets/resources/revenue-sheet/draft")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(spreadsheetDraftJson("Revenue sheet", "draft"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data.tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data.spreadsheetKey").isEqualTo("revenue-sheet")
+                .jsonPath("$.data.sheets[0].sheetKey").isEqualTo("Daily")
+                .jsonPath("$.data.status").isEqualTo("DRAFT")
+                .jsonPath("$.data.createdBy").isEqualTo(ACTOR);
+
+        client.post()
+                .uri("/canvas/bi/spreadsheets/resources/revenue-sheet/publish")
+                .header("X-Tenant-Id", TENANT_ID.toString())
+                .header("X-Actor", "publisher")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.spreadsheetKey").isEqualTo("revenue-sheet")
+                .jsonPath("$.data.status").isEqualTo("PUBLISHED")
+                .jsonPath("$.data.updatedBy").isEqualTo("publisher");
+
+        client.get()
+                .uri("/canvas/bi/spreadsheets/resources")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].spreadsheetKey").isEqualTo("revenue-sheet");
+
+        client.get()
+                .uri("/canvas/bi/spreadsheets/resources/revenue-sheet")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.spreadsheetKey").isEqualTo("revenue-sheet");
+
+        client.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/canvas/bi/spreadsheets/resources/revenue-sheet/versions")
+                        .queryParam("limit", 1)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].resourceType").isEqualTo("SPREADSHEET")
+                .jsonPath("$.data[0].resourceKey").isEqualTo("revenue-sheet")
+                .jsonPath("$.data[0].version").isEqualTo(2);
+
+        client.post()
+                .uri("/canvas/bi/spreadsheets/resources/revenue-sheet/versions/1/restore")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.version").isEqualTo(3)
+                .jsonPath("$.data.status").isEqualTo("DRAFT");
+
+        client.delete()
+                .uri("/canvas/bi/spreadsheets/resources/revenue-sheet")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data").doesNotExist();
+    }
+
+    @Test
     void permissionRoutesPreserveGrantEnvelopeAndEffectiveAccessDenyPrecedence() {
         TestFixture fixture = fixtureWithWorkspaceDatasetChartAndDashboard();
         WebTestClient client = webClient(fixture.facade);
@@ -928,6 +1200,313 @@ class BiApiCompatibilityTest {
                 .jsonPath("$.data[0].resourceKey").isEqualTo("orders-trend");
     }
 
+    @Test
+    void permissionAdministrationRoutesPreserveLegacyEnvelopeTenantScopeAndReviewFlow() {
+        TestFixture fixture = new TestFixture();
+        WebTestClient client = webClient(fixture.facade);
+
+        client.post()
+                .uri("/canvas/bi/permissions/resources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "resourceType": " Dashboard ",
+                          "resourceKey": " Marketing Overview ",
+                          "subjectType": "role",
+                          "subjectId": "analyst",
+                          "actionKey": "view",
+                          "effect": "allow"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data.tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data.resourceType").isEqualTo("DASHBOARD")
+                .jsonPath("$.data.resourceKey").isEqualTo("marketing-overview")
+                .jsonPath("$.data.subjectType").isEqualTo("ROLE")
+                .jsonPath("$.data.actionKey").isEqualTo("VIEW")
+                .jsonPath("$.data.effect").isEqualTo("ALLOW")
+                .jsonPath("$.data.createdBy").isEqualTo(ACTOR);
+
+        client.post()
+                .uri("/canvas/bi/permissions/rows")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "datasetKey": " Orders Daily ",
+                          "ruleKey": " CN Only ",
+                          "subjectType": "role",
+                          "subjectId": "analyst",
+                          "filters": [{"field":"country","op":"EQ","value":"CN"}]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.datasetKey").isEqualTo("orders-daily")
+                .jsonPath("$.data.ruleKey").isEqualTo("cn-only")
+                .jsonPath("$.data.filterJson").value(value ->
+                        assertThat((String) value).contains("country"));
+
+        client.post()
+                .uri("/canvas/bi/permissions/columns")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "datasetKey": " Orders Daily ",
+                          "fieldKey": " Customer Phone ",
+                          "subjectType": "user",
+                          "subjectId": "alice",
+                          "policy": "mask",
+                          "mask": {"strategy":"last4"}
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.fieldKey").isEqualTo("customer-phone")
+                .jsonPath("$.data.policy").isEqualTo("MASK")
+                .jsonPath("$.data.maskJson").value(value ->
+                        assertThat((String) value).contains("last4"));
+
+        client.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/canvas/bi/permissions/resources")
+                        .queryParam("resourceType", "dashboard")
+                        .queryParam("resourceKey", "Marketing Overview")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].resourceKey").isEqualTo("marketing-overview");
+
+        client.get()
+                .uri("/canvas/bi/permissions/rows?datasetKey=Orders Daily")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].datasetKey").isEqualTo("orders-daily");
+
+        client.get()
+                .uri("/canvas/bi/permissions/columns?datasetKey=Orders Daily")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].fieldKey").isEqualTo("customer-phone");
+
+        client.post()
+                .uri("/canvas/bi/permissions/requests")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "resourceType": "dashboard",
+                          "resourceKey": "Marketing Overview",
+                          "requestedAction": "export",
+                          "reason": "Need campaign export"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.status").isEqualTo("PENDING")
+                .jsonPath("$.data.requestedBy").isEqualTo(ACTOR);
+
+        client.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/canvas/bi/permissions/requests")
+                        .queryParam("resourceType", "dashboard")
+                        .queryParam("resourceKey", "Marketing Overview")
+                        .queryParam("status", "pending")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.length()").isEqualTo(1)
+                .jsonPath("$.data[0].requestedAction").isEqualTo("EXPORT");
+
+        client.post()
+                .uri("/canvas/bi/permissions/requests/1/review")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "status": "approved",
+                          "reviewComment": "go ahead"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.status").isEqualTo("APPROVED")
+                .jsonPath("$.data.reviewedBy").isEqualTo(ACTOR)
+                .jsonPath("$.data.grantedPermissionId").exists();
+
+        client.delete()
+                .uri("/canvas/bi/permissions/resources/1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0);
+        client.delete()
+                .uri("/canvas/bi/permissions/resources/1")
+                .exchange()
+                .expectStatus().isOk();
+
+        client.get()
+                .uri("/canvas/bi/permissions/audit?limit=3")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.length()").isEqualTo(3)
+                .jsonPath("$.data[0].actionKey").isEqualTo("BI_PERMISSION_REQUEST_REVIEW");
+    }
+
+    @Test
+    void subscriptionDeliveryRoutesPreserveLegacyEnvelopeAndFinalModuleState() {
+        TestFixture fixture = new TestFixture();
+        WebTestClient client = WebTestClient.bindToController(new BiCatalogController(fixture.facade)).build();
+
+        client.post()
+                .uri("/canvas/bi/subscriptions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "subscriptionKey": " Daily Revenue ",
+                          "name": "Daily revenue",
+                          "resourceType": " dashboard ",
+                          "resourceKey": " Marketing Overview ",
+                          "resourceId": 300,
+                          "schedule": {"cron": "0 8 * * *"},
+                          "receivers": {"email": ["ops@example.com"]},
+                          "delivery": {"channel": "email"},
+                          "enabled": true
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.errorCode").doesNotExist()
+                .jsonPath("$.traceId").doesNotExist()
+                .jsonPath("$.data.tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data.subscriptionKey").isEqualTo("daily-revenue")
+                .jsonPath("$.data.resourceType").isEqualTo("DASHBOARD")
+                .jsonPath("$.data.resourceKey").isEqualTo("marketing-overview")
+                .jsonPath("$.data.createdBy").isEqualTo(ACTOR);
+
+        client.post()
+                .uri("/canvas/bi/alerts")
+                .header("X-Actor", "operator")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "alertKey": " GMV Spike ",
+                          "name": "GMV spike",
+                          "datasetKey": " Orders Daily ",
+                          "metricKey": " Gross GMV ",
+                          "condition": {"op": "GT", "value": 1000},
+                          "receivers": {"email": ["growth@example.com"]},
+                          "enabled": true
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.alertKey").isEqualTo("gmv-spike")
+                .jsonPath("$.data.datasetKey").isEqualTo("orders-daily")
+                .jsonPath("$.data.metricKey").isEqualTo("gross-gmv")
+                .jsonPath("$.data.createdBy").isEqualTo("operator");
+
+        client.post()
+                .uri("/canvas/bi/subscriptions/101/run")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.jobType").isEqualTo("SUBSCRIPTION")
+                .jsonPath("$.data.status").isEqualTo("TRIGGERED");
+        client.post()
+                .uri("/canvas/bi/alerts/201/run")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.jobType").isEqualTo("ALERT");
+
+        client.post()
+                .uri("/canvas/bi/delivery-logs/retry?limit=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.checked").isEqualTo(2)
+                .jsonPath("$.data.retried").isEqualTo(2);
+
+        client.get()
+                .uri("/canvas/bi/delivery-logs?limit=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.length()").isEqualTo(4)
+                .jsonPath("$.data[0].status").isEqualTo("DELIVERED");
+
+        client.get()
+                .uri("/canvas/bi/delivery-audit?limit=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.total").isEqualTo(4)
+                .jsonPath("$.data.triggered").isEqualTo(2)
+                .jsonPath("$.data.delivered").isEqualTo(2);
+
+        client.get()
+                .uri("/canvas/bi/delivery-attachments?jobType=subscription&jobId=101&limit=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data[0].attachmentKey").isEqualTo("subscription-101");
+
+        client.get()
+                .uri("/canvas/bi/delivery-attachments/401/download")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals("Content-Type", "text/plain")
+                .expectHeader().valueMatches("Content-Disposition", "attachment; filename=.*daily-revenue.*")
+                .expectBody(byte[].class)
+                .value(bytes -> assertThat(new String(bytes)).isEqualTo("delivery-401"));
+
+        client.post()
+                .uri("/canvas/bi/delivery-scheduler/run")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.subscriptionsChecked").isEqualTo(1)
+                .jsonPath("$.data.alertsChecked").isEqualTo(1);
+
+        client.delete()
+                .uri("/canvas/bi/subscriptions/101")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0);
+        client.delete()
+                .uri("/canvas/bi/alerts/201")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
     private static WebTestClient webClient(BiCatalogFacade facade) {
         return WebTestClient.bindToController(new BiControllerAdapter(facade)).build();
     }
@@ -935,6 +1514,13 @@ class BiApiCompatibilityTest {
     @SuppressWarnings("unchecked")
     private static List<String> asStringList(Object value) {
         return (List<String>) value;
+    }
+
+    private static <T> List<T> limited(List<T> values, Integer limit) {
+        if (limit == null || limit < 0 || limit >= values.size()) {
+            return values;
+        }
+        return values.subList(0, limit);
     }
 
     private static TestFixture fixtureWithWorkspaceAndDataset(String datasetKey, String status) {
@@ -1061,6 +1647,20 @@ class BiApiCompatibilityTest {
                   "theme": {"mode": "light"},
                   "filters": {"region": "CN"},
                   "chartKeys": ["orders-trend"],
+                  "status": "%s"
+                }
+                """.formatted(name, status);
+    }
+
+    private static String spreadsheetDraftJson(String name, String status) {
+        return """
+                {
+                  "spreadsheetKey": "body-key-ignored",
+                  "name": "%s",
+                  "description": "Finance workbook",
+                  "sheets": [{"sheetKey": " Daily ", "title": "Daily revenue"}],
+                  "dataBinding": {"datasetKey": "orders-daily"},
+                  "style": {"theme": "compact"},
                   "status": "%s"
                 }
                 """.formatted(name, status);
@@ -1296,14 +1896,252 @@ class BiApiCompatibilityTest {
             return envelope(() -> facade.chartReferenceImpact(tenantIdOrDefault(tenantId), chartKey));
         }
 
-        @PostMapping("/canvas/bi/permissions/resources")
-        Mono<CompatibilityEnvelope<BiPermissionGrantView>> grantPermission(
+        @PostMapping("/canvas/bi/charts/resources/{chartKey}/publish")
+        Mono<CompatibilityEnvelope<BiChartView>> publishChartResource(
+                @PathVariable String chartKey,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> facade.publishChartResource(
+                    tenantIdOrDefault(tenantId),
+                    chartKey,
+                    actorOrDefault(actor)));
+        }
+
+        @DeleteMapping("/canvas/bi/charts/resources/{chartKey}")
+        Mono<CompatibilityEnvelope<Void>> archiveChartResource(
+                @PathVariable String chartKey,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> {
+                facade.archiveChartResource(tenantIdOrDefault(tenantId), chartKey, actorOrDefault(actor));
+                return null;
+            });
+        }
+
+        @GetMapping("/canvas/bi/charts/resources/{chartKey}/versions")
+        Mono<CompatibilityEnvelope<List<BiResourceVersionView>>> listChartResourceVersions(
+                @PathVariable String chartKey,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
+            return envelope(() -> facade.listChartResourceVersions(tenantIdOrDefault(tenantId), chartKey));
+        }
+
+        @PostMapping("/canvas/bi/charts/resources/{chartKey}/versions/{version}/restore")
+        Mono<CompatibilityEnvelope<BiChartView>> restoreChartResourceVersion(
+                @PathVariable String chartKey,
+                @PathVariable Integer version,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> facade.restoreChartResourceVersion(
+                    tenantIdOrDefault(tenantId),
+                    chartKey,
+                    version,
+                    actorOrDefault(actor)));
+        }
+
+        @GetMapping("/canvas/bi/spreadsheets/resources")
+        Mono<CompatibilityEnvelope<List<BiSpreadsheetResourceView>>> listSpreadsheetResources(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
+            return envelope(() -> facade.listSpreadsheetResources(tenantIdOrDefault(tenantId)));
+        }
+
+        @GetMapping("/canvas/bi/spreadsheets/resources/{spreadsheetKey}")
+        Mono<CompatibilityEnvelope<BiSpreadsheetResourceView>> getSpreadsheetResource(
+                @PathVariable String spreadsheetKey,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
+            return envelope(() -> facade.getSpreadsheetResource(tenantIdOrDefault(tenantId), spreadsheetKey));
+        }
+
+        @PostMapping("/canvas/bi/spreadsheets/resources/{spreadsheetKey}/draft")
+        Mono<CompatibilityEnvelope<BiSpreadsheetResourceView>> saveSpreadsheetDraft(
+                @PathVariable String spreadsheetKey,
                 @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
                 @RequestHeader(value = "X-Actor", required = false) String actor,
-                @RequestBody PermissionGrantRequest request) {
-            return envelope(() -> facade.grantPermission(
+                @RequestBody SpreadsheetDraftRequest request) {
+            return envelope(() -> facade.saveSpreadsheetDraft(
                     tenantIdOrDefault(tenantId),
+                    spreadsheetKey,
                     request.toCommand(),
+                    actorOrDefault(actor)));
+        }
+
+        @PostMapping("/canvas/bi/spreadsheets/resources/{spreadsheetKey}/publish")
+        Mono<CompatibilityEnvelope<BiSpreadsheetResourceView>> publishSpreadsheetResource(
+                @PathVariable String spreadsheetKey,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> facade.publishSpreadsheetResource(
+                    tenantIdOrDefault(tenantId),
+                    spreadsheetKey,
+                    actorOrDefault(actor)));
+        }
+
+        @DeleteMapping("/canvas/bi/spreadsheets/resources/{spreadsheetKey}")
+        Mono<CompatibilityEnvelope<Void>> archiveSpreadsheetResource(
+                @PathVariable String spreadsheetKey,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> {
+                facade.archiveSpreadsheetResource(tenantIdOrDefault(tenantId), spreadsheetKey, actorOrDefault(actor));
+                return null;
+            });
+        }
+
+        @GetMapping("/canvas/bi/spreadsheets/resources/{spreadsheetKey}/versions")
+        Mono<CompatibilityEnvelope<List<BiResourceVersionView>>> listSpreadsheetResourceVersions(
+                @PathVariable String spreadsheetKey,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestParam(required = false) Integer limit) {
+            return envelope(() -> limited(
+                    facade.listSpreadsheetResourceVersions(tenantIdOrDefault(tenantId), spreadsheetKey),
+                    limit));
+        }
+
+        @PostMapping("/canvas/bi/spreadsheets/resources/{spreadsheetKey}/versions/{version}/restore")
+        Mono<CompatibilityEnvelope<BiSpreadsheetResourceView>> restoreSpreadsheetResourceVersion(
+                @PathVariable String spreadsheetKey,
+                @PathVariable Integer version,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> facade.restoreSpreadsheetResourceVersion(
+                    tenantIdOrDefault(tenantId),
+                    spreadsheetKey,
+                    version,
+                    actorOrDefault(actor)));
+        }
+
+        @PostMapping("/canvas/bi/permissions/resources")
+        Mono<CompatibilityEnvelope<BiResourcePermissionView>> upsertResourcePermission(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor,
+                @RequestBody BiResourcePermissionCommand command) {
+            return envelope(() -> facade.upsertResourcePermission(
+                    tenantIdOrDefault(tenantId),
+                    command,
+                    actorOrDefault(actor)));
+        }
+
+        @GetMapping("/canvas/bi/permissions/resources")
+        Mono<CompatibilityEnvelope<List<BiResourcePermissionView>>> listResourcePermissions(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestParam(required = false) String resourceType,
+                @RequestParam(required = false) String resourceKey,
+                @RequestParam(required = false) Long resourceId) {
+            return envelope(() -> facade.listResourcePermissions(
+                    tenantIdOrDefault(tenantId),
+                    resourceType,
+                    resourceKey,
+                    resourceId));
+        }
+
+        @DeleteMapping("/canvas/bi/permissions/resources/{id}")
+        Mono<CompatibilityEnvelope<Void>> deleteResourcePermission(
+                @PathVariable Long id,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> {
+                facade.deleteResourcePermission(tenantIdOrDefault(tenantId), actorOrDefault(actor), id);
+                return null;
+            });
+        }
+
+        @GetMapping("/canvas/bi/permissions/rows")
+        Mono<CompatibilityEnvelope<List<BiRowPermissionView>>> listRowPermissions(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestParam(required = false) String datasetKey) {
+            return envelope(() -> facade.listRowPermissions(tenantIdOrDefault(tenantId), datasetKey));
+        }
+
+        @PostMapping("/canvas/bi/permissions/rows")
+        Mono<CompatibilityEnvelope<BiRowPermissionView>> upsertRowPermission(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor,
+                @RequestBody BiRowPermissionCommand command) {
+            return envelope(() -> facade.upsertRowPermission(tenantIdOrDefault(tenantId), command,
+                    actorOrDefault(actor)));
+        }
+
+        @DeleteMapping("/canvas/bi/permissions/rows/{id}")
+        Mono<CompatibilityEnvelope<Void>> deleteRowPermission(
+                @PathVariable Long id,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> {
+                facade.deleteRowPermission(tenantIdOrDefault(tenantId), actorOrDefault(actor), id);
+                return null;
+            });
+        }
+
+        @GetMapping("/canvas/bi/permissions/columns")
+        Mono<CompatibilityEnvelope<List<BiColumnPermissionView>>> listColumnPermissions(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestParam(required = false) String datasetKey) {
+            return envelope(() -> facade.listColumnPermissions(tenantIdOrDefault(tenantId), datasetKey));
+        }
+
+        @PostMapping("/canvas/bi/permissions/columns")
+        Mono<CompatibilityEnvelope<BiColumnPermissionView>> upsertColumnPermission(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor,
+                @RequestBody BiColumnPermissionCommand command) {
+            return envelope(() -> facade.upsertColumnPermission(tenantIdOrDefault(tenantId), command,
+                    actorOrDefault(actor)));
+        }
+
+        @DeleteMapping("/canvas/bi/permissions/columns/{id}")
+        Mono<CompatibilityEnvelope<Void>> deleteColumnPermission(
+                @PathVariable Long id,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor) {
+            return envelope(() -> {
+                facade.deleteColumnPermission(tenantIdOrDefault(tenantId), actorOrDefault(actor), id);
+                return null;
+            });
+        }
+
+        @GetMapping("/canvas/bi/permissions/audit")
+        Mono<CompatibilityEnvelope<List<BiPermissionAuditEntryView>>> permissionAudit(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestParam(defaultValue = "20") int limit) {
+            return envelope(() -> facade.permissionAudit(tenantIdOrDefault(tenantId), limit));
+        }
+
+        @GetMapping("/canvas/bi/permissions/requests")
+        Mono<CompatibilityEnvelope<List<BiPermissionRequestView>>> listPermissionRequests(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestParam(required = false) String resourceType,
+                @RequestParam(required = false) String resourceKey,
+                @RequestParam(required = false) String status) {
+            return envelope(() -> facade.listPermissionRequests(
+                    tenantIdOrDefault(tenantId),
+                    resourceType,
+                    resourceKey,
+                    status));
+        }
+
+        @PostMapping("/canvas/bi/permissions/requests")
+        Mono<CompatibilityEnvelope<BiPermissionRequestView>> requestPermission(
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor,
+                @RequestBody BiPermissionRequestCommand command) {
+            return envelope(() -> facade.requestPermission(
+                    tenantIdOrDefault(tenantId),
+                    command,
+                    actorOrDefault(actor)));
+        }
+
+        @PostMapping("/canvas/bi/permissions/requests/{id}/review")
+        Mono<CompatibilityEnvelope<BiPermissionRequestView>> reviewPermissionRequest(
+                @PathVariable Long id,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+                @RequestHeader(value = "X-Actor", required = false) String actor,
+                @RequestBody BiPermissionRequestReviewCommand command) {
+            BiPermissionRequestReviewCommand merged = new BiPermissionRequestReviewCommand(
+                    id,
+                    command == null ? null : command.status(),
+                    command == null ? null : command.reviewComment());
+            return envelope(() -> facade.reviewPermissionRequest(
+                    tenantIdOrDefault(tenantId),
+                    merged,
                     actorOrDefault(actor)));
         }
 
@@ -1471,6 +2309,27 @@ class BiApiCompatibilityTest {
                     theme,
                     filters,
                     chartKeys,
+                    status);
+        }
+    }
+
+    private record SpreadsheetDraftRequest(
+            String spreadsheetKey,
+            String name,
+            String description,
+            List<Map<String, Object>> sheets,
+            Map<String, Object> dataBinding,
+            Map<String, Object> style,
+            String status) {
+
+        private BiSpreadsheetResourceCommand toCommand() {
+            return new BiSpreadsheetResourceCommand(
+                    spreadsheetKey,
+                    name,
+                    description,
+                    sheets == null ? List.of() : sheets,
+                    dataBinding == null ? Map.of() : dataBinding,
+                    style == null ? Map.of() : style,
                     status);
         }
     }
@@ -1704,8 +2563,26 @@ class BiApiCompatibilityTest {
         @Override
         public BiPermissionGrant saveGrant(BiPermissionGrant grant) {
             BiPermissionGrant saved = grant.id() == null ? grant.withId(nextGrantId++) : grant;
+            grants.removeIf(existing -> saved.id().equals(existing.id()));
             grants.add(saved);
             return saved;
+        }
+
+        @Override
+        public void deleteGrant(Long tenantId,
+                                Long workspaceId,
+                                String resourceType,
+                                Long resourceId,
+                                String subjectType,
+                                String subjectId,
+                                String actionKey) {
+            grants.removeIf(grant -> tenantId.equals(grant.tenantId())
+                    && workspaceId.equals(grant.workspaceId())
+                    && resourceType.equals(grant.resourceType())
+                    && resourceId.equals(grant.resourceId())
+                    && subjectType.equals(grant.subjectType())
+                    && subjectId.equals(grant.subjectId())
+                    && actionKey.equals(grant.actionKey()));
         }
 
         @Override

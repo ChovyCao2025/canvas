@@ -116,5 +116,10 @@ class CdpWarehouseRealtimeCutoverReadinessControllerCompatibilityTest {
             calls.add(tenantId);
             return view;
         }
+
+        @Override
+        public java.util.Map<String, Object> scanIncidents(Long tenantId) {
+            return java.util.Map.of("tenantId", tenantId, "incidentCount", 0, "incidents", List.of());
+        }
     }
 }

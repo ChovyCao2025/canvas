@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_realtime_retry (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    event_log_id BIGINT NOT NULL,
+    message_id VARCHAR(128) NULL,
+    event_code VARCHAR(128) NULL,
+    status VARCHAR(20) NOT NULL,
+    attempt_count INT NOT NULL DEFAULT 0,
+    first_error VARCHAR(1000) NULL,
+    last_error VARCHAR(1000) NULL,
+    next_retry_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_by VARCHAR(128) NULL,
+    locked_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    finished_at DATETIME NULL,
+    UNIQUE KEY uk_cdp_warehouse_retry_event (tenant_id, event_log_id),
+    INDEX idx_cdp_warehouse_retry_due (status, next_retry_at, id),
+    INDEX idx_cdp_warehouse_retry_status (tenant_id, status, updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse near-real-time delivery retry ledger';

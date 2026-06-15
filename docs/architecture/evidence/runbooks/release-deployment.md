@@ -15,7 +15,7 @@ bash scripts/release/pre-deploy-check.sh --dry-run
 Actual pre-deploy gate:
 
 ```bash
-export CANVAS_IMAGE_TAG="registry.example.com/canvas-engine:<git-sha>"
+export CANVAS_IMAGE_TAG="<git-sha>"
 export CANVAS_MIGRATION_BACKUP_EVIDENCE="docs/architecture/evidence/release-<timestamp>/canvas-before-flyway.sql.sha256"
 export CANVAS_DB_HOST="<db-host>"
 export CANVAS_DB_PORT="3306"
@@ -33,13 +33,15 @@ The script validates production-like profiles, Flyway migration policy, immutabl
 Dry run:
 
 ```bash
+CANVAS_IMAGE_NAME="registry.example.com/canvas-boot" \
+CANVAS_IMAGE_TAG="<git-sha>" \
 bash scripts/release/build-image.sh --dry-run
 ```
 
 Actual build:
 
 ```bash
-CANVAS_IMAGE_NAME="registry.example.com/canvas-engine" \
+CANVAS_IMAGE_NAME="registry.example.com/canvas-boot" \
 CANVAS_IMAGE_TAG="<git-sha>" \
 bash scripts/release/build-image.sh --push
 ```
@@ -49,7 +51,7 @@ bash scripts/release/build-image.sh --push
 Render or substitute the image placeholder before applying Kubernetes templates:
 
 ```bash
-export CANVAS_IMAGE="registry.example.com/canvas-engine:<git-sha>"
+export CANVAS_IMAGE="registry.example.com/canvas-boot:<git-sha>"
 envsubst < deploy/k8s/canvas-engine-deployment.yaml | kubectl apply -f -
 kubectl apply -f deploy/k8s/canvas-engine-service.yaml
 kubectl apply -f deploy/k8s/canvas-engine-hpa.yaml

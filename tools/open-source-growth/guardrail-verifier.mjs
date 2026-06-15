@@ -67,6 +67,16 @@ const TRACEABILITY_IDS = [
 
 const PHASE_GATES = ['Month 1', 'Month 2', 'Month 3', 'Month 4', 'Month 5', 'Month 6']
 const FORBIDDEN_RUNTIME_LOADING = ['URLClassLoader', 'PF4J']
+const DEMO_COMPOSE_SERVICES = ['mysql', 'redis', 'wiremock', 'rocketmq-namesrv', 'rocketmq-broker']
+const DEMO_WIREMOCK_ENDPOINTS = [
+  '/mock/demo/golden-path',
+  '/mock/demo/templates',
+  '/mock/demo/plugins',
+  '/mock/message/sms',
+  '/mock/message/email',
+  '/mock/approval/start',
+  '/mock/ai/audit',
+]
 const PR_TEMPLATE_REFERENCES = [
   'OSG requirement',
   'Phase gate',
@@ -76,6 +86,18 @@ const PR_TEMPLATE_REFERENCES = [
 const CODEOWNERS_REFERENCES = [
   '/docs/open-source-growth/',
   '/tools/open-source-growth/',
+]
+
+const CLI_G10_GATED_MESSAGE = 'Backend API commands are gated until G10 public extension/API stability passes'
+const FORBIDDEN_CLI_BACKEND_API_SURFACES = [
+  { text: 'canvas-cli import <file>', label: 'import command in usage' },
+  { text: 'canvas-cli export <canvasId>', label: 'export command in usage' },
+  { text: 'canvas-cli publish <canvasId>', label: 'publish command in usage' },
+  { text: 'fetch(', label: 'network fetch call' },
+  { text: 'requestJson', label: 'backend request helper' },
+  { text: '/canvas/dsl/map', label: 'Canvas DSL map backend path' },
+  { text: '/canvas/dsl/export/', label: 'Canvas DSL export backend path' },
+  { text: '/publish', label: 'publish backend path' },
 ]
 
 const PROGRAM_COORDINATION_DOCS = [
@@ -145,6 +167,19 @@ const PARALLEL_SYSTEM_REFERENCES = [
 
 function readIfExists(file) {
   return existsSync(file) ? readFileSync(file, 'utf8') : ''
+}
+
+function readJsonIfExists(errors, fileLabel, file) {
+  if (!existsSync(file)) {
+    errors.push(`${fileLabel} is required`)
+    return null
+  }
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'))
+  } catch (error) {
+    errors.push(`${fileLabel} must be valid JSON: ${error.message}`)
+    return null
+  }
 }
 
 function listFiles(dir) {
@@ -246,6 +281,174 @@ function requireSectionBridgeDeclarations(errors, workerPackets) {
   }
 }
 
+function collectWireMockMappings(root) {
+  const mappingsDir = path.join(root, 'wiremock/mappings')
+  if (!existsSync(mappingsDir)) {
+    return { mappings: [], errors: [] }
+  }
+  const errors = []
+  const mappings = []
+  for (const file of listFiles(mappingsDir).filter(candidate => candidate.endsWith('.json'))) {
+    const relative = path.relative(root, file)
+    const parsed = readJsonIfExists(errors, relative, file)
+    if (!parsed) {
+      continue
+    }
+    if (Array.isArray(parsed.mappings)) {
+      mappings.push(...parsed.mappings.map(mapping => ({ ...mapping, source: relative })))
+    } else {
+      mappings.push({ ...parsed, source: relative })
+    }
+  }
+  return { mappings, errors }
+}
+
+function findMappingByUrl(mappings, url) {
+  return mappings.find(mapping => mapping?.request?.url === url)
+}
+
+function extractQuotedStrings(content) {
+  const values = []
+  const pattern = /['"]([^'"]+)['"]/g
+  let match
+  while ((match = pattern.exec(content)) !== null) {
+    values.push(match[1])
+  }
+  return values
+}
+
+function extractFrontendNewUserWelcomePlugins(root) {
+  const catalog = readIfExists(path.join(root, 'frontend/src/pages/canvas-list/templateCatalog.ts'))
+  const match = /key:\s*['"]new-user-welcome['"][\s\S]*?requiredPlugins:\s*\[([^\]]+)\]/.exec(catalog)
+  return match ? extractQuotedStrings(match[1]) : []
+}
+
+function arraysEqual(left, right) {
+  return left.length === right.length && left.every((value, index) => value === right[index])
+}
+
+function requireCliGoldenPathFixture(errors, root) {
+  const fixture = readJsonIfExists(
+    errors,
+    'tools/canvas-cli/test/fixtures/valid-journey.json',
+    path.join(root, 'tools/canvas-cli/test/fixtures/valid-journey.json'),
+  )
+  if (!fixture) {
+    return
+  }
+  const nodes = Array.isArray(fixture?.spec?.nodes) ? fixture.spec.nodes : []
+  const edges = Array.isArray(fixture?.spec?.edges) ? fixture.spec.edges : []
+  const nodeIds = nodes.map(node => node?.id)
+  if (fixture?.metadata?.name !== 'new-user-welcome') {
+    errors.push('CLI valid-journey fixture must use metadata.name new-user-welcome')
+  }
+  for (const nodeId of ['segment', 'coupon', 'message']) {
+    if (!nodeIds.includes(nodeId)) {
+      errors.push(`CLI valid-journey fixture must include ${nodeId} node`)
+    }
+  }
+  if (!nodes.some(node => node?.id === 'segment' && String(node?.config?.expression ?? '').includes('user.lifecycleStage') && String(node?.config?.expression ?? '').includes('new'))) {
+    errors.push('CLI valid-journey segment node must match user.lifecycleStage == new')
+  }
+  for (const [from, to] of [['segment', 'coupon'], ['coupon', 'message']]) {
+    if (!edges.some(edge => edge?.from === from && edge?.to === to)) {
+      errors.push(`CLI valid-journey fixture must include ${from} -> ${to} edge`)
+    }
+  }
+}
+
+function requireCliLocalOnlyUntilG10(errors, root) {
+  const cliSourcePath = path.join(root, 'tools/canvas-cli/src/index.mjs')
+  const cliSource = readIfExists(cliSourcePath)
+  if (!cliSource) {
+    errors.push('tools/canvas-cli/src/index.mjs is required for local-only CLI gate')
+    return
+  }
+  if (!cliSource.includes(CLI_G10_GATED_MESSAGE)) {
+    errors.push('canvas-cli must gate backend API commands until G10 public extension/API stability passes')
+  }
+  for (const surface of FORBIDDEN_CLI_BACKEND_API_SURFACES) {
+    if (cliSource.includes(surface.text)) {
+      errors.push(`canvas-cli must remain local-only before G10; remove ${surface.label}`)
+    }
+  }
+}
+
+function requireDemoReadinessGate(errors, root) {
+  const composeFile = path.join(root, 'docker-compose.demo.yml')
+  const compose = readIfExists(composeFile)
+  if (!compose) {
+    errors.push('docker-compose.demo.yml is required')
+  }
+  for (const service of DEMO_COMPOSE_SERVICES) {
+    if (!new RegExp(`^\\s{2}${service}:\\s*$`, 'm').test(compose)) {
+      errors.push(`docker-compose.demo.yml must define ${service} service`)
+    }
+  }
+
+  const collected = collectWireMockMappings(root)
+  errors.push(...collected.errors)
+  const mappings = collected.mappings
+  for (const endpoint of DEMO_WIREMOCK_ENDPOINTS) {
+    if (!findMappingByUrl(mappings, endpoint)) {
+      errors.push(`wiremock mappings must include ${endpoint}`)
+    }
+  }
+
+  const templatesMapping = findMappingByUrl(mappings, '/mock/demo/templates')
+  const pluginsMapping = findMappingByUrl(mappings, '/mock/demo/plugins')
+  const goldenPathMapping = findMappingByUrl(mappings, '/mock/demo/golden-path')
+  const templates = templatesMapping?.response?.jsonBody?.templates
+  const plugins = pluginsMapping?.response?.jsonBody?.plugins
+  const goldenPathBody = goldenPathMapping?.response?.jsonBody
+
+  if (!Array.isArray(templates)) {
+    errors.push('/mock/demo/templates must return a templates array')
+  }
+  if (!Array.isArray(plugins)) {
+    errors.push('/mock/demo/plugins must return a plugins array')
+  }
+  if (goldenPathBody && !JSON.stringify(goldenPathBody).includes('mock AI risk audit')) {
+    errors.push('/mock/demo/golden-path must include mock AI risk audit coverage')
+  }
+
+  if (!Array.isArray(templates) || !Array.isArray(plugins)) {
+    return
+  }
+
+  const enabledPlugins = new Set(
+    plugins
+      .filter(plugin => plugin?.enabled === true && plugin?.mode === 'mock')
+      .map(plugin => plugin.key),
+  )
+  if (!templates.some(template => template?.key === 'new-user-welcome')) {
+    errors.push('/mock/demo/templates must include new-user-welcome')
+  }
+  const newUserWelcomeTemplate = templates.find(template => template?.key === 'new-user-welcome')
+  const frontendPlugins = extractFrontendNewUserWelcomePlugins(root)
+  if (frontendPlugins.length === 0) {
+    errors.push('frontend template catalog must define new-user-welcome requiredPlugins')
+  } else if (newUserWelcomeTemplate && !arraysEqual(newUserWelcomeTemplate.requiredPlugins || [], frontendPlugins)) {
+    errors.push(`new-user-welcome WireMock requiredPlugins must match frontend catalog: ${frontendPlugins.join(', ')}`)
+  }
+  requireCliGoldenPathFixture(errors, root)
+  requireCliLocalOnlyUntilG10(errors, root)
+  for (const template of templates) {
+    if (!template?.key) {
+      errors.push('/mock/demo/templates entries must include key')
+      continue
+    }
+    if (template.docs && !existsSync(path.join(root, template.docs))) {
+      errors.push(`${template.key} demo template docs path is missing: ${template.docs}`)
+    }
+    for (const plugin of template.requiredPlugins || []) {
+      if (!enabledPlugins.has(plugin)) {
+        errors.push(`${template.key} requires demo plugin ${plugin}, but /mock/demo/plugins does not enable it in mock mode`)
+      }
+    }
+  }
+}
+
 export function verifyOpenSourceGrowthGuardrails(rootDir = process.cwd()) {
   const root = path.resolve(rootDir)
   const errors = []
@@ -333,6 +536,7 @@ export function verifyOpenSourceGrowthGuardrails(rootDir = process.cwd()) {
   for (const reference of PARALLEL_SYSTEM_REFERENCES) {
     requireContains(errors, 'implementation-guardrails.md', guardrails, reference)
   }
+  requireDemoReadinessGate(errors, root)
 
   const traceability = readIfExists(path.join(osgDir, 'traceability-matrix.md'))
   for (const id of TRACEABILITY_IDS) {

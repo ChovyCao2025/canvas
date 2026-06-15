@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains a Marketing Canvas platform with a Java backend and Vite frontend. Backend code lives in `backend/`: `canvas-engine` is the Spring Boot application, and `canvas-cache-sdk` is the reusable tiered cache module. Java sources follow `src/main/java`, tests follow `src/test/java`, and Flyway migrations live in `backend/canvas-engine/src/main/resources/db/migration/`. Frontend code lives in `frontend/src`, organized by `pages`, `components`, `hooks`, `services`, `types`, and `auth`. Supporting docs are under `docs/`, local dependency config is in `docker-compose.local.yml`, and mock external APIs are in `wiremock/`.
+This repository contains a Marketing Canvas platform with a Java backend and Vite frontend. Backend code lives in `backend/`: `canvas-boot` is the Spring Boot runtime assembly, `canvas-engine` remains the legacy runtime/source reference until removal, and `canvas-cache-sdk` is the reusable tiered cache module. Java sources follow `src/main/java`, tests follow `src/test/java`, and Flyway migrations are mirrored into `backend/canvas-boot/src/main/resources/db/migration/` for the current runtime. Frontend code lives in `frontend/src`, organized by `pages`, `components`, `hooks`, `services`, `types`, and `auth`. Supporting docs are under `docs/`, local dependency config is in `docker-compose.local.yml`, and mock external APIs are in `wiremock/`.
 
 ## Build, Test, and Development Commands
 
@@ -18,8 +18,8 @@ Backend commands:
 cd backend
 mvn clean install -DskipTests
 mvn clean install
-mvn -f canvas-engine/pom.xml spring-boot:run
-mvn test -pl canvas-engine -Dtest=StartHandlerTest
+mvn -f canvas-boot/pom.xml spring-boot:run
+mvn -pl canvas-boot -am -Dtest=ModularArchitectureTest test
 ```
 
 Frontend commands:
@@ -42,6 +42,8 @@ Java uses 4-space indentation, package names under `org.chovy`, PascalCase class
 ## Testing Guidelines
 
 Backend tests use JUnit 5 with AssertJ. Run module or targeted tests before changing engine, cache, persistence, or controller behavior. Frontend tests use Vitest in the Node environment. Prefer focused unit tests for graph helpers, config panels, services, and hooks. When changing migrations, include schema or migration verification tests where practical.
+
+Apply TDD and verification skills with engineering judgment, not as ceremony. Add or update tests when a change affects behavior, compatibility contracts, shared logic, persistence, migrations, regressions, or non-obvious validation. For clear mechanical wiring, route aliases, deterministic adapters, documentation-only edits, or changes already covered by existing tests, it is acceptable to skip creating a new test class; instead run the smallest useful verification such as compile, focused existing tests, preflight checks, or static scans, and note the rationale in the handoff or final response.
 
 ## Commit & Pull Request Guidelines
 

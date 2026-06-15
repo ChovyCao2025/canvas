@@ -134,7 +134,7 @@ Backend:
 cd backend
 JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home \
 PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH \
-mvn -pl canvas-engine test -DfailIfNoTests=false
+mvn -pl canvas-boot -am test -DfailIfNoTests=false
 ```
 
 Focused backend content gate:
@@ -143,7 +143,7 @@ Focused backend content gate:
 cd backend
 JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home \
 PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH \
-mvn -pl canvas-engine test \
+mvn -pl canvas-boot -am test \
   -Dtest=MarketingAssetUploadServiceTest,MarketingAssetUploadWebhookSignatureServiceTest,MarketingAssetUploadIntentSchemaTest,MarketingAssetServiceTest,MarketingContentReleaseServiceTest,MarketingContentReleaseSchemaTest,MarketingContentHubSchemaTest,MarketingContentUploadControllerTest,PublicMarketingContentUploadWebhookControllerTest,SecurityConfigRouteTest,SecurityConfigRoleTest,ProductionConfigGuardTest,ApplicationYamlTest,FlywayMigrationPolicyTest \
   -DfailIfNoTests=false
 ```

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS architecture_deployment_evidence (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  candidate_key VARCHAR(128) NOT NULL,
+  owner_id VARCHAR(128) NOT NULL,
+  current_state_evidence TEXT NOT NULL,
+  target_architecture TEXT NOT NULL,
+  scaling_trigger TEXT NOT NULL,
+  operational_cost_notes TEXT NOT NULL,
+  dependency_notes TEXT NOT NULL,
+  proof_command VARCHAR(1000) NOT NULL,
+  rollback_plan VARCHAR(1000) NOT NULL,
+  residency_impact_notes TEXT NULL,
+  decision_status VARCHAR(32) NOT NULL DEFAULT 'BLOCKED_PENDING_REVIEW',
+  reviewed_by VARCHAR(128) NULL,
+  reviewed_at DATETIME NULL,
+  child_spec VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_arch_deploy_candidate_status (candidate_key, decision_status),
+  INDEX idx_arch_deploy_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

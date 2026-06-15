@@ -103,6 +103,42 @@ class ExecutionControllerCompatibilityTest {
     }
 
     @Test
+    void dryRunExecutionRoutePreservesOldPathAndMarksCommandDryRun() {
+        CapturingExecutionFacade facade = new CapturingExecutionFacade(
+                new ExecutionResultView("dry-run-1", "SUCCESS"),
+                traceView(42L));
+
+        webClient(facade)
+                .post()
+                .uri("/canvas/execute/dry-run/42")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "inputParams": {"couponCode": "A10"},
+                          "graphJson": "{\\"nodes\\":[]}"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data.executionId").isEqualTo("dry-run-1")
+                .jsonPath("$.data.status").isEqualTo("SUCCESS");
+
+        assertThat(facade.commands).hasSize(1);
+        ExecutionRequestCommand command = facade.commands.getFirst();
+        assertThat(command.tenantId()).isEqualTo(TENANT_ID);
+        assertThat(command.canvasId()).isEqualTo(42L);
+        assertThat(command.versionId()).isNull();
+        assertThat(command.triggerType()).isEqualTo("DIRECT_CALL");
+        assertThat(command.userId()).isEqualTo("system");
+        assertThat(command.payload()).containsEntry("couponCode", "A10");
+        assertThat(command.dryRun()).isTrue();
+    }
+
+    @Test
     void traceRoutePreservesOldPathEnvelopeAndNodeResultKeys() {
         CapturingExecutionFacade facade = new CapturingExecutionFacade(
                 new ExecutionResultView("exec-direct-1", "SUCCESS"),

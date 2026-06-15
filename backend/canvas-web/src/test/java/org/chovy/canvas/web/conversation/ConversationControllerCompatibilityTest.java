@@ -265,6 +265,192 @@ class ConversationControllerCompatibilityTest {
         assertThat(facade.actors).containsExactly(DEFAULT_ACTOR);
     }
 
+    @Test
+    void remainingConversationAliasesPreserveCompatibilityEnvelopeAndDelegateFacade() {
+        RecordingConversationFacade facade = new RecordingConversationFacade();
+        WebTestClient client = webClient(facade);
+
+        client.post()
+                .uri("/canvas/conversations/adapters/WHATSAPP/ingress")
+                .header("X-Tenant-Id", HEADER_TENANT_ID.toString())
+                .header("X-Actor", HEADER_ACTOR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"entry":[{"changes":[{"value":{"messages":[{"id":"wamid-1","from":"user-2","text":{"body":"hello"}}]}}]}]}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data[0].status").isEqualTo("RECORDED");
+
+        client.get()
+                .uri("/canvas/conversations?userId=user-1&channel=whatsapp&limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].sessionId").isEqualTo(100);
+
+        client.get()
+                .uri("/canvas/conversations/100/messages?limit=3")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].messageId").isEqualTo(200);
+
+        client.get()
+                .uri("/canvas/conversations/workspace/inbox?status=OPEN&assignedTo=alice&channel=whatsapp&limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].id").isEqualTo(88);
+
+        client.post()
+                .uri("/canvas/conversations/workspace/work-items/88/tasks")
+                .header("X-Actor", HEADER_ACTOR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"title":"Follow up","description":"Call customer","dueAt":"2026-06-12T18:00:00"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.taskId").isEqualTo(501);
+
+        client.post()
+                .uri("/canvas/conversations/workspace/tasks/501/complete")
+                .header("X-Actor", HEADER_ACTOR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"result":"DONE","note":"completed"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.status").isEqualTo("COMPLETED");
+
+        client.get()
+                .uri("/canvas/conversations/workspace/work-items/88/timeline?messageLimit=3&auditLimit=2")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.workItemId").isEqualTo(88)
+                .jsonPath("$.data.messages[0].messageId").isEqualTo(200);
+
+        client.post()
+                .uri("/canvas/conversations/workspace/sla-breaches/evaluate?limit=5")
+                .header("X-Actor", HEADER_ACTOR)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.evaluatedCount").isEqualTo(5);
+
+        client.get()
+                .uri("/canvas/conversations/workspace/sla-breaches?status=OPEN&limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].workItemId").isEqualTo(88);
+
+        client.post()
+                .uri("/canvas/conversations/workspace/work-items/88/ai-reply-suggestions/generate")
+                .header("X-Actor", HEADER_ACTOR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"prompt":"suggest reply","tone":"friendly"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.suggestionId").isEqualTo(701);
+
+        client.post()
+                .uri("/canvas/conversations/workspace/work-items/88/ai-reply-suggestions/701/review")
+                .header("X-Actor", HEADER_ACTOR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"status":"APPROVED","reviewNote":"ship it"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.status").isEqualTo("APPROVED");
+
+        client.get()
+                .uri("/canvas/conversations/workspace/work-items/88/ai-reply-suggestions?status=APPROVED&limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].suggestionId").isEqualTo(701);
+
+        client.post()
+                .uri("/canvas/conversations/private-domain/sync-runs")
+                .header("X-Actor", HEADER_ACTOR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"provider":"wechat","ownerUserId":"owner-1","contacts":[{"externalUserId":"user-1"}]}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data.provider").isEqualTo("wechat");
+
+        client.get()
+                .uri("/canvas/conversations/private-domain/contacts?provider=wechat&ownerUserId=owner-1&keyword=vip&limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].externalUserId").isEqualTo("user-1");
+
+        client.get()
+                .uri("/canvas/conversations/private-domain/groups?provider=wechat&ownerUserId=owner-1&limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].groupId").isEqualTo("group-1");
+
+        client.get()
+                .uri("/canvas/conversations/private-domain/sync-runs?provider=wechat&limit=5")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].runId").isEqualTo(801);
+
+        client.post()
+                .uri("/canvas/conversations/provider-webhooks/whatsapp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"entry":[{"changes":[{"value":{"messages":[{"id":"wamid-2","from":"user-3","text":{"body":"hi"}}]}}]}]}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.data[0].messageId").isEqualTo(200);
+
+        assertThat(facade.adapterKeys).containsExactly("WHATSAPP", "WHATSAPP");
+        assertThat(facade.listSessionFilters).contains("user-1:whatsapp:5");
+        assertThat(facade.messageSessionIds).contains(100L);
+        assertThat(facade.workItemIds).contains(88L);
+        assertThat(facade.privateDomainProviders).contains("wechat");
+    }
+
     private static WebTestClient webClient(ConversationFacade facade) {
         return WebTestClient.bindToController(new ConversationController(facade)).build();
     }
@@ -298,6 +484,11 @@ class ConversationControllerCompatibilityTest {
         private ConversationRoutingAgentCommand routingAgentCommand;
         private ConversationRoutingRuleCommand routingRuleCommand;
         private ConversationRouteCommand routeCommand;
+        private final List<String> adapterKeys = new ArrayList<>();
+        private final List<String> listSessionFilters = new ArrayList<>();
+        private final List<Long> messageSessionIds = new ArrayList<>();
+        private final List<Long> workItemIds = new ArrayList<>();
+        private final List<String> privateDomainProviders = new ArrayList<>();
 
         @Override
         public ConversationRecordResult recordInbound(ConversationInboundCommand command) {
@@ -402,6 +593,161 @@ class ConversationControllerCompatibilityTest {
                     NOW,
                     NOW.plusMinutes(command.slaMinutes()),
                     "rule");
+        }
+
+        @Override
+        public List<Map<String, Object>> recordAdapterInbound(
+                Long tenantId,
+                String adapterKey,
+                Map<String, Object> payload,
+                String actor) {
+            recordMutation(tenantId, actor);
+            adapterKeys.add(adapterKey);
+            return List.of(Map.of(
+                    "sessionId", 100L,
+                    "messageId", 200L,
+                    "status", "RECORDED",
+                    "adapterKey", adapterKey));
+        }
+
+        @Override
+        public List<Map<String, Object>> listSessions(Long tenantId, String userId, String channel, int limit) {
+            tenantIds.add(tenantId);
+            listSessionFilters.add(userId + ":" + channel + ":" + limit);
+            return List.of(Map.of(
+                    "sessionId", 100L,
+                    "tenantId", tenantId,
+                    "userId", userId,
+                    "channel", channel,
+                    "status", "ACTIVE"));
+        }
+
+        @Override
+        public List<Map<String, Object>> listMessages(Long tenantId, Long sessionId, int limit) {
+            tenantIds.add(tenantId);
+            messageSessionIds.add(sessionId);
+            return List.of(Map.of(
+                    "messageId", 200L,
+                    "sessionId", sessionId,
+                    "direction", "INBOUND",
+                    "text", "hello"));
+        }
+
+        @Override
+        public List<ConversationWorkItemView> inbox(
+                Long tenantId,
+                String status,
+                String assignedTo,
+                String channel,
+                int limit) {
+            tenantIds.add(tenantId);
+            return List.of(workItem(88L, tenantId, 100L, status, "NORMAL", assignedTo, "sales", null));
+        }
+
+        @Override
+        public Map<String, Object> createTask(Long tenantId, Long workItemId, Map<String, Object> command, String actor) {
+            recordMutation(tenantId, actor);
+            workItemIds.add(workItemId);
+            return Map.of("taskId", 501L, "workItemId", workItemId, "status", "OPEN", "title", command.get("title"));
+        }
+
+        @Override
+        public Map<String, Object> completeTask(Long tenantId, Long taskId, Map<String, Object> command, String actor) {
+            recordMutation(tenantId, actor);
+            return Map.of("taskId", taskId, "status", "COMPLETED", "result", command.get("result"));
+        }
+
+        @Override
+        public Map<String, Object> timeline(Long tenantId, Long workItemId, int messageLimit, int auditLimit) {
+            tenantIds.add(tenantId);
+            workItemIds.add(workItemId);
+            return Map.of(
+                    "workItemId", workItemId,
+                    "messages", List.of(Map.of("messageId", 200L, "text", "hello")),
+                    "audits", List.of(Map.of("auditId", 301L, "eventType", "CREATED")));
+        }
+
+        @Override
+        public Map<String, Object> evaluateSlaBreaches(Long tenantId, int limit, String actor) {
+            recordMutation(tenantId, actor);
+            return Map.of("evaluatedCount", limit, "breachCount", 1);
+        }
+
+        @Override
+        public List<Map<String, Object>> slaBreaches(Long tenantId, String status, int limit) {
+            tenantIds.add(tenantId);
+            return List.of(Map.of("breachId", 601L, "workItemId", 88L, "status", status));
+        }
+
+        @Override
+        public Map<String, Object> generateAiReplySuggestion(
+                Long tenantId,
+                Long workItemId,
+                Map<String, Object> command,
+                String actor) {
+            recordMutation(tenantId, actor);
+            workItemIds.add(workItemId);
+            return Map.of("suggestionId", 701L, "workItemId", workItemId, "status", "GENERATED");
+        }
+
+        @Override
+        public Map<String, Object> reviewAiReplySuggestion(
+                Long tenantId,
+                Long workItemId,
+                Long suggestionId,
+                Map<String, Object> command,
+                String actor) {
+            recordMutation(tenantId, actor);
+            workItemIds.add(workItemId);
+            return Map.of("suggestionId", suggestionId, "workItemId", workItemId, "status", command.get("status"));
+        }
+
+        @Override
+        public List<Map<String, Object>> listAiReplySuggestions(
+                Long tenantId,
+                Long workItemId,
+                String status,
+                int limit) {
+            tenantIds.add(tenantId);
+            workItemIds.add(workItemId);
+            return List.of(Map.of("suggestionId", 701L, "workItemId", workItemId, "status", status));
+        }
+
+        @Override
+        public Map<String, Object> ingestPrivateDomainSync(Long tenantId, Map<String, Object> command, String actor) {
+            recordMutation(tenantId, actor);
+            privateDomainProviders.add((String) command.get("provider"));
+            return Map.of("runId", 801L, "provider", command.get("provider"), "status", "SUCCESS");
+        }
+
+        @Override
+        public List<Map<String, Object>> privateDomainContacts(
+                Long tenantId,
+                String provider,
+                String ownerUserId,
+                String keyword,
+                int limit) {
+            tenantIds.add(tenantId);
+            privateDomainProviders.add(provider);
+            return List.of(Map.of("externalUserId", "user-1", "provider", provider, "ownerUserId", ownerUserId));
+        }
+
+        @Override
+        public List<Map<String, Object>> privateDomainGroups(
+                Long tenantId,
+                String provider,
+                String ownerUserId,
+                int limit) {
+            tenantIds.add(tenantId);
+            privateDomainProviders.add(provider);
+            return List.of(Map.of("groupId", "group-1", "provider", provider, "ownerUserId", ownerUserId));
+        }
+
+        @Override
+        public List<Map<String, Object>> privateDomainSyncRuns(Long tenantId, String provider, int limit) {
+            tenantIds.add(tenantId);
+            privateDomainProviders.add(provider);
+            return List.of(Map.of("runId", 801L, "provider", provider, "status", "SUCCESS"));
         }
 
         private void recordMutation(Long tenantId, String actor) {

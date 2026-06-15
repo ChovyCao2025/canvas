@@ -21,13 +21,28 @@ Read and follow:
 - this assigned worker packet
 
 Do not change runtime behavior. Do not rename symbols. Do not modify method
-bodies except for adding inline comments. Do not alter imports, annotations, or
-formatting except for comment placement and required blank lines between
-documented fields.
+bodies except for adding inline comments or preserving existing record
+constructor logic during an allowed record-to-class conversion. Do not alter
+imports, annotations, or formatting except for comment placement, readability
+blank lines allowed by docs/java-commenting/README.md, and imports required by
+an allowed record-to-class conversion.
+
+When you encounter a Java record in your assigned write scope, convert it to a
+normal class following the "Record Conversion Rule" in
+docs/java-commenting/README.md. Do not drop, rename, merge, reorder, or
+reinterpret any record component.
+
+When you encounter a Spring-managed bean with multiple constructors, follow the
+"Dependency Injection Rule" in docs/java-commenting/README.md. Prefer Spring
+Boot constructor injection with Lombok `@RequiredArgsConstructor` for required
+dependencies, `@ConfigurationProperties` for grouped configuration, and
+`ObjectProvider<T>` or `Optional<T>` for optional dependencies. Do not
+consolidate constructors unless all assigned-scope call sites and tests remain
+compatible. Otherwise report the file under "needs human confirmation".
 
 Every Java type, field, constructor, and method in your assigned write scope
-must receive an English Javadoc comment. Important internal logic must receive
-concise inline comments when the reason is not obvious.
+must receive a Chinese Javadoc comment. Important internal logic must receive
+concise Chinese inline comments when the reason is not obvious.
 
 If business meaning is unclear, write a conservative comment and report the
 location under "needs human confirmation". Do not invent domain behavior.
@@ -237,4 +252,3 @@ After each worker returns:
 [ ] Run or review module verification.
 [ ] Dispatch the next non-overlapping packet.
 ```
-

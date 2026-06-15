@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS bi_dataset_acceleration_policy (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  tenant_id BIGINT NOT NULL,
+  dataset_key VARCHAR(128) NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
+  acceleration_mode VARCHAR(32) NOT NULL DEFAULT 'DIRECT_QUERY',
+  refresh_mode VARCHAR(32) NOT NULL DEFAULT 'MANUAL',
+  refresh_interval_minutes BIGINT NOT NULL DEFAULT 60,
+  ttl_seconds BIGINT NOT NULL DEFAULT 300,
+  max_rows BIGINT NOT NULL DEFAULT 100000,
+  cron_expression VARCHAR(128),
+  materialized_table VARCHAR(256),
+  last_status VARCHAR(32) NOT NULL DEFAULT 'IDLE',
+  last_run_id BIGINT,
+  last_refreshed_at DATETIME,
+  updated_by VARCHAR(128),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_bi_dataset_acceleration_policy_dataset (tenant_id, dataset_key),
+  KEY idx_bi_dataset_acceleration_policy_mode (tenant_id, acceleration_mode, enabled),
+  KEY idx_bi_dataset_acceleration_policy_refresh (tenant_id, refresh_mode, last_refreshed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='BI dataset acceleration policy';
+
+CREATE TABLE IF NOT EXISTS bi_dataset_extract_refresh_run (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  tenant_id BIGINT NOT NULL,
+  dataset_key VARCHAR(128) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  row_count BIGINT,
+  duration_ms BIGINT,
+  materialized_table VARCHAR(256),
+  requested_by VARCHAR(128),
+  started_at DATETIME NOT NULL,
+  finished_at DATETIME,
+  error_message VARCHAR(1000),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_bi_dataset_extract_refresh_run_dataset (tenant_id, dataset_key, started_at),
+  KEY idx_bi_dataset_extract_refresh_run_status (tenant_id, status, started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='BI dataset extract refresh run history';

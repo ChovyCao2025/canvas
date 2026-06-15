@@ -267,6 +267,24 @@ public class MybatisBiCatalogRepository implements BiWorkspaceRepository, BiData
     }
 
     @Override
+    public void deleteGrant(Long tenantId,
+                            Long workspaceId,
+                            String resourceType,
+                            Long resourceId,
+                            String subjectType,
+                            String subjectId,
+                            String actionKey) {
+        permissionMapper.delete(new LambdaQueryWrapper<BiResourcePermissionDO>()
+                .eq(BiResourcePermissionDO::getTenantId, tenantId)
+                .eq(BiResourcePermissionDO::getWorkspaceId, workspaceId)
+                .eq(BiResourcePermissionDO::getResourceType, resourceType)
+                .eq(BiResourcePermissionDO::getResourceId, resourceId)
+                .eq(BiResourcePermissionDO::getSubjectType, subjectType)
+                .eq(BiResourcePermissionDO::getSubjectId, subjectId)
+                .eq(BiResourcePermissionDO::getActionKey, actionKey));
+    }
+
+    @Override
     public List<BiPermissionGrant> listResourceGrants(Long tenantId,
                                                       Long workspaceId,
                                                       String resourceType,

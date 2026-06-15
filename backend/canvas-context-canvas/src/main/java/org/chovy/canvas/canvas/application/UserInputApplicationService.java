@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.chovy.canvas.canvas.api.UserInputFacade;
 import org.chovy.canvas.canvas.domain.UserInputForm;
 import org.chovy.canvas.canvas.domain.UserInputResponse;
 import org.chovy.canvas.canvas.domain.UserInputStatus;
@@ -13,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class UserInputApplicationService {
+public class UserInputApplicationService implements UserInputFacade {
 
     private final UserInputFormRepository formRepository;
     private final UserInputResponseRepository responseRepository;
@@ -48,6 +49,15 @@ public class UserInputApplicationService {
                 .map(existing -> new PendingInput(existing.formId(), existing.id(), existing.status().name(),
                         existing.expiresAt(), existing.timeoutNodeId()))
                 .orElseGet(() -> createNewPending(command, idempotencyKey));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public UserInputFacade.SubmitResult submit(Long responseId, UserInputFacade.SubmitCommand command) {
+        SubmitResult result = submit(responseId, new SubmitCommand(
+                command == null ? Map.of() : command.response(),
+                command == null ? null : command.operator()));
+        return new UserInputFacade.SubmitResult(result.responseId(), result.status(), result.duplicate());
     }
 
     @Transactional(rollbackFor = Exception.class)

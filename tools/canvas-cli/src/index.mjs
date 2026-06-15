@@ -3,31 +3,22 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 
-const DEFAULT_API_URL = 'http://localhost:8080'
-const IMPORT_PATH = '/canvas/dsl/map'
+const G10_GATED_MESSAGE = 'Backend API commands are gated until G10 public extension/API stability passes; use local validate and diff for now.'
 
 const usage = `Canvas CLI
 
 Usage:
-  canvas-cli [--api-url <url>] --help
+  canvas-cli --help
   canvas-cli validate <file>
-  canvas-cli import <file>
-  canvas-cli export <canvasId>
   canvas-cli diff <before> <after>
-  canvas-cli publish <canvasId>
 
 Commands:
   validate <file>        Validate a local Canvas DSL v1 JSON Journey document.
-  import <file>          POST { document } to /canvas/dsl/map for import preview.
-  export <canvasId>      GET /canvas/dsl/export/<canvasId> and print JSON.
   diff <before> <after>  Summarize added, removed, and changed node ids locally.
-  publish <canvasId>     POST /canvas/<canvasId>/publish and print JSON.
 
-Options:
-  --api-url <url>        Backend API base URL. Overrides CANVAS_API_URL.
-                         Default: ${DEFAULT_API_URL}
-
-validate and diff are local-only. import, export, and publish call backend APIs.`
+Current boundary:
+  import, export, and publish are blocked until G10 public extension/API stability passes.
+  validate and diff are local-only and do not call backend APIs.`
 
 function readJson(file) {
   try {
@@ -127,7 +118,6 @@ function formatList(ids) {
 
 function parseGlobalOptions(args) {
   const commandArgs = []
-  let apiUrl
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
@@ -137,7 +127,6 @@ function parseGlobalOptions(args) {
       if (!value) {
         throw new Error('--api-url requires a value')
       }
-      apiUrl = value
       index += 1
       continue
     }
@@ -147,7 +136,6 @@ function parseGlobalOptions(args) {
       if (!value) {
         throw new Error('--api-url requires a value')
       }
-      apiUrl = value
       continue
     }
 
@@ -155,63 +143,8 @@ function parseGlobalOptions(args) {
   }
 
   return {
-    apiUrl: apiUrl ?? process.env.CANVAS_API_URL ?? DEFAULT_API_URL,
     commandArgs
   }
-}
-
-function buildApiUrl(apiUrl, path) {
-  const normalizedBase = apiUrl.endsWith('/') ? apiUrl : `${apiUrl}/`
-  const normalizedPath = path.replace(/^\/+/, '')
-  return new URL(normalizedPath, normalizedBase).toString()
-}
-
-async function requestJson(apiUrl, method, path, body) {
-  let url
-  try {
-    url = buildApiUrl(apiUrl, path)
-  } catch (error) {
-    throw new Error(`invalid API URL ${apiUrl}: ${error.message}`)
-  }
-
-  const options = {
-    method,
-    headers: {
-      accept: 'application/json'
-    }
-  }
-
-  if (body !== undefined) {
-    options.headers['content-type'] = 'application/json'
-    options.body = JSON.stringify(body)
-  }
-
-  let response
-  try {
-    response = await fetch(url, options)
-  } catch (error) {
-    throw new Error(`API request failed: ${method} ${path}: ${error.message}`)
-  }
-
-  const responseText = await response.text()
-  if (!response.ok) {
-    const details = responseText.trim().length > 0 ? `: ${responseText}` : ''
-    throw new Error(`API request failed: ${method} ${path} returned ${response.status}${details}`)
-  }
-
-  if (responseText.trim().length === 0) {
-    return {}
-  }
-
-  try {
-    return JSON.parse(responseText)
-  } catch (error) {
-    throw new Error(`API response from ${method} ${path} was not valid JSON: ${error.message}`)
-  }
-}
-
-function printJson(value) {
-  console.log(JSON.stringify(value, null, 2))
 }
 
 function runValidate(file) {
@@ -245,30 +178,9 @@ function runDiff(beforeFile, afterFile) {
   return 0
 }
 
-async function runImport(file, apiUrl) {
-  const document = readJson(file)
-  const response = await requestJson(apiUrl, 'POST', IMPORT_PATH, { document })
-  printJson(response)
-  return 0
-}
-
-async function runExport(canvasId, apiUrl) {
-  const path = `/canvas/dsl/export/${encodeURIComponent(canvasId)}`
-  const response = await requestJson(apiUrl, 'GET', path)
-  printJson(response)
-  return 0
-}
-
-async function runPublish(canvasId, apiUrl) {
-  const path = `/canvas/${encodeURIComponent(canvasId)}/publish`
-  const response = await requestJson(apiUrl, 'POST', path)
-  printJson(response)
-  return 0
-}
-
 async function main(args) {
   try {
-    const { apiUrl, commandArgs } = parseGlobalOptions(args)
+    const { commandArgs } = parseGlobalOptions(args)
     const [command, ...rest] = commandArgs
 
     if (!command || command === '--help' || command === '-h') {
@@ -278,17 +190,12 @@ async function main(args) {
     if (command === 'validate' && rest.length === 1) {
       return runValidate(rest[0])
     }
-    if (command === 'import' && rest.length === 1) {
-      return await runImport(rest[0], apiUrl)
-    }
-    if (command === 'export' && rest.length === 1) {
-      return await runExport(rest[0], apiUrl)
-    }
     if (command === 'diff' && rest.length === 2) {
       return runDiff(rest[0], rest[1])
     }
-    if (command === 'publish' && rest.length === 1) {
-      return await runPublish(rest[0], apiUrl)
+    if (['import', 'export', 'publish'].includes(command)) {
+      console.error(G10_GATED_MESSAGE)
+      return 1
     }
 
     console.error(usage)

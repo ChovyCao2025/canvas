@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,6 +67,26 @@ class ModularArchitectureTest {
         }
     }
 
+    @Test
+    void bootRuntimeResourcesMirrorLegacyEngineUntilEngineRemoval() throws Exception {
+        Path backendRoot = backendRoot();
+        Path engineResources = backendRoot.resolve("canvas-engine/src/main/resources");
+        Path bootResources = backendRoot.resolve("canvas-boot/src/main/resources");
+
+        List<String> engineResourceFiles = listRelativeFiles(engineResources);
+        List<String> bootResourceFiles = listRelativeFiles(bootResources);
+
+        assertThat(bootResources.resolve("application.yml")).exists();
+        assertThat(bootResources.resolve("application-prod.yml")).exists();
+        assertThat(bootResources.resolve("application-staging.yml")).exists();
+        assertThat(bootResources.resolve("db/migration"))
+                .as("canvas-boot must package Flyway migrations for the cutover runtime")
+                .isDirectory();
+        assertThat(bootResourceFiles)
+                .as("canvas-boot resources must keep the runtime/Flyway surface available while canvas-engine remains the source of truth")
+                .containsExactlyElementsOf(engineResourceFiles);
+    }
+
     private static List<String> allNewModules() {
         return List.of(
                 "canvas-common",
@@ -97,5 +118,17 @@ class ModularArchitectureTest {
             return userDir;
         }
         return userDir.resolve("backend");
+    }
+
+    private static List<String> listRelativeFiles(Path root) throws Exception {
+        try (Stream<Path> files = Files.walk(root)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .map(root::relativize)
+                    .map(Path::toString)
+                    .map(path -> path.replace('\\', '/'))
+                    .sorted()
+                    .toList();
+        }
     }
 }

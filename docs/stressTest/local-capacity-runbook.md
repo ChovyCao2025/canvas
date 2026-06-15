@@ -62,9 +62,9 @@ curl -sS http://localhost:8099/__admin/mappings | head
 
 ```bash
 cd /Users/photonpay/project/canvas/backend
-mvn -q -pl canvas-engine -am clean package -DskipTests
+mvn -q -pl canvas-boot -am clean package -DskipTests
 cd /Users/photonpay/project/canvas
-docker build -f backend/canvas-engine/Dockerfile.perf -t canvas-engine:perf .
+docker build -f backend/canvas-boot/Dockerfile.perf -t canvas-boot:perf .
 ```
 
 ## 6. 启动固定资源后端
@@ -89,7 +89,7 @@ docker run -d \
   -e CANVAS_INTEGRATION_TAGGER_SERVICE_URL=http://host.docker.internal:8099/mock/tagger \
   -e CANVAS_INTEGRATION_REACH_PLATFORM_URL=http://host.docker.internal:8099/mock/reach \
   -e CANVAS_INTEGRATION_API_CALL_BASE_URL=http://host.docker.internal:8099/mock/api \
-  canvas-engine:perf
+  canvas-boot:perf
 ```
 
 健康检查：

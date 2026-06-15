@@ -995,6 +995,1100 @@ Rollback path:
   and BI test files listed in this packet
 ```
 
+### DDD-C09AI: BI Resource Operations Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AI
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AH recovered favorite route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceCommentCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceCommentView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceLockCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceLockView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceLocationCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceLocationView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceMoveCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceTransferCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceOwnershipView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPublishApprovalCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPublishApprovalReviewCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPublishApprovalView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiResourceOperationsCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 25 current
+  production endpoints after recovered DDD-C09AH. Legacy sources for this
+  batch include:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceCommentController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceCollaborationController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceLocationController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceTransferController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiPublishApprovalController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceCommentController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceCollaborationController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceLocationController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiResourceTransferController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiPublishApprovalController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/resource/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add a compact final-module BI resources operations batch through the existing
+  BiCatalogController and BiCatalogFacade without depending on old
+  canvas-engine services. Cover these production routes:
+  - POST /canvas/bi/resources/comments
+  - GET /canvas/bi/resources/comments
+  - DELETE /canvas/bi/resources/comments/{commentId}
+  - POST /canvas/bi/resources/locks/acquire
+  - GET /canvas/bi/resources/locks
+  - POST /canvas/bi/resources/locks/release
+  - POST /canvas/bi/resources/locations
+  - POST /canvas/bi/resources/move
+  - GET /canvas/bi/resources/locations
+  - POST /canvas/bi/resources/transfer
+  - GET /canvas/bi/resources/ownerships
+  - GET /canvas/bi/resources/publish-approvals
+  - POST /canvas/bi/resources/publish-approvals
+  - POST /canvas/bi/resources/publish-approvals/{approvalId}/review
+
+  Preserve the stable compatibility envelope used by existing BI routes:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  analyst. The compact seed may use an in-memory final BI catalog owned by
+  canvas-context-bi. It must scope state by tenant, normalize resource type and
+  keys, keep deterministic ordering, make comment delete and lock release
+  idempotent, and model publish approval review state without persistence.
+  Do not add persistence, old-domain dependencies, cross-module dependencies,
+  or POM changes.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|adapter\\.persistence|Mapper|DO" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiResourceOperationsCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AI reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AJ: BI Portal And Big-Screen Resource Lifecycle Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AJ
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AI BI resource operations route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPortalResourceCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPortalResourceView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiBigScreenResourceCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiBigScreenResourceView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceVersionView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPresentationResourceCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 39 current
+  production endpoints after DDD-C09AI. Legacy sources for this batch are:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiPortalController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiBigScreenController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiPortalController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiBigScreenController.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for BI portal and big-screen resource
+  lifecycle routes through the existing BiCatalogController and BiCatalogFacade
+  without depending on old canvas-engine services. Cover these production
+  routes:
+  - GET /canvas/bi/portals/resources
+  - GET /canvas/bi/portals/resources/{portalKey}
+  - POST /canvas/bi/portals/resources/{portalKey}/draft
+  - POST /canvas/bi/portals/resources/{portalKey}/publish
+  - DELETE /canvas/bi/portals/resources/{portalKey}
+  - GET /canvas/bi/portals/resources/{portalKey}/versions
+  - POST /canvas/bi/portals/resources/{portalKey}/versions/{version}/restore
+  - GET /canvas/bi/big-screens/resources
+  - GET /canvas/bi/big-screens/resources/{screenKey}
+  - POST /canvas/bi/big-screens/resources/{screenKey}/draft
+  - POST /canvas/bi/big-screens/resources/{screenKey}/publish
+  - DELETE /canvas/bi/big-screens/resources/{screenKey}
+  - GET /canvas/bi/big-screens/resources/{screenKey}/versions
+  - POST /canvas/bi/big-screens/resources/{screenKey}/versions/{version}/restore
+
+  Preserve the stable compatibility envelope used by existing BI routes:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  analyst. The compact seed may use an in-memory final BI catalog owned by
+  canvas-context-bi. It must scope state by tenant, normalize portal/screen
+  keys, support list/detail/draft/publish/archive/version-list/version-restore,
+  keep deterministic ordering, and make archive idempotent enough for
+  compatibility. Do not add persistence, old-domain dependencies, cross-module
+  dependencies, or POM changes.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|adapter\\.persistence|Mapper|DO" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPresentationResourceCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AJ reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AK: BI AI Assistant Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AK
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AJ BI portal and big-screen lifecycle route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiAiRequestCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiAiResponseView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiAiAssistantCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 53 current
+  production endpoints after DDD-C09AJ. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiAiController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiAiController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for BI AI assistant routes through the
+  existing BiCatalogController and BiCatalogFacade without depending on old
+  canvas-engine services or old BI AI agent services. Cover these production
+  routes:
+  - POST /canvas/bi/ai/ask
+  - POST /canvas/bi/ai/interpret
+  - POST /canvas/bi/ai/report
+  - POST /canvas/bi/ai/dashboard-draft
+  - POST /canvas/bi/ai/insights
+
+  Preserve the stable compatibility envelope used by existing BI routes:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  analyst. The compact seed may use an in-memory/deterministic final BI AI
+  catalog owned by canvas-context-bi. It must scope results by tenant, normalize
+  operation names, preserve request payload hints in response metadata, keep
+  deterministic IDs/order, and return route-specific response types or fields
+  that are stable enough for compatibility tests. Do not add persistence,
+  old-domain dependencies, cross-module dependencies, external LLM calls, or
+  POM changes.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|adapter\\.persistence|Mapper|DO|BiAskDataAgentService|BiInterpretationAgentService|BiReportAgentService|BiDashboardDraftAgentService|BiInsightAgentService" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiAiAssistantCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AK reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AL: BI Spreadsheet Resource Lifecycle Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AL
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AK BI AI assistant route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSpreadsheetResourceCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSpreadsheetResourceView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceVersionView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPresentationResourceCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 58 current
+  production endpoints after DDD-C09AK. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSpreadsheetController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSpreadsheetController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/spreadsheet/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPresentationResourceCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for BI spreadsheet resource lifecycle
+  routes through the existing BiCatalogController and BiCatalogFacade without
+  depending on old canvas-engine services. Cover these production routes:
+  - GET /canvas/bi/spreadsheets/resources
+  - GET /canvas/bi/spreadsheets/resources/{spreadsheetKey}
+  - POST /canvas/bi/spreadsheets/resources/{spreadsheetKey}/draft
+  - POST /canvas/bi/spreadsheets/resources/{spreadsheetKey}/publish
+  - DELETE /canvas/bi/spreadsheets/resources/{spreadsheetKey}
+  - GET /canvas/bi/spreadsheets/resources/{spreadsheetKey}/versions
+  - POST /canvas/bi/spreadsheets/resources/{spreadsheetKey}/versions/{version}/restore
+
+  Preserve the stable compatibility envelope used by existing BI routes:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  analyst. The compact seed may extend the existing in-memory final BI
+  presentation catalog owned by canvas-context-bi. It must scope state by
+  tenant, normalize spreadsheet keys, support list/detail/draft/publish/archive/
+  version-list/version-restore, keep deterministic ordering, and make archive
+  idempotent enough for compatibility. Do not add persistence, old-domain
+  dependencies, cross-module dependencies, or POM changes.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|adapter\\.persistence|Mapper|DO|BiSpreadsheetResourceService|BiSpreadsheetResource|BiSpreadsheetVersionView" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPresentationResourceCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AL reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AM: BI Permission Administration Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AM
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AL BI spreadsheet lifecycle route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourcePermissionCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourcePermissionView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiRowPermissionCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiRowPermissionView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiColumnPermissionCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiColumnPermissionView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPermissionAuditEntryView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPermissionRequestCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPermissionRequestReviewCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiPermissionRequestView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPermissionAdministrationCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 65 current
+  production endpoints after DDD-C09AL. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiPermissionController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiPermissionController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/permission/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPermissionPolicy.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPermissionGrant.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for BI permission administration and
+  permission request routes through the existing BiCatalogController and
+  BiCatalogFacade without depending on old canvas-engine services. Cover these
+  production routes:
+  - GET /canvas/bi/permissions/resources
+  - POST /canvas/bi/permissions/resources
+  - DELETE /canvas/bi/permissions/resources/{id}
+  - GET /canvas/bi/permissions/rows
+  - POST /canvas/bi/permissions/rows
+  - DELETE /canvas/bi/permissions/rows/{id}
+  - GET /canvas/bi/permissions/columns
+  - POST /canvas/bi/permissions/columns
+  - DELETE /canvas/bi/permissions/columns/{id}
+  - GET /canvas/bi/permissions/audit
+  - GET /canvas/bi/permissions/requests
+  - POST /canvas/bi/permissions/requests
+  - POST /canvas/bi/permissions/requests/{id}/review
+
+  Preserve the stable compatibility envelope used by existing BI routes:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  analyst. The compact seed may use an in-memory final BI permission catalog
+  owned by canvas-context-bi. It must scope state by tenant, normalize resource
+  types and keys consistently, support list filters, deterministic ordering,
+  idempotent deletes, bounded audit limit, permission request submit/review,
+  and keep existing grant/effective-access behavior intact. Do not add
+  persistence, old-domain dependencies, cross-module dependencies, or POM
+  changes.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|adapter\\.persistence|Mapper|DO|BiPermissionAdminService|BiPermissionRequestService|BiResourcePermission|BiRowPermission|BiColumnPermission|BiPermissionRequestView" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiPermissionAdministrationCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AM reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AN: BI Chart Lifecycle Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AN
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AM BI permission administration route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiChartLifecycleCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 77 current
+  production endpoints after DDD-C09AM. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiChartController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI domain/API/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiChartController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/chart/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for the remaining legacy chart
+  lifecycle routes through the existing BiCatalogController and BiCatalogFacade
+  without depending on old canvas-engine services. Cover these production
+  routes:
+  - POST /canvas/bi/charts/resources/{chartKey}/publish
+  - DELETE /canvas/bi/charts/resources/{chartKey}
+  - GET /canvas/bi/charts/resources/{chartKey}/versions
+  - POST /canvas/bi/charts/resources/{chartKey}/versions/{version}/restore
+
+  Preserve the stable compatibility envelope used by existing BI routes:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  analyst. The compact seed may use an in-memory final BI chart lifecycle
+  catalog owned by canvas-context-bi. It must scope lifecycle state by tenant
+  and chart key, publish by updating the final chart status, archive
+  idempotently, list versions newest-first, and restore a selected version as a
+  new draft current chart snapshot. Do not add old-domain dependencies,
+  cross-module dependencies, POM changes, or persistence unless already
+  available inside the exact allowed scope.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|BiChartResourceService|BiChartController" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiChartLifecycleCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AN reserved BI domain/API/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AO: BI Subscription And Delivery Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AO
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AN BI chart lifecycle route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSubscriptionCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSubscriptionView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiAlertRuleCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiAlertRuleView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliveryRunResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliveryLogView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliveryAuditSummary.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliveryRetryResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliveryAttachmentView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliveryAttachmentDownload.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliveryAttachmentCleanupResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDeliverySchedulerResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiSubscriptionDeliveryCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 81 current
+  production endpoints after DDD-C09AN. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSubscriptionController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSubscriptionController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/subscription/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for the legacy BI subscription,
+  alert, delivery log, delivery attachment, and delivery scheduler routes
+  through the existing BiCatalogController and BiCatalogFacade without depending
+  on old canvas-engine services. Cover these production routes:
+  - GET /canvas/bi/subscriptions
+  - POST /canvas/bi/subscriptions
+  - DELETE /canvas/bi/subscriptions/{id}
+  - POST /canvas/bi/subscriptions/{id}/run
+  - GET /canvas/bi/alerts
+  - POST /canvas/bi/alerts
+  - DELETE /canvas/bi/alerts/{id}
+  - POST /canvas/bi/alerts/{id}/run
+  - GET /canvas/bi/delivery-logs
+  - GET /canvas/bi/delivery-audit
+  - POST /canvas/bi/delivery-logs/retry
+  - GET /canvas/bi/delivery-attachments
+  - GET /canvas/bi/delivery-attachments/{id}/download
+  - POST /canvas/bi/delivery-attachments/cleanup
+  - POST /canvas/bi/delivery-scheduler/run
+
+  Preserve the stable compatibility envelope used by existing BI routes for
+  JSON responses: success responses use code=0 and message=success with no
+  errorCode or traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor
+  defaults to analyst. The download route should return ResponseEntity<byte[]>
+  with content type and content disposition headers, matching the legacy binary
+  response shape. The compact seed may use an in-memory final BI subscription
+  delivery catalog owned by canvas-context-bi. It must scope state by tenant,
+  normalize keys and job types, support idempotent deletes, deterministic
+  newest-first log/attachment ordering, audit counts, retry/run/scheduler
+  summaries, and safe empty/default behavior where optional legacy services
+  previously returned empty results. Do not add old-domain dependencies,
+  cross-module dependencies, POM changes, or persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|BiSubscriptionAdminService|BiDeliveryRuntimeService|BiDeliverySchedulerService|BiDeliveryAttachmentService|BiSubscriptionController" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiSubscriptionDeliveryCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AO reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AP: BI Query Operations Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AP
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AO BI subscription and delivery route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCompileResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryResultView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryExplainResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCancelResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryGateCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryGateResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryContractGateCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryHistoryItemView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryHistoryDetailView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryGovernanceSummaryView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryGovernancePolicyCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryGovernancePolicyView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryGovernanceAuditEntryView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCachePolicyCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCachePolicyView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCacheInvalidationCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCacheInvalidationResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiQueryCacheStatsView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceHealthView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceHealthSnapshotView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceHealthSloView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiEmbedTicketCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiEmbedTicketView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiEmbedTicketVerifyCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiEmbedTicketPayloadView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiEmbedQueryCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiEmbedTicketCleanupResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiQueryOperationsCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 96 current
+  production endpoints after DDD-C09AO. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiQueryController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiQueryController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/query/**
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/embed/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for legacy BI query compile/execute,
+  query history, governance policy/audit, cache policy/stats, datasource health,
+  and embed-ticket/query routes through the existing BiCatalogController and
+  BiCatalogFacade without depending on old canvas-engine services. Cover these
+  production routes:
+  - POST /canvas/bi/query/compile
+  - POST /canvas/bi/query/execute
+  - POST /canvas/bi/query/explain
+  - POST /canvas/bi/query/cancel/{sqlHash}
+  - POST /canvas/bi/query/execute-gated
+  - POST /canvas/bi/query/execute-contract-gated
+  - GET /canvas/bi/query/history
+  - GET /canvas/bi/query/history/{historyId}
+  - GET /canvas/bi/query/governance-summary
+  - GET /canvas/bi/query/governance-policy
+  - POST /canvas/bi/query/governance-policy
+  - GET /canvas/bi/query/governance-audit
+  - GET /canvas/bi/query/cache-policy
+  - POST /canvas/bi/query/cache-policy
+  - POST /canvas/bi/query/cache/invalidate
+  - GET /canvas/bi/query/cache-stats
+  - GET /canvas/bi/datasources/health
+  - GET /canvas/bi/datasources/health/history
+  - GET /canvas/bi/datasources/health/slo
+  - POST /canvas/bi/embed-tickets
+  - POST /canvas/bi/embed-tickets/verify
+  - POST /canvas/bi/embed/query/execute
+  - POST /canvas/bi/embed-tickets/cleanup
+
+  Preserve the stable compatibility envelope used by existing BI routes for
+  JSON responses: success responses use code=0 and message=success with no
+  errorCode or traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor
+  defaults to analyst. The compact seed may use an in-memory final BI query
+  operations catalog owned by canvas-context-bi. It must scope mutable state by
+  tenant, normalize dataset keys and SQL hashes, provide deterministic query
+  results/explanations/history ordering, support idempotent cancel and cache
+  invalidation behavior, enforce simple embed ticket origin/use behavior, and
+  return safe empty/default datasource health and governance/cache summaries.
+  Do not add old-domain dependencies, cross-module dependencies, POM changes,
+  or persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|BiQueryController|BiQueryExecutionService|BiEmbedTicketService|BiQueryGovernancePolicyService|BiQueryCachePolicyService|BiDatasourceHealthProvider" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiQueryOperationsCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AP reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AQ: BI Datasource Operations Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AQ
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AP BI query operations route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceConnectorView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceOnboardingCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceOnboardingView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceFileMaterializationResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceConnectionTestResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceCredentialRotationCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceCredentialRotationView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceSchemaPreviewView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceApiPreviewCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceApiPreviewView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDatasourceSchemaSnapshotView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiDatasourceOperationsCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 119 current
+  production endpoints after DDD-C09AP. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiDatasourceController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiDatasourceController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/datasource/**
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/datasource/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for legacy BI datasource connector,
+  onboarding, file-upload/materialize, connection-test, credential rotation,
+  API/schema preview, schema sync, and schema snapshot routes through the
+  existing BiCatalogController and BiCatalogFacade without depending on old
+  canvas-engine services. Cover these production routes:
+  - GET /canvas/bi/datasources/connectors
+  - GET /canvas/bi/datasources/onboarding
+  - POST /canvas/bi/datasources/onboarding
+  - POST /canvas/bi/datasources/file-upload
+  - POST /canvas/bi/datasources/file-upload/materialize
+  - PUT /canvas/bi/datasources/onboarding/{id}
+  - POST /canvas/bi/datasources/{id}/connection-test
+  - POST /canvas/bi/datasources/{id}/credential-rotation
+  - GET /canvas/bi/datasources/{id}/schema-preview
+  - POST /canvas/bi/datasources/{id}/api-preview
+  - POST /canvas/bi/datasources/{id}/schema-sync
+  - GET /canvas/bi/datasources/{id}/schema-snapshot
+  - GET /canvas/bi/datasources/{id}/schema-snapshots
+
+  Preserve the stable compatibility envelope used by existing BI routes for
+  JSON responses: success responses use code=0 and message=success with no
+  errorCode or traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor
+  defaults to analyst. The compact seed may use an in-memory final BI
+  datasource operations catalog owned by canvas-context-bi. It must scope state
+  by tenant, normalize connector/source keys, provide deterministic connector
+  catalog and onboarding ordering, support idempotent-ish update/test/rotation
+  behavior, return safe schema/API preview structures, and handle multipart
+  file upload routes without persisting bytes. Do not add old-domain
+  dependencies, cross-module dependencies, POM changes, or persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|BiDatasourceController|BiDatasourceOnboardingService|BiDatasourceRuntimeService|BiDatasourceFileUploadService|BiDatasourceFileMaterializationService|DataSourceConfigService" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiDatasourceOperationsCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AQ reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AR: BI Self-Service Export Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AR
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AQ BI datasource operations route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServicePreviewCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportReviewCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportJobView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportJobDetailView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportDownload.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportCleanupResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportRetryResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiSelfServiceExportQueueResult.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiSelfServiceExportCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary top candidate route:/canvas/bi shows 20 old controllers,
+  169 old endpoints, 1 current production controller, and 132 current
+  production endpoints after DDD-C09AQ. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSelfServiceController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSelfServiceController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/**
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/query/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for legacy BI self-service preview,
+  export lifecycle, download, cleanup, retry, and queue-run routes through the
+  existing BiCatalogController and BiCatalogFacade without depending on old
+  canvas-engine services. Cover these production routes:
+  - POST /canvas/bi/self-service/preview
+  - POST /canvas/bi/self-service/exports
+  - GET /canvas/bi/self-service/exports
+  - POST /canvas/bi/self-service/exports/{id}/review
+  - GET /canvas/bi/self-service/exports/{id}
+  - GET /canvas/bi/self-service/exports/{id}/download
+  - POST /canvas/bi/self-service/exports/{id}/cancel
+  - POST /canvas/bi/self-service/exports/cleanup
+  - POST /canvas/bi/self-service/exports/retry
+  - POST /canvas/bi/self-service/exports/queue/run
+
+  Preserve the stable compatibility envelope used by existing BI routes for
+  JSON responses: success responses use code=0 and message=success with no
+  errorCode or traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor
+  defaults to analyst and missing X-Role defaults to ANALYST. Download returns
+  bytes with content type and attachment disposition. The compact seed may use
+  an in-memory final BI self-service export catalog owned by canvas-context-bi,
+  scoped by tenant, with deterministic preview rows, export status transitions,
+  review/cancel behavior, cleanup/retry/queue counters, and no persistence.
+  Do not add old-domain dependencies, cross-module dependencies, POM changes, or
+  direct persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|BiSelfServiceController|BiSelfServiceExportService|BiSelfServicePreviewRequest|BiExportJobCommand|BiExportApprovalReviewCommand" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiSelfServiceExportCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AR reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
+### DDD-C09AS: BI Dashboard Resource Runtime Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AS
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AR BI self-service export route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDashboardCloneCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDashboardExportPackageView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDashboardImportCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDashboardRuntimeStateCommand.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiDashboardRuntimeStateView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiResourceVersionView.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiDashboardResourceOperationsCatalog.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary route:/canvas/bi shows 20 old controllers, 169 old endpoints,
+  1 current production controller, and 142 current production endpoints after
+  DDD-C09AR. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiDashboardController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiDashboardController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dashboard/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/BiCatalogApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for legacy BI dashboard resource
+  lifecycle, export/import, versions, and runtime-state routes through the
+  existing BiCatalogController and BiCatalogFacade without depending on old
+  canvas-engine services. Cover these production routes:
+  - POST /canvas/bi/dashboards/resources/{dashboardKey}/clone
+  - GET /canvas/bi/dashboards/resources/{dashboardKey}/export
+  - GET /canvas/bi/dashboards/resources/{dashboardKey}/export-file
+  - POST /canvas/bi/dashboards/resources/import
+  - POST /canvas/bi/dashboards/resources/import-file
+  - DELETE /canvas/bi/dashboards/resources/{dashboardKey}
+  - GET /canvas/bi/dashboards/resources/{dashboardKey}/versions
+  - POST /canvas/bi/dashboards/resources/{dashboardKey}/versions/{version}/restore
+  - GET /canvas/bi/dashboards/resources/{dashboardKey}/runtime-state
+  - POST /canvas/bi/dashboards/resources/{dashboardKey}/runtime-state
+
+  Preserve the stable compatibility envelope used by existing BI routes for
+  JSON responses: success responses use code=0 and message=success with no
+  errorCode or traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor
+  defaults to analyst and missing X-Role defaults to ANALYST. Export-file
+  returns bytes with content type and attachment disposition. The compact seed
+  may use an in-memory final BI dashboard operations catalog owned by
+  canvas-context-bi, scoped by tenant, with deterministic clone/import/export,
+  archive, version restore, and runtime-state behavior. Do not add old-domain
+  dependencies, cross-module dependencies, POM changes, or direct persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement the minimal final BI
+  API/service/controller changes and rerun focused tests plus BI compatibility.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-context-bi,canvas-web -am -Dtest=BiCatalogApplicationServiceTest,BiCatalogControllerCompatibilityTest,BiApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.bi|BiDashboardController|BiDashboardResourceService|BiDashboardRuntimeStateService|BiDashboardCloneCommand|BiDashboardImportCommand" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/BiDashboardResourceOperationsCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AS reserved BI API/domain/application/controller
+  and BI test files listed in this packet
+```
+
 ### DDD-C09K: Conversation Production Controller Seed
 
 ```text
@@ -1855,6 +2949,634 @@ Rollback path:
   revert assigned backend AI files and tests
 ```
 
+### DDD-C09AT: Marketing Monitoring Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AT
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AS BI dashboard resource runtime route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/MarketingMonitoringFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/MarketingMonitoringApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/MarketingMonitoringCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/MarketingMonitoringApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/MarketingMonitoringController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/MarketingMonitoringControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary route:/canvas/marketing-monitoring shows 3 old controllers,
+  30 old endpoints, 0 current production controllers, and 0 current production
+  endpoints after DDD-C09AS. Legacy sources for this batch are:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingMonitoringController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingMonitorAnomalyController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingMonitoringWebhookAdminController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-marketing
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-marketing/** except the exact allowed marketing API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed marketing controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed marketing test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingMonitoringController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingMonitorAnomalyController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingMonitoringWebhookAdminController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/monitoring/**
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/**
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for all legacy
+  /canvas/marketing-monitoring routes through a final marketing context facade,
+  application service, in-memory catalog, and production controller. Cover these
+  production routes:
+  - POST /canvas/marketing-monitoring/sources
+  - POST /canvas/marketing-monitoring/items
+  - GET /canvas/marketing-monitoring/items
+  - GET /canvas/marketing-monitoring/alerts
+  - POST /canvas/marketing-monitoring/alerts/{alertId}/resolve
+  - POST /canvas/marketing-monitoring/alert-channels
+  - POST /canvas/marketing-monitoring/alerts/{alertId}/dispatch
+  - GET /canvas/marketing-monitoring/alert-deliveries
+  - POST /canvas/marketing-monitoring/sources/{sourceId}/polling
+  - POST /canvas/marketing-monitoring/sources/{sourceId}/poll
+  - POST /canvas/marketing-monitoring/trends/snapshots/build
+  - GET /canvas/marketing-monitoring/trends/snapshots
+  - POST /canvas/marketing-monitoring/items/{itemId}/inferences
+  - GET /canvas/marketing-monitoring/inferences
+  - POST /canvas/marketing-monitoring/provider-credentials
+  - GET /canvas/marketing-monitoring/provider-credentials
+  - POST /canvas/marketing-monitoring/provider-credentials/{credentialKey}/refresh
+  - POST /canvas/marketing-monitoring/provider-credentials/refresh-due
+  - POST /canvas/marketing-monitoring/provider-credentials/{credentialKey}/revoke
+  - POST /canvas/marketing-monitoring/provider-credentials/{credentialKey}/disable
+  - GET /canvas/marketing-monitoring/provider-credentials/events
+  - POST /canvas/marketing-monitoring/provider-credentials/oauth/authorizations
+  - POST /canvas/marketing-monitoring/provider-credentials/oauth/callback
+  - GET /canvas/marketing-monitoring/provider-credentials/oauth/authorizations
+  - GET /canvas/marketing-monitoring/provider-credentials/oauth/events
+  - POST /canvas/marketing-monitoring/anomaly-rules
+  - POST /canvas/marketing-monitoring/anomalies/detect
+  - GET /canvas/marketing-monitoring/anomalies
+  - POST /canvas/marketing-monitoring/anomalies/{eventId}/resolve
+  - POST /canvas/marketing-monitoring/sources/{sourceId}/webhook-secret/rotate
+
+  Preserve compatibility envelope style used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or traceId;
+  bad requests map to API_001. Missing X-Tenant-Id defaults to 7L and missing
+  X-Actor defaults to operator-1. The compact seed may use generic
+  Map<String,Object> command/view payloads in the final marketing API to avoid
+  recreating legacy domain object graphs, but it must scope state by tenant,
+  apply safe limits, return deterministic IDs/statuses, and support the major
+  state transitions (resolve alert/event, dispatch, credential refresh/revoke/
+  disable, OAuth callback, webhook secret rotate). Do not add old-domain
+  dependencies, cross-module dependencies, POM changes, or persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement minimal final
+  marketing API/service/controller changes and rerun focused tests plus
+  MarketingApiCompatibilityTest.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=MarketingMonitoringApplicationServiceTest,MarketingMonitoringControllerCompatibilityTest,MarketingApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.monitoring|MarketingMonitoringController|MarketingMonitorAnomalyController|MarketingMonitoringWebhookAdminController|MarketingMonitoringService|MarketingMonitorAlertFanoutService|MarketingMonitorPollingService|MarketingMonitorInferenceService|MarketingMonitorProviderCredentialService|MarketingMonitorProviderOAuthAuthorizationService|MarketingMonitorAnomalyDetectionService|MarketingMonitorWebhookIngestionService" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/MarketingMonitoringController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/MarketingMonitoringFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/MarketingMonitoringApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/MarketingMonitoringCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-marketing/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AT reserved marketing API/domain/application/controller
+  and marketing test files listed in this packet
+```
+
+### DDD-C09AU: Growth Activities Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AU
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AT Marketing Monitoring route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/GrowthActivityFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/GrowthActivityApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/GrowthActivityCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/GrowthActivityApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/GrowthActivityController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/GrowthActivityControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary route:/canvas/growth-activities shows 1 old controller,
+  25 old endpoints, 0 current production controllers, and 0 current production
+  endpoints after DDD-C09AT. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/GrowthActivityController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-marketing
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-marketing/** except the exact allowed marketing API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed marketing controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed marketing test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/GrowthActivityController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/marketing/**
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/**
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for all legacy
+  /canvas/growth-activities routes through a final marketing context facade,
+  application service, in-memory catalog, and production controller. Cover these
+  production routes:
+  - POST /canvas/growth-activities
+  - GET /canvas/growth-activities
+  - GET /canvas/growth-activities/{activityId}
+  - GET /canvas/growth-activities/{activityId}/report
+  - GET /canvas/growth-activities/{activityId}/readiness
+  - GET /canvas/growth-activities/{activityId}/reward-pools
+  - POST /canvas/growth-activities/{activityId}/reward-pools
+  - GET /canvas/growth-activities/{activityId}/grants
+  - POST /canvas/growth-activities/{activityId}/grants
+  - POST /canvas/growth-activities/{activityId}/grants/{grantId}/retry
+  - POST /canvas/growth-activities/{activityId}/grants/{grantId}/reconcile
+  - POST /canvas/growth-activities/{activityId}/grants/{grantId}/cancel
+  - GET /canvas/growth-activities/{activityId}/referral-codes
+  - POST /canvas/growth-activities/{activityId}/referral-codes
+  - GET /canvas/growth-activities/{activityId}/referrals
+  - POST /canvas/growth-activities/{activityId}/referrals
+  - POST /canvas/growth-activities/{activityId}/referrals/{relationId}/qualify
+  - GET /canvas/growth-activities/{activityId}/tasks
+  - POST /canvas/growth-activities/{activityId}/tasks
+  - GET /canvas/growth-activities/{activityId}/task-progress
+  - POST /canvas/growth-activities/{activityId}/task-progress
+  - POST /canvas/growth-activities/{activityId}/task-progress/{progressId}/reset
+  - POST /canvas/growth-activities/{activityId}/publish
+  - POST /canvas/growth-activities/{activityId}/pause
+  - POST /canvas/growth-activities/{activityId}/close
+
+  Preserve compatibility envelope style used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or traceId;
+  bad requests map to API_001. Missing X-Tenant-Id defaults to 7L and missing
+  X-Actor defaults to operator-1. The legacy controller's internal fallback was
+  tenant 0/system through TenantContextResolver, but final canvas-web
+  compatibility controllers use header defaults; follow final controller style.
+
+  The compact seed may use generic Map<String,Object> command/view payloads in
+  the final marketing API to avoid recreating legacy domain object graphs, but
+  it must scope state by tenant, apply safe limits, return deterministic
+  IDs/statuses, and support the major state transitions:
+  publish/pause/close activity, grant retry/reconcile/cancel, referral qualify,
+  task progress reset, reward pool/task/referral/grant creation. Some legacy
+  path params are compatibility-only at controller level: activityId is not
+  passed to old service calls for grant retry/reconcile/cancel, referral
+  qualify, or task progress reset. The final seed may include it in payloads for
+  traceability but should transition by grantId/relationId/progressId.
+
+  Do not add old-domain dependencies, cross-module dependencies, POM changes, or
+  persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement minimal final
+  marketing API/service/controller changes and rerun focused tests plus
+  MarketingApiCompatibilityTest.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=GrowthActivityApplicationServiceTest,GrowthActivityControllerCompatibilityTest,MarketingApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.marketing|GrowthActivityController|GrowthActivityService|GrowthActivityReadinessService|GrowthActivityReportService|GrowthRewardPoolService|GrowthRewardGrantService|GrowthReferralService|GrowthTaskService|TenantContextResolver" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/GrowthActivityController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/GrowthActivityFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/GrowthActivityApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/GrowthActivityCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-marketing/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AU reserved growth activity API/domain/application/controller
+  and marketing test files listed in this packet
+```
+
+### DDD-C09AV: Search Marketing Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AV
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AU Growth Activities route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/SearchMarketingFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/SearchMarketingApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/SearchMarketingCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/SearchMarketingApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/SearchMarketingController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/SearchMarketingControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary route:/canvas/search-marketing shows 1 old controller,
+  24 old endpoints, 0 current production controllers, and 0 current production
+  endpoints after DDD-C09AU. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/SearchMarketingController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-marketing
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-marketing/** except the exact allowed marketing API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed marketing controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed marketing test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/SearchMarketingController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/marketing/**
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/**
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for all legacy
+  /canvas/search-marketing routes through a final marketing context facade,
+  application service, in-memory catalog, and production controller. Cover
+  these production routes:
+  - GET /canvas/search-marketing/sources
+  - POST /canvas/search-marketing/sources
+  - GET /canvas/search-marketing/keywords
+  - POST /canvas/search-marketing/keywords
+  - GET /canvas/search-marketing/snapshots
+  - POST /canvas/search-marketing/snapshots
+  - GET /canvas/search-marketing/opportunities
+  - POST /canvas/search-marketing/opportunities/evaluate
+  - POST /canvas/search-marketing/opportunities/{opportunityId}/status
+  - POST /canvas/search-marketing/opportunities/{opportunityId}/mutations
+  - GET /canvas/search-marketing/mutations
+  - POST /canvas/search-marketing/mutations
+  - POST /canvas/search-marketing/mutations/{mutationId}/approve
+  - POST /canvas/search-marketing/mutations/{mutationId}/execute
+  - GET /canvas/search-marketing/url-inspections
+  - GET /canvas/search-marketing/sync-runs
+  - POST /canvas/search-marketing/sources/{sourceId}/sync
+  - POST /canvas/search-marketing/sources/sync-due
+  - GET /canvas/search-marketing/provider-changes
+  - POST /canvas/search-marketing/mutations/{mutationId}/reconcile
+  - GET /canvas/search-marketing/impact-windows
+  - POST /canvas/search-marketing/impact-windows/evaluate-due
+  - GET /canvas/search-marketing/readiness
+  - GET /canvas/search-marketing/summary
+
+  Preserve compatibility envelope style used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or traceId;
+  bad requests map to API_001. Missing X-Tenant-Id defaults to 7L and missing
+  X-Actor defaults to operator-1. Query date params use ISO yyyy-MM-dd for
+  startDate/endDate. Manual sync runType defaults to PERFORMANCE. sync-due and
+  evaluate-due default limit to 50.
+
+  The compact seed may use generic Map<String,Object> command/view payloads in
+  the final marketing API to avoid recreating legacy domain object graphs, but
+  it must scope state by tenant, apply safe limits, return deterministic IDs and
+  statuses, and support source/keyword/snapshot/mutation/opportunity/sync/
+  provider-change/impact-window/readiness/summary flows well enough for route
+  compatibility tests.
+
+  Do not add old-domain dependencies, cross-module dependencies, POM changes, or
+  persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement minimal final
+  marketing API/service/controller changes and rerun focused tests plus
+  MarketingApiCompatibilityTest.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=SearchMarketingApplicationServiceTest,SearchMarketingControllerCompatibilityTest,MarketingApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.marketing|SearchMarketingService|SearchMarketingMutationService|SearchMarketingSyncRunService|SearchMarketingReadinessService|SearchMarketingReconciliationService|SearchMarketingImpactWindowService|TenantContextResolver" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/SearchMarketingController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/SearchMarketingFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/SearchMarketingApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/SearchMarketingCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-marketing/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AV reserved search marketing API/domain/application/controller
+  and marketing test files listed in this packet
+```
+
+### DDD-C09AW: AI Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AW
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AV Search Marketing route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/AiFacade.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/AiApplicationService.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/AiCatalog.java
+  backend/canvas-platform/src/test/java/org/chovy/canvas/platform/application/AiApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/ai/AiController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/ai/AiControllerCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary route:/ai shows 4 old controllers, 23 old endpoints, 0
+  current production controllers, and 0 current production endpoints after
+  DDD-C09AV. Legacy sources for this batch are:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiDecisionController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiPredictionController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiPromptTemplateController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiProviderController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-platform
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-platform/** except the exact allowed platform API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed AI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed AI test file
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiDecisionController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiPredictionController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiPromptTemplateController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AiProviderController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/ai/**
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add compact final-module compatibility for all legacy /ai routes through a
+  final platform facade, application service, in-memory catalog, and production
+  controller. Cover these production routes:
+  - POST /ai/decisions/recompute
+  - GET /ai/decisions/latest-run
+  - GET /ai/decisions/recommendations
+  - POST /ai/decisions/recommendations/{recommendationId}/feedback
+  - GET /ai/predictions/latest-run
+  - GET /ai/predictions/readiness
+  - GET /ai/predictions/churn-distribution
+  - GET /ai/predictions/top-risk-users
+  - POST /ai/predictions/recompute
+  - GET /ai/prompt-templates
+  - POST /ai/prompt-templates
+  - GET /ai/prompt-templates/{id}
+  - PUT /ai/prompt-templates/{id}
+  - POST /ai/prompt-templates/{id}/disable
+  - POST /ai/prompt-templates/render
+  - POST /ai/prompt-templates/evaluate
+  - GET /ai/prompt-templates/evaluation-audits
+  - GET /ai/providers
+  - POST /ai/providers
+  - GET /ai/providers/{id}
+  - PUT /ai/providers/{id}
+  - POST /ai/providers/{id}/disable
+  - GET /ai/providers/{id}/models
+
+  Preserve compatibility envelope style used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or traceId;
+  bad requests map to API_001. Missing X-Tenant-Id defaults to 7L and missing
+  X-Actor defaults to operator-1. The legacy controllers use admin context
+  fallbacks when TenantContextResolver is absent; the final compact controller
+  should use explicit final header defaults.
+
+  The compact seed may use generic Map<String,Object> command/view payloads in
+  the final platform API to avoid recreating legacy domain object graphs, but it
+  must scope state by tenant, apply safe limits, return deterministic IDs and
+  statuses, and support decision run/recommendation/feedback, prediction
+  readiness/risk distribution/top users/recompute, prompt template CRUD/render/
+  evaluate/audits, and provider CRUD/disable/models flows.
+
+  Do not add old-domain dependencies, cross-module dependencies, POM changes, or
+  persistence.
+
+  Follow TDD: first add focused failing tests for service behavior and
+  controller compatibility, run them RED, then implement minimal final
+  platform API/service/controller changes and rerun focused tests.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-platform,canvas-web -am -Dtest=AiApplicationServiceTest,AiControllerCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.ai|TenantContextResolver|AiDecisionModelService|ChurnPredictionService|AiPromptTemplateService|AiPromptEvaluationService|AiProviderModelRegistryService" backend/canvas-web/src/main/java/org/chovy/canvas/web/ai/AiController.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/AiFacade.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/AiApplicationService.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/AiCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-platform/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/ai/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AW reserved AI API/domain/application/controller
+  and test files listed in this packet
+```
+
+### DDD-C09AX: Marketing Content Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AX
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AW AI route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/MarketingContentFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/MarketingContentApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/MarketingContentCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/MarketingContentApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/MarketingContentController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/MarketingContentControllerCompatibilityTest.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary after DDD-C09AW shows route:/marketing with 1 old controller,
+  21 old endpoints, 0 current production controllers, and 0 current production
+  endpoints. Legacy source for this batch is:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingContentController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-marketing
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-marketing/** except the exact allowed marketing content API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed MarketingContentController file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed marketing content test files
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingContentController.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/**
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/**
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/MarketingApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add a compact final-module marketing content route batch without depending
+  on old canvas-engine services. Cover these production route shapes:
+  - GET /marketing/content/asset-folders
+  - POST /marketing/content/asset-folders
+  - GET /marketing/content/assets
+  - POST /marketing/content/assets
+  - POST /marketing/content/assets/upload-intents
+  - POST /marketing/content/assets/upload-intents/expire-stale
+  - POST /marketing/content/assets/{assetKey}/status
+  - GET /marketing/content/templates
+  - POST /marketing/content/templates
+  - POST /marketing/content/templates/{templateKey}/preview
+  - POST /marketing/content/templates/{templateKey}/status
+  - GET /marketing/content/entries
+  - POST /marketing/content/entries
+  - POST /marketing/content/entries/{entryKey}/publish
+  - POST /marketing/content/entries/{entryKey}/archive
+  - POST /marketing/content/releases/validate
+  - POST /marketing/content/releases/publish
+  - GET /marketing/content/releases
+  - POST /marketing/content/releases/{releaseKey}/resolve
+  - POST /marketing/content/releases/{releaseKey}/rollback
+  - GET /marketing/content/audit-events
+
+  Preserve the stable compatibility envelope used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  operator-1. Bad request validation errors should map to API_001. The compact
+  seed may use in-memory final marketing content state scoped by tenant. It
+  should model folders, assets, upload intents, templates, entries, releases,
+  release validation/resolve/rollback, and audit events with deterministic
+  keys and ordering. Do not add persistence, old-domain dependencies,
+  cross-module dependencies, POM changes, or old TenantContextResolver usage.
+
+  Follow TDD: first add focused failing tests for application service behavior
+  and controller compatibility, run them RED, then implement minimal final
+  marketing API/service/catalog/controller changes and rerun focused tests plus
+  MarketingApiCompatibilityTest.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-marketing,canvas-web -am -Dtest=MarketingContentApplicationServiceTest,MarketingContentControllerCompatibilityTest,MarketingApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.domain\\.content|TenantContextResolver|MarketingAssetService|ContentTemplateService|ContentEntryService|MarketingAssetUploadService|MarketingContentReleaseService" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/MarketingContentController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/MarketingContentFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/MarketingContentApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/MarketingContentCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-marketing/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AX reserved marketing content API/domain/application/controller
+  and test files listed in this packet
+```
+
+### DDD-C09AY: Admin Platform Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AY
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AX Marketing Content route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/AdminPlatformFacade.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/AdminPlatformApplicationService.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/AdminPlatformCatalog.java
+  backend/canvas-platform/src/test/java/org/chovy/canvas/platform/application/AdminPlatformApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/admin/AdminPlatformController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/admin/AdminPlatformControllerCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary after DDD-C09AX shows route:/admin with 4 old controllers,
+  21 old endpoints, 0 current production controllers, and 0 current production
+  endpoints. Legacy sources for this batch are:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/AdminController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasProjectController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/SystemOptionController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/TenantController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-platform
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-platform/** except the exact allowed admin platform API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed admin controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed admin controller test file
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AdminController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasProjectController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/SystemOptionController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/TenantController.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add a compact final-module admin platform route batch without depending on
+  old canvas-engine services. Cover these production route shapes:
+  - GET /admin/users
+  - POST /admin/users
+  - PUT /admin/users/{id}
+  - PUT /admin/users/{id}/disable
+  - GET /admin/projects
+  - POST /admin/projects
+  - GET /admin/projects/{projectId}
+  - PUT /admin/projects/{projectId}
+  - PUT /admin/projects/{projectId}/disable
+  - GET /admin/projects/{projectId}/members
+  - PUT /admin/projects/{projectId}/members/{userId}
+  - DELETE /admin/projects/{projectId}/members/{userId}
+  - GET /admin/projects/{projectId}/canvases
+  - GET /admin/projects/{projectId}/stats
+  - GET /admin/system-options
+  - PUT /admin/system-options/{id}
+  - GET /admin/tenants
+  - POST /admin/tenants
+  - PUT /admin/tenants/{id}/disable
+  - PUT /admin/tenants/{id}/activate
+  - GET /admin/tenants/{id}/usage
+
+  Preserve the stable compatibility envelope used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  operator-1. Bad request validation errors should map to API_001. The compact
+  seed may use in-memory final platform state scoped by tenant where relevant.
+  It should model users, projects, project members, project canvases/stats,
+  system options, tenants, tenant activation/disable, and tenant usage with
+  deterministic ids and ordering. Do not add persistence, old-domain
+  dependencies, cross-module dependencies, POM changes, or old
+  TenantContextResolver usage.
+
+  Follow TDD: first add focused failing tests for application service behavior
+  and controller compatibility, run them RED, then implement minimal final
+  platform API/service/catalog/controller changes and rerun focused tests.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-platform,canvas-web -am -Dtest=AdminPlatformApplicationServiceTest,AdminPlatformControllerCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(auth|domain|dto|query|dal)|TenantContextResolver|SysUserService|CanvasProjectService|CanvasProjectPermissionService|SystemOptionService|TenantService|AuditEventService" backend/canvas-web/src/main/java/org/chovy/canvas/web/admin/AdminPlatformController.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/AdminPlatformFacade.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/AdminPlatformApplicationService.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/AdminPlatformCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-platform/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/admin/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AY reserved admin platform API/domain/application/controller
+  and test files listed in this packet
+```
+
 ### OSG-W13: Frontend AI Assistant
 
 ```text
@@ -1882,6 +3604,400 @@ Must not run with:
   another worker editing canvas-editor/index.tsx or shared editor store files
 Rollback path:
   revert assigned frontend AI files
+```
+
+### DDD-C09AZ: Warehouse Realtime Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09AZ
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AY Admin Platform route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehouseRealtimeFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehouseRealtimeApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehouseRealtimeCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpWarehouseRealtimeApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehouseRealtimeController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpWarehouseRealtimeControllerCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary after DDD-C09AY shows route:/warehouse/realtime with
+  8 old controllers, 21 old endpoints, 1 current production controller, and
+  1 current production endpoint. The existing final endpoint is
+  GET /warehouse/realtime/cutover-readiness and must not be duplicated.
+  Legacy sources for this batch are:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseRealtimeController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseRealtimeSchemaController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseRealtimePipelineController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseRealtimeJobIncidentController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseRealtimeJobController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseRealtimePipelineIncidentController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseExternalRealtimeJobProbeController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-cdp
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-cdp/** except the exact allowed warehouse realtime API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed cdp controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed cdp controller test file
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseRealtime*.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseExternalRealtimeJobProbeController.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/**
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add a compact final-module warehouse realtime route batch without depending
+  on old canvas-engine services. Cover these production route shapes:
+  - GET /warehouse/realtime/status
+  - POST /warehouse/realtime/schemas
+  - GET /warehouse/realtime/schemas
+  - GET /warehouse/realtime/schemas/latest
+  - GET /warehouse/realtime/pipelines/contracts
+  - POST /warehouse/realtime/pipelines/contracts
+  - POST /warehouse/realtime/pipelines/checkpoints
+  - GET /warehouse/realtime/pipelines/status
+  - POST /warehouse/realtime/jobs/incidents/scan
+  - POST /warehouse/realtime/jobs/heartbeats
+  - GET /warehouse/realtime/jobs/status
+  - POST /warehouse/realtime/jobs/actions
+  - GET /warehouse/realtime/jobs/actions/pending
+  - POST /warehouse/realtime/jobs/actions/{actionId}/ack
+  - POST /warehouse/realtime/jobs/actions/{actionId}/complete
+  - POST /warehouse/realtime/pipelines/incidents/scan
+  - POST /warehouse/realtime/job-probes/targets
+  - GET /warehouse/realtime/job-probes/targets
+  - POST /warehouse/realtime/job-probes/targets/{targetId}/enabled
+  - POST /warehouse/realtime/job-probes/scan
+
+  Preserve the stable compatibility envelope used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  operator-1. Bad request validation errors should map to API_001. The compact
+  seed may use in-memory final CDP state scoped by tenant. It should model
+  realtime status, schema registration/list/latest, pipeline contracts,
+  checkpoints, pipeline and job status, job incidents/actions, pipeline
+  incidents, external job probe targets, enable toggles, and scans with
+  deterministic ids and ordering. Do not add persistence, old-domain
+  dependencies, cross-module dependencies, POM changes, old TenantContextResolver
+  usage, or a duplicate /warehouse/realtime/cutover-readiness mapping.
+
+  Follow TDD: first add focused failing tests for application service behavior
+  and controller compatibility, run them RED, then implement minimal final CDP
+  API/service/catalog/controller changes and rerun focused tests.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-cdp,canvas-web -am -Dtest=CdpWarehouseRealtimeApplicationServiceTest,CdpWarehouseRealtimeControllerCompatibilityTest,CdpApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|CdpWarehouseRealtimeCheckpointService|CdpWarehouseRealtimeSchemaService|CdpWarehouseRealtimePipelineService|CdpWarehouseRealtimeJobControlService|CdpWarehouseRealtimeJobIncidentService|CdpWarehouseRealtimePipelineIncidentService|CdpWarehouseExternalRealtimeJobProbeService" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehouseRealtimeController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehouseRealtimeFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehouseRealtimeApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehouseRealtimeCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-cdp/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09AZ reserved warehouse realtime API/domain/application/controller
+  and test files listed in this packet
+```
+
+### DDD-C09BA: Risk Governance Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BA
+Mode: code-writing
+Readiness gate: R5 after DDD-C09AZ Warehouse Realtime route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-risk/src/main/java/org/chovy/canvas/risk/api/RiskGovernanceFacade.java
+  backend/canvas-context-risk/src/main/java/org/chovy/canvas/risk/application/RiskGovernanceApplicationService.java
+  backend/canvas-context-risk/src/main/java/org/chovy/canvas/risk/domain/RiskGovernanceCatalog.java
+  backend/canvas-context-risk/src/test/java/org/chovy/canvas/risk/application/RiskGovernanceApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/risk/RiskGovernanceController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/risk/RiskGovernanceControllerCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary after DDD-C09AZ shows route:/canvas/risk with 5 old
+  controllers, 23 old endpoints, 4 current production controllers, and
+  4 current production endpoints. Existing final endpoints are:
+  - POST /canvas/risk/decisions/evaluate
+  - GET /canvas/risk/lists
+  - GET /canvas/risk/scenes
+  - GET /canvas/risk/strategies
+  This batch must not duplicate those mappings. Legacy sources for this batch are:
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskDecisionController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskListController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskStrategyController.java
+  - backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskLabController.java
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-risk
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-risk/** except the exact allowed risk governance API/domain/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed risk governance controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed risk governance controller test file
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskDecisionController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskListController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskStrategyController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/risk/RiskLabController.java
+  backend/canvas-context-risk/src/main/java/org/chovy/canvas/risk/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/risk/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/risk/**
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add a compact final-module risk governance route batch without depending on
+  old canvas-engine services. Cover these production route shapes:
+  - GET /canvas/risk/decisions/traces
+  - POST /canvas/risk/lists
+  - POST /canvas/risk/lists/{listKey}/entries
+  - GET /canvas/risk/lists/{listKey}/entries
+  - DELETE /canvas/risk/lists/{listKey}/entries/{entryId}
+  - POST /canvas/risk/lists/{listKey}/entries/import
+  - POST /canvas/risk/strategies
+  - GET /canvas/risk/strategies/{strategyKey}
+  - GET /canvas/risk/strategies/{strategyKey}/versions
+  - POST /canvas/risk/strategies/{strategyKey}/versions/{version}/validate
+  - POST /canvas/risk/strategies/{strategyKey}/versions/{version}/simulate
+  - POST /canvas/risk/strategies/{strategyKey}/versions/{version}/submit
+  - POST /canvas/risk/strategies/{strategyKey}/versions/{version}/approve
+  - POST /canvas/risk/strategies/{strategyKey}/versions/{version}/activate
+  - POST /canvas/risk/strategies/{strategyKey}/rollback
+  - POST /canvas/risk/strategies/{strategyKey}/pause
+  - GET /canvas/risk/strategies/{strategyKey}/versions/{left}/diff/{right}
+  - POST /canvas/risk/lab/simulations
+  - GET /canvas/risk/lab/simulations
+
+  Preserve the stable compatibility envelope used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  operator-1. Bad request validation errors should map to API_001. The compact
+  seed may use in-memory final risk state scoped by tenant. It should model
+  decision traces, lists, list entries, list import, strategy drafts,
+  strategy versions, validation/simulation/submit/approve/activate/rollback/
+  pause/diff, and lab simulations with deterministic ids and ordering. Do not
+  add persistence, old-domain dependencies, cross-module dependencies, POM
+  changes, old TenantContextResolver usage, or duplicate any existing final
+  risk route mapping.
+
+  Follow TDD: first add focused failing tests for application service behavior
+  and controller compatibility, run them RED, then implement minimal final risk
+  API/service/catalog/controller changes and rerun focused tests.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-risk,canvas-web -am -Dtest=RiskGovernanceApplicationServiceTest,RiskGovernanceControllerCompatibilityTest,RiskApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|RiskListService|RiskStrategyService|RiskSimulationService|RiskDecisionTraceReader" backend/canvas-web/src/main/java/org/chovy/canvas/web/risk/RiskGovernanceController.java backend/canvas-context-risk/src/main/java/org/chovy/canvas/risk/api/RiskGovernanceFacade.java backend/canvas-context-risk/src/main/java/org/chovy/canvas/risk/application/RiskGovernanceApplicationService.java backend/canvas-context-risk/src/main/java/org/chovy/canvas/risk/domain/RiskGovernanceCatalog.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-risk/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/risk/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09BA reserved risk governance API/domain/application/controller
+  and test files listed in this packet
+```
+
+### DDD-C09BB: Canvas Route Batch
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BB
+Mode: code-writing
+Readiness gate: R5 after DDD-C09BA Risk Governance route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CanvasCompatibilityFacade.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CanvasCompatibilityApplicationService.java
+  backend/canvas-context-canvas/src/test/java/org/chovy/canvas/canvas/application/CanvasCompatibilityApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CanvasController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/canvas/CanvasControllerCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary after DDD-C09BA shows family:Canvas with one old
+  controller, 24 old endpoints, one current production controller, and
+  6 current production endpoints. Existing final Canvas endpoints are:
+  - GET /canvas/{id}/versions
+  - GET /canvas/{id}/versions/{versionId}
+  - POST /canvas/{id}/publish
+  - POST /canvas/{id}/offline
+  - POST /canvas/{id}/archive
+  - POST /canvas/{id}/kill
+  Existing separate final controllers also cover:
+  - /canvas/dsl/** routes
+  - GET/PUT /canvas/{id}/project-folder-metadata
+  This batch must not duplicate those mappings.
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-canvas
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-canvas/** except the exact allowed Canvas compatibility API/application/test files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed Canvas controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed Canvas controller test file
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/canvas/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/CanvasApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add a compact final-module Canvas compatibility route batch without depending
+  on old canvas-engine services. Cover these missing production route shapes:
+  - POST /canvas
+  - GET /canvas/{id}
+  - PUT /canvas/{id}
+  - GET /canvas/list
+  - POST /canvas/{id}/submit-review
+  - GET /canvas/{id}/approval-status
+  - GET /canvas/{id}/pre-publish-checks
+  - POST /canvas/{id}/revert/{versionId}
+  - POST /canvas/{id}/canary
+  - POST /canvas/{id}/promote-canary
+  - POST /canvas/{id}/rollback-canary
+  - POST /canvas/{id}/rollback
+  - POST /canvas/{id}/clone
+  - GET /canvas/{id}/versions/{v1}/diff/{v2}
+  - PUT /canvas/{id}/safe
+  - POST /canvas/{id}/message-preview
+  - GET /canvas/{id}/export
+  - POST /canvas/import
+
+  Preserve the stable compatibility envelope used by final CanvasController:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  operator-1. Bad request validation errors should map to API_001. The compact
+  seed may use in-memory final Canvas state scoped by tenant. It should model
+  create/get/update/list, review status, pre-publish checks, clone, revert,
+  canary/promote/rollback, safe update conflict, message preview, export, and
+  import with deterministic ids and ordering. Do not add persistence, old-domain
+  dependencies, cross-module dependencies, POM changes, old TenantContextResolver
+  usage, or duplicate any existing final Canvas route mapping.
+
+  Follow TDD: first add focused failing tests for application service behavior
+  and controller compatibility, run them RED, then implement minimal final
+  Canvas compatibility API/service/controller changes and rerun focused tests.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn clean test -pl canvas-context-canvas,canvas-web -am -Dtest=CanvasCompatibilityApplicationServiceTest,CanvasControllerCompatibilityTest,CanvasApiCompatibilityTest test
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|CanvasService|CanvasOpsService|CanvasPublishApprovalService|CanvasPrePublishCheckService|CanvasMessagePreviewService|CanvasImportExportService" backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CanvasController.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CanvasCompatibilityFacade.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CanvasCompatibilityApplicationService.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-canvas/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09BB reserved Canvas compatibility API/application/controller
+  and test files listed in this packet
+```
+
+### DDD-C09BC: BI Remaining Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BC
+Mode: code-writing
+Readiness gate: R5 after DDD-C09BB Canvas route closeout
+Target backend state: DDD_FINAL_MODULE
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/BiCatalogControllerCompatibilityTest.java
+Inventory rows required:
+  routeGapSummary after DDD-C09BB shows route:/canvas/bi with 20 old
+  controllers, 169 old endpoints, 1 current production controller, and
+  152 current production endpoints. The current final BI controller already
+  covers most query, dashboard, chart, spreadsheet, resource collaboration,
+  datasource operations, subscription/delivery, permission, self-service,
+  and embed ticket routes. This batch should not duplicate existing mappings.
+Allowed module POM edits:
+  none; backend/canvas-web already depends on canvas-context-bi
+Forbidden write scope:
+  backend/canvas-engine/**
+  backend/canvas-context-bi/** except the exact allowed BI facade/application files
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller file
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/**/*.java except the exact allowed BI controller test file
+  backend/pom.xml
+  frontend/**
+  docs/** except worker return evidence if explicitly instructed by coordinator
+Read scope:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/**
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/**
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/bi/**
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/BiApiCompatibilityTest.java
+Contracts to read:
+  docs/ddd-rewrite/task-packs/09-coordinator-web-boot-cutover.md
+  docs/ddd-rewrite/contract-tests/compatibility-test-plan.md
+Goal:
+  Add a compact final-module BI route alias batch without depending on old
+  canvas-engine services. Prefer delegating to existing BiCatalogFacade methods
+  and compact deterministic compatibility responses. Cover remaining old route
+  shapes that are not already mapped, especially:
+  - POST /canvas/bi/datasets/resources
+  - DELETE /canvas/bi/datasets/resources
+  - POST /canvas/bi/datasets/resources/from-datasource-schema
+  - POST /canvas/bi/datasets/resources/from-datasource-schema/multi-table
+  - POST /canvas/bi/datasets/resources/sql-preview
+  - POST /canvas/bi/datasets/resources/acceleration-scheduler/run
+  - POST /canvas/bi/charts/resources
+  - DELETE /canvas/bi/charts/resources
+  - POST /canvas/bi/dashboards/resources
+  - DELETE /canvas/bi/dashboards/resources
+  - POST /canvas/bi/portals/resources
+  - DELETE /canvas/bi/portals/resources
+  - GET /canvas/bi/portals/runtime
+  - GET /canvas/bi/portals/runtime/{portalKey}
+  - POST /canvas/bi/big-screens/resources
+  - DELETE /canvas/bi/big-screens/resources
+  - POST /canvas/bi/spreadsheets/resources
+  - DELETE /canvas/bi/spreadsheets/resources
+  - GET /canvas/bi/datasources
+  - POST /canvas/bi/datasources
+  - PUT /canvas/bi/datasources
+  - POST /canvas/bi/embed/resources/dashboard
+  - POST /canvas/bi/embed/resources/dashboard/runtime-state
+  - POST /canvas/bi/embed/resources/portal
+  - POST /canvas/bi/self-service
+  - GET /canvas/bi/self-service
+
+  Preserve the stable compatibility envelope used by final web controllers:
+  success responses use code=0 and message=success with no errorCode or
+  traceId; missing X-Tenant-Id defaults to 7L; missing X-Actor defaults to
+  analyst. Bad request validation errors should map to API_001. Do not add
+  persistence, old-domain dependencies, cross-module dependencies, POM changes,
+  old TenantContextResolver usage, or duplicate an existing final BI route.
+
+  Follow TDD: first add focused failing controller compatibility tests for the
+  new alias routes, run them RED, then implement minimal facade/application/
+  controller changes and rerun focused tests.
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-bi -Dtest=BiCatalogApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|BiDatasetResourceService|BiDatasourceOnboardingService|BiEmbedTicketService|BiPortalRuntimeService|BiSelfServiceExportService" backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/BiCatalogController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/BiCatalogFacade.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/BiCatalogApplicationService.java
+Can run with:
+  read-only reviewers and no other workers editing backend/canvas-context-bi/**
+  or backend/canvas-web/src/main/java/org/chovy/canvas/web/bi/**
+Must not run with:
+  DDD-C09 or any worker editing backend/**
+Rollback path:
+  revert only the exact DDD-C09BC reserved BI facade/application/controller/test
+  files listed in this packet
 ```
 
 ### OSG-W14: Playground Flow
@@ -1914,4 +4030,1467 @@ Must not run with:
   DDD-C09, OSG-W02, or any worker editing the same home/list/editor files
 Rollback path:
   revert assigned playground docs/frontend files
+```
+
+### DDD-C09BD: Conversation Remaining Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BD
+Dispatch id: dispatch-DDD-C09BD-conversation-remaining-routes-20260614-074000
+Readiness gate: R5 after DDD-C09BC closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Allowed write scope:
+  backend/canvas-context-conversation/src/main/java/org/chovy/canvas/conversation/api/ConversationFacade.java
+  backend/canvas-context-conversation/src/main/java/org/chovy/canvas/conversation/application/ConversationApplicationService.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/conversation/ConversationController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/conversation/ConversationControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BD-conversation-remaining-routes-20260614-074000/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the four allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/ConversationController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/ConversationWorkspaceController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/ConversationPrivateDomainController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/ConversationProviderWebhookController.java
+
+Goal:
+  Add final-module compatibility coverage for the remaining /canvas/conversations
+  route aliases so preflight moves the route:/canvas/conversations gap forward.
+  Preserve the compatibility envelope used by ConversationController:
+  code=0/message=success on success, API_001 for bad requests, default
+  X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  POST /canvas/conversations/adapters/{adapterKey}/ingress
+  GET /canvas/conversations
+  GET /canvas/conversations/{sessionId}/messages
+  GET /canvas/conversations/workspace/inbox
+  POST /canvas/conversations/workspace/work-items/{workItemId}/tasks
+  POST /canvas/conversations/workspace/tasks/{taskId}/complete
+  GET /canvas/conversations/workspace/work-items/{workItemId}/timeline
+  POST /canvas/conversations/workspace/sla-breaches/evaluate
+  GET /canvas/conversations/workspace/sla-breaches
+  POST /canvas/conversations/workspace/work-items/{workItemId}/ai-reply-suggestions/generate
+  POST /canvas/conversations/workspace/work-items/{workItemId}/ai-reply-suggestions/{suggestionId}/review
+  GET /canvas/conversations/workspace/work-items/{workItemId}/ai-reply-suggestions
+  POST /canvas/conversations/private-domain/sync-runs
+  GET /canvas/conversations/private-domain/contacts
+  GET /canvas/conversations/private-domain/groups
+  GET /canvas/conversations/private-domain/sync-runs
+  POST /canvas/conversations/provider-webhooks/whatsapp
+
+Implementation guidance:
+  Prefer compact final-module facade methods returning Map/List structures over
+  adding many new DTO files. Keep behavior deterministic and compatibility
+  focused. Do not import old org.chovy.canvas.domain/dto/query/dal packages,
+  TenantContextResolver, or old services. You are not alone in the worktree:
+  preserve unrelated dirty changes and do not revert others' edits.
+
+TDD:
+  First add focused RED tests in ConversationControllerCompatibilityTest for
+  the missing aliases. Run the focused Maven command and capture expected
+  failure. Then implement minimal controller/facade/application behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-conversation -Dtest=ConversationApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=ConversationControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|ConversationIngressService|ConversationWorkspaceService|ConversationRoutingService|ConversationAiReplyService|ConversationPrivateDomainSyncService|ConversationAdapterHarness|WhatsAppWebhookPayloadMapper" backend/canvas-web/src/main/java/org/chovy/canvas/web/conversation/ConversationController.java backend/canvas-context-conversation/src/main/java/org/chovy/canvas/conversation/api/ConversationFacade.java backend/canvas-context-conversation/src/main/java/org/chovy/canvas/conversation/application/ConversationApplicationService.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BN: Webhooks Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BN
+Dispatch id: dispatch-DDD-C09BN-webhooks-routes-20260614-104200
+Readiness gate: R5 after DDD-C09BM closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/cdp/webhooks
+  oldControllerCount=1
+  oldEndpointCount=9
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/WebhookSubscriptionController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWebhookFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWebhookApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWebhookCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpWebhookApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWebhookController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpWebhookControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BN-webhooks-routes-20260614-104200/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/WebhookSubscriptionController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/cdp/webhooks
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  GET /cdp/webhooks
+  POST /cdp/webhooks
+  PUT /cdp/webhooks/{id}
+  PUT /cdp/webhooks/{id}/pause
+  PUT /cdp/webhooks/{id}/resume
+  DELETE /cdp/webhooks/{id}
+  POST /cdp/webhooks/{id}/rotate-secret
+  POST /cdp/webhooks/{id}/test
+  GET /cdp/webhooks/{id}/deliveries
+
+Implementation guidance:
+  Use compact deterministic final CDP webhook structures. Do not import old
+  org.chovy.canvas.domain/dto/query/dal/engine packages, TenantContextResolver,
+  WebhookSubscriptionValidator, WebhookDispatcherService, SecretCipher,
+  WebhookSubscriptionMapper, WebhookDeliveryLogMapper, old webhook DOs, or old
+  webhook DTOs. Preserve unrelated dirty changes and do not revert others'
+  edits.
+
+TDD:
+  First add focused RED tests in CdpWebhookControllerCompatibilityTest and
+  CdpWebhookApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpWebhookApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpWebhookControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|WebhookSubscriptionValidator|WebhookDispatcherService|SecretCipher|WebhookSubscriptionMapper|WebhookDeliveryLogMapper|WebhookSubscriptionDO|WebhookDeliveryLogDO|WebhookSubscriptionDTO|WebhookSubscriptionReq|WebhookDeliveryDTO|WebhookRotateSecretResp" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWebhookController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWebhookFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWebhookApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWebhookCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BO: Ops Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BO
+Dispatch id: dispatch-DDD-C09BO-ops-routes-20260614-111207
+Readiness gate: R5 after DDD-C09BN closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/ops
+  oldControllerCount=1
+  oldEndpointCount=9
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/OpsController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/OpsFacade.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/OpsApplicationService.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/OpsCatalog.java
+  backend/canvas-platform/src/test/java/org/chovy/canvas/platform/application/OpsApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/ops/OpsController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/ops/OpsControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BO-ops-routes-20260614-111207/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/OpsController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/ops without
+  depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  POST /ops/cache/invalidate/{id}
+  POST /ops/recovery/runtime-state/rebuild
+  GET /ops/runtime/status
+  GET /ops/audit-events
+  POST /ops/canvas/{id}/pause
+  POST /ops/canvas/{id}/offline
+  POST /ops/canvas/{id}/resume
+  POST /ops/canvas/{id}/kill
+  POST /ops/canvas/{id}/rollback
+
+Scope note:
+  Do not implement the old OpsController's /canvas/templates,
+  /canvas/{id}/save-as-template, /canvas/from-template/{templateId}, or
+  /canvas/pending-reviews routes in this task; they are outside route:/ops.
+
+TDD:
+  First add focused RED tests in OpsApplicationServiceTest and
+  OpsControllerCompatibilityTest. Run the focused Maven commands and capture
+  expected failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-platform -Dtest=OpsApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=OpsControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|CanvasOpsService|CanvasService|OpsAuditEventService|NotificationEventService|CanvasConfigCache|TriggerRouteRecoveryService|CanvasMapper|CanvasTemplateMapper|CanvasVersionMapper|CanvasManualApprovalMapper" backend/canvas-web/src/main/java/org/chovy/canvas/web/ops/OpsController.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/OpsFacade.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/OpsApplicationService.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/OpsCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BM: Computed Tags Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BM
+Dispatch id: dispatch-DDD-C09BM-computed-tags-routes-20260614-102400
+Readiness gate: R5 after DDD-C09BL closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/cdp/computed-tags
+  oldControllerCount=1
+  oldEndpointCount=9
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpComputedTagFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpComputedTagApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpComputedTagCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpComputedTagApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpComputedTagController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpComputedTagControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BM-computed-tags-routes-20260614-102400/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/cdp/computed-tags
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  GET /cdp/computed-tags
+  POST /cdp/computed-tags
+  POST /cdp/computed-tags/{tagCode}/preview
+  POST /cdp/computed-tags/{tagCode}/activate
+  POST /cdp/computed-tags/{tagCode}/pause
+  POST /cdp/computed-tags/{tagCode}/run
+  GET /cdp/computed-tags/{tagCode}/runs
+  GET /cdp/computed-tags/{tagCode}/lineage
+  POST /cdp/computed-tags/{tagCode}/impact-check
+
+Implementation guidance:
+  Use compact deterministic final CDP computed tag structures. Do not import
+  old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, ComputedTagService, CdpLineageService, or old computed
+  tag mapper/dataobject classes. Preserve unrelated dirty changes and do not
+  revert others' edits.
+
+TDD:
+  First add focused RED tests in CdpComputedTagControllerCompatibilityTest and
+  CdpComputedTagApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpComputedTagApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpComputedTagControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|ComputedTagService|CdpLineageService|CdpComputedTagDefinitionDO|CdpComputedTagRunDO|CdpComputedTagDefinitionMapper|CdpComputedTagDependencyMapper|CdpComputedTagRunMapper" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpComputedTagController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpComputedTagFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpComputedTagApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpComputedTagCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BL: Creator Collaboration Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BL
+Dispatch id: dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500
+Readiness gate: R5 after DDD-C09BK closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/canvas/creator-collaboration
+  oldControllerCount=1
+  oldEndpointCount=9
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CreatorCollaborationController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CreatorCollaborationFacade.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CreatorCollaborationApplicationService.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/domain/CreatorCollaborationCatalog.java
+  backend/canvas-context-canvas/src/test/java/org/chovy/canvas/canvas/application/CreatorCollaborationApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CreatorCollaborationController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/canvas/CreatorCollaborationControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BL-creator-collaboration-routes-20260614-100500/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CreatorCollaborationController.java
+
+Goal:
+  Add compact final-module compatibility coverage for
+  route:/canvas/creator-collaboration without depending on old canvas-engine
+  services. Preserve final web CompatibilityEnvelope behavior:
+  code=0/message=success on success, API_001 for bad requests, default
+  X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  POST /canvas/creator-collaboration/creators
+  POST /canvas/creator-collaboration/campaigns
+  POST /canvas/creator-collaboration/collaborations
+  POST /canvas/creator-collaboration/deliverables
+  POST /canvas/creator-collaboration/mutations
+  POST /canvas/creator-collaboration/mutations/{mutationId}/approve
+  POST /canvas/creator-collaboration/mutations/{mutationId}/execute
+  GET /canvas/creator-collaboration/mutations
+  GET /canvas/creator-collaboration/summary
+
+Implementation guidance:
+  Use compact deterministic final Canvas creator-collaboration structures. Do
+  not import old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, CreatorCollaborationService, or
+  CreatorProviderMutationService. Preserve unrelated dirty changes and do not
+  revert others' edits.
+
+TDD:
+  First add focused RED tests in CreatorCollaborationControllerCompatibilityTest
+  and CreatorCollaborationApplicationServiceTest. Run focused Maven and capture
+  expected failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-canvas -Dtest=CreatorCollaborationApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CreatorCollaborationControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|CreatorCollaborationService|CreatorProviderMutationService" backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CreatorCollaborationController.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CreatorCollaborationFacade.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CreatorCollaborationApplicationService.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/domain/CreatorCollaborationCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BK: Warehouse Tables Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BK
+Dispatch id: dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500
+Readiness gate: R5 after DDD-C09BJ closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/warehouse/tables
+  oldControllerCount=2
+  oldEndpointCount=9
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseTableDriftIncidentController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseTableGovernanceController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehouseTableFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehouseTableApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehouseTableCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpWarehouseTableApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehouseTableController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpWarehouseTableControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BK-warehouse-tables-routes-20260614-094500/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseTableDriftIncidentController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseTableGovernanceController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/warehouse/tables
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  GET /warehouse/tables/contracts
+  POST /warehouse/tables/contracts
+  POST /warehouse/tables/contracts/{tableKey}/inspect
+  POST /warehouse/tables/inspect
+  POST /warehouse/tables/contracts/{tableKey}/inspect-live
+  POST /warehouse/tables/inspect-live
+  POST /warehouse/tables/contracts/{tableKey}/remediation-plan
+  POST /warehouse/tables/remediation-plan
+  POST /warehouse/tables/incidents/scan
+
+Implementation guidance:
+  Use compact deterministic final CDP warehouse table structures. Do not import
+  old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, CdpWarehouseTableGovernanceService, or
+  CdpWarehouseTableDriftIncidentService. Preserve unrelated dirty changes and
+  do not revert others' edits.
+
+TDD:
+  First add focused RED tests in CdpWarehouseTableControllerCompatibilityTest
+  and CdpWarehouseTableApplicationServiceTest. Run focused Maven and capture
+  expected failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpWarehouseTableApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpWarehouseTableControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|CdpWarehouseTableGovernanceService|CdpWarehouseTableDriftIncidentService" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehouseTableController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehouseTableFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehouseTableApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehouseTableCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BE: Warehouse Privacy Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BE
+Dispatch id: dispatch-DDD-C09BE-warehouse-privacy-routes-20260614-080300
+Readiness gate: R5 after DDD-C09BD closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehousePrivacyFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehousePrivacyApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehousePrivacyCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpWarehousePrivacyApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehousePrivacyController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpWarehousePrivacyControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BE-warehouse-privacy-routes-20260614-080300/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehousePrivacyErasureController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehousePrivacyTombstoneController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/warehouse/privacy
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  POST /warehouse/privacy/erasure/requests
+  POST /warehouse/privacy/erasure/requests/{id}/proofs
+  POST /warehouse/privacy/erasure/requests/{id}/execute
+  POST /warehouse/privacy/erasure/requests/{id}/audience-rebuild
+  POST /warehouse/privacy/erasure/audience-rebuild/automation/run
+  GET /warehouse/privacy/erasure/audience-rebuild/automation/runs
+  GET /warehouse/privacy/erasure/audience-rebuild/automation/runs/{id}
+  GET /warehouse/privacy/erasure/requests
+  GET /warehouse/privacy/erasure/requests/{id}
+  GET /warehouse/privacy/erasure/summary
+  POST /warehouse/privacy/tombstones
+  POST /warehouse/privacy/tombstones/from-erasure-request
+  POST /warehouse/privacy/tombstones/{id}/revoke
+  GET /warehouse/privacy/tombstones
+  GET /warehouse/privacy/tombstones/decision
+
+Implementation guidance:
+  Use compact deterministic Map/List structures and a small final CDP privacy
+  catalog if useful. Do not import old org.chovy.canvas.domain/dto/query/dal
+  packages, TenantContextResolver, or old services. You are not alone in the
+  worktree: preserve unrelated dirty changes and do not revert others' edits.
+
+TDD:
+  First add focused RED tests in CdpWarehousePrivacyControllerCompatibilityTest
+  and CdpWarehousePrivacyApplicationServiceTest. Run focused Maven and capture
+  expected failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpWarehousePrivacyApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpWarehousePrivacyControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|CdpWarehousePrivacyErasureService|CdpWarehousePrivacyErasureExecutionService|CdpWarehousePrivacyAudienceBitmapRebuildService|CdpWarehousePrivacyAudienceBitmapRebuildAutomationService|CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService|CdpWarehousePrivacyTombstoneService" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehousePrivacyController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehousePrivacyFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehousePrivacyApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehousePrivacyCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BF: Marketing Integrations Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BF
+Dispatch id: dispatch-DDD-C09BF-marketing-integrations-routes-20260614-081400
+Readiness gate: R5 after DDD-C09BE closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/canvas/marketing-integrations
+  oldControllerCount=2
+  oldEndpointCount=11
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingIntegrationContractController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingIntegrationContractProbeController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/MarketingIntegrationFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/MarketingIntegrationApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/MarketingIntegrationCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/MarketingIntegrationApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/MarketingIntegrationController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/MarketingIntegrationControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BF-marketing-integrations-routes-20260614-081400/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingIntegrationContractController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingIntegrationContractProbeController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/canvas/marketing-integrations
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  POST /canvas/marketing-integrations/contracts
+  GET /canvas/marketing-integrations/contracts
+  GET /canvas/marketing-integrations/contracts/{contractId}/audit-events
+  DELETE /canvas/marketing-integrations/contracts/{contractId}
+  POST /canvas/marketing-integrations/contracts/{contractId}/probe-runs
+  GET /canvas/marketing-integrations/contract-probe-runs
+  POST /canvas/marketing-integrations/contract-probe-runs/scan
+  GET /canvas/marketing-integrations/contract-slo-evaluations
+  POST /canvas/marketing-integrations/contracts/{contractId}/probes
+  GET /canvas/marketing-integrations/contracts/{contractId}/probes
+  GET /canvas/marketing-integrations/probes
+
+Implementation guidance:
+  Use compact deterministic Map/List structures and a small final Marketing
+  integration catalog if useful. Do not import old org.chovy.canvas.domain/dto/
+  query/dal packages, TenantContextResolver, or old services. You are not alone
+  in the worktree: preserve unrelated dirty changes and do not revert others'
+  edits.
+
+TDD:
+  First add focused RED tests in MarketingIntegrationControllerCompatibilityTest
+  and MarketingIntegrationApplicationServiceTest. Run focused Maven and capture
+  expected failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-marketing -Dtest=MarketingIntegrationApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=MarketingIntegrationControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|MarketingIntegrationContractService|MarketingIntegrationContractProbeService|MarketingIntegrationContractProbeAutomationService|MarketingIntegrationContractSloService" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/MarketingIntegrationController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/MarketingIntegrationFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/MarketingIntegrationApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/MarketingIntegrationCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BG: Analytics Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BG
+Dispatch id: dispatch-DDD-C09BG-analytics-routes-20260614-082400
+Readiness gate: R5 after DDD-C09BF closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/analytics
+  oldControllerCount=1
+  oldEndpointCount=10
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/AnalyticsController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/AnalyticsFacade.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/AnalyticsViews.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/AnalyticsApplicationService.java
+  backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/AnalyticsCatalog.java
+  backend/canvas-context-bi/src/test/java/org/chovy/canvas/bi/application/AnalyticsApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/analytics/AnalyticsController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/analytics/AnalyticsControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BG-analytics-routes-20260614-082400/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the seven allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AnalyticsController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AnalyticsQueryService.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/analytics
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L.
+
+Target routes:
+  GET /analytics/events/counts
+  GET /analytics/events
+  GET /analytics/events/count
+  GET /analytics/users/{userId}/timeline
+  GET /analytics/events/attributes/{attribute}/distribution
+  GET /analytics/attributes/{attribute}/distribution
+  GET /analytics/funnels/{funnelKey}
+  POST /analytics/alerts/preview
+  POST /analytics/exports
+  GET /analytics/exports/{id}
+
+Implementation guidance:
+  Use compact deterministic final BI analytics structures. Do not import old
+  org.chovy.canvas.domain/dto/query/dal packages, TenantContextResolver, or
+  AnalyticsQueryService. You are not alone in the worktree: preserve unrelated
+  dirty changes and do not revert others' edits.
+
+TDD:
+  First add focused RED tests in AnalyticsControllerCompatibilityTest and
+  AnalyticsApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-bi -Dtest=AnalyticsApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=AnalyticsControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal)|TenantContextResolver|AnalyticsQueryService|AnalyticsEventMapper|AnalyticsFunnelDefinitionMapper|AnalyticsAlertRuleMapper|AnalyticsExportJobMapper" backend/canvas-web/src/main/java/org/chovy/canvas/web/analytics/AnalyticsController.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/AnalyticsFacade.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/api/AnalyticsViews.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/application/AnalyticsApplicationService.java backend/canvas-context-bi/src/main/java/org/chovy/canvas/bi/domain/AnalyticsCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BH: Audience Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BH
+Dispatch id: dispatch-DDD-C09BH-audience-routes-20260614-083805
+Readiness gate: R5 after DDD-C09BG closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/canvas/audiences
+  oldControllerCount=1
+  oldEndpointCount=10
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/AudienceController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/AudienceFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/AudienceApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/AudienceCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/AudienceApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/AudienceController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/AudienceControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BH-audience-routes-20260614-083805/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AudienceController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/canvas/audiences
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests, default X-Tenant-Id=7L, default X-Actor=operator-1.
+
+Target routes:
+  GET /canvas/audiences
+  GET /canvas/audiences/source-fields
+  POST /canvas/audiences/preview
+  GET /canvas/audiences/{id}
+  GET /canvas/audiences/ready
+  POST /canvas/audiences
+  PUT /canvas/audiences/{id}
+  DELETE /canvas/audiences/{id}
+  POST /canvas/audiences/{id}/compute
+  GET /canvas/audiences/{id}/stat
+
+Implementation guidance:
+  Use compact deterministic final Marketing audience structures. Do not import
+  old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, or old audience services. Preserve unrelated dirty
+  changes and do not revert others' edits.
+
+TDD:
+  First add focused RED tests in AudienceControllerCompatibilityTest and
+  AudienceApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-marketing -Dtest=AudienceApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=AudienceControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|AudienceDefinitionMapper|AudienceStatMapper|AudienceBatchComputeService|AudienceSchedulerService|AsyncTaskService|AudienceComputeTaskRunner|CdpAudienceSourceService" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/AudienceController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/AudienceFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/AudienceApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/AudienceCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BI: Programmatic DSP Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BI
+Dispatch id: dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000
+Readiness gate: R5 after DDD-C09BH closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/canvas/programmatic-dsp
+  oldControllerCount=1
+  oldEndpointCount=10
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/ProgrammaticDspController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/ProgrammaticDspFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/ProgrammaticDspApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/ProgrammaticDspCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/ProgrammaticDspApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/ProgrammaticDspController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/ProgrammaticDspControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BI-programmatic-dsp-routes-20260614-085000/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/ProgrammaticDspController.java
+
+Goal:
+  Add compact final-module compatibility coverage for
+  route:/canvas/programmatic-dsp without depending on old canvas-engine services.
+  Preserve final web CompatibilityEnvelope behavior: code=0/message=success on
+  success, API_001 for bad requests, default X-Tenant-Id=7L, default
+  X-Actor=operator-1.
+
+Target routes:
+  POST /canvas/programmatic-dsp/seats
+  POST /canvas/programmatic-dsp/campaigns
+  POST /canvas/programmatic-dsp/line-items
+  POST /canvas/programmatic-dsp/supply-paths
+  POST /canvas/programmatic-dsp/snapshots
+  GET /canvas/programmatic-dsp/summary
+  POST /canvas/programmatic-dsp/mutations
+  POST /canvas/programmatic-dsp/mutations/{mutationId}/approve
+  POST /canvas/programmatic-dsp/mutations/{mutationId}/execute
+  GET /canvas/programmatic-dsp/mutations
+
+Implementation guidance:
+  Use compact deterministic final Marketing programmatic DSP structures. Do not
+  import old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, ProgrammaticDspService, or
+  ProgrammaticDspMutationService. Preserve unrelated dirty changes and do not
+  revert others' edits.
+
+TDD:
+  First add focused RED tests in ProgrammaticDspControllerCompatibilityTest and
+  ProgrammaticDspApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-marketing -Dtest=ProgrammaticDspApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=ProgrammaticDspControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|ProgrammaticDspService|ProgrammaticDspMutationService|ProgrammaticDspSeatMapper|ProgrammaticDspCampaignMapper|ProgrammaticDspLineItemMapper|ProgrammaticDspSupplyPathMapper|ProgrammaticDspSnapshotMapper|ProgrammaticDspMutationMapper" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/ProgrammaticDspController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/ProgrammaticDspFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/ProgrammaticDspApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/ProgrammaticDspCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BQ: Warehouse Availability Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BQ
+Dispatch id: dispatch-DDD-C09BQ-warehouse-availability-routes-20260614-123929
+Readiness gate: R5 after DDD-C09BP Public Ingress route closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/warehouse/availability
+  oldControllerCount=3
+  oldEndpointCount=8
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseAvailabilityController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseAvailabilityIncidentController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseConsumerAvailabilityIncidentController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehouseAvailabilityFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehouseAvailabilityApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehouseAvailabilityCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpWarehouseAvailabilityApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehouseAvailabilityController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpWarehouseAvailabilityControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BQ-warehouse-availability-routes-20260614-123929/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseAvailabilityController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseAvailabilityIncidentController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWarehouseConsumerAvailabilityIncidentController.java
+
+Goal:
+  Add compact final-module compatibility coverage for
+  route:/warehouse/availability without depending on old canvas-engine services.
+  Preserve final web CompatibilityEnvelope behavior: code=0/message=success on
+  success, API_001 for bad requests, default X-Tenant-Id=7L, default
+  X-Actor=operator-1.
+
+Target routes:
+  GET /warehouse/availability
+  POST /warehouse/availability/assets
+  GET /warehouse/availability/assets
+  POST /warehouse/availability/contracts
+  GET /warehouse/availability/contracts
+  POST /warehouse/availability/contracts/{contractKey}/evaluate
+  POST /warehouse/availability/incidents/scan
+  POST /warehouse/availability/consumer-incidents/scan
+
+Implementation guidance:
+  Use compact deterministic final CDP warehouse availability structures. Do not
+  import old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, CdpWarehouseAvailabilityService,
+  CdpWarehouseConsumerAvailabilityService,
+  CdpWarehouseAvailabilityIncidentService, or
+  CdpWarehouseConsumerAvailabilityIncidentService. Preserve unrelated dirty
+  changes and do not revert others' edits.
+
+TDD:
+  First add focused RED tests in CdpWarehouseAvailabilityControllerCompatibilityTest
+  and CdpWarehouseAvailabilityApplicationServiceTest. Run focused Maven and
+  capture expected failure. Then implement minimal facade/application/domain/controller behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpWarehouseAvailabilityApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpWarehouseAvailabilityControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|CdpWarehouseAvailabilityService|CdpWarehouseConsumerAvailabilityService|CdpWarehouseAvailabilityIncidentService|CdpWarehouseConsumerAvailabilityIncidentService" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpWarehouseAvailabilityController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpWarehouseAvailabilityFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpWarehouseAvailabilityApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpWarehouseAvailabilityCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BS: Computed Profile Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BS
+Dispatch id: dispatch-DDD-C09BS-computed-profile-routes-20260614-134941
+Readiness gate: R5 after DDD-C09BR Tag Definitions route closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/cdp/computed-profile-attributes
+  oldControllerCount=1
+  oldEndpointCount=8
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpComputedProfileFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpComputedProfileApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpComputedProfileCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpComputedProfileApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpComputedProfileController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpComputedProfileControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BS-computed-profile-routes-20260614-134941/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java
+
+Goal:
+  Add compact final-module compatibility coverage for
+  route:/cdp/computed-profile-attributes without depending on old
+  canvas-engine services. Preserve final web CompatibilityEnvelope behavior:
+  code=0/message=success on success, API_001 for bad requests where
+  controller/application validation rejects input, default X-Tenant-Id=7L,
+  and default X-Actor=operator-1.
+
+Target routes:
+  GET /cdp/computed-profile-attributes
+  POST /cdp/computed-profile-attributes
+  POST /cdp/computed-profile-attributes/{id}/preview
+  POST /cdp/computed-profile-attributes/{id}/activate
+  POST /cdp/computed-profile-attributes/{id}/pause
+  POST /cdp/computed-profile-attributes/{id}/run
+  GET /cdp/computed-profile-attributes/{id}/runs
+  GET /cdp/computed-profile-attributes/{id}/changes
+
+Implementation guidance:
+  Use compact deterministic final CDP computed-profile structures. Do not
+  import old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, ComputedProfileAttributeService,
+  CdpComputedProfileAttributeDO, CdpComputedProfileRunDO,
+  CdpProfileAttributeChangeLogDO, or old R. Preserve unrelated dirty changes
+  and do not revert others' edits.
+
+TDD:
+  First add focused RED tests in CdpComputedProfileControllerCompatibilityTest
+  and CdpComputedProfileApplicationServiceTest. Run focused Maven and capture
+  expected failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpComputedProfileApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpComputedProfileControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|ComputedProfileAttributeService|CdpComputedProfileAttributeDO|CdpComputedProfileRunDO|CdpProfileAttributeChangeLogDO" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpComputedProfileController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpComputedProfileFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpComputedProfileApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpComputedProfileCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BR: Tag Definitions Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BR
+Dispatch id: dispatch-DDD-C09BR-tag-definitions-routes-20260614-131323
+Readiness gate: R5 after DDD-C09BQ Warehouse Availability route closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/canvas/tag-definitions
+  oldControllerCount=1
+  oldEndpointCount=8
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/TagDefinitionController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpTagDefinitionFacade.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpTagDefinitionApplicationService.java
+  backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpTagDefinitionCatalog.java
+  backend/canvas-context-cdp/src/test/java/org/chovy/canvas/cdp/application/CdpTagDefinitionApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpTagDefinitionController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/cdp/CdpTagDefinitionControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BR-tag-definitions-routes-20260614-131323/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/TagDefinitionController.java
+
+Goal:
+  Add compact final-module compatibility coverage for
+  route:/canvas/tag-definitions without depending on old canvas-engine
+  services. Preserve final web CompatibilityEnvelope behavior:
+  code=0/message=success on success, API_001 for bad requests where
+  controller/application validation rejects input, default X-Tenant-Id=7L,
+  and default X-Actor=operator-1.
+
+Target routes:
+  GET /canvas/tag-definitions
+  POST /canvas/tag-definitions
+  PUT /canvas/tag-definitions/{id}
+  DELETE /canvas/tag-definitions/{id}
+  GET /canvas/tag-definitions/{tagCode}/values
+  POST /canvas/tag-definitions/{tagCode}/values
+  PUT /canvas/tag-definitions/values/{id}
+  DELETE /canvas/tag-definitions/values/{id}
+
+Implementation guidance:
+  Use compact deterministic final CDP tag-definition structures. Do not import
+  old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, TagDefinitionService, TagDefinitionDO,
+  TagValueDefinitionDO, PageResult, or old R. Preserve unrelated dirty changes
+  and do not revert others' edits.
+
+TDD:
+  First add focused RED tests in CdpTagDefinitionControllerCompatibilityTest
+  and CdpTagDefinitionApplicationServiceTest. Run focused Maven and capture
+  expected failure. Then implement minimal facade/application/domain/controller
+  behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-cdp -Dtest=CdpTagDefinitionApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CdpTagDefinitionControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|TagDefinitionService|TagDefinitionDO|TagValueDefinitionDO|PageResult" backend/canvas-web/src/main/java/org/chovy/canvas/web/cdp/CdpTagDefinitionController.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/api/CdpTagDefinitionFacade.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/application/CdpTagDefinitionApplicationService.java backend/canvas-context-cdp/src/main/java/org/chovy/canvas/cdp/domain/CdpTagDefinitionCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BT: Canvas Stats Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BT
+Dispatch id: dispatch-DDD-C09BT-canvas-stats-routes-20260614-141402
+Readiness gate: R5 after DDD-C09BS Computed Profile route closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=family:CanvasStats
+  oldControllerCount=1
+  oldEndpointCount=7
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasStatsController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CanvasStatsFacade.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CanvasStatsApplicationService.java
+  backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/domain/CanvasStatsCatalog.java
+  backend/canvas-context-canvas/src/test/java/org/chovy/canvas/canvas/application/CanvasStatsApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CanvasStatsController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/canvas/CanvasStatsControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BT-canvas-stats-routes-20260614-141402/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasStatsController.java
+
+Goal:
+  Add compact final-module compatibility coverage for family:CanvasStats
+  without depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests where controller/application validation rejects input.
+
+Target routes:
+  GET /canvas/{id}/execution/{executionId}/trace
+  GET /canvas/{id}/executions
+  GET /canvas/{id}/stats
+  GET /canvas/{id}/funnel
+  GET /canvas/{id}/trend
+  GET /canvas/{id}/receipts
+  GET /canvas/{id}/attribution-summary
+
+Implementation guidance:
+  Use compact deterministic final Canvas stats structures. Do not import old
+  org.chovy.canvas.domain/dto/query/dal/engine packages,
+  CanvasExecutionMapper, CanvasExecutionTraceMapper, CanvasExecutionStatsMapper,
+  DorisQueryService, DailyStatsDTO, MessageSendRecordMapper,
+  CanvasConversionAttributionMapper, MapFieldKeys, QueryWrapper, or
+  LambdaQueryWrapper. Preserve unrelated dirty changes and do not revert others'
+  edits.
+
+TDD:
+  First add focused RED tests in CanvasStatsControllerCompatibilityTest and
+  CanvasStatsApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-canvas -Dtest=CanvasStatsApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=CanvasStatsControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|CanvasExecutionMapper|CanvasExecutionTraceMapper|CanvasExecutionStatsMapper|DorisQueryService|DailyStatsDTO|MessageSendRecordMapper|CanvasConversionAttributionMapper|MapFieldKeys|QueryWrapper|LambdaQueryWrapper" backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CanvasStatsController.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/api/CanvasStatsFacade.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/application/CanvasStatsApplicationService.java backend/canvas-context-canvas/src/main/java/org/chovy/canvas/canvas/domain/CanvasStatsCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BP: Public Ingress Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BP
+Dispatch id: dispatch-DDD-C09BP-public-ingress-routes-20260614-115134
+Readiness gate: R5 after DDD-C09BO Ops route closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/public
+  oldControllerCount=4
+  oldEndpointCount=8
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingFormController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/PublicConversationWebhookController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/PublicMarketingContentUploadWebhookController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/PublicMarketingMonitoringWebhookController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/PublicIngressFacade.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/PublicIngressApplicationService.java
+  backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/PublicIngressCatalog.java
+  backend/canvas-platform/src/test/java/org/chovy/canvas/platform/application/PublicIngressApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/publicingress/PublicIngressController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/publicingress/PublicIngressControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BP-public-ingress-routes-20260614-115134/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MarketingFormController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/PublicConversationWebhookController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/PublicMarketingContentUploadWebhookController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/PublicMarketingMonitoringWebhookController.java
+
+Goal:
+  Add compact final-module compatibility coverage for route:/public without
+  depending on old canvas-engine services. Preserve final web
+  CompatibilityEnvelope behavior: code=0/message=success on success, API_001
+  for bad requests where controller/application validation rejects input.
+
+Target routes:
+  GET /public/marketing-forms/{publicKey}
+  POST /public/marketing-forms/{publicKey}/submit
+  GET /public/conversation-webhooks/{tenantId}/whatsapp
+  POST /public/conversation-webhooks/{tenantId}/whatsapp
+  GET /public/conversations/webhooks/{tenantId}/whatsapp
+  POST /public/conversations/webhooks/{tenantId}/whatsapp
+  POST /public/marketing/content/assets/upload-callbacks/{tenantId}/{provider}
+  POST /public/marketing-monitoring/webhooks/{tenantId}/{sourceKey}
+
+Implementation guidance:
+  Use compact deterministic final Platform public-ingress structures. Do not
+  import old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, MarketingFormService, ConversationAdapterHarness,
+  WhatsAppWebhookPayloadMapper, WhatsAppWebhookSecurityService,
+  DeliveryOutboxService, MarketingAssetUploadService,
+  MarketingAssetUploadWebhookSignatureService, or
+  MarketingMonitorWebhookIngestionService. Preserve unrelated dirty changes and
+  do not revert others' edits.
+
+TDD:
+  First add focused RED tests in PublicIngressControllerCompatibilityTest and
+  PublicIngressApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-platform -Dtest=PublicIngressApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=PublicIngressControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|MarketingFormService|ConversationAdapterHarness|WhatsAppWebhookPayloadMapper|WhatsAppWebhookSecurityService|DeliveryOutboxService|MarketingAssetUploadService|MarketingAssetUploadWebhookSignatureService|MarketingMonitorWebhookIngestionService" backend/canvas-web/src/main/java/org/chovy/canvas/web/publicingress/PublicIngressController.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/api/PublicIngressFacade.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/application/PublicIngressApplicationService.java backend/canvas-platform/src/main/java/org/chovy/canvas/platform/domain/PublicIngressCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
+```
+
+### DDD-C09BJ: AB Experiments Route Aliases
+
+```text
+Program: DDD modular rewrite
+Task id: DDD-C09BJ
+Dispatch id: dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800
+Readiness gate: R5 after DDD-C09BI closeout
+Worker type: code-writing
+Branch/worktree: main / /Users/photonpay/project/canvas
+Base commit: 2a1cdec07ec27a5298958822014aa28d9312869c
+
+Inventory rows required:
+  group=route:/canvas/ab-experiments
+  oldControllerCount=2
+  oldEndpointCount=9
+  currentControllerCount=0
+  currentEndpointCount=0
+  representativeOldControllerFiles=[
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/AbExperimentController.java,
+    backend/canvas-engine/src/main/java/org/chovy/canvas/web/AbExperimentGovernanceController.java
+  ]
+
+Allowed write scope:
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/AbExperimentFacade.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/AbExperimentApplicationService.java
+  backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/AbExperimentCatalog.java
+  backend/canvas-context-marketing/src/test/java/org/chovy/canvas/marketing/application/AbExperimentApplicationServiceTest.java
+  backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/AbExperimentController.java
+  backend/canvas-web/src/test/java/org/chovy/canvas/web/marketing/AbExperimentControllerCompatibilityTest.java
+
+Coordinator-owned files, do not edit:
+  docs/program-coordination/dispatch-state.json
+  docs/program-coordination/progress-ledger.md
+  docs/program-coordination/evidence/dispatch-DDD-C09BJ-ab-experiments-routes-20260614-090800/**
+  docs/program-coordination/subagent-worker-packets.md
+
+Forbidden write scope:
+  backend/canvas-engine/**
+  any pom.xml
+  files outside the six allowed code/test paths
+
+Legacy reference only:
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AbExperimentController.java
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/AbExperimentGovernanceController.java
+
+Goal:
+  Add compact final-module compatibility coverage for
+  route:/canvas/ab-experiments without depending on old canvas-engine services.
+  Preserve final web CompatibilityEnvelope behavior: code=0/message=success on
+  success, API_001 for bad requests, default X-Tenant-Id=7L, default
+  X-Actor=operator-1.
+
+Target routes:
+  GET /canvas/ab-experiments
+  POST /canvas/ab-experiments
+  PUT /canvas/ab-experiments/{id}
+  DELETE /canvas/ab-experiments/{id}
+  GET /canvas/ab-experiments/{id}/groups
+  POST /canvas/ab-experiments/{id}/groups
+  PUT /canvas/ab-experiments/{id}/groups/{groupId}
+  DELETE /canvas/ab-experiments/{id}/groups/{groupId}
+  POST /canvas/ab-experiments/{experimentId}/governance/evaluate
+
+Implementation guidance:
+  Use compact deterministic final Marketing AB experiment structures. Do not
+  import old org.chovy.canvas.domain/dto/query/dal/engine packages,
+  TenantContextResolver, AbExperimentMapper, AbExperimentGroupService, or
+  AbExperimentGovernanceService. Preserve unrelated dirty changes and do not
+  revert others' edits.
+
+TDD:
+  First add focused RED tests in AbExperimentControllerCompatibilityTest and
+  AbExperimentApplicationServiceTest. Run focused Maven and capture expected
+  failure. Then implement minimal facade/application/domain/controller behavior.
+
+Verification commands:
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test -pl canvas-context-marketing -Dtest=AbExperimentApplicationServiceTest
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-web -am -Dtest=AbExperimentControllerCompatibilityTest test
+  cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn compile -pl canvas-web -am -DskipTests
+  node tools/program-coordination/cutover-compatibility-preflight.mjs . --json
+  rg -n "canvas-engine|org\\.chovy\\.canvas\\.(domain|dto|query|dal|engine)|TenantContextResolver|AbExperimentMapper|AbExperimentGroupService|AbExperimentGovernanceService" backend/canvas-web/src/main/java/org/chovy/canvas/web/marketing/AbExperimentController.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/api/AbExperimentFacade.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/application/AbExperimentApplicationService.java backend/canvas-context-marketing/src/main/java/org/chovy/canvas/marketing/domain/AbExperimentCatalog.java
+
+Return:
+  Use the canonical return packet fields from this file. Include files changed,
+  contracts changed, tests run, verification result, risks, and rollback path.
 ```
