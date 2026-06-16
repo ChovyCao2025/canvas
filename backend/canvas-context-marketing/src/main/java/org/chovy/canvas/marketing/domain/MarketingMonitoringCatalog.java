@@ -8,15 +8,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 维护MarketingMonitoring相关的内存业务目录。
+ */
 public class MarketingMonitoringCatalog {
 
+    /**
+     * 用于生成确定性业务时间的时钟。
+     */
     private final Clock clock;
     private final Map<Long, TenantState> tenants = new LinkedHashMap<>();
 
+    /**
+     * 创建MarketingMonitoringCatalog实例。
+     */
     public MarketingMonitoringCatalog(Clock clock) {
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
+    /**
+     * 执行execute业务操作。
+     */
     public Map<String, Object> execute(Long tenantId, String operation, Map<String, Object> payload, String actor) {
         TenantState state = state(tenantId);
         Map<String, Object> safePayload = safeMap(payload);
@@ -51,6 +63,9 @@ public class MarketingMonitoringCatalog {
         };
     }
 
+    /**
+     * 查询列表。
+     */
     public List<Map<String, Object>> list(Long tenantId, String operation, Map<String, Object> criteria, int limit) {
         TenantState state = state(tenantId);
         List<Map<String, Object>> rows = switch (operation) {
@@ -79,11 +94,17 @@ public class MarketingMonitoringCatalog {
                 .toList();
     }
 
+    /**
+     * 执行upsertSource业务操作。
+     */
     private Map<String, Object> upsertSource(TenantState state, Map<String, Object> payload, String actor) {
         return upsertStored(state.sources, state.nextSourceId++, state.tenantId, "upsertSource", payload, actor,
                 key(payload, "sourceKey", "source"));
     }
 
+    /**
+     * 执行ingestItem业务操作。
+     */
     private Map<String, Object> ingestItem(TenantState state, Map<String, Object> payload, String actor) {
         Map<String, Object> item = appendStored(state.items, state.nextItemId++, state.tenantId, "ingestItem", payload,
                 actor, "INGESTED");
@@ -95,6 +116,9 @@ public class MarketingMonitoringCatalog {
         return item;
     }
 
+    /**
+     * 执行dispatchAlert业务操作。
+     */
     private Map<String, Object> dispatchAlert(TenantState state, Map<String, Object> payload, String actor) {
         Map<String, Object> dispatch = appendStored(state.alertDispatches, state.nextDispatchId++, state.tenantId,
                 "dispatchAlert", payload, actor, "DISPATCHED");
@@ -105,6 +129,9 @@ public class MarketingMonitoringCatalog {
         return dispatch;
     }
 
+    /**
+     * 执行upsertCredential业务操作。
+     */
     private Map<String, Object> upsertCredential(TenantState state, Map<String, Object> payload, String actor) {
         Map<String, Object> credential = upsertStored(state.providerCredentials, state.nextCredentialId++, state.tenantId,
                 "upsertProviderCredential", payload, actor, key(payload, "credentialKey", "credential"));
@@ -113,6 +140,9 @@ public class MarketingMonitoringCatalog {
         return credential;
     }
 
+    /**
+     * 执行credentialTransition业务操作。
+     */
     private Map<String, Object> credentialTransition(TenantState state, Map<String, Object> payload, String actor,
                                                      String status) {
         String credentialKey = key(payload, "credentialKey", "credential");
@@ -127,6 +157,9 @@ public class MarketingMonitoringCatalog {
         return new LinkedHashMap<>(credential);
     }
 
+    /**
+     * 执行refreshDue业务操作。
+     */
     private Map<String, Object> refreshDue(TenantState state, Map<String, Object> payload, String actor) {
         int limit = toInt(payload.get("limit"), 50);
         List<Map<String, Object>> refreshed = state.providerCredentials.stream()
@@ -140,6 +173,9 @@ public class MarketingMonitoringCatalog {
         return result;
     }
 
+    /**
+     * 执行startOAuth业务操作。
+     */
     private Map<String, Object> startOAuth(TenantState state, Map<String, Object> payload, String actor) {
         Map<String, Object> auth = appendStored(state.oauthAuthorizations, state.nextOAuthId++, state.tenantId,
                 "startProviderOAuthAuthorization", payload, actor, "STARTED");
@@ -150,6 +186,9 @@ public class MarketingMonitoringCatalog {
         return auth;
     }
 
+    /**
+     * 执行completeOAuth业务操作。
+     */
     private Map<String, Object> completeOAuth(TenantState state, Map<String, Object> payload, String actor) {
         Map<String, Object> auth = appendStored(state.oauthAuthorizations, state.nextOAuthId++, state.tenantId,
                 "completeProviderOAuthAuthorization", payload, actor, "COMPLETED");
@@ -159,6 +198,9 @@ public class MarketingMonitoringCatalog {
         return auth;
     }
 
+    /**
+     * 执行detectAnomalies业务操作。
+     */
     private Map<String, Object> detectAnomalies(TenantState state, Map<String, Object> payload, String actor) {
         Map<String, Object> event = appendStored(state.anomalyEvents, state.nextAnomalyEventId++, state.tenantId,
                 "anomaly", payload, actor, "OPEN");
@@ -167,16 +209,25 @@ public class MarketingMonitoringCatalog {
         return detection;
     }
 
+    /**
+     * 执行transitionAlert业务操作。
+     */
     private Map<String, Object> transitionAlert(TenantState state, Map<String, Object> payload, String actor,
                                                 String status) {
         return transition(state.alerts, state.tenantId, "resolveAlert", "alertId", payload, actor, status);
     }
 
+    /**
+     * 执行transitionAnomaly业务操作。
+     */
     private Map<String, Object> transitionAnomaly(TenantState state, Map<String, Object> payload, String actor,
                                                   String status) {
         return transition(state.anomalyEvents, state.tenantId, "resolveAnomaly", "eventId", payload, actor, status);
     }
 
+    /**
+     * 执行rotateWebhookSecret业务操作。
+     */
     private Map<String, Object> rotateWebhookSecret(TenantState state, Map<String, Object> payload, String actor) {
         Map<String, Object> secret = base(state.tenantId, "rotateWebhookSecret", payload, actor, "ROTATED");
         secret.put("sourceId", value(payload, "sourceId"));
@@ -184,6 +235,9 @@ public class MarketingMonitoringCatalog {
         return secret;
     }
 
+    /**
+     * 执行upsertStored业务操作。
+     */
     private Map<String, Object> upsertStored(List<Map<String, Object>> rows, long id, Long tenantId, String operation,
                                              Map<String, Object> payload, String actor, String businessKey) {
         Map<String, Object> existing = rows.stream()
@@ -205,6 +259,9 @@ public class MarketingMonitoringCatalog {
         return new LinkedHashMap<>(row);
     }
 
+    /**
+     * 执行appendStored业务操作。
+     */
     private Map<String, Object> appendStored(List<Map<String, Object>> rows, long id, Long tenantId, String operation,
                                              Map<String, Object> payload, String actor, String status) {
         Map<String, Object> row = base(tenantId, operation, payload, actor, status);
@@ -217,6 +274,9 @@ public class MarketingMonitoringCatalog {
         return new LinkedHashMap<>(row);
     }
 
+    /**
+     * 执行transition业务操作。
+     */
     private Map<String, Object> transition(List<Map<String, Object>> rows, Long tenantId, String operation,
                                            String idField, Map<String, Object> payload, String actor, String status) {
         Object id = value(payload, idField);
@@ -230,6 +290,9 @@ public class MarketingMonitoringCatalog {
         return new LinkedHashMap<>(row);
     }
 
+    /**
+     * 执行appendCredentialEvent业务操作。
+     */
     private void appendCredentialEvent(TenantState state, Object credentialKey, String eventType, String status,
                                        String actor) {
         appendStored(state.providerCredentialEvents, state.nextCredentialEventId++, state.tenantId,
@@ -239,6 +302,9 @@ public class MarketingMonitoringCatalog {
                         "status", status), actor, status);
     }
 
+    /**
+     * 执行appendOAuthEvent业务操作。
+     */
     private void appendOAuthEvent(TenantState state, Object authState, Object credentialKey, String eventType,
                                   String status, String actor) {
         appendStored(state.oauthEvents, state.nextOAuthEventId++, state.tenantId,
@@ -249,6 +315,9 @@ public class MarketingMonitoringCatalog {
                         "status", status), actor, status);
     }
 
+    /**
+     * 执行base业务操作。
+     */
     private Map<String, Object> base(Long tenantId, String operation, Map<String, Object> payload, String actor,
                                      String status) {
         Map<String, Object> row = new LinkedHashMap<>();
@@ -261,6 +330,9 @@ public class MarketingMonitoringCatalog {
         return row;
     }
 
+    /**
+     * 执行matches业务操作。
+     */
     private boolean matches(Map<String, Object> row, Map<String, Object> criteria) {
         for (Map.Entry<String, Object> entry : criteria.entrySet()) {
             if (entry.getValue() == null || String.valueOf(entry.getValue()).isBlank() || "limit".equals(entry.getKey())) {
@@ -274,14 +346,23 @@ public class MarketingMonitoringCatalog {
         return true;
     }
 
+    /**
+     * 执行state业务操作。
+     */
     private TenantState state(Long tenantId) {
         return tenants.computeIfAbsent(tenantId, TenantState::new);
     }
 
+    /**
+     * 执行safeMap业务操作。
+     */
     private Map<String, Object> safeMap(Map<String, Object> payload) {
         return payload == null ? Map.of() : new LinkedHashMap<>(payload);
     }
 
+    /**
+     * 规范化commonFields输入值。
+     */
     private void normalizeCommonFields(Map<String, Object> row) {
         uppercase(row, "sentimentLabel");
         uppercase(row, "providerType");
@@ -292,6 +373,9 @@ public class MarketingMonitoringCatalog {
         copyBusinessKey(row, "ruleKey");
     }
 
+    /**
+     * 执行uppercase业务操作。
+     */
     private void uppercase(Map<String, Object> row, String key) {
         Object value = row.get(key);
         if (value instanceof String text && !text.isBlank()) {
@@ -299,6 +383,9 @@ public class MarketingMonitoringCatalog {
         }
     }
 
+    /**
+     * 执行copyBusinessKey业务操作。
+     */
     private void copyBusinessKey(Map<String, Object> row, String key) {
         Object value = row.get(key);
         if (value != null) {
@@ -306,16 +393,25 @@ public class MarketingMonitoringCatalog {
         }
     }
 
+    /**
+     * 执行key业务操作。
+     */
     private static String key(Map<String, Object> payload, String key, String fallback) {
         Object value = payload.get(key);
         String text = value == null ? "" : String.valueOf(value).trim();
         return text.isBlank() ? fallback : text;
     }
 
+    /**
+     * 执行value业务操作。
+     */
     private static Object value(Map<String, Object> payload, String key) {
         return payload.get(key);
     }
 
+    /**
+     * 转换为long对象。
+     */
     private static long toLong(Object value, long fallback) {
         if (value instanceof Number number) {
             return number.longValue();
@@ -327,6 +423,9 @@ public class MarketingMonitoringCatalog {
         }
     }
 
+    /**
+     * 转换为int对象。
+     */
     private static int toInt(Object value, int fallback) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -338,7 +437,13 @@ public class MarketingMonitoringCatalog {
         }
     }
 
+    /**
+     * 提供TenantState的业务能力。
+     */
     private static final class TenantState {
+        /**
+         * 保存tenantId字段值。
+         */
         private final Long tenantId;
         private final List<Map<String, Object>> sources = new ArrayList<>();
         private final List<Map<String, Object>> items = new ArrayList<>();
@@ -356,24 +461,95 @@ public class MarketingMonitoringCatalog {
         private final List<Map<String, Object>> oauthEvents = new ArrayList<>();
         private final List<Map<String, Object>> anomalyRules = new ArrayList<>();
         private final List<Map<String, Object>> anomalyEvents = new ArrayList<>();
+
+        /**
+         * 保存nextSourceId字段值。
+         */
         private long nextSourceId = 10L;
+
+        /**
+         * 保存nextItemId字段值。
+         */
         private long nextItemId = 100L;
+
+        /**
+         * 保存nextAlertId字段值。
+         */
         private long nextAlertId = 200L;
+
+        /**
+         * 保存nextAlertChannelId字段值。
+         */
         private long nextAlertChannelId = 300L;
+
+        /**
+         * 保存nextDispatchId字段值。
+         */
         private long nextDispatchId = 400L;
+
+        /**
+         * 保存nextDeliveryId字段值。
+         */
         private long nextDeliveryId = 500L;
+
+        /**
+         * 保存nextPollingId字段值。
+         */
         private long nextPollingId = 600L;
+
+        /**
+         * 保存nextPollRunId字段值。
+         */
         private long nextPollRunId = 700L;
+
+        /**
+         * 保存nextTrendSnapshotId字段值。
+         */
         private long nextTrendSnapshotId = 800L;
+
+        /**
+         * 保存nextInferenceId字段值。
+         */
         private long nextInferenceId = 900L;
+
+        /**
+         * 保存nextCredentialId字段值。
+         */
         private long nextCredentialId = 1000L;
+
+        /**
+         * 保存nextCredentialEventId字段值。
+         */
         private long nextCredentialEventId = 1100L;
+
+        /**
+         * 保存nextOAuthId字段值。
+         */
         private long nextOAuthId = 1200L;
+
+        /**
+         * 保存nextOAuthEventId字段值。
+         */
         private long nextOAuthEventId = 1300L;
+
+        /**
+         * 保存nextAnomalyRuleId字段值。
+         */
         private long nextAnomalyRuleId = 1400L;
+
+        /**
+         * 保存nextAnomalyEventId字段值。
+         */
         private long nextAnomalyEventId = 1500L;
+
+        /**
+         * 保存nextSecretVersion字段值。
+         */
         private long nextSecretVersion = 1L;
 
+        /**
+         * 创建TenantState实例。
+         */
         private TenantState(Long tenantId) {
             this.tenantId = tenantId;
         }

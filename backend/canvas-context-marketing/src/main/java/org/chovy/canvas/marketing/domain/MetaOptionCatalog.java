@@ -6,11 +6,17 @@ import java.util.Map;
 
 import org.chovy.canvas.marketing.api.MetaOptionView;
 
+/**
+ * 维护MetaOption相关的内存业务目录。
+ */
 public class MetaOptionCatalog {
 
     private final Map<String, List<MetaOptionView>> optionsByCategory = new LinkedHashMap<>();
     private final Map<String, List<MetaOptionView>> groupsByExperimentKey = new LinkedHashMap<>();
 
+    /**
+     * 创建MetaOptionCatalog实例。
+     */
     public MetaOptionCatalog() {
         optionsByCategory.put("coupon_type", List.of(
                 option("DISCOUNT", "Discount coupon"),
@@ -45,10 +51,16 @@ public class MetaOptionCatalog {
                 option("B", "Treatment")));
     }
 
+    /**
+     * 执行options业务操作。
+     */
     public List<MetaOptionView> options(Long tenantId, String category) {
         return List.copyOf(optionsByCategory.getOrDefault(normalize(category), List.of()));
     }
 
+    /**
+     * 执行optionsBatch业务操作。
+     */
     public Map<String, List<MetaOptionView>> optionsBatch(Long tenantId, List<String> categories) {
         Map<String, List<MetaOptionView>> result = new LinkedHashMap<>();
         if (categories == null) {
@@ -61,30 +73,51 @@ public class MetaOptionCatalog {
         return result;
     }
 
+    /**
+     * 执行abExperiments业务操作。
+     */
     public List<MetaOptionView> abExperiments(Long tenantId) {
         return List.of(option("checkout-test", "Checkout test"));
     }
 
+    /**
+     * 执行abExperimentGroups业务操作。
+     */
     public List<MetaOptionView> abExperimentGroups(Long tenantId, String experimentKey) {
         return List.copyOf(groupsByExperimentKey.getOrDefault(normalize(experimentKey), List.of()));
     }
 
+    /**
+     * 执行bizLines业务操作。
+     */
     public List<MetaOptionView> bizLines(Long tenantId) {
         return options(tenantId, "biz_line");
     }
 
+    /**
+     * 执行bizLineApis业务操作。
+     */
     public List<MetaOptionView> bizLineApis(Long tenantId, String bizLineKey) {
         return options(tenantId, "biz_line_api");
     }
 
+    /**
+     * 执行aiProviders业务操作。
+     */
     public List<MetaOptionView> aiProviders(Long tenantId) {
         return List.of(option("11", "OpenAI (openai)"));
     }
 
+    /**
+     * 执行aiTemplates业务操作。
+     */
     public List<MetaOptionView> aiTemplates(Long tenantId) {
         return List.of(option("9001", "Winback (MARKETING)"));
     }
 
+    /**
+     * 执行aiModels业务操作。
+     */
     public List<MetaOptionView> aiModels(Long tenantId, Long providerId) {
         if (providerId != null && providerId != 11L) {
             return List.of();
@@ -92,6 +125,9 @@ public class MetaOptionCatalog {
         return List.of(option("gpt-4.1-mini", "GPT-4.1 mini"));
     }
 
+    /**
+     * 执行identityTypes业务操作。
+     */
     public List<MetaOptionView> identityTypes(Integer allowImport) {
         if (allowImport != null && allowImport == 0) {
             return List.of(option("phone", "Phone"));
@@ -101,6 +137,9 @@ public class MetaOptionCatalog {
                 option("email", "Email"));
     }
 
+    /**
+     * 执行apiDefinitions业务操作。
+     */
     public List<Map<String, Object>> apiDefinitions() {
         return List.of(schemaOption(
                 "send-coupon",
@@ -109,6 +148,9 @@ public class MetaOptionCatalog {
                 1));
     }
 
+    /**
+     * 执行eventDefinitions业务操作。
+     */
     public List<Map<String, Object>> eventDefinitions() {
         return List.of(schemaOption(
                 "user.created",
@@ -117,10 +159,16 @@ public class MetaOptionCatalog {
                 null));
     }
 
+    /**
+     * 执行contextFields业务操作。
+     */
     public List<Map<String, Object>> contextFields() {
         return List.of(field("userId", "User ID", "STRING", "trigger"));
     }
 
+    /**
+     * 执行canvasContextFields业务操作。
+     */
     public List<Map<String, Object>> canvasContextFields(
             List<String> eventCodes,
             List<String> apiKeys,
@@ -140,6 +188,9 @@ public class MetaOptionCatalog {
         return List.copyOf(fields);
     }
 
+    /**
+     * 执行mqDefinitions业务操作。
+     */
     public List<Map<String, Object>> mqDefinitions() {
         return List.of(schemaOption(
                 "MQ_COUPON_GRANTED",
@@ -148,6 +199,9 @@ public class MetaOptionCatalog {
                 null));
     }
 
+    /**
+     * 执行taggerTags业务操作。
+     */
     public List<MetaOptionView> taggerTags(String type) {
         if ("online".equalsIgnoreCase(normalize(type))) {
             return List.of(option("active_session", "Active session"));
@@ -155,6 +209,9 @@ public class MetaOptionCatalog {
         return List.of(option("market_identity", "Market identity"));
     }
 
+    /**
+     * 执行taggerTagValues业务操作。
+     */
     public List<MetaOptionView> taggerTagValues(String tagCode) {
         if ("market_identity".equals(normalize(tagCode))) {
             return List.of(
@@ -164,6 +221,9 @@ public class MetaOptionCatalog {
         return List.of();
     }
 
+    /**
+     * 执行schemaOption业务操作。
+     */
     private static Map<String, Object> schemaOption(
             String value,
             String label,
@@ -179,6 +239,9 @@ public class MetaOptionCatalog {
         return result;
     }
 
+    /**
+     * 执行field业务操作。
+     */
     private static Map<String, Object> field(String key, String name, String dataType, String sourceNodeType) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("fieldKey", key);
@@ -188,10 +251,16 @@ public class MetaOptionCatalog {
         return result;
     }
 
+    /**
+     * 执行option业务操作。
+     */
     private static MetaOptionView option(String value, String label) {
         return new MetaOptionView(value, label);
     }
 
+    /**
+     * 规范化输入值。
+     */
     private static String normalize(String value) {
         return value == null ? "" : value.trim();
     }

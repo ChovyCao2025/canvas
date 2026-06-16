@@ -12,12 +12,18 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.PaidMediaFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证PaidMediaApplicationService的关键兼容行为。
+ */
 class PaidMediaApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T03:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 upserts destination by provider and destination key within tenant 场景的兼容行为。
+     */
     @Test
     void upsertsDestinationByProviderAndDestinationKeyWithinTenant() {
         PaidMediaFacade service = new PaidMediaApplicationService(CLOCK);
@@ -60,6 +66,9 @@ class PaidMediaApplicationServiceTest {
         assertThat(updated.createdBy()).isEqualTo("planner");
     }
 
+    /**
+     * 验证 sync audience deduplicates users applies consent and filters runs and members 场景的兼容行为。
+     */
     @Test
     void syncAudienceDeduplicatesUsersAppliesConsentAndFiltersRunsAndMembers() {
         PaidMediaFacade service = new PaidMediaApplicationService(CLOCK);
@@ -103,6 +112,9 @@ class PaidMediaApplicationServiceTest {
         assertThat(skipped.get(0).reason()).isIn("CONSENT_DENIED", "PROFILE_NOT_FOUND");
     }
 
+    /**
+     * 验证 validation defaults and limit bounds follow legacy compatibility 场景的兼容行为。
+     */
     @Test
     void validationDefaultsAndLimitBoundsFollowLegacyCompatibility() {
         PaidMediaFacade service = new PaidMediaApplicationService(CLOCK);

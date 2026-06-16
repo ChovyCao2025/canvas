@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.MauticInsightFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MauticInsightApplicationService的关键兼容行为。
+ */
 class MauticInsightApplicationServiceTest {
 
+    /**
+     * 验证 audience membership is seeded and deterministic for compatibility 场景的兼容行为。
+     */
     @Test
     void audienceMembershipIsSeededAndDeterministicForCompatibility() {
         MauticInsightFacade service = new MauticInsightApplicationService();
@@ -39,6 +45,9 @@ class MauticInsightApplicationServiceTest {
                 .containsEntry("status", "UNKNOWN");
     }
 
+    /**
+     * 验证 journey path and suppression timeline return stable ordered payloads 场景的兼容行为。
+     */
     @Test
     void journeyPathAndSuppressionTimelineReturnStableOrderedPayloads() {
         MauticInsightFacade service = new MauticInsightApplicationService();
@@ -60,6 +69,9 @@ class MauticInsightApplicationServiceTest {
                 .containsExactly("SMS", "EMAIL");
     }
 
+    /**
+     * 验证 channel preference applies default and honors explicit preferred channel 场景的兼容行为。
+     */
     @Test
     void channelPreferenceAppliesDefaultAndHonorsExplicitPreferredChannel() {
         MauticInsightFacade service = new MauticInsightApplicationService();
@@ -78,6 +90,9 @@ class MauticInsightApplicationServiceTest {
                 .containsEntry("fallbackChannel", "PUSH");
     }
 
+    /**
+     * 验证 publish health and frequency templates use compact seed data 场景的兼容行为。
+     */
     @Test
     void publishHealthAndFrequencyTemplatesUseCompactSeedData() {
         MauticInsightFacade service = new MauticInsightApplicationService();
@@ -100,6 +115,9 @@ class MauticInsightApplicationServiceTest {
                 "node_once_window");
     }
 
+    /**
+     * 验证 invalid read parameters throw illegal argument for controller envelope 场景的兼容行为。
+     */
     @Test
     void invalidReadParametersThrowIllegalArgumentForControllerEnvelope() {
         MauticInsightFacade service = new MauticInsightApplicationService();

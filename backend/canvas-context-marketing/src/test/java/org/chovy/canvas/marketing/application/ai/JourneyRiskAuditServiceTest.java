@@ -7,10 +7,16 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证JourneyRiskAuditService的关键兼容行为。
+ */
 class JourneyRiskAuditServiceTest {
 
     private final JourneyRiskAuditService service = new JourneyRiskAuditService();
 
+    /**
+     * 验证 returns structured risk findings for minimum ai audit rules 场景的兼容行为。
+     */
     @Test
     void returnsStructuredRiskFindingsForMinimumAiAuditRules() {
         JourneyRiskAuditService.AuditResult result = service.audit(new JourneyRiskAuditService.AuditRequest(
@@ -40,6 +46,9 @@ class JourneyRiskAuditServiceTest {
                 .allSatisfy(finding -> assertThat(finding.message()).isNotBlank());
     }
 
+    /**
+     * 验证 returns ready when journey contains caps approval spacing and exit path 场景的兼容行为。
+     */
     @Test
     void returnsReadyWhenJourneyContainsCapsApprovalSpacingAndExitPath() {
         JourneyRiskAuditService.AuditResult result = service.audit(new JourneyRiskAuditService.AuditRequest(
@@ -61,10 +70,16 @@ class JourneyRiskAuditServiceTest {
         assertThat(result.findings()).isEmpty();
     }
 
+    /**
+     * 执行node业务操作。
+     */
     private static JourneyRiskAuditService.JourneyNode node(String id, String type, Map<String, Object> config) {
         return new JourneyRiskAuditService.JourneyNode(id, type, config);
     }
 
+    /**
+     * 执行edge业务操作。
+     */
     private static JourneyRiskAuditService.JourneyEdge edge(String from, String to) {
         return new JourneyRiskAuditService.JourneyEdge(from, to);
     }

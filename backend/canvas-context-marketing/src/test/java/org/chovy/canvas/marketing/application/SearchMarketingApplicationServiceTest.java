@@ -12,12 +12,18 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.SearchMarketingFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证SearchMarketingApplicationService的关键兼容行为。
+ */
 class SearchMarketingApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T03:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 sources keywords snapshots and summary are tenant scoped and deterministic 场景的兼容行为。
+     */
     @Test
     void sourcesKeywordsSnapshotsAndSummaryAreTenantScopedAndDeterministic() {
         SearchMarketingFacade service = new SearchMarketingApplicationService(CLOCK);
@@ -54,6 +60,9 @@ class SearchMarketingApplicationServiceTest {
                 .containsEntry("clickCount", 10L);
     }
 
+    /**
+     * 验证 opportunities mutations sync and impact windows support compatibility transitions 场景的兼容行为。
+     */
     @Test
     void opportunitiesMutationsSyncAndImpactWindowsSupportCompatibilityTransitions() {
         SearchMarketingFacade service = new SearchMarketingApplicationService(CLOCK);
@@ -95,6 +104,9 @@ class SearchMarketingApplicationServiceTest {
                 .satisfies(row -> assertThat(row).containsEntry("mutationId", 1L));
     }
 
+    /**
+     * 验证 readiness defaults limits and validation follow compatibility rules 场景的兼容行为。
+     */
     @Test
     void readinessDefaultsLimitsAndValidationFollowCompatibilityRules() {
         SearchMarketingFacade service = new SearchMarketingApplicationService(CLOCK);

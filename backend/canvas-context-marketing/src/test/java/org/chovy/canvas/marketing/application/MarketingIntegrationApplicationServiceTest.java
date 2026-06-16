@@ -6,10 +6,16 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MarketingIntegrationApplicationService的关键兼容行为。
+ */
 class MarketingIntegrationApplicationServiceTest {
 
     private final MarketingIntegrationApplicationService service = new MarketingIntegrationApplicationService();
 
+    /**
+     * 验证 manages contracts probes runs and slo evaluations with deterministic compatibility payloads 场景的兼容行为。
+     */
     @Test
     void managesContractsProbesRunsAndSloEvaluationsWithDeterministicCompatibilityPayloads() {
         Map<String, Object> contract = service.upsertContract(

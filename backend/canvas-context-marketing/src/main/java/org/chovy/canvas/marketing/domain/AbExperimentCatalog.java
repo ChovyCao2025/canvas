@@ -7,18 +7,38 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 维护AbExperiment相关的内存业务目录。
+ */
 public class AbExperimentCatalog {
 
+    /**
+     * 用于生成确定性业务时间的时钟。
+     */
     private final Clock clock;
     private final Map<Long, Map<String, Object>> experiments = new LinkedHashMap<>();
     private final Map<Long, Map<String, Object>> groups = new LinkedHashMap<>();
+
+    /**
+     * 保存nextExperimentId字段值。
+     */
     private long nextExperimentId = 1L;
+
+    /**
+     * 保存nextGroupId字段值。
+     */
     private long nextGroupId = 1L;
 
+    /**
+     * 创建AbExperimentCatalog实例。
+     */
     public AbExperimentCatalog(Clock clock) {
         this.clock = clock;
     }
 
+    /**
+     * 查询列表。
+     */
     public synchronized Map<String, Object> list(Long tenantId, Map<String, Object> query) {
         Map<String, Object> safe = safePayload(query);
         Integer enabled = nullableInt(safe.get("enabled"));
@@ -26,6 +46,9 @@ public class AbExperimentCatalog {
                 enabled == null ? null : enabled != 0);
     }
 
+    /**
+     * 查询列表。
+     */
     public synchronized Map<String, Object> list(Long tenantId, Integer pageValue, Integer sizeValue,
                                                  Boolean enabledValue) {
         Integer enabled = enabledValue == null ? null : enabledValue ? 1 : 0;
@@ -45,6 +68,9 @@ public class AbExperimentCatalog {
         return result;
     }
 
+    /**
+     * 创建业务对象。
+     */
     public synchronized Map<String, Object> create(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         Long id = resolveId(safe, "id", nextExperimentId);
@@ -61,6 +87,9 @@ public class AbExperimentCatalog {
         return copy(row);
     }
 
+    /**
+     * 更新业务对象。
+     */
     public synchronized Map<String, Object> update(Long tenantId, Long id, Map<String, Object> payload, String actor) {
         Map<String, Object> row = requireExperiment(tenantId, id);
         Map<String, Object> safe = safePayload(payload);
@@ -83,6 +112,9 @@ public class AbExperimentCatalog {
         return copy(row);
     }
 
+    /**
+     * 删除或停用业务对象。
+     */
     public synchronized Map<String, Object> delete(Long tenantId, Long id) {
         Map<String, Object> row = requireExperiment(tenantId, id);
         row.put("enabled", 0);
@@ -90,6 +122,9 @@ public class AbExperimentCatalog {
         return copy(row);
     }
 
+    /**
+     * 查询groups列表。
+     */
     public synchronized List<Map<String, Object>> listGroups(Long tenantId, Long experimentId,
                                                              boolean includeDisabled) {
         requireExperiment(tenantId, experimentId);
@@ -102,6 +137,9 @@ public class AbExperimentCatalog {
                 .toList();
     }
 
+    /**
+     * 创建group业务对象。
+     */
     public synchronized Map<String, Object> createGroup(Long tenantId, Long experimentId, Map<String, Object> payload,
                                                         String actor) {
         requireExperiment(tenantId, experimentId);
@@ -120,6 +158,9 @@ public class AbExperimentCatalog {
         return copy(row);
     }
 
+    /**
+     * 更新group业务对象。
+     */
     public synchronized Map<String, Object> updateGroup(Long tenantId, Long experimentId, Long groupId,
                                                         Map<String, Object> payload, String actor) {
         requireExperiment(tenantId, experimentId);
@@ -141,6 +182,9 @@ public class AbExperimentCatalog {
         return copy(row);
     }
 
+    /**
+     * 删除或停用group业务对象。
+     */
     public synchronized Map<String, Object> deleteGroup(Long tenantId, Long experimentId, Long groupId) {
         requireExperiment(tenantId, experimentId);
         Map<String, Object> row = requireGroup(tenantId, experimentId, groupId);
@@ -149,6 +193,9 @@ public class AbExperimentCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行evaluateGovernance业务操作。
+     */
     public synchronized Map<String, Object> evaluateGovernance(Long tenantId, Long experimentId,
                                                                String controlVariantKey, String actor) {
         Map<String, Object> experiment = requireExperiment(tenantId, experimentId);
@@ -171,6 +218,9 @@ public class AbExperimentCatalog {
         return result;
     }
 
+    /**
+     * 执行baseRow业务操作。
+     */
     private Map<String, Object> baseRow(Long id, Long tenantId, String actor) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", id);
@@ -182,6 +232,9 @@ public class AbExperimentCatalog {
         return row;
     }
 
+    /**
+     * 转换为uch对象。
+     */
     private void touch(Map<String, Object> row, String actor) {
         row.putIfAbsent("createdBy", actor);
         row.putIfAbsent("createdAt", now());
@@ -189,6 +242,9 @@ public class AbExperimentCatalog {
         row.put("updatedAt", now());
     }
 
+    /**
+     * 校验并返回experiment必填值。
+     */
     private Map<String, Object> requireExperiment(Long tenantId, Long id) {
         Map<String, Object> row = experiments.get(id);
         if (row == null || !tenantId.equals(row.get("tenantId"))) {
@@ -197,6 +253,9 @@ public class AbExperimentCatalog {
         return row;
     }
 
+    /**
+     * 校验并返回group必填值。
+     */
     private Map<String, Object> requireGroup(Long tenantId, Long experimentId, Long groupId) {
         Map<String, Object> row = groups.get(groupId);
         if (row == null || !tenantId.equals(row.get("tenantId")) || !experimentId.equals(row.get("experimentId"))) {
@@ -205,23 +264,38 @@ public class AbExperimentCatalog {
         return row;
     }
 
+    /**
+     * 执行now业务操作。
+     */
     private Instant now() {
         return Instant.now(clock);
     }
 
+    /**
+     * 执行safePayload业务操作。
+     */
     private static Map<String, Object> safePayload(Map<String, Object> payload) {
         return payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
     }
 
+    /**
+     * 执行copy业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> row) {
         return new LinkedHashMap<>(row);
     }
 
+    /**
+     * 执行resolveId业务操作。
+     */
     private static Long resolveId(Map<String, Object> payload, String key, Long fallback) {
         Long id = nullableLong(payload.get(key));
         return id == null || id < 1 ? fallback : id;
     }
 
+    /**
+     * 执行text业务操作。
+     */
     private static String text(Object value, String fallback) {
         if (value == null || value.toString().isBlank()) {
             return fallback;
@@ -229,6 +303,9 @@ public class AbExperimentCatalog {
         return value.toString().trim();
     }
 
+    /**
+     * 执行nullableInt业务操作。
+     */
     private static Integer nullableInt(Object value) {
         if (value == null || value.toString().isBlank()) {
             return null;
@@ -236,6 +313,9 @@ public class AbExperimentCatalog {
         return intValue(value, 0);
     }
 
+    /**
+     * 执行intValue业务操作。
+     */
     private static int intValue(Object value, int fallback) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -246,6 +326,9 @@ public class AbExperimentCatalog {
         return Integer.parseInt(value.toString());
     }
 
+    /**
+     * 执行nullableLong业务操作。
+     */
     private static Long nullableLong(Object value) {
         if (value instanceof Number number) {
             return number.longValue();

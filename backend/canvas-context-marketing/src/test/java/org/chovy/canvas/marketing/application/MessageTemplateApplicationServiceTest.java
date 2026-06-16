@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.MessageTemplateFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MessageTemplateApplicationService的关键兼容行为。
+ */
 class MessageTemplateApplicationServiceTest {
 
+    /**
+     * 验证 create search and preview are tenant scoped and normalize legacy fields 场景的兼容行为。
+     */
     @Test
     void createSearchAndPreviewAreTenantScopedAndNormalizeLegacyFields() {
         MessageTemplateFacade service = new MessageTemplateApplicationService();
@@ -42,6 +48,9 @@ class MessageTemplateApplicationServiceTest {
         assertThat(preview.missingVariables()).containsExactly("couponCode");
     }
 
+    /**
+     * 验证 rejects unsupported channels and missing templates with legacy messages 场景的兼容行为。
+     */
     @Test
     void rejectsUnsupportedChannelsAndMissingTemplatesWithLegacyMessages() {
         MessageTemplateFacade service = new MessageTemplateApplicationService();
@@ -56,6 +65,9 @@ class MessageTemplateApplicationServiceTest {
                 .hasMessageContaining("template not found: missing");
     }
 
+    /**
+     * 验证 ignores duplicate variables in declaration order 场景的兼容行为。
+     */
     @Test
     void ignoresDuplicateVariablesInDeclarationOrder() {
         MessageTemplateFacade service = new MessageTemplateApplicationService();

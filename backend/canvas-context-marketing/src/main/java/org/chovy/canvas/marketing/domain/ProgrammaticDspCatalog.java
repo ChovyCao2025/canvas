@@ -11,8 +11,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 维护ProgrammaticDsp相关的内存业务目录。
+ */
 public class ProgrammaticDspCatalog {
 
+    /**
+     * 用于生成确定性业务时间的时钟。
+     */
     private final Clock clock;
     private final Map<Long, Map<String, Object>> seats = new LinkedHashMap<>();
     private final Map<Long, Map<String, Object>> campaigns = new LinkedHashMap<>();
@@ -20,17 +26,47 @@ public class ProgrammaticDspCatalog {
     private final Map<Long, Map<String, Object>> supplyPaths = new LinkedHashMap<>();
     private final Map<Long, Map<String, Object>> snapshots = new LinkedHashMap<>();
     private final Map<Long, Map<String, Object>> mutations = new LinkedHashMap<>();
+
+    /**
+     * 保存nextSeatId字段值。
+     */
     private long nextSeatId = 1L;
+
+    /**
+     * 保存nextCampaignId字段值。
+     */
     private long nextCampaignId = 1L;
+
+    /**
+     * 保存nextLineItemId字段值。
+     */
     private long nextLineItemId = 1L;
+
+    /**
+     * 保存nextSupplyPathId字段值。
+     */
     private long nextSupplyPathId = 1L;
+
+    /**
+     * 保存nextSnapshotId字段值。
+     */
     private long nextSnapshotId = 1L;
+
+    /**
+     * 保存nextMutationId字段值。
+     */
     private long nextMutationId = 1L;
 
+    /**
+     * 创建ProgrammaticDspCatalog实例。
+     */
     public ProgrammaticDspCatalog(Clock clock) {
         this.clock = clock;
     }
 
+    /**
+     * 执行upsertSeat业务操作。
+     */
     public synchronized Map<String, Object> upsertSeat(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         Long id = resolveId(safe, "id", nextSeatId);
@@ -45,6 +81,9 @@ public class ProgrammaticDspCatalog {
         return copy(seat);
     }
 
+    /**
+     * 执行upsertCampaign业务操作。
+     */
     public synchronized Map<String, Object> upsertCampaign(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         Long seatId = longValue(safe.get("seatId"), 1L);
@@ -63,6 +102,9 @@ public class ProgrammaticDspCatalog {
         return copy(campaign);
     }
 
+    /**
+     * 执行upsertLineItem业务操作。
+     */
     public synchronized Map<String, Object> upsertLineItem(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         Long campaignId = longValue(safe.get("campaignId"), 1L);
@@ -82,6 +124,9 @@ public class ProgrammaticDspCatalog {
         return copy(lineItem);
     }
 
+    /**
+     * 执行upsertSupplyPath业务操作。
+     */
     public synchronized Map<String, Object> upsertSupplyPath(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         Long seatId = longValue(safe.get("seatId"), 1L);
@@ -100,6 +145,9 @@ public class ProgrammaticDspCatalog {
         return copy(supplyPath);
     }
 
+    /**
+     * 执行recordSnapshot业务操作。
+     */
     public synchronized Map<String, Object> recordSnapshot(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         Long lineItemId = longValue(safe.get("lineItemId"), 1L);
@@ -118,6 +166,9 @@ public class ProgrammaticDspCatalog {
         return copy(snapshot);
     }
 
+    /**
+     * 执行summary业务操作。
+     */
     public synchronized Map<String, Object> summary(Long tenantId, Map<String, Object> query) {
         Map<String, Object> safe = safePayload(query);
         Long seatId = nullableLong(safe.get("seatId"));
@@ -160,6 +211,9 @@ public class ProgrammaticDspCatalog {
                 "spend", scopedSnapshots.stream().mapToDouble(row -> (Double) row.get("spend")).sum());
     }
 
+    /**
+     * 执行proposeMutation业务操作。
+     */
     public synchronized Map<String, Object> proposeMutation(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         Long lineItemId = longValue(safe.get("lineItemId"), 1L);
@@ -182,6 +236,9 @@ public class ProgrammaticDspCatalog {
         return copy(mutation);
     }
 
+    /**
+     * 执行approveMutation业务操作。
+     */
     public synchronized Map<String, Object> approveMutation(Long tenantId, Long mutationId, Map<String, Object> payload,
                                                             String actor) {
         Map<String, Object> mutation = requireMutation(tenantId, mutationId);
@@ -194,6 +251,9 @@ public class ProgrammaticDspCatalog {
         return copy(mutation);
     }
 
+    /**
+     * 执行executeMutation业务操作。
+     */
     public synchronized Map<String, Object> executeMutation(Long tenantId, Long mutationId, Map<String, Object> payload,
                                                             String actor) {
         Map<String, Object> mutation = requireMutation(tenantId, mutationId);
@@ -210,6 +270,9 @@ public class ProgrammaticDspCatalog {
         return copy(mutation);
     }
 
+    /**
+     * 查询mutations列表。
+     */
     public synchronized List<Map<String, Object>> listMutations(Long tenantId, Map<String, Object> query) {
         Map<String, Object> safe = safePayload(query);
         Long lineItemId = nullableLong(safe.get("lineItemId"));
@@ -227,6 +290,9 @@ public class ProgrammaticDspCatalog {
                 .toList();
     }
 
+    /**
+     * 执行baseRow业务操作。
+     */
     private Map<String, Object> baseRow(Long id, Long tenantId, String actor) {
         return mapOf(
                 "id", id,
@@ -237,6 +303,9 @@ public class ProgrammaticDspCatalog {
                 "updatedAt", now());
     }
 
+    /**
+     * 转换为uch对象。
+     */
     private void touch(Map<String, Object> row, String actor) {
         row.putIfAbsent("createdBy", actor);
         row.putIfAbsent("createdAt", now());
@@ -244,6 +313,9 @@ public class ProgrammaticDspCatalog {
         row.put("updatedAt", now());
     }
 
+    /**
+     * 校验并返回seat必填值。
+     */
     private Map<String, Object> requireSeat(Long tenantId, Long seatId) {
         Map<String, Object> seat = seats.get(seatId);
         if (seat == null || !tenantId.equals(seat.get("tenantId"))) {
@@ -252,6 +324,9 @@ public class ProgrammaticDspCatalog {
         return seat;
     }
 
+    /**
+     * 校验并返回campaign必填值。
+     */
     private Map<String, Object> requireCampaign(Long tenantId, Long campaignId) {
         Map<String, Object> campaign = campaigns.get(campaignId);
         if (campaign == null || !tenantId.equals(campaign.get("tenantId"))) {
@@ -260,6 +335,9 @@ public class ProgrammaticDspCatalog {
         return campaign;
     }
 
+    /**
+     * 校验并返回lineItem必填值。
+     */
     private Map<String, Object> requireLineItem(Long tenantId, Long lineItemId) {
         Map<String, Object> lineItem = lineItems.get(lineItemId);
         if (lineItem == null || !tenantId.equals(lineItem.get("tenantId"))) {
@@ -268,6 +346,9 @@ public class ProgrammaticDspCatalog {
         return lineItem;
     }
 
+    /**
+     * 校验并返回mutation必填值。
+     */
     private Map<String, Object> requireMutation(Long tenantId, Long mutationId) {
         Map<String, Object> mutation = mutations.get(mutationId);
         if (mutation == null || !tenantId.equals(mutation.get("tenantId"))) {
@@ -276,17 +357,26 @@ public class ProgrammaticDspCatalog {
         return mutation;
     }
 
+    /**
+     * 执行campaignBelongsToSeat业务操作。
+     */
     private boolean campaignBelongsToSeat(Long tenantId, Long campaignId, Long seatId) {
         Map<String, Object> campaign = campaigns.get(campaignId);
         return campaign != null && tenantId.equals(campaign.get("tenantId")) && seatId.equals(campaign.get("seatId"));
     }
 
+    /**
+     * 执行countByTenant业务操作。
+     */
     private int countByTenant(Map<Long, Map<String, Object>> rows, Long tenantId) {
         return (int) rows.values().stream()
                 .filter(row -> tenantId.equals(row.get("tenantId")))
                 .count();
     }
 
+    /**
+     * 执行countCampaigns业务操作。
+     */
     private int countCampaigns(Long tenantId, Long seatId, Long campaignId) {
         return (int) campaigns.values().stream()
                 .filter(row -> tenantId.equals(row.get("tenantId")))
@@ -295,6 +385,9 @@ public class ProgrammaticDspCatalog {
                 .count();
     }
 
+    /**
+     * 执行countSupplyPaths业务操作。
+     */
     private int countSupplyPaths(Long tenantId, Long seatId) {
         return (int) supplyPaths.values().stream()
                 .filter(row -> tenantId.equals(row.get("tenantId")))
@@ -302,14 +395,23 @@ public class ProgrammaticDspCatalog {
                 .count();
     }
 
+    /**
+     * 执行now业务操作。
+     */
     private String now() {
         return Instant.now(clock).toString();
     }
 
+    /**
+     * 执行resolveId业务操作。
+     */
     private static Long resolveId(Map<String, Object> payload, String key, Long fallback) {
         return Math.max(1L, longValue(payload.get(key), fallback));
     }
 
+    /**
+     * 执行nullableLong业务操作。
+     */
     private static Long nullableLong(Object value) {
         if (value == null || value.toString().isBlank()) {
             return null;
@@ -317,6 +419,9 @@ public class ProgrammaticDspCatalog {
         return longValue(value, null);
     }
 
+    /**
+     * 执行longValue业务操作。
+     */
     private static Long longValue(Object value, Long fallback) {
         if (value == null) {
             return fallback;
@@ -331,6 +436,9 @@ public class ProgrammaticDspCatalog {
         }
     }
 
+    /**
+     * 执行intValue业务操作。
+     */
     private static int intValue(Object value, int fallback) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -341,6 +449,9 @@ public class ProgrammaticDspCatalog {
         return fallback;
     }
 
+    /**
+     * 执行doubleValue业务操作。
+     */
     private static double doubleValue(Object value, double fallback) {
         if (value instanceof Number number) {
             return number.doubleValue();
@@ -351,6 +462,9 @@ public class ProgrammaticDspCatalog {
         return fallback;
     }
 
+    /**
+     * 执行boolValue业务操作。
+     */
     private static boolean boolValue(Object value, boolean fallback) {
         if (value instanceof Boolean bool) {
             return bool;
@@ -361,6 +475,9 @@ public class ProgrammaticDspCatalog {
         return fallback;
     }
 
+    /**
+     * 执行text业务操作。
+     */
     private static String text(Object value, String fallback) {
         if (value == null) {
             return fallback;
@@ -369,6 +486,9 @@ public class ProgrammaticDspCatalog {
         return text.isBlank() ? fallback : text;
     }
 
+    /**
+     * 执行nullableUpper业务操作。
+     */
     private static String nullableUpper(Object value) {
         if (value == null || value.toString().isBlank()) {
             return null;
@@ -376,6 +496,9 @@ public class ProgrammaticDspCatalog {
         return value.toString().trim().toUpperCase();
     }
 
+    /**
+     * 执行nullableDate业务操作。
+     */
     private static LocalDate nullableDate(Object value) {
         if (value == null || value.toString().isBlank()) {
             return null;
@@ -390,6 +513,9 @@ public class ProgrammaticDspCatalog {
         }
     }
 
+    /**
+     * 执行nullableDateTime业务操作。
+     */
     private static LocalDateTime nullableDateTime(Object value) {
         if (value == null || value.toString().isBlank()) {
             return null;
@@ -404,6 +530,9 @@ public class ProgrammaticDspCatalog {
         }
     }
 
+    /**
+     * 执行nestedMap业务操作。
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> nestedMap(Object value) {
         if (value instanceof Map<?, ?> map) {
@@ -412,14 +541,23 @@ public class ProgrammaticDspCatalog {
         return Map.of();
     }
 
+    /**
+     * 执行safePayload业务操作。
+     */
     private static Map<String, Object> safePayload(Map<String, Object> payload) {
         return payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
     }
 
+    /**
+     * 执行copy业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }
 
+    /**
+     * 执行mapOf业务操作。
+     */
     private static Map<String, Object> mapOf(Object... keysAndValues) {
         Map<String, Object> row = new LinkedHashMap<>();
         for (int i = 0; i < keysAndValues.length; i += 2) {

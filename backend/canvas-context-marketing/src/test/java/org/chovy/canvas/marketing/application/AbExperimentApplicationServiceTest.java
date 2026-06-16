@@ -12,12 +12,18 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.AbExperimentFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证AbExperimentApplicationService的关键兼容行为。
+ */
 class AbExperimentApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T03:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 manages experiments groups and governance within tenant 场景的兼容行为。
+     */
     @Test
     void managesExperimentsGroupsAndGovernanceWithinTenant() {
         AbExperimentFacade service = new AbExperimentApplicationService(CLOCK);
@@ -66,6 +72,9 @@ class AbExperimentApplicationServiceTest {
         assertThat(service.list(8L, Map.of())).containsEntry("total", 0L);
     }
 
+    /**
+     * 验证 deletes disable rows and validation is tenant scoped 场景的兼容行为。
+     */
     @Test
     void deletesDisableRowsAndValidationIsTenantScoped() {
         AbExperimentFacade service = new AbExperimentApplicationService(CLOCK);

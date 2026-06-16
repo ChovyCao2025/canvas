@@ -10,8 +10,14 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.TagImportSourceFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证TagImportSourceApplicationService的关键兼容行为。
+ */
 class TagImportSourceApplicationServiceTest {
 
+    /**
+     * 验证 sources are tenant scoped and list filtering keeps legacy page shape 场景的兼容行为。
+     */
     @Test
     void sourcesAreTenantScopedAndListFilteringKeepsLegacyPageShape() {
         TagImportSourceFacade service = new TagImportSourceApplicationService();
@@ -39,6 +45,9 @@ class TagImportSourceApplicationServiceTest {
                         .containsEntry("id", 7001L));
     }
 
+    /**
+     * 验证 create update delete and run preserve legacy fields and tenant isolation 场景的兼容行为。
+     */
     @Test
     void createUpdateDeleteAndRunPreserveLegacyFieldsAndTenantIsolation() {
         TagImportSourceFacade service = new TagImportSourceApplicationService();
@@ -74,6 +83,9 @@ class TagImportSourceApplicationServiceTest {
                 .hasMessageContaining("tag import source not found");
     }
 
+    /**
+     * 验证 defaults validation and run result match compatibility rules 场景的兼容行为。
+     */
     @Test
     void defaultsValidationAndRunResultMatchCompatibilityRules() {
         TagImportSourceFacade service = new TagImportSourceApplicationService();
@@ -107,6 +119,9 @@ class TagImportSourceApplicationServiceTest {
                 .hasMessageContaining("fieldMapping must be JSON");
     }
 
+    /**
+     * 执行sourcePayload业务操作。
+     */
     private static Map<String, Object> sourcePayload() {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("name", "CRM API");
