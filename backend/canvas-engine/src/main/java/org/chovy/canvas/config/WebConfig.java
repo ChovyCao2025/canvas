@@ -1,6 +1,7 @@
 package org.chovy.canvas.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -24,6 +25,7 @@ public class WebConfig {
     private final List<String> allowedOrigins;
     private final boolean productionLike;
 
+    @Autowired
     public WebConfig(
             @Value("${canvas.cors.allowed-origins:*}") List<String> allowedOrigins,
             Environment environment) {

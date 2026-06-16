@@ -12,6 +12,7 @@ import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -54,6 +55,7 @@ public class CanvasRouteInitializer {
     /** 其他实例持有启动重建锁时，本实例等待 ready 标记的窗口。 */
     private static final Duration REBUILD_LOCK_RETRY_DELAY = Duration.ofSeconds(2);
 
+    @Autowired
     public CanvasRouteInitializer(
             CanvasMapper canvasMapper,
             CanvasVersionMapper canvasVersionMapper,

@@ -1,5 +1,6 @@
 package org.chovy.canvas.infrastructure.redis;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisOperations;
@@ -47,6 +48,7 @@ public class TriggerRouteService {
     /** 等待路由变更锁的最大毫秒数。 */
     private static final long ROUTE_MUTATION_LOCK_WAIT_MS = 5_000L;
 
+    @Autowired
     public TriggerRouteService(
             StringRedisTemplate redis,
             RedisKeyUtil keys,
