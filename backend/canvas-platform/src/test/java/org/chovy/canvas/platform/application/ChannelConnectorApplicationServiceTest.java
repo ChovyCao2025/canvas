@@ -8,8 +8,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.domain.ChannelConnectorCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖渠道连接器应用服务的兼容视图、模式更新和回退校验。
+ */
 class ChannelConnectorApplicationServiceTest {
 
+    /**
+     * 验证旧版渠道连接器视图保持确定性字段。
+     */
     @Test
     void exposesDeterministicLegacyChannelConnectorViews() {
         ChannelConnectorApplicationService service =
@@ -51,6 +57,9 @@ class ChannelConnectorApplicationServiceTest {
                         .containsEntry("userId", "user-1"));
     }
 
+    /**
+     * 验证模式更新、健康检查和回退校验的标准化行为。
+     */
     @Test
     void normalizesModeUpdatesHealthTestsAndFallbackValidation() {
         ChannelConnectorApplicationService service =

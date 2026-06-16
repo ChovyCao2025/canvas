@@ -7,23 +7,52 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
+/**
+ * 使用 JDBC 从平台表中汇总营销控制面运行时证据。
+ */
 @Component
 public class JdbcMarketingPlatformControlPlaneEvidenceProvider
         implements MarketingPlatformControlPlaneEvidenceProvider {
 
+    /**
+     * 生产集成探针被认为新鲜的时间窗口，单位为小时。
+     */
     private static final long INTEGRATION_PROBE_FRESHNESS_HOURS = 24;
+
+    /**
+     * 集成探针失败告警类型。
+     */
     private static final String INTEGRATION_PROBE_FAILURE_ALERT = "INTEGRATION_CONTRACT_PROBE_FAILURE";
+
+    /**
+     * 集成 SLO 燃尽率告警类型。
+     */
     private static final String INTEGRATION_SLO_BURN_RATE_ALERT = "INTEGRATION_CONTRACT_SLO_BURN_RATE";
 
+    /**
+     * 执行控制面证据统计 SQL 的 JDBC 模板。
+     */
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * 使用 JDBC 模板创建证据提供者。
+     *
+     * @param jdbcTemplate 执行 SQL 的 JDBC 模板
+     */
     public JdbcMarketingPlatformControlPlaneEvidenceProvider(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /**
+     * 查询指定租户的控制面运行时证据。
+     *
+     * @param tenantId 租户标识
+     * @return 控制面运行时证据
+     */
     @Override
     public RuntimeEvidence evidence(Long tenantId) {
         Long scopedTenantId = tenantId == null || tenantId < 0 ? 0L : tenantId;
+        // 只统计最近 24 小时的生产探针，避免陈旧 PASS 掩盖当前集成风险。
         LocalDateTime freshProbeAfter = LocalDateTime.now().minusHours(INTEGRATION_PROBE_FRESHNESS_HOURS);
         return new RuntimeEvidence(
                 count("SELECT COUNT(*) FROM canvas WHERE tenant_id = ? AND status = 1", scopedTenantId),
@@ -160,11 +189,19 @@ public class JdbcMarketingPlatformControlPlaneEvidenceProvider
                         """, scopedTenantId));
     }
 
+    /**
+     * 执行单值 COUNT 查询。
+     *
+     * @param sql COUNT 查询语句
+     * @param args 查询参数
+     * @return 查询结果；表或列缺失等数据访问失败时返回 0
+     */
     private long count(String sql, Object... args) {
         try {
             Long value = jdbcTemplate.queryForObject(sql, Long.class, args);
             return value == null ? 0L : value;
         } catch (DataAccessException ignored) {
+            // 控制面要能在部分营销表尚未迁移时启动，缺失证据按 0 处理。
             return 0L;
         }
     }

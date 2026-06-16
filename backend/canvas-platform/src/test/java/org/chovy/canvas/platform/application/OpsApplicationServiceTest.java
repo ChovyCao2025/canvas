@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.domain.OpsCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖运维应用服务的缓存、运行时、审计和应急动作。
+ */
 class OpsApplicationServiceTest {
 
+    /**
+     * 验证运行时状态、缓存失效、重建和审计查询。
+     */
     @Test
     void exposesRuntimeCacheRecoveryAndAuditOperations() {
         OpsApplicationService service = new OpsApplicationService(new OpsCatalog());
@@ -38,6 +44,9 @@ class OpsApplicationServiceTest {
                 .containsEntry("action", "CACHE_INVALIDATE");
     }
 
+    /**
+     * 验证应急动作必须提供原因并写入审计。
+     */
     @Test
     void emergencyActionsRequireReasonAndRecordAudits() {
         OpsApplicationService service = new OpsApplicationService(new OpsCatalog());
@@ -63,6 +72,9 @@ class OpsApplicationServiceTest {
                 .contains("PAUSE", "KILL");
     }
 
+    /**
+     * 验证默认值和参数校验符合 Web 兼容契约。
+     */
     @Test
     void defaultsAndValidationMatchWebCompatibilityContract() {
         OpsApplicationService service = new OpsApplicationService(new OpsCatalog());
