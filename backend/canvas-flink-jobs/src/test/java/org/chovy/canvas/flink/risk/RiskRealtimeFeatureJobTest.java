@@ -6,8 +6,14 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证风险实时特征作业的注册表和 SQL 契约。
+ */
 class RiskRealtimeFeatureJobTest {
 
+    /**
+     * 风险实时特征管道应暴露在 Flink 管道注册表中。
+     */
     @Test
     void registryExposesRiskRealtimeFeaturePipeline() {
         assertThat(CanvasFlinkPipelineRegistry.isKnown(RiskRealtimeFeatureJob.PIPELINE_KEY)).isTrue();
@@ -15,6 +21,9 @@ class RiskRealtimeFeatureJobTest {
                 .isEqualTo("sql/risk_realtime_features.sql");
     }
 
+    /**
+     * 作业规格应声明源端 topic、Redis key、Doris 目标表和首批窗口特征。
+     */
     @Test
     void jobConfigDeclaresSourceAndSinkSettings() {
         RiskRealtimeFeatureJob.JobSpec spec = RiskRealtimeFeatureJob.jobSpec();
@@ -30,6 +39,9 @@ class RiskRealtimeFeatureJobTest {
                 "benefit.issue_amount_1d");
     }
 
+    /**
+     * SQL asset 应包含首批实时风险特征窗口定义。
+     */
     @Test
     void sqlDefinesFirstRealtimeFeatureWindows() {
         String sql = CanvasFlinkSqlTemplateLoader.load("sql/risk_realtime_features.sql");

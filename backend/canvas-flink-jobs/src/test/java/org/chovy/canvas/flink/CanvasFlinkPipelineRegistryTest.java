@@ -10,8 +10,14 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证 Flink 管道注册表和 SQL asset 的发布契约。
+ */
 class CanvasFlinkPipelineRegistryTest {
 
+    /**
+     * 注册表应暴露首批可部署管道和对应 SQL asset。
+     */
     @Test
     void resolvesAllFirstSlicePipelineKeysToSqlAssets() {
         assertThat(CanvasFlinkPipelineRegistry.all())
@@ -28,6 +34,9 @@ class CanvasFlinkPipelineRegistryTest {
                 .hasSize(5);
     }
 
+    /**
+     * 未知 pipeline key 应被明确拒绝。
+     */
     @Test
     void rejectsUnknownPipelineKey() {
         assertThatThrownBy(() -> CanvasFlinkPipelineRegistry.sqlAssetFor("unknown"))
@@ -35,6 +44,11 @@ class CanvasFlinkPipelineRegistryTest {
                 .hasMessageContaining("unknown pipeline");
     }
 
+    /**
+     * 每个已注册 SQL asset 应包含管道标识、目标表和 Doris 占位符。
+     *
+     * @throws Exception SQL asset 读取失败时抛出
+     */
     @Test
     void sqlAssetsContainExpectedSinkTablesAndPipelineKeys() throws Exception {
         Map<String, String> expectedSinkTables = Map.of(
@@ -55,6 +69,13 @@ class CanvasFlinkPipelineRegistryTest {
         }
     }
 
+    /**
+     * 从 classpath 读取 SQL asset。
+     *
+     * @param assetPath SQL asset 路径
+     * @return SQL asset 内容
+     * @throws IOException 资源读取失败时抛出
+     */
     private String readResource(String assetPath) throws IOException {
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         try (InputStream stream = loader.getResourceAsStream(assetPath)) {

@@ -9,10 +9,21 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证生产 Flink 部署清单、脚本和运行手册的静态契约。
+ */
 class CanvasFlinkProductionDeploymentTest {
 
+    /**
+     * 仓库根目录，测试从模块目录运行时用于定位部署文件。
+     */
     private static final Path REPO_ROOT = Path.of("../..").normalize();
 
+    /**
+     * Helm chart 应定义生产 Flink 集群、运行密钥和网络访问契约。
+     *
+     * @throws Exception 部署文件读取失败时抛出
+     */
     @Test
     void helmChartDefinesProductionFlinkClusterAndSecrets() throws Exception {
         String values = read("deploy/helm/canvas/values.yaml");
@@ -73,6 +84,11 @@ class CanvasFlinkProductionDeploymentTest {
                 .contains("port: 8081");
     }
 
+    /**
+     * 静态 Kubernetes manifests 应与 Helm 部署契约保持一致。
+     *
+     * @throws Exception 部署文件读取失败时抛出
+     */
     @Test
     void staticKubernetesManifestsMirrorHelmFlinkDeploymentContract() throws Exception {
         String configMap = read("deploy/k8s/canvas-flink-configmap.yaml");
@@ -133,6 +149,11 @@ class CanvasFlinkProductionDeploymentTest {
                 .contains("canvas-flink-internal-api-token");
     }
 
+    /**
+     * 本地 docker compose 应启用 Doris 两阶段提交依赖的 checkpoint 配置。
+     *
+     * @throws Exception 文件读取失败时抛出
+     */
     @Test
     void localDockerComposeEnablesCheckpointingForDorisTwoPhaseCommit() throws Exception {
         String compose = read("docker-compose.local.yml");
@@ -167,6 +188,11 @@ class CanvasFlinkProductionDeploymentTest {
                 .contains("WHERE tenant_id=${probe_tenant_id} AND message_id='${message_id}'");
     }
 
+    /**
+     * 运行期验证脚本应在行级校验通过后才报告 PASS 证据。
+     *
+     * @throws Exception 文件读取失败时抛出
+     */
     @Test
     void liveVerifierReportsPassRuntimeProofOnlyAfterRowLevelValidation() throws Exception {
         String liveVerifier = read("scripts/verify-flink-realtime-warehouse-live.sh");
@@ -185,6 +211,11 @@ class CanvasFlinkProductionDeploymentTest {
                 .isLessThan(liveVerifier.indexOf("report_pipeline_runtime_proof \"${PIPELINE_TRACE}\""));
     }
 
+    /**
+     * 生产运行手册和告警规则应覆盖 Flink 运维门禁。
+     *
+     * @throws Exception 文件读取失败时抛出
+     */
     @Test
     void productionRunbookAndAlertsCoverFlinkOperationalGates() throws Exception {
         String runbook = read("docs/runbooks/flink-production-deployment.md");
@@ -206,6 +237,11 @@ class CanvasFlinkProductionDeploymentTest {
                 .contains("CanvasFlinkCheckpointDurationHigh");
     }
 
+    /**
+     * 生产预检脚本应覆盖部署镜像、管道、密钥和告警规则。
+     *
+     * @throws Exception 文件读取或脚本语法检查失败时抛出
+     */
     @Test
     void productionPreflightScriptEnforcesFlinkDeploymentContract() throws Exception {
         String script = read("scripts/verify-flink-production-deployment.sh");
@@ -235,12 +271,27 @@ class CanvasFlinkProductionDeploymentTest {
         assertThat(runScriptSyntax("scripts/verify-flink-production-deployment.sh")).isEqualTo(0);
     }
 
+    /**
+     * 读取仓库根目录下的文本文件。
+     *
+     * @param relativePath 相对仓库根目录的文件路径
+     * @return 文件内容
+     * @throws IOException 文件读取失败时抛出
+     */
     private String read(String relativePath) throws IOException {
         Path path = REPO_ROOT.resolve(relativePath).normalize();
         assertThat(path).as(relativePath).exists();
         return Files.readString(path);
     }
 
+    /**
+     * 对指定脚本执行 bash 语法检查。
+     *
+     * @param relativePath 相对仓库根目录的脚本路径
+     * @return bash 语法检查退出码
+     * @throws IOException 进程启动失败时抛出
+     * @throws InterruptedException 等待进程时线程被中断则抛出
+     */
     private int runScriptSyntax(String relativePath) throws IOException, InterruptedException {
         Path path = REPO_ROOT.resolve(relativePath).normalize().toAbsolutePath();
         return new ProcessBuilder("/bin/bash", "-n", path.toString())

@@ -8,8 +8,14 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证 Flink SQL 脚本拆分和执行器提交行为。
+ */
 class CanvasFlinkSqlJobRunnerTest {
 
+    /**
+     * 多条 SQL 应去除首尾空白后按顺序提交并返回数量。
+     */
     @Test
     void runExecutesTrimmedStatementsInOrderAndReturnsCount() {
         List<String> executed = new ArrayList<>();
@@ -26,6 +32,9 @@ class CanvasFlinkSqlJobRunnerTest {
                 "INSERT INTO sink_table SELECT * FROM source_table");
     }
 
+    /**
+     * 空脚本或空语句不应提交给执行器。
+     */
     @Test
     void runSkipsNullBlankAndEmptyStatements() {
         List<String> executed = new ArrayList<>();
@@ -36,6 +45,9 @@ class CanvasFlinkSqlJobRunnerTest {
         assertThat(executed).isEmpty();
     }
 
+    /**
+     * 缺少执行器时应拒绝运行 SQL。
+     */
     @Test
     void runRejectsMissingExecutor() {
         assertThatThrownBy(() -> CanvasFlinkSqlJobRunner.run("SELECT 1", null))
@@ -43,6 +55,9 @@ class CanvasFlinkSqlJobRunnerTest {
                 .hasMessageContaining("SQL executor is required");
     }
 
+    /**
+     * 单条语句执行失败时应停止后续提交并向上传播异常。
+     */
     @Test
     void runPropagatesExecutionFailureAndStopsSubmittingRemainingStatements() {
         List<String> executed = new ArrayList<>();
@@ -65,6 +80,9 @@ class CanvasFlinkSqlJobRunnerTest {
                 "INSERT INTO sink_table SELECT * FROM source_table");
     }
 
+    /**
+     * 字符串字面量内部的分号不应切分语句。
+     */
     @Test
     void statementsDoNotSplitSemicolonsInsideStringLiterals() {
         assertThat(CanvasFlinkSqlJobRunner.statements("""
@@ -76,6 +94,9 @@ class CanvasFlinkSqlJobRunnerTest {
                         "INSERT INTO source_table VALUES ('a;b', 'it''s still one; value')");
     }
 
+    /**
+     * SQL 注释内部的分号不应切分语句。
+     */
     @Test
     void statementsDoNotSplitSemicolonsInsideSqlComments() {
         assertThat(CanvasFlinkSqlJobRunner.statements("""
@@ -90,6 +111,9 @@ class CanvasFlinkSqlJobRunnerTest {
                         "/* block comment includes ;\n   across lines */\nINSERT INTO sink_table SELECT * FROM source_table");
     }
 
+    /**
+     * dollar quote 代码块内部的分号不应切分语句。
+     */
     @Test
     void statementsDoNotSplitSemicolonsInsideDollarQuotedBlocks() {
         assertThat(CanvasFlinkSqlJobRunner.statements("""

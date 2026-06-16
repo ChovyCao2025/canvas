@@ -14,10 +14,19 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证 checkpoint 上报器的 HTTP 投递契约。
+ */
 class CanvasFlinkCheckpointReporterTest {
 
+    /**
+     * 每个用例独占的本地 HTTP 服务。
+     */
     private HttpServer server;
 
+    /**
+     * 用例结束后关闭本地 HTTP 服务。
+     */
     @AfterEach
     void stopServer() {
         if (server != null) {
@@ -25,6 +34,11 @@ class CanvasFlinkCheckpointReporterTest {
         }
     }
 
+    /**
+     * 应当按后端接口兼容的 JSON 结构发送 checkpoint payload。
+     *
+     * @throws Exception 本地 HTTP 服务启动或请求处理失败时抛出
+     */
     @Test
     void postsControllerCompatibleCheckpointPayload() throws Exception {
         AtomicReference<String> method = new AtomicReference<>();
@@ -57,6 +71,11 @@ class CanvasFlinkCheckpointReporterTest {
                 .contains("\"sinkSchemaVersion\":\"v1\"");
     }
 
+    /**
+     * 配置内部 token 时应写入内部认证请求头。
+     *
+     * @throws Exception 本地 HTTP 服务启动或请求处理失败时抛出
+     */
     @Test
     void sendsInternalApiTokenWhenConfigured() throws Exception {
         AtomicReference<String> method = new AtomicReference<>();
@@ -73,6 +92,11 @@ class CanvasFlinkCheckpointReporterTest {
         assertThat(internalToken).hasValue("internal-secret");
     }
 
+    /**
+     * 后端返回非 2xx 时应让调用方感知上报失败。
+     *
+     * @throws Exception 本地 HTTP 服务启动或请求处理失败时抛出
+     */
     @Test
     void failsOnNonSuccessfulHttpStatus() throws Exception {
         AtomicInteger requests = new AtomicInteger();
@@ -92,6 +116,12 @@ class CanvasFlinkCheckpointReporterTest {
         assertThat(requests).hasValue(1);
     }
 
+    /**
+     * 创建测试用 checkpoint payload。
+     *
+     * @param status checkpoint 状态
+     * @return 测试 payload
+     */
     private CanvasFlinkCheckpointReporter.CheckpointPayload payload(String status) {
         return new CanvasFlinkCheckpointReporter.CheckpointPayload(
                 "mysql_cdp_event_log_to_doris_ods",
@@ -110,6 +140,16 @@ class CanvasFlinkCheckpointReporterTest {
                 "v1");
     }
 
+    /**
+     * 创建不检查内部 token 的本地 HTTP 服务。
+     *
+     * @param status 响应状态码
+     * @param method 接收到的请求方法
+     * @param path 接收到的请求路径
+     * @param body 接收到的请求体
+     * @return 已启动的 HTTP 服务
+     * @throws IOException 服务启动失败时抛出
+     */
     private HttpServer server(int status,
                               AtomicReference<String> method,
                               AtomicReference<String> path,
@@ -117,6 +157,17 @@ class CanvasFlinkCheckpointReporterTest {
         return server(status, method, path, body, null);
     }
 
+    /**
+     * 创建会记录请求明细的本地 HTTP 服务。
+     *
+     * @param status 响应状态码
+     * @param method 接收到的请求方法
+     * @param path 接收到的请求路径
+     * @param body 接收到的请求体
+     * @param internalToken 接收到的内部认证 token
+     * @return 已启动的 HTTP 服务
+     * @throws IOException 服务启动失败时抛出
+     */
     private HttpServer server(int status,
                               AtomicReference<String> method,
                               AtomicReference<String> path,
@@ -136,11 +187,24 @@ class CanvasFlinkCheckpointReporterTest {
         return httpServer;
     }
 
+    /**
+     * 返回当前本地 HTTP 服务的 checkpoint 接口地址。
+     *
+     * @return checkpoint 接口地址
+     */
     private String endpoint() {
         return "http://localhost:" + server.getAddress().getPort()
                 + "/warehouse/realtime/pipelines/checkpoints";
     }
 
+    /**
+     * 向测试请求写入固定响应。
+     *
+     * @param exchange HTTP 请求交换对象
+     * @param status 响应状态码
+     * @param response 响应体
+     * @throws IOException 响应写入失败时抛出
+     */
     private static void respond(HttpExchange exchange, int status, String response) throws IOException {
         byte[] bytes = response.getBytes();
         exchange.sendResponseHeaders(status, bytes.length);
