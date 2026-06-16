@@ -128,13 +128,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
+/**
+ * BiCatalogApplicationServiceTest 测试类。
+ */
 class BiCatalogApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-06T02:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Test
     void upsertDatasetNormalizesBusinessKeyAndRetainsFieldMetricContracts() {
         FakeRepository repository = new FakeRepository();
@@ -177,7 +181,9 @@ class BiCatalogApplicationServiceTest {
                 .satisfies(metric -> assertThat(metric.metricKey()).isEqualTo("gmv"));
         assertThat(repository.datasetsById.get(100L).model()).containsEntry("grain", "day");
     }
-
+    /**
+     * 执行 self Service Export Catalog Scopes Preview Exports And Lifecycle By Tenant 相关处理。
+     */
     @Test
     void selfServiceExportCatalogScopesPreviewExportsAndLifecycleByTenant() {
         FakeRepository repository = new FakeRepository();
@@ -226,7 +232,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(service.cancelSelfServiceExport(7L, "analyst", pending.id()).status())
                 .isEqualTo("CANCELLED");
     }
-
+    /**
+     * 执行 chart Cannot Use Missing Or Archived Dataset 相关处理。
+     */
     @Test
     void chartCannotUseMissingOrArchivedDataset() {
         FakeRepository repository = new FakeRepository();
@@ -248,7 +256,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dataset is not available for BI chart");
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Test
     void listDatasetResourcesExcludesArchivedAndPreservesRepositoryOrdering() {
         FakeRepository repository = new FakeRepository();
@@ -270,7 +280,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(views).extracting(BiDatasetView::status)
                 .doesNotContain(BiResourceStatus.ARCHIVED.name());
     }
-
+    /**
+     * 获取 Dataset Resource Resolves By Dataset Key And Rejects Missing Or Archived。
+     */
     @Test
     void getDatasetResourceResolvesByDatasetKeyAndRejectsMissingOrArchived() {
         FakeRepository repository = new FakeRepository();
@@ -289,7 +301,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("BI dataset not found");
     }
-
+    /**
+     * 执行 resource Operations Catalog Scopes By Tenant Normalizes Keys And Keeps Deterministic Ordering 相关处理。
+     */
     @Test
     void resourceOperationsCatalogScopesByTenantNormalizesKeysAndKeepsDeterministicOrdering() {
         FakeRepository repository = new FakeRepository();
@@ -344,7 +358,9 @@ class BiCatalogApplicationServiceTest {
                         org.assertj.core.groups.Tuple.tuple("CHART", "orders-trend"),
                         org.assertj.core.groups.Tuple.tuple("DASHBOARD", "marketing-overview"));
     }
-
+    /**
+     * 执行 resource Operations Catalog Makes Delete And Release Idempotent And Models Approvals 相关处理。
+     */
     @Test
     void resourceOperationsCatalogMakesDeleteAndReleaseIdempotentAndModelsApprovals() {
         FakeRepository repository = new FakeRepository();
@@ -408,7 +424,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(service.listPublishApprovals(7L, "dashboard", "Marketing Overview", "approved")).singleElement()
                 .satisfies(view -> assertThat(view.id()).isEqualTo(approval.id()));
     }
-
+    /**
+     * 执行 portal Resource Lifecycle Scopes By Tenant Normalizes Keys And Restores Versions 相关处理。
+     */
     @Test
     void portalResourceLifecycleScopesByTenantNormalizesKeysAndRestoresVersions() {
         FakeRepository repository = new FakeRepository();
@@ -469,7 +487,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("BI portal resource not found");
     }
-
+    /**
+     * 执行 big Screen Resource Lifecycle Scopes By Tenant Normalizes Keys And Restores Versions 相关处理。
+     */
     @Test
     void bigScreenResourceLifecycleScopesByTenantNormalizesKeysAndRestoresVersions() {
         FakeRepository repository = new FakeRepository();
@@ -530,7 +550,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("BI big-screen resource not found");
     }
-
+    /**
+     * 执行 spreadsheet Resource Lifecycle Scopes By Tenant Normalizes Keys And Restores Versions 相关处理。
+     */
     @Test
     void spreadsheetResourceLifecycleScopesByTenantNormalizesKeysAndRestoresVersions() {
         FakeRepository repository = new FakeRepository();
@@ -599,7 +621,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("BI spreadsheet resource not found");
     }
-
+    /**
+     * 执行 query Dataset Catalog Returns Compact Sorted Built In Views Without Internal Sql Details 相关处理。
+     */
     @Test
     void queryDatasetCatalogReturnsCompactSortedBuiltInViewsWithoutInternalSqlDetails() {
         FakeRepository repository = new FakeRepository();
@@ -662,7 +686,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown BI dataset: missing_dataset");
     }
-
+    /**
+     * 执行 query Operations Catalog Compiles Executes Tracks History And Defaults Policies By Tenant 相关处理。
+     */
     @Test
     void queryOperationsCatalogCompilesExecutesTracksHistoryAndDefaultsPoliciesByTenant() {
         FakeRepository repository = new FakeRepository();
@@ -714,7 +740,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(service.datasourceHealth()).isEmpty();
         assertThat(service.datasourceHealthSlo(10).availabilityRate()).isEqualTo(100.0);
     }
-
+    /**
+     * 执行 datasource Operations Catalog Scopes By Tenant And Supports Preview Rotation And Snapshots 相关处理。
+     */
     @Test
     void datasourceOperationsCatalogScopesByTenantAndSupportsPreviewRotationAndSnapshots() {
         FakeRepository repository = new FakeRepository();
@@ -775,7 +803,9 @@ class BiCatalogApplicationServiceTest {
                 .extracting(BiDatasourceSchemaSnapshotView::id)
                 .containsExactly(snapshot.id());
     }
-
+    /**
+     * 执行 datasource File Upload Creates Compact Sources Without Persisting Bytes And Materializes Dataset Shape 相关处理。
+     */
     @Test
     void datasourceFileUploadCreatesCompactSourcesWithoutPersistingBytesAndMaterializesDatasetShape() {
         FakeRepository repository = new FakeRepository();
@@ -819,7 +849,9 @@ class BiCatalogApplicationServiceTest {
                 .containsEntry("status", "SUCCESS")
                 .containsEntry("importedRows", 1000L);
     }
-
+    /**
+     * 执行 embed Ticket Operations Normalize Scope Enforce Origin And Execute Scoped Query Once 相关处理。
+     */
     @Test
     void embedTicketOperationsNormalizeScopeEnforceOriginAndExecuteScopedQueryOnce() {
         FakeRepository repository = new FakeRepository();
@@ -860,7 +892,9 @@ class BiCatalogApplicationServiceTest {
                 .hasMessageContaining("origin is not allowed");
         assertThat(service.cleanupEmbedTickets(7L, 100).checked()).isGreaterThanOrEqualTo(1);
     }
-
+    /**
+     * 执行 dashboard Preset Catalog Returns Compact Built In Views And Rejects Unknown Key 相关处理。
+     */
     @Test
     void dashboardPresetCatalogReturnsCompactBuiltInViewsAndRejectsUnknownKey() {
         FakeRepository repository = new FakeRepository();
@@ -931,7 +965,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown BI dashboard preset: missing-dashboard");
     }
-
+    /**
+     * 执行 ai Assistant Catalog Scopes By Tenant Normalizes Operation And Preserves Request Hints 相关处理。
+     */
     @Test
     void aiAssistantCatalogScopesByTenantNormalizesOperationAndPreservesRequestHints() {
         FakeRepository repository = new FakeRepository();
@@ -995,7 +1031,9 @@ class BiCatalogApplicationServiceTest {
                 .containsEntry("params", Map.of("region", "CN"));
         assertThat(tenantScoped.assistantRunId()).isEqualTo("bi-ai-42-ask");
     }
-
+    /**
+     * 执行 ai Assistant Catalog Returns Route Specific Stable Fields 相关处理。
+     */
     @Test
     void aiAssistantCatalogReturnsRouteSpecificStableFields() {
         FakeRepository repository = new FakeRepository();
@@ -1092,7 +1130,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(insights.anomalies()).containsExactly("No deterministic anomaly detected in compact mode");
         assertThat(insights.opportunities()).containsExactly("Use the insight as a draft before publishing BI decisions");
     }
-
+    /**
+     * 执行 quick Engine Capacity Catalog Returns Compact Summary And Clamps Limit 相关处理。
+     */
     @Test
     void quickEngineCapacityCatalogReturnsCompactSummaryAndClampsLimit() {
         FakeRepository repository = new FakeRepository();
@@ -1136,7 +1176,9 @@ class BiCatalogApplicationServiceTest {
                 "details",
                 "userRankings");
     }
-
+    /**
+     * 执行 quick Engine Queue Catalog Normalizes Filters And Limit 相关处理。
+     */
     @Test
     void quickEngineQueueCatalogNormalizesFiltersAndLimit() {
         FakeRepository repository = new FakeRepository();
@@ -1184,7 +1226,9 @@ class BiCatalogApplicationServiceTest {
                 "total",
                 "jobs");
     }
-
+    /**
+     * 执行 quick Engine Capacity Policies Normalize Input Preserve Defaults And Validate Legacy Bounds 相关处理。
+     */
     @Test
     void quickEngineCapacityPoliciesNormalizeInputPreserveDefaultsAndValidateLegacyBounds() {
         FakeRepository repository = new FakeRepository();
@@ -1266,7 +1310,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxConcurrentQueries must be between 1 and 10000");
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Test
     void listChartResourcesExcludesArchivedAndPreservesRepositoryOrdering() {
         FakeRepository repository = new FakeRepository();
@@ -1289,7 +1335,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(views).extracting(BiChartView::status)
                 .doesNotContain(BiResourceStatus.ARCHIVED.name());
     }
-
+    /**
+     * 获取 Chart Resource Resolves By Chart Key And Rejects Missing Or Archived。
+     */
     @Test
     void getChartResourceResolvesByChartKeyAndRejectsMissingOrArchived() {
         FakeRepository repository = new FakeRepository();
@@ -1310,7 +1358,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("BI chart not found");
     }
-
+    /**
+     * 执行 chart Lifecycle Publishes Archives Lists Versions Newest First And Restores Draft Snapshot 相关处理。
+     */
     @Test
     void chartLifecyclePublishesArchivesListsVersionsNewestFirstAndRestoresDraftSnapshot() {
         FakeRepository repository = new FakeRepository();
@@ -1403,7 +1453,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("BI chart not found");
     }
-
+    /**
+     * 执行 chart Reference Impact Returns Compact Dashboard References And Rejects Missing Or Archived Chart 相关处理。
+     */
     @Test
     void chartReferenceImpactReturnsCompactDashboardReferencesAndRejectsMissingOrArchivedChart() {
         FakeRepository repository = new FakeRepository();
@@ -1472,7 +1524,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("BI chart not found: missing-chart");
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Test
     void listDashboardResourcesExcludesArchivedAndPreservesRepositoryOrdering() {
         FakeRepository repository = new FakeRepository();
@@ -1494,7 +1548,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(views).extracting(BiDashboardView::status)
                 .doesNotContain(BiResourceStatus.ARCHIVED.name());
     }
-
+    /**
+     * 获取 Dashboard Resource Resolves By Dashboard Key And Rejects Missing Or Archived。
+     */
     @Test
     void getDashboardResourceResolvesByDashboardKeyAndRejectsMissingOrArchived() {
         FakeRepository repository = new FakeRepository();
@@ -1514,7 +1570,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("BI dashboard not found");
     }
-
+    /**
+     * 执行 dashboard Resource Operations Clone Export Import Archive Versions And Runtime State By Tenant 相关处理。
+     */
     @Test
     void dashboardResourceOperationsCloneExportImportArchiveVersionsAndRuntimeStateByTenant() {
         FakeRepository repository = new FakeRepository();
@@ -1577,7 +1635,9 @@ class BiCatalogApplicationServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("BI dashboard not found");
     }
-
+    /**
+     * 执行 repository List Dataset Resources Filters Tenant Excludes Archived And Orders Catalog Rows 相关处理。
+     */
     @Test
     void repositoryListDatasetResourcesFiltersTenantExcludesArchivedAndOrdersCatalogRows() {
         initBiDatasetTableInfo();
@@ -1601,7 +1661,9 @@ class BiCatalogApplicationServiceTest {
                 .contains("updated_at DESC")
                 .contains("dataset_key ASC");
     }
-
+    /**
+     * 执行 repository Dataset Detail Falls Back From Tenant To Tenant Zero 相关处理。
+     */
     @Test
     void repositoryDatasetDetailFallsBackFromTenantToTenantZero() {
         initBiDatasetTableInfo();
@@ -1633,7 +1695,9 @@ class BiCatalogApplicationServiceTest {
                 .contains("tenant_id =")
                 .contains("workspace_id =");
     }
-
+    /**
+     * 执行 repository List Chart Resources Filters Tenant Default Workspace Excludes Archived And Orders Catalog Rows 相关处理。
+     */
     @Test
     void repositoryListChartResourcesFiltersTenantDefaultWorkspaceExcludesArchivedAndOrdersCatalogRows() {
         initBiChartTableInfo();
@@ -1657,7 +1721,9 @@ class BiCatalogApplicationServiceTest {
                 .contains("updated_at DESC")
                 .contains("chart_key ASC");
     }
-
+    /**
+     * 执行 repository Chart Detail Uses Tenant Default Workspace Without Tenant Zero Fallback 相关处理。
+     */
     @Test
     void repositoryChartDetailUsesTenantDefaultWorkspaceWithoutTenantZeroFallback() {
         initBiChartTableInfo();
@@ -1681,7 +1747,9 @@ class BiCatalogApplicationServiceTest {
                 .contains("status <>")
                 .contains("LIMIT 1");
     }
-
+    /**
+     * 执行 repository List Dashboard Resources Filters Tenant Default Workspace Excludes Archived And Orders Catalog Rows 相关处理。
+     */
     @Test
     void repositoryListDashboardResourcesFiltersTenantDefaultWorkspaceExcludesArchivedAndOrdersCatalogRows() {
         initBiDashboardTableInfo();
@@ -1705,7 +1773,9 @@ class BiCatalogApplicationServiceTest {
                 .contains("updated_at DESC")
                 .contains("dashboard_key ASC");
     }
-
+    /**
+     * 执行 repository Dashboard Detail Uses Tenant Default Workspace Without Tenant Zero Fallback 相关处理。
+     */
     @Test
     void repositoryDashboardDetailUsesTenantDefaultWorkspaceWithoutTenantZeroFallback() {
         initBiDashboardTableInfo();
@@ -1731,7 +1801,9 @@ class BiCatalogApplicationServiceTest {
                 .contains("status <>")
                 .contains("LIMIT 1");
     }
-
+    /**
+     * 执行 dashboard Read Model Includes Charts And Readiness For Canvas Web 相关处理。
+     */
     @Test
     void dashboardReadModelIncludesChartsAndReadinessForCanvasWeb() {
         FakeRepository repository = new FakeRepository();
@@ -1768,7 +1840,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(readModel.readiness().blockers())
                 .anySatisfy(issue -> assertThat(issue.code()).isEqualTo("MISSING_CHART"));
     }
-
+    /**
+     * 执行 permission Decision Is Exposed Through Stable Api View 相关处理。
+     */
     @Test
     void permissionDecisionIsExposedThroughStableApiView() {
         FakeRepository repository = new FakeRepository();
@@ -1805,7 +1879,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(view.effect()).isEqualTo("DENY");
         assertThat(view.signature()).contains("DASHBOARD:10:VIEW:DENY:USER:alice");
     }
-
+    /**
+     * 执行 resource Favorites Are Tenant Actor Scoped Normalized Deduplicated Filtered Ordered And Deleted Idempotently 相关处理。
+     */
     @Test
     void resourceFavoritesAreTenantActorScopedNormalizedDeduplicatedFilteredOrderedAndDeletedIdempotently() {
         FakeRepository repository = new FakeRepository();
@@ -1860,7 +1936,9 @@ class BiCatalogApplicationServiceTest {
                 .extracting(BiResourceFavoriteView::resourceKey)
                 .containsExactly("orders-trend");
     }
-
+    /**
+     * 执行 permission Administration Catalog Scopes Normalizes Filters Orders Audits And Reviews Requests 相关处理。
+     */
     @Test
     void permissionAdministrationCatalogScopesNormalizesFiltersOrdersAuditsAndReviewsRequests() {
         FakeRepository repository = new FakeRepository();
@@ -1957,7 +2035,9 @@ class BiCatalogApplicationServiceTest {
                 .hasSize(2)
                 .allSatisfy(entry -> assertThat(entry.actorId()).isNotBlank());
     }
-
+    /**
+     * 执行 permission Administration Grants And Deletes Drive Effective Access 相关处理。
+     */
     @Test
     void permissionAdministrationGrantsAndDeletesDriveEffectiveAccess() {
         FakeRepository repository = new FakeRepository();
@@ -2008,7 +2088,9 @@ class BiCatalogApplicationServiceTest {
                 Set.of("analyst"),
                 "view")).allowed()).isFalse();
     }
-
+    /**
+     * 执行 subscription Delivery Catalog Scopes Normalizes Runs Retries Attachments And Audit Counts 相关处理。
+     */
     @Test
     void subscriptionDeliveryCatalogScopesNormalizesRunsRetriesAttachmentsAndAuditCounts() {
         FakeRepository repository = new FakeRepository();
@@ -2081,7 +2163,9 @@ class BiCatalogApplicationServiceTest {
         assertThat(service.runDeliveryScheduler(7L, "scheduler").subscriptionsChecked()).isZero();
         assertThat(service.cleanupDeliveryAttachments(7L, 10).filesDeleted()).isPositive();
     }
-
+    /**
+     * 执行 workspace 相关处理。
+     */
     private static BiWorkspace workspace(Long id) {
         return new BiWorkspace(
                 id,
@@ -2094,11 +2178,15 @@ class BiCatalogApplicationServiceTest {
                 LocalDateTime.parse("2026-06-01T00:00:00"),
                 LocalDateTime.parse("2026-06-01T00:00:00"));
     }
-
+    /**
+     * 执行 dataset 相关处理。
+     */
     private static BiDataset dataset(Long id, String key, BiResourceStatus status) {
         return dataset(id, key, status, LocalDateTime.parse("2026-06-01T00:00:00"));
     }
-
+    /**
+     * 执行 dataset 相关处理。
+     */
     private static BiDataset dataset(Long id, String key, BiResourceStatus status, LocalDateTime updatedAt) {
         return new BiDataset(
                 id,
@@ -2118,11 +2206,15 @@ class BiCatalogApplicationServiceTest {
                 LocalDateTime.parse("2026-06-01T00:00:00"),
                 updatedAt);
     }
-
+    /**
+     * 执行 chart 相关处理。
+     */
     private static BiChart chart(Long id, String key, BiResourceStatus status) {
         return chart(id, key, status, LocalDateTime.parse("2026-06-01T00:00:00"));
     }
-
+    /**
+     * 执行 chart 相关处理。
+     */
     private static BiChart chart(Long id, String key, BiResourceStatus status, LocalDateTime updatedAt) {
         return new BiChart(
                 id,
@@ -2141,11 +2233,15 @@ class BiCatalogApplicationServiceTest {
                 LocalDateTime.parse("2026-06-01T00:00:00"),
                 updatedAt);
     }
-
+    /**
+     * 执行 dashboard 相关处理。
+     */
     private static BiDashboard dashboard(Long id, String key, BiResourceStatus status) {
         return dashboard(id, key, status, LocalDateTime.parse("2026-06-01T00:00:00"));
     }
-
+    /**
+     * 执行 dashboard 相关处理。
+     */
     private static BiDashboard dashboard(Long id, String key, BiResourceStatus status, LocalDateTime updatedAt) {
         return new BiDashboard(
                 id,
@@ -2163,17 +2259,23 @@ class BiCatalogApplicationServiceTest {
                 LocalDateTime.parse("2026-06-01T00:00:00"),
                 updatedAt);
     }
-
+    /**
+     * 执行 record Component Names 相关处理。
+     */
     private static List<String> recordComponentNames(Class<? extends Record> recordType) {
         return Arrays.stream(recordType.getRecordComponents())
                 .map(component -> component.getName())
                 .toList();
     }
-
+    /**
+     * 执行 repository With Dataset Mapper 相关处理。
+     */
     private static MybatisBiCatalogRepository repositoryWithDatasetMapper(BiDatasetMapper datasetMapper) {
         return repositoryWithMappers(mock(BiWorkspaceMapper.class), datasetMapper);
     }
-
+    /**
+     * 执行 repository With Chart Mapper 相关处理。
+     */
     private static MybatisBiCatalogRepository repositoryWithChartMapper(BiWorkspaceMapper workspaceMapper,
                                                                         BiChartMapper chartMapper) {
         return new MybatisBiCatalogRepository(
@@ -2187,7 +2289,9 @@ class BiCatalogApplicationServiceTest {
                 mock(BiResourcePermissionMapper.class),
                 new BiPersistenceConverter());
     }
-
+    /**
+     * 执行 repository With Dashboard Mapper 相关处理。
+     */
     private static MybatisBiCatalogRepository repositoryWithDashboardMapper(BiWorkspaceMapper workspaceMapper,
                                                                             BiDashboardMapper dashboardMapper) {
         return new MybatisBiCatalogRepository(
@@ -2201,7 +2305,9 @@ class BiCatalogApplicationServiceTest {
                 mock(BiResourcePermissionMapper.class),
                 new BiPersistenceConverter());
     }
-
+    /**
+     * 执行 repository With Mappers 相关处理。
+     */
     private static MybatisBiCatalogRepository repositoryWithMappers(BiWorkspaceMapper workspaceMapper,
                                                                     BiDatasetMapper datasetMapper) {
         return new MybatisBiCatalogRepository(
@@ -2215,31 +2321,41 @@ class BiCatalogApplicationServiceTest {
                 mock(BiResourcePermissionMapper.class),
                 new BiPersistenceConverter());
     }
-
+    /**
+     * 执行 init Bi Dataset Table Info 相关处理。
+     */
     private static void initBiDatasetTableInfo() {
         if (TableInfoHelper.getTableInfo(BiDatasetDO.class) == null) {
             TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), BiDatasetDO.class);
         }
     }
-
+    /**
+     * 执行 init Bi Workspace Table Info 相关处理。
+     */
     private static void initBiWorkspaceTableInfo() {
         if (TableInfoHelper.getTableInfo(BiWorkspaceDO.class) == null) {
             TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), BiWorkspaceDO.class);
         }
     }
-
+    /**
+     * 执行 init Bi Chart Table Info 相关处理。
+     */
     private static void initBiChartTableInfo() {
         if (TableInfoHelper.getTableInfo(BiChartDO.class) == null) {
             TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), BiChartDO.class);
         }
     }
-
+    /**
+     * 执行 init Bi Dashboard Table Info 相关处理。
+     */
     private static void initBiDashboardTableInfo() {
         if (TableInfoHelper.getTableInfo(BiDashboardDO.class) == null) {
             TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), BiDashboardDO.class);
         }
     }
-
+    /**
+     * 执行 workspace Row 相关处理。
+     */
     private static BiWorkspaceDO workspaceRow(Long id, Long tenantId) {
         BiWorkspaceDO row = new BiWorkspaceDO();
         row.setId(id);
@@ -2252,11 +2368,15 @@ class BiCatalogApplicationServiceTest {
         row.setUpdatedAt(LocalDateTime.parse("2026-06-01T00:00:00"));
         return row;
     }
-
+    /**
+     * 执行 dataset Row 相关处理。
+     */
     private static BiDatasetDO datasetRow(Long id, Long tenantId, String datasetKey, BiResourceStatus status) {
         return datasetRow(id, tenantId, 5L, datasetKey, status);
     }
-
+    /**
+     * 执行 dataset Row 相关处理。
+     */
     private static BiDatasetDO datasetRow(Long id,
                                           Long tenantId,
                                           Long workspaceId,
@@ -2279,31 +2399,75 @@ class BiCatalogApplicationServiceTest {
         row.setUpdatedAt(LocalDateTime.parse("2026-06-01T00:00:00"));
         return row;
     }
-
+    /**
+     * FakeRepository 仓储接口。
+     */
     private static final class FakeRepository implements BiWorkspaceRepository, BiDatasetRepository,
             BiChartRepository, BiDashboardRepository, BiPermissionRepository {
+        /**
+         * workspacesById 对应的标识。
+         */
         private final Map<Long, BiWorkspace> workspacesById = new LinkedHashMap<>();
+
+        /**
+         * datasetsById 对应的标识。
+         */
         private final Map<Long, BiDataset> datasetsById = new LinkedHashMap<>();
+
+        /**
+         * chartsById 对应的标识。
+         */
         private final Map<Long, BiChart> chartsById = new LinkedHashMap<>();
+
+        /**
+         * dashboardsById 对应的标识。
+         */
         private final Map<Long, BiDashboard> dashboardsById = new LinkedHashMap<>();
+
+        /**
+         * grants 对应的数据集合。
+         */
         private final List<BiPermissionGrant> grants = new ArrayList<>();
+
+        /**
+         * nextDatasetId 对应的标识。
+         */
         private long nextDatasetId = 100L;
+
+        /**
+         * nextChartId 对应的标识。
+         */
         private long nextChartId = 200L;
+
+        /**
+         * nextDashboardId 对应的标识。
+         */
         private long nextDashboardId = 300L;
+
+        /**
+         * nextGrantId 对应的标识。
+         */
         private long nextGrantId = 400L;
 
+        /**
+         * 执行 find Workspace 相关处理。
+         */
         @Override
         public BiWorkspace findWorkspace(Long tenantId, Long workspaceId) {
             BiWorkspace workspace = workspacesById.get(workspaceId);
             return workspace == null || !tenantId.equals(workspace.tenantId()) ? null : workspace;
         }
-
+        /**
+         * 执行 save Workspace 相关处理。
+         */
         @Override
         public BiWorkspace saveWorkspace(BiWorkspace workspace) {
             workspacesById.put(workspace.id(), workspace);
             return workspace;
         }
-
+        /**
+         * 执行 find Dataset By Key 相关处理。
+         */
         @Override
         public BiDataset findDatasetByKey(Long tenantId, Long workspaceId, BiResourceKey datasetKey) {
             return datasetsById.values().stream()
@@ -2313,13 +2477,17 @@ class BiCatalogApplicationServiceTest {
                     .findFirst()
                     .orElse(null);
         }
-
+        /**
+         * 执行 find Dataset By Id 相关处理。
+         */
         @Override
         public BiDataset findDatasetById(Long tenantId, Long datasetId) {
             BiDataset dataset = datasetsById.get(datasetId);
             return dataset == null || !tenantId.equals(dataset.tenantId()) ? null : dataset;
         }
-
+        /**
+         * 查询列表数据。
+         */
         @Override
         public List<BiDataset> listAvailableDatasets(Long tenantId) {
             return datasetsById.values().stream()
@@ -2334,13 +2502,17 @@ class BiCatalogApplicationServiceTest {
                     })
                     .toList();
         }
-
+        /**
+         * 执行 find Available Dataset By Key With Tenant Fallback 相关处理。
+         */
         @Override
         public BiDataset findAvailableDatasetByKeyWithTenantFallback(Long tenantId, BiResourceKey datasetKey) {
             BiDataset tenantDataset = findAvailableDatasetByKey(tenantId, datasetKey);
             return tenantDataset == null ? findAvailableDatasetByKey(0L, datasetKey) : tenantDataset;
         }
-
+        /**
+         * 执行 find Available Dataset By Key 相关处理。
+         */
         private BiDataset findAvailableDatasetByKey(Long tenantId, BiResourceKey datasetKey) {
             return datasetsById.values().stream()
                     .filter(dataset -> tenantId.equals(dataset.tenantId()))
@@ -2349,14 +2521,18 @@ class BiCatalogApplicationServiceTest {
                     .findFirst()
                     .orElse(null);
         }
-
+        /**
+         * 执行 save Dataset 相关处理。
+         */
         @Override
         public BiDataset saveDataset(BiDataset dataset) {
             BiDataset saved = dataset.id() == null ? dataset.withId(nextDatasetId++) : dataset;
             datasetsById.put(saved.id(), saved);
             return saved;
         }
-
+        /**
+         * 执行 find Chart By Key 相关处理。
+         */
         @Override
         public BiChart findChartByKey(Long tenantId, Long workspaceId, BiResourceKey chartKey) {
             return chartsById.values().stream()
@@ -2366,7 +2542,9 @@ class BiCatalogApplicationServiceTest {
                     .findFirst()
                     .orElse(null);
         }
-
+        /**
+         * 查询列表数据。
+         */
         @Override
         public List<BiChart> listChartsByKeys(Long tenantId, Long workspaceId, List<BiResourceKey> chartKeys) {
             return chartKeys.stream()
@@ -2374,7 +2552,9 @@ class BiCatalogApplicationServiceTest {
                     .filter(chart -> chart != null)
                     .toList();
         }
-
+        /**
+         * 查询列表数据。
+         */
         @Override
         public List<BiChart> listAvailableCharts(Long tenantId) {
             return chartsById.values().stream()
@@ -2389,7 +2569,9 @@ class BiCatalogApplicationServiceTest {
                     })
                     .toList();
         }
-
+        /**
+         * 执行 find Available Chart By Key 相关处理。
+         */
         @Override
         public BiChart findAvailableChartByKey(Long tenantId, BiResourceKey chartKey) {
             return chartsById.values().stream()
@@ -2399,14 +2581,18 @@ class BiCatalogApplicationServiceTest {
                     .findFirst()
                     .orElse(null);
         }
-
+        /**
+         * 执行 save Chart 相关处理。
+         */
         @Override
         public BiChart saveChart(BiChart chart) {
             BiChart saved = chart.id() == null ? chart.withId(nextChartId++) : chart;
             chartsById.put(saved.id(), saved);
             return saved;
         }
-
+        /**
+         * 执行 find Dashboard By Key 相关处理。
+         */
         @Override
         public BiDashboard findDashboardByKey(Long tenantId, Long workspaceId, BiResourceKey dashboardKey) {
             return dashboardsById.values().stream()
@@ -2416,7 +2602,9 @@ class BiCatalogApplicationServiceTest {
                     .findFirst()
                     .orElse(null);
         }
-
+        /**
+         * 查询列表数据。
+         */
         @Override
         public List<BiDashboard> listAvailableDashboards(Long tenantId) {
             return dashboardsById.values().stream()
@@ -2431,7 +2619,9 @@ class BiCatalogApplicationServiceTest {
                     })
                     .toList();
         }
-
+        /**
+         * 执行 find Available Dashboard By Key 相关处理。
+         */
         @Override
         public BiDashboard findAvailableDashboardByKey(Long tenantId, BiResourceKey dashboardKey) {
             return dashboardsById.values().stream()
@@ -2441,14 +2631,18 @@ class BiCatalogApplicationServiceTest {
                     .findFirst()
                     .orElse(null);
         }
-
+        /**
+         * 执行 save Dashboard 相关处理。
+         */
         @Override
         public BiDashboard saveDashboard(BiDashboard dashboard) {
             BiDashboard saved = dashboard.id() == null ? dashboard.withId(nextDashboardId++) : dashboard;
             dashboardsById.put(saved.id(), saved);
             return saved;
         }
-
+        /**
+         * 执行 save Grant 相关处理。
+         */
         @Override
         public BiPermissionGrant saveGrant(BiPermissionGrant grant) {
             BiPermissionGrant saved = grant.id() == null ? grant.withId(nextGrantId++) : grant;
@@ -2456,7 +2650,9 @@ class BiCatalogApplicationServiceTest {
             grants.add(saved);
             return saved;
         }
-
+        /**
+         * 删除业务数据。
+         */
         @Override
         public void deleteGrant(Long tenantId,
                                 Long workspaceId,
@@ -2473,7 +2669,9 @@ class BiCatalogApplicationServiceTest {
                     && subjectId.equals(grant.subjectId())
                     && actionKey.equals(grant.actionKey()));
         }
-
+        /**
+         * 查询列表数据。
+         */
         @Override
         public List<BiPermissionGrant> listResourceGrants(Long tenantId,
                                                           Long workspaceId,

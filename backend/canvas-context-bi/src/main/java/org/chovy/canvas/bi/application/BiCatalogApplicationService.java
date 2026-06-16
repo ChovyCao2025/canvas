@@ -166,6 +166,7 @@ import org.chovy.canvas.bi.domain.BiSelfServiceExportCatalog;
 import org.chovy.canvas.bi.domain.BiSubscriptionDeliveryCatalog;
 import org.chovy.canvas.bi.domain.BiWorkspace;
 import org.chovy.canvas.bi.domain.BiWorkspaceRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -203,6 +204,7 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
     private final BiSelfServiceExportCatalog selfServiceExportCatalog;
     private final Clock clock;
 
+    @Autowired
     public BiCatalogApplicationService(BiWorkspaceRepository workspaceRepository,
                                        BiDatasetRepository datasetRepository,
                                        BiChartRepository chartRepository,

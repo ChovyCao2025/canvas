@@ -3,14 +3,37 @@ package org.chovy.canvas.bi.domain;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-
+/**
+ * BiAccessRequest 不可变数据载体。
+ */
 public record BiAccessRequest(
+        /**
+         * 租户标识。
+         */
         Long tenantId,
+        /**
+         * 工作空间标识。
+         */
         Long workspaceId,
+        /**
+         * 资源类型。
+         */
         String resourceType,
+        /**
+         * 资源标识。
+         */
         Long resourceId,
+        /**
+         * 操作者。
+         */
         String actor,
+        /**
+         * roles 对应的数据集合。
+         */
         Set<String> roles,
+        /**
+         * 操作键。
+         */
         String actionKey
 ) {
     public BiAccessRequest {

@@ -3,9 +3,13 @@ package org.chovy.canvas.bi.domain;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-
+/**
+ * BiPermissionPolicy 策略。
+ */
 public class BiPermissionPolicy {
-
+    /**
+     * 执行 evaluate 相关处理。
+     */
     public BiAccessDecision evaluate(BiAccessRequest request, List<BiPermissionGrant> grants) {
         if (request == null) {
             throw new IllegalArgumentException("access request is required");
@@ -19,6 +23,7 @@ public class BiPermissionPolicy {
                 .filter(grant -> subjectMatches(grant, request))
                 .sorted(Comparator.comparingInt(this::subjectRank))
                 .toList();
+        // DENY 优先级高于 ALLOW，确保显式拒绝能够覆盖更宽泛的授权。
         BiPermissionGrant deny = matching.stream()
                 .filter(grant -> "DENY".equals(grant.effect()))
                 .findFirst()
@@ -41,7 +46,9 @@ public class BiPermissionPolicy {
                         request.resourceId(),
                         request.actionKey()));
     }
-
+    /**
+     * 执行 decision 相关处理。
+     */
     private BiAccessDecision decision(BiAccessRequest request, BiPermissionGrant grant, boolean allowed, String reason) {
         return new BiAccessDecision(allowed, grant.effect(), grant.subjectType(), grant.subjectId(), reason,
                 "bi-permission:v1:%d:%d:%s:%d:%s:%s:%s:%s".formatted(
@@ -54,11 +61,15 @@ public class BiPermissionPolicy {
                         grant.subjectType(),
                         grant.subjectId()));
     }
-
+    /**
+     * 执行 action Matches 相关处理。
+     */
     private boolean actionMatches(String grantAction, String requestedAction) {
         return "*".equals(grantAction) || grantAction.equals(requestedAction);
     }
-
+    /**
+     * 执行 subject Matches 相关处理。
+     */
     private boolean subjectMatches(BiPermissionGrant grant, BiAccessRequest request) {
         return switch (grant.subjectType()) {
             case "ALL" -> "*".equals(grant.subjectId()) || "ALL".equals(grant.subjectId());
@@ -67,7 +78,9 @@ public class BiPermissionPolicy {
             default -> false;
         };
     }
-
+    /**
+     * 执行 subject Rank 相关处理。
+     */
     private int subjectRank(BiPermissionGrant grant) {
         return switch (grant.subjectType()) {
             case "USER" -> 0;

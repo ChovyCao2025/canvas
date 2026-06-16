@@ -14,14 +14,33 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
+/**
+ * BiPresentationResourceCatalog 目录服务。
+ */
 public class BiPresentationResourceCatalog {
-
+    /**
+     * portals 对应的数据集合。
+     */
     private final Map<ResourceRef, PortalState> portals = new LinkedHashMap<>();
+
+    /**
+     * bigScreens 对应的数据集合。
+     */
     private final Map<ResourceRef, BigScreenState> bigScreens = new LinkedHashMap<>();
+
+    /**
+     * spreadsheets 对应的数据集合。
+     */
     private final Map<ResourceRef, SpreadsheetState> spreadsheets = new LinkedHashMap<>();
+
+    /**
+     * versions 对应的数据集合。
+     */
     private final Map<ResourceRef, List<VersionState>> versions = new LinkedHashMap<>();
 
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiPortalResourceView> listPortals(Long tenantId) {
         Long scopedTenantId = tenant(tenantId);
         return portals.values().stream()
@@ -32,7 +51,9 @@ public class BiPresentationResourceCatalog {
                 .map(this::toPortalView)
                 .toList();
     }
-
+    /**
+     * 获取 Portal。
+     */
     public synchronized BiPortalResourceView getPortal(Long tenantId, String portalKey) {
         PortalState state = portals.get(ref(tenantId, "PORTAL", portalKey));
         if (state == null || "ARCHIVED".equals(state.status)) {
@@ -40,7 +61,9 @@ public class BiPresentationResourceCatalog {
         }
         return toPortalView(state);
     }
-
+    /**
+     * 执行 save Portal Draft 相关处理。
+     */
     public synchronized BiPortalResourceView savePortalDraft(
             Long tenantId,
             String portalKey,
@@ -71,7 +94,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, version, portalSnapshot(state), state.updatedBy, now);
         return toPortalView(state);
     }
-
+    /**
+     * 发布业务资源。
+     */
     public synchronized BiPortalResourceView publishPortal(Long tenantId, String portalKey, String actor,
                                                            LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "PORTAL", portalKey);
@@ -94,7 +119,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, state.version, portalSnapshot(state), state.updatedBy, now);
         return toPortalView(state);
     }
-
+    /**
+     * 归档业务资源。
+     */
     public synchronized void archivePortal(Long tenantId, String portalKey, String actor, LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "PORTAL", portalKey);
         PortalState existing = portals.get(ref);
@@ -116,11 +143,15 @@ public class BiPresentationResourceCatalog {
                 existing.createdAt,
                 now));
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiResourceVersionView> listPortalVersions(Long tenantId, String portalKey) {
         return listVersions(ref(tenantId, "PORTAL", portalKey));
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     public synchronized BiPortalResourceView restorePortal(Long tenantId, String portalKey, Integer version,
                                                            String actor, LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "PORTAL", portalKey);
@@ -144,7 +175,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, state.version, portalSnapshot(state), state.updatedBy, now);
         return toPortalView(state);
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiBigScreenResourceView> listBigScreens(Long tenantId) {
         Long scopedTenantId = tenant(tenantId);
         return bigScreens.values().stream()
@@ -155,7 +188,9 @@ public class BiPresentationResourceCatalog {
                 .map(this::toBigScreenView)
                 .toList();
     }
-
+    /**
+     * 获取 Big Screen。
+     */
     public synchronized BiBigScreenResourceView getBigScreen(Long tenantId, String screenKey) {
         BigScreenState state = bigScreens.get(ref(tenantId, "BIG_SCREEN", screenKey));
         if (state == null || "ARCHIVED".equals(state.status)) {
@@ -163,7 +198,9 @@ public class BiPresentationResourceCatalog {
         }
         return toBigScreenView(state);
     }
-
+    /**
+     * 执行 save Big Screen Draft 相关处理。
+     */
     public synchronized BiBigScreenResourceView saveBigScreenDraft(
             Long tenantId,
             String screenKey,
@@ -194,7 +231,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, version, bigScreenSnapshot(state), state.updatedBy, now);
         return toBigScreenView(state);
     }
-
+    /**
+     * 发布业务资源。
+     */
     public synchronized BiBigScreenResourceView publishBigScreen(Long tenantId, String screenKey, String actor,
                                                                  LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "BIG_SCREEN", screenKey);
@@ -217,7 +256,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, state.version, bigScreenSnapshot(state), state.updatedBy, now);
         return toBigScreenView(state);
     }
-
+    /**
+     * 归档业务资源。
+     */
     public synchronized void archiveBigScreen(Long tenantId, String screenKey, String actor, LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "BIG_SCREEN", screenKey);
         BigScreenState existing = bigScreens.get(ref);
@@ -239,11 +280,15 @@ public class BiPresentationResourceCatalog {
                 existing.createdAt,
                 now));
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiResourceVersionView> listBigScreenVersions(Long tenantId, String screenKey) {
         return listVersions(ref(tenantId, "BIG_SCREEN", screenKey));
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     public synchronized BiBigScreenResourceView restoreBigScreen(Long tenantId, String screenKey, Integer version,
                                                                  String actor, LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "BIG_SCREEN", screenKey);
@@ -267,7 +312,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, state.version, bigScreenSnapshot(state), state.updatedBy, now);
         return toBigScreenView(state);
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiSpreadsheetResourceView> listSpreadsheets(Long tenantId) {
         Long scopedTenantId = tenant(tenantId);
         return spreadsheets.values().stream()
@@ -278,7 +325,9 @@ public class BiPresentationResourceCatalog {
                 .map(this::toSpreadsheetView)
                 .toList();
     }
-
+    /**
+     * 获取 Spreadsheet。
+     */
     public synchronized BiSpreadsheetResourceView getSpreadsheet(Long tenantId, String spreadsheetKey) {
         SpreadsheetState state = spreadsheets.get(ref(tenantId, "SPREADSHEET", spreadsheetKey));
         if (state == null || "ARCHIVED".equals(state.status)) {
@@ -286,7 +335,9 @@ public class BiPresentationResourceCatalog {
         }
         return toSpreadsheetView(state);
     }
-
+    /**
+     * 执行 save Spreadsheet Draft 相关处理。
+     */
     public synchronized BiSpreadsheetResourceView saveSpreadsheetDraft(
             Long tenantId,
             String spreadsheetKey,
@@ -317,7 +368,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, version, spreadsheetSnapshot(state), state.updatedBy, now);
         return toSpreadsheetView(state);
     }
-
+    /**
+     * 发布业务资源。
+     */
     public synchronized BiSpreadsheetResourceView publishSpreadsheet(Long tenantId, String spreadsheetKey, String actor,
                                                                      LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "SPREADSHEET", spreadsheetKey);
@@ -340,7 +393,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, state.version, spreadsheetSnapshot(state), state.updatedBy, now);
         return toSpreadsheetView(state);
     }
-
+    /**
+     * 归档业务资源。
+     */
     public synchronized void archiveSpreadsheet(Long tenantId, String spreadsheetKey, String actor, LocalDateTime now) {
         ResourceRef ref = ref(tenantId, "SPREADSHEET", spreadsheetKey);
         SpreadsheetState existing = spreadsheets.get(ref);
@@ -362,11 +417,15 @@ public class BiPresentationResourceCatalog {
                 existing.createdAt,
                 now));
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiResourceVersionView> listSpreadsheetVersions(Long tenantId, String spreadsheetKey) {
         return listVersions(ref(tenantId, "SPREADSHEET", spreadsheetKey));
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     public synchronized BiSpreadsheetResourceView restoreSpreadsheet(Long tenantId,
                                                                      String spreadsheetKey,
                                                                      Integer version,
@@ -393,7 +452,9 @@ public class BiPresentationResourceCatalog {
         appendVersion(ref, state.status, state.version, spreadsheetSnapshot(state), state.updatedBy, now);
         return toSpreadsheetView(state);
     }
-
+    /**
+     * 执行 require Portal 相关处理。
+     */
     private PortalState requirePortal(ResourceRef ref) {
         PortalState state = portals.get(ref);
         if (state == null || "ARCHIVED".equals(state.status)) {
@@ -401,7 +462,9 @@ public class BiPresentationResourceCatalog {
         }
         return state;
     }
-
+    /**
+     * 执行 require Big Screen 相关处理。
+     */
     private BigScreenState requireBigScreen(ResourceRef ref) {
         BigScreenState state = bigScreens.get(ref);
         if (state == null || "ARCHIVED".equals(state.status)) {
@@ -409,7 +472,9 @@ public class BiPresentationResourceCatalog {
         }
         return state;
     }
-
+    /**
+     * 执行 require Spreadsheet 相关处理。
+     */
     private SpreadsheetState requireSpreadsheet(ResourceRef ref) {
         SpreadsheetState state = spreadsheets.get(ref);
         if (state == null || "ARCHIVED".equals(state.status)) {
@@ -417,7 +482,9 @@ public class BiPresentationResourceCatalog {
         }
         return state;
     }
-
+    /**
+     * 查询列表数据。
+     */
     private List<BiResourceVersionView> listVersions(ResourceRef ref) {
         return versions.getOrDefault(ref, List.of()).stream()
                 .sorted(Comparator.comparing(VersionState::version).reversed())
@@ -431,7 +498,9 @@ public class BiPresentationResourceCatalog {
                         state.createdAt()))
                 .toList();
     }
-
+    /**
+     * 执行 version 相关处理。
+     */
     private VersionState version(ResourceRef ref, Integer version) {
         if (version == null || version <= 0) {
             throw new IllegalArgumentException("version is required");
@@ -441,7 +510,9 @@ public class BiPresentationResourceCatalog {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("BI resource version not found"));
     }
-
+    /**
+     * 执行 append Version 相关处理。
+     */
     private void appendVersion(ResourceRef ref,
                                String status,
                                Integer version,
@@ -453,7 +524,9 @@ public class BiPresentationResourceCatalog {
         updated.add(new VersionState(version, status, snapshot, actor, now));
         versions.put(ref, List.copyOf(updated));
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiPortalResourceView toPortalView(PortalState state) {
         return new BiPortalResourceView(
                 state.tenantId,
@@ -470,7 +543,9 @@ public class BiPresentationResourceCatalog {
                 state.createdAt,
                 state.updatedAt);
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiBigScreenResourceView toBigScreenView(BigScreenState state) {
         return new BiBigScreenResourceView(
                 state.tenantId,
@@ -487,7 +562,9 @@ public class BiPresentationResourceCatalog {
                 state.createdAt,
                 state.updatedAt);
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiSpreadsheetResourceView toSpreadsheetView(SpreadsheetState state) {
         return new BiSpreadsheetResourceView(
                 state.tenantId,
@@ -504,7 +581,9 @@ public class BiPresentationResourceCatalog {
                 state.createdAt,
                 state.updatedAt);
     }
-
+    /**
+     * 执行 portal Snapshot 相关处理。
+     */
     private static Map<String, Object> portalSnapshot(PortalState state) {
         return Map.of(
                 "title", state.title,
@@ -513,7 +592,9 @@ public class BiPresentationResourceCatalog {
                 "layout", state.layout,
                 "settings", state.settings);
     }
-
+    /**
+     * 执行 big Screen Snapshot 相关处理。
+     */
     private static Map<String, Object> bigScreenSnapshot(BigScreenState state) {
         return Map.of(
                 "title", state.title,
@@ -522,7 +603,9 @@ public class BiPresentationResourceCatalog {
                 "layout", state.layout,
                 "settings", state.settings);
     }
-
+    /**
+     * 执行 spreadsheet Snapshot 相关处理。
+     */
     private static Map<String, Object> spreadsheetSnapshot(SpreadsheetState state) {
         return Map.of(
                 "name", state.name,
@@ -531,30 +614,42 @@ public class BiPresentationResourceCatalog {
                 "dataBinding", state.dataBinding,
                 "style", state.style);
     }
-
+    /**
+     * 执行 ref 相关处理。
+     */
     private static ResourceRef ref(Long tenantId, String resourceType, String resourceKey) {
         return new ResourceRef(tenant(tenantId), resourceType, BiResourceKey.of(resourceKey, "resourceKey").value());
     }
-
+    /**
+     * 执行 tenant 相关处理。
+     */
     private static Long tenant(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }
-
+    /**
+     * 执行 required Text 相关处理。
+     */
     private static String requiredText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
         }
         return value.trim();
     }
-
+    /**
+     * 执行 optional Text 相关处理。
+     */
     private static String optionalText(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
-
+    /**
+     * 执行 actor 相关处理。
+     */
     private static String actor(String actor) {
         return actor == null || actor.isBlank() ? "system" : actor.trim();
     }
-
+    /**
+     * 执行 keys 相关处理。
+     */
     private static List<String> keys(List<String> values, String field) {
         if (values == null) {
             return List.of();
@@ -565,11 +660,15 @@ public class BiPresentationResourceCatalog {
                 .distinct()
                 .toList();
     }
-
+    /**
+     * 执行 copy Map 相关处理。
+     */
     private static Map<String, Object> copyMap(Map<String, Object> value) {
         return value == null ? Map.of() : Map.copyOf(value);
     }
-
+    /**
+     * 执行 copy Maps 相关处理。
+     */
     private static List<Map<String, Object>> copyMaps(List<Map<String, Object>> values) {
         if (values == null) {
             return List.of();
@@ -578,7 +677,9 @@ public class BiPresentationResourceCatalog {
                 .map(BiPresentationResourceCatalog::copySpreadsheetSheet)
                 .toList();
     }
-
+    /**
+     * 执行 copy Spreadsheet Sheet 相关处理。
+     */
     private static Map<String, Object> copySpreadsheetSheet(Map<String, Object> value) {
         if (value == null || value.isEmpty()) {
             return Map.of();
@@ -590,82 +691,220 @@ public class BiPresentationResourceCatalog {
         }
         return Map.copyOf(copy);
     }
-
+    /**
+     * 执行 text 相关处理。
+     */
     private static String text(Map<String, Object> snapshot, String key) {
         Object value = snapshot.get(key);
         return value == null ? null : value.toString();
     }
-
+    /**
+     * 执行 string List 相关处理。
+     */
     @SuppressWarnings("unchecked")
     private static List<String> stringList(Object value) {
         return value instanceof List<?> list ? (List<String>) list : List.of();
     }
-
+    /**
+     * 执行 map 相关处理。
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> map(Object value) {
         return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
     }
-
+    /**
+     * 执行 maps 相关处理。
+     */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> maps(Object value) {
         return value instanceof List<?> list ? (List<Map<String, Object>>) list : List.of();
     }
-
+    /**
+     * ResourceRef 不可变数据载体。
+     */
     private record ResourceRef(Long tenantId, String resourceType, String resourceKey) {
     }
-
+    /**
+     * VersionState 不可变数据载体。
+     */
     private record VersionState(
+            /**
+             * 版本号。
+             */
             Integer version,
+            /**
+             * 状态值。
+             */
             String status,
+            /**
+             * snapshot 字段值。
+             */
             Map<String, Object> snapshot,
+            /**
+             * 创建人。
+             */
             String createdBy,
             LocalDateTime createdAt) {
     }
-
+    /**
+     * PortalState 不可变数据载体。
+     */
     private record PortalState(
+            /**
+             * 租户标识。
+             */
             Long tenantId,
+            /**
+             * portalKey 对应的业务键。
+             */
             String portalKey,
+            /**
+             * 展示标题。
+             */
             String title,
+            /**
+             * 说明文本。
+             */
             String description,
+            /**
+             * dashboardKeys 对应的数据集合。
+             */
             List<String> dashboardKeys,
+            /**
+             * 布局配置。
+             */
             Map<String, Object> layout,
+            /**
+             * settings 对应的数据集合。
+             */
             Map<String, Object> settings,
+            /**
+             * 状态值。
+             */
             String status,
+            /**
+             * 版本号。
+             */
             Integer version,
+            /**
+             * 创建人。
+             */
             String createdBy,
+            /**
+             * updatedBy 字段值。
+             */
             String updatedBy,
+            /**
+             * 创建时间。
+             */
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
     }
-
+    /**
+     * BigScreenState 不可变数据载体。
+     */
     private record BigScreenState(
+            /**
+             * 租户标识。
+             */
             Long tenantId,
+            /**
+             * screenKey 对应的业务键。
+             */
             String screenKey,
+            /**
+             * 展示标题。
+             */
             String title,
+            /**
+             * 说明文本。
+             */
             String description,
+            /**
+             * dashboardKeys 对应的数据集合。
+             */
             List<String> dashboardKeys,
+            /**
+             * 布局配置。
+             */
             Map<String, Object> layout,
+            /**
+             * settings 对应的数据集合。
+             */
             Map<String, Object> settings,
+            /**
+             * 状态值。
+             */
             String status,
+            /**
+             * 版本号。
+             */
             Integer version,
+            /**
+             * 创建人。
+             */
             String createdBy,
+            /**
+             * updatedBy 字段值。
+             */
             String updatedBy,
+            /**
+             * 创建时间。
+             */
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
     }
-
+    /**
+     * SpreadsheetState 不可变数据载体。
+     */
     private record SpreadsheetState(
+            /**
+             * 租户标识。
+             */
             Long tenantId,
+            /**
+             * spreadsheetKey 对应的业务键。
+             */
             String spreadsheetKey,
+            /**
+             * 展示名称。
+             */
             String name,
+            /**
+             * 说明文本。
+             */
             String description,
+            /**
+             * sheets 对应的数据集合。
+             */
             List<Map<String, Object>> sheets,
+            /**
+             * dataBinding 字段值。
+             */
             Map<String, Object> dataBinding,
+            /**
+             * 样式配置。
+             */
             Map<String, Object> style,
+            /**
+             * 状态值。
+             */
             String status,
+            /**
+             * 版本号。
+             */
             Integer version,
+            /**
+             * 创建人。
+             */
             String createdBy,
+            /**
+             * updatedBy 字段值。
+             */
             String updatedBy,
+            /**
+             * 创建时间。
+             */
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
     }

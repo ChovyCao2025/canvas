@@ -17,22 +17,73 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-
+/**
+ * BiPermissionAdministrationCatalog 目录服务。
+ */
 public class BiPermissionAdministrationCatalog {
-
+    /**
+     * WORKSPACE_ID 对应的标识。
+     */
     private static final Long WORKSPACE_ID = 5L;
+
+    /**
+     * resourcePermissions 对应的数据集合。
+     */
     private final Map<Long, BiResourcePermissionView> resourcePermissions = new LinkedHashMap<>();
+
+    /**
+     * rowPermissions 对应的数据集合。
+     */
     private final Map<Long, BiRowPermissionView> rowPermissions = new LinkedHashMap<>();
+
+    /**
+     * columnPermissions 对应的数据集合。
+     */
     private final Map<Long, BiColumnPermissionView> columnPermissions = new LinkedHashMap<>();
+
+    /**
+     * permissionRequests 对应的数据集合。
+     */
     private final Map<Long, BiPermissionRequestView> permissionRequests = new LinkedHashMap<>();
+
+    /**
+     * auditEntries 对应的数据集合。
+     */
     private final Map<Long, BiPermissionAuditEntryView> auditEntries = new LinkedHashMap<>();
+
+    /**
+     * auditTenants 对应的数据集合。
+     */
     private final Map<Long, Long> auditTenants = new LinkedHashMap<>();
+
+    /**
+     * nextResourcePermissionId 对应的标识。
+     */
     private long nextResourcePermissionId = 1L;
+
+    /**
+     * nextRowPermissionId 对应的标识。
+     */
     private long nextRowPermissionId = 1L;
+
+    /**
+     * nextColumnPermissionId 对应的标识。
+     */
     private long nextColumnPermissionId = 1L;
+
+    /**
+     * nextRequestId 对应的标识。
+     */
     private long nextRequestId = 1L;
+
+    /**
+     * nextAuditId 对应的标识。
+     */
     private long nextAuditId = 1L;
 
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiResourcePermissionView> listResourcePermissions(
             Long tenantId,
             String resourceType,
@@ -54,7 +105,9 @@ public class BiPermissionAdministrationCatalog {
                         .thenComparing(BiResourcePermissionView::id))
                 .toList();
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     public synchronized BiResourcePermissionView upsertResourcePermission(
             Long tenantId,
             BiResourcePermissionCommand command,
@@ -101,7 +154,9 @@ public class BiPermissionAdministrationCatalog {
                     now);
         return view;
     }
-
+    /**
+     * 删除业务数据。
+     */
     public synchronized BiResourcePermissionView deleteResourcePermission(
             Long tenantId,
             String actor,
@@ -114,7 +169,9 @@ public class BiPermissionAdministrationCatalog {
         }
         return removed;
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiRowPermissionView> listRowPermissions(Long tenantId, String datasetKey) {
         Long scopedTenantId = tenant(tenantId);
         String key = nullableKey(datasetKey);
@@ -128,7 +185,9 @@ public class BiPermissionAdministrationCatalog {
                         .thenComparing(BiRowPermissionView::id))
                 .toList();
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     public synchronized BiRowPermissionView upsertRowPermission(
             Long tenantId,
             BiRowPermissionCommand command,
@@ -166,7 +225,9 @@ public class BiPermissionAdministrationCatalog {
                 detail("DATASET", datasetKey, ruleKey, "ROW"), now);
         return view;
     }
-
+    /**
+     * 删除业务数据。
+     */
     public synchronized void deleteRowPermission(Long tenantId, String actor, Long id, LocalDateTime now) {
         BiRowPermissionView removed = removeScoped(rowPermissions, tenantId, id);
         if (removed != null) {
@@ -174,7 +235,9 @@ public class BiPermissionAdministrationCatalog {
                     detail("DATASET", removed.datasetKey(), removed.ruleKey(), "ROW"), now);
         }
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiColumnPermissionView> listColumnPermissions(Long tenantId, String datasetKey) {
         Long scopedTenantId = tenant(tenantId);
         String key = nullableKey(datasetKey);
@@ -188,7 +251,9 @@ public class BiPermissionAdministrationCatalog {
                         .thenComparing(BiColumnPermissionView::id))
                 .toList();
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     public synchronized BiColumnPermissionView upsertColumnPermission(
             Long tenantId,
             BiColumnPermissionCommand command,
@@ -228,7 +293,9 @@ public class BiPermissionAdministrationCatalog {
                 detail("DATASET", datasetKey, fieldKey, policy), now);
         return view;
     }
-
+    /**
+     * 删除业务数据。
+     */
     public synchronized void deleteColumnPermission(Long tenantId, String actor, Long id, LocalDateTime now) {
         BiColumnPermissionView removed = removeScoped(columnPermissions, tenantId, id);
         if (removed != null) {
@@ -236,7 +303,9 @@ public class BiPermissionAdministrationCatalog {
                     detail("DATASET", removed.datasetKey(), removed.fieldKey(), removed.policy()), now);
         }
     }
-
+    /**
+     * 执行 audit 相关处理。
+     */
     public synchronized List<BiPermissionAuditEntryView> audit(Long tenantId, int limit) {
         int boundedLimit = Math.max(0, Math.min(limit, 100));
         Long scopedTenantId = tenant(tenantId);
@@ -248,7 +317,9 @@ public class BiPermissionAdministrationCatalog {
                 .limit(boundedLimit)
                 .toList();
     }
-
+    /**
+     * 查询列表数据。
+     */
     public synchronized List<BiPermissionRequestView> listPermissionRequests(
             Long tenantId,
             String resourceType,
@@ -267,7 +338,9 @@ public class BiPermissionAdministrationCatalog {
                         .thenComparing(BiPermissionRequestView::id))
                 .toList();
     }
-
+    /**
+     * 执行 request Permission 相关处理。
+     */
     public synchronized BiPermissionRequestView requestPermission(
             Long tenantId,
             BiPermissionRequestCommand command,
@@ -296,7 +369,9 @@ public class BiPermissionAdministrationCatalog {
                 detail(view.resourceType(), view.resourceKey(), view.requestedAction(), view.status()), now);
         return view;
     }
-
+    /**
+     * 执行 review Permission Request 相关处理。
+     */
     public synchronized BiPermissionRequestView reviewPermissionRequest(
             Long tenantId,
             BiPermissionRequestReviewCommand command,
@@ -348,7 +423,9 @@ public class BiPermissionAdministrationCatalog {
                 now);
         return reviewed;
     }
-
+    /**
+     * 删除业务数据。
+     */
     private <T> T removeScoped(Map<Long, T> values, Long tenantId, Long id) {
         if (id == null || id <= 0) {
             return null;
@@ -365,7 +442,9 @@ public class BiPermissionAdministrationCatalog {
         }
         return null;
     }
-
+    /**
+     * 执行 audit 相关处理。
+     */
     private void audit(Long tenantId, String actor, String actionKey, String resourceType, String detailJson,
                        LocalDateTime now) {
         Long id = nextAuditId++;
@@ -378,42 +457,60 @@ public class BiPermissionAdministrationCatalog {
                 now));
         auditTenants.put(id, tenant(tenantId));
     }
-
+    /**
+     * 执行 audit Priority 相关处理。
+     */
     private static int auditPriority(BiPermissionAuditEntryView entry) {
         return "BI_PERMISSION_REQUEST_REVIEW".equals(entry.actionKey()) ? 0 : 1;
     }
-
+    /**
+     * 执行 tenant 相关处理。
+     */
     private static Long tenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
-
+    /**
+     * 执行 actor 相关处理。
+     */
     private static String actor(String actor) {
         return actor == null || actor.isBlank() ? "system" : actor.trim();
     }
-
+    /**
+     * 执行 text 相关处理。
+     */
     private static String text(String value) {
         return value == null ? null : value.trim();
     }
-
+    /**
+     * 执行 required Type 相关处理。
+     */
     private static String requiredType(String value) {
         return upper(value, "resourceType");
     }
-
+    /**
+     * 执行 nullable Type 相关处理。
+     */
     private static String nullableType(String value) {
         return value == null || value.isBlank() ? null : requiredType(value);
     }
-
+    /**
+     * 执行 nullable Upper 相关处理。
+     */
     private static String nullableUpper(String value) {
         return value == null || value.isBlank() ? null : value.trim().toUpperCase(Locale.ROOT);
     }
-
+    /**
+     * 执行 upper 相关处理。
+     */
     private static String upper(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
         }
         return value.trim().toUpperCase(Locale.ROOT);
     }
-
+    /**
+     * 执行 effect 相关处理。
+     */
     private static String effect(String value) {
         String effect = upper(value, "effect");
         if (!"ALLOW".equals(effect) && !"DENY".equals(effect)) {
@@ -421,7 +518,9 @@ public class BiPermissionAdministrationCatalog {
         }
         return effect;
     }
-
+    /**
+     * 执行 column Policy 相关处理。
+     */
     private static String columnPolicy(String value) {
         String policy = upper(value, "policy");
         if (!"ALLOW".equals(policy) && !"DENY".equals(policy) && !"MASK".equals(policy)) {
@@ -429,7 +528,9 @@ public class BiPermissionAdministrationCatalog {
         }
         return policy;
     }
-
+    /**
+     * 执行 review Status 相关处理。
+     */
     private static String reviewStatus(String value) {
         String status = upper(value, "status");
         if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
@@ -437,42 +538,58 @@ public class BiPermissionAdministrationCatalog {
         }
         return status;
     }
-
+    /**
+     * 执行 subject Id 相关处理。
+     */
     private static String subjectId(String value) {
         return value == null || value.isBlank() ? "*" : value.trim();
     }
-
+    /**
+     * 执行 nullable Key 相关处理。
+     */
     private static String nullableKey(String value) {
         return value == null || value.isBlank() ? null : key(value);
     }
-
+    /**
+     * 执行 key 相关处理。
+     */
     private static String key(String value) {
         return BiResourceKey.of(value, "resourceKey").value();
     }
-
+    /**
+     * 执行 required Resource Id 相关处理。
+     */
     private static Long requiredResourceId(Long resourceId) {
         if (resourceId == null || resourceId <= 0) {
             throw new IllegalArgumentException("resourceId is required");
         }
         return resourceId;
     }
-
+    /**
+     * 执行 stable Id 相关处理。
+     */
     private static Long stableId(String key) {
         return (long) (key.hashCode() & 0x7fffffff);
     }
-
+    /**
+     * 执行 filters Json 相关处理。
+     */
     private static String filtersJson(BiRowPermissionCommand command) {
         if (command.filters() != null && !command.filters().isEmpty()) {
             return json(command.filters());
         }
         return json(command.filter());
     }
-
+    /**
+     * 执行 detail 相关处理。
+     */
     private static String detail(String type, String key, String action, String result) {
         return "{\"resourceType\":\"" + escape(type) + "\",\"resourceKey\":\"" + escape(key)
                 + "\",\"action\":\"" + escape(action) + "\",\"result\":\"" + escape(result) + "\"}";
     }
-
+    /**
+     * 执行 json 相关处理。
+     */
     private static String json(Object value) {
         if (value == null) {
             return "{}";
@@ -493,7 +610,9 @@ public class BiPermissionAdministrationCatalog {
         }
         return jsonValue(value);
     }
-
+    /**
+     * 执行 json Value 相关处理。
+     */
     private static String jsonValue(Object value) {
         if (value == null) {
             return "null";
@@ -506,7 +625,9 @@ public class BiPermissionAdministrationCatalog {
         }
         return "\"" + escape(String.valueOf(value)) + "\"";
     }
-
+    /**
+     * 执行 escape 相关处理。
+     */
     private static String escape(String value) {
         return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
     }

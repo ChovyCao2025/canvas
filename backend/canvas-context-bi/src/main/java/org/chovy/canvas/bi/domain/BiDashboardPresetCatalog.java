@@ -2,7 +2,9 @@ package org.chovy.canvas.bi.domain;
 
 import java.util.List;
 import java.util.Map;
-
+/**
+ * BiDashboardPresetCatalog 目录服务。
+ */
 public final class BiDashboardPresetCatalog {
 
     private static final BiDashboardPreset CANVAS_EFFECT = new BiDashboardPreset(
@@ -118,26 +120,56 @@ public final class BiDashboardPresetCatalog {
                             "/canvas/{canvas_id}/stats")),
             List.of("EMAIL", "LARK", "WEBHOOK"),
             List.of("INTERNAL_CANVAS", "EXTERNAL_TICKET"));
-
+    /**
+     * 执行 presets 相关处理。
+     */
     public List<BiDashboardPreset> presets(Long tenantId) {
         return List.of(CANVAS_EFFECT);
     }
-
+    /**
+     * 执行 preset 相关处理。
+     */
     public BiDashboardPreset preset(Long tenantId, String dashboardKey) {
         return presets(tenantId).stream()
                 .filter(preset -> preset.dashboardKey().equals(dashboardKey))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown BI dashboard preset: " + dashboardKey));
     }
-
+    /**
+     * BiDashboardPreset 不可变数据载体。
+     */
     public record BiDashboardPreset(
+            /**
+             * 仪表盘键。
+             */
             String dashboardKey,
+            /**
+             * 展示标题。
+             */
             String title,
+            /**
+             * 说明文本。
+             */
             String description,
+            /**
+             * 数据集键。
+             */
             String datasetKey,
+            /**
+             * 组件列表。
+             */
             List<BiDashboardWidget> widgets,
+            /**
+             * 筛选条件。
+             */
             List<BiDashboardFilter> filters,
+            /**
+             * interactions 对应的数据集合。
+             */
             List<BiDashboardInteraction> interactions,
+            /**
+             * subscriptionChannels 对应的数据集合。
+             */
             List<String> subscriptionChannels,
             List<String> embedScopes) {
 
@@ -149,16 +181,45 @@ public final class BiDashboardPresetCatalog {
             embedScopes = embedScopes == null ? List.of() : List.copyOf(embedScopes);
         }
     }
-
+    /**
+     * BiDashboardWidget 不可变数据载体。
+     */
     public record BiDashboardWidget(
+            /**
+             * widgetKey 对应的业务键。
+             */
             String widgetKey,
+            /**
+             * 展示标题。
+             */
             String title,
+            /**
+             * chartType 字段值。
+             */
             String chartType,
+            /**
+             * dimensions 对应的数据集合。
+             */
             List<String> dimensions,
+            /**
+             * 指标列表。
+             */
             List<String> metrics,
+            /**
+             * gridX 字段值。
+             */
             int gridX,
+            /**
+             * gridY 字段值。
+             */
             int gridY,
+            /**
+             * gridW 字段值。
+             */
             int gridW,
+            /**
+             * gridH 字段值。
+             */
             int gridH,
             String stylePreset) {
 
@@ -167,17 +228,49 @@ public final class BiDashboardPresetCatalog {
             metrics = metrics == null ? List.of() : List.copyOf(metrics);
         }
     }
-
+    /**
+     * BiDashboardFilter 不可变数据载体。
+     */
     public record BiDashboardFilter(
+            /**
+             * filterKey 对应的业务键。
+             */
             String filterKey,
+            /**
+             * fieldKey 对应的业务键。
+             */
             String fieldKey,
+            /**
+             * label 字段值。
+             */
             String label,
+            /**
+             * controlType 字段值。
+             */
             String controlType,
+            /**
+             * required 字段值。
+             */
             boolean required,
+            /**
+             * defaultValue 字段值。
+             */
             String defaultValue,
+            /**
+             * targetWidgetKeys 对应的数据集合。
+             */
             List<String> targetWidgetKeys,
+            /**
+             * cascade 字段值。
+             */
             BiDashboardFilterCascade cascade,
+            /**
+             * optionDatasetKey 对应的业务键。
+             */
             String optionDatasetKey,
+            /**
+             * optionFieldKey 对应的业务键。
+             */
             String optionFieldKey,
             boolean hidden) {
 
@@ -185,9 +278,17 @@ public final class BiDashboardPresetCatalog {
             targetWidgetKeys = targetWidgetKeys == null ? List.of() : List.copyOf(targetWidgetKeys);
         }
     }
-
+    /**
+     * BiDashboardFilterCascade 不可变数据载体。
+     */
     public record BiDashboardFilterCascade(
+            /**
+             * parentFilterKeys 对应的数据集合。
+             */
             List<String> parentFilterKeys,
+            /**
+             * parentFieldMapping 字段值。
+             */
             Map<String, String> parentFieldMapping,
             String mode) {
 
@@ -197,12 +298,29 @@ public final class BiDashboardPresetCatalog {
             mode = mode == null || mode.isBlank() ? "SAME_SOURCE" : mode;
         }
     }
-
+    /**
+     * BiDashboardInteraction 不可变数据载体。
+     */
     public record BiDashboardInteraction(
+            /**
+             * interactionKey 对应的业务键。
+             */
             String interactionKey,
+            /**
+             * sourceWidgetKey 对应的业务键。
+             */
             String sourceWidgetKey,
+            /**
+             * targetWidgetKey 对应的业务键。
+             */
             String targetWidgetKey,
+            /**
+             * interactionType 字段值。
+             */
             String interactionType,
+            /**
+             * fieldKey 对应的业务键。
+             */
             String fieldKey,
             String target) {
     }

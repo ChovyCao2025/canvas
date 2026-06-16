@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-
+/**
+ * BiDashboardWidgetMapper MyBatis 映射器。
+ */
 @Mapper
 public interface BiDashboardWidgetMapper extends BaseMapper<BiDashboardWidgetDO> {
 
@@ -13,5 +15,8 @@ public interface BiDashboardWidgetMapper extends BaseMapper<BiDashboardWidgetDO>
             WHERE tenant_id = #{tenantId}
               AND dashboard_id = #{dashboardId}
             """)
+    /**
+     * 删除业务数据。
+     */
     int deleteByDashboard(@Param("tenantId") Long tenantId, @Param("dashboardId") Long dashboardId);
 }

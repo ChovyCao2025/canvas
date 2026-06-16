@@ -13,10 +13,14 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-
+/**
+ * BiPersistenceConverter 业务对象。
+ */
 @Component
 public class BiPersistenceConverter {
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiWorkspaceDO toWorkspaceRow(BiWorkspace workspace) {
         if (workspace == null) {
             return null;
@@ -33,7 +37,9 @@ public class BiPersistenceConverter {
         row.setUpdatedAt(workspace.updatedAt());
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiWorkspace toWorkspace(BiWorkspaceDO row) {
         if (row == null) {
             return null;
@@ -49,7 +55,9 @@ public class BiPersistenceConverter {
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDatasetDO toDatasetRow(BiDataset dataset) {
         if (dataset == null) {
             return null;
@@ -71,7 +79,9 @@ public class BiPersistenceConverter {
         row.setUpdatedAt(dataset.updatedAt());
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDataset toDataset(BiDatasetDO row, List<BiDatasetFieldDO> fieldRows, List<BiMetricDO> metricRows) {
         if (row == null) {
             return null;
@@ -94,7 +104,9 @@ public class BiPersistenceConverter {
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDatasetFieldDO toDatasetFieldRow(Long tenantId, Long datasetId, BiDatasetField field) {
         BiDatasetFieldDO row = new BiDatasetFieldDO();
         row.setTenantId(tenantId);
@@ -109,7 +121,9 @@ public class BiPersistenceConverter {
         row.setSortOrder(field.sortOrder());
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDatasetField toDatasetField(BiDatasetFieldDO row) {
         return new BiDatasetField(
                 BiResourceKey.of(row.getFieldKey(), "fieldKey"),
@@ -121,7 +135,9 @@ public class BiPersistenceConverter {
                 row.getVisible() == null || row.getVisible(),
                 row.getSortOrder() == null ? 0 : row.getSortOrder());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiMetricDO toMetricRow(Long tenantId, Long workspaceId, Long datasetId, BiMetric metric) {
         BiMetricDO row = new BiMetricDO();
         row.setTenantId(tenantId);
@@ -136,7 +152,9 @@ public class BiPersistenceConverter {
         row.setStatus(BiResourceStatus.PUBLISHED.name());
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiMetric toMetric(BiMetricDO row) {
         return new BiMetric(
                 BiResourceKey.of(row.getMetricKey(), "metricKey"),
@@ -146,7 +164,9 @@ public class BiPersistenceConverter {
                 row.getDataType(),
                 row.getUnit());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiChartDO toChartRow(BiChart chart) {
         if (chart == null) {
             return null;
@@ -168,7 +188,9 @@ public class BiPersistenceConverter {
         row.setUpdatedAt(chart.updatedAt());
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiChart toChart(BiChartDO row, BiDataset dataset) {
         if (row == null || dataset == null) {
             return null;
@@ -190,7 +212,9 @@ public class BiPersistenceConverter {
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDashboardDO toDashboardRow(BiDashboard dashboard) {
         if (dashboard == null) {
             return null;
@@ -211,11 +235,15 @@ public class BiPersistenceConverter {
         row.setUpdatedAt(dashboard.updatedAt());
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDashboard toDashboard(BiDashboardDO row) {
         return toDashboard(row, List.of());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDashboard toDashboard(BiDashboardDO row, List<String> chartKeys) {
         if (row == null) {
             return null;
@@ -236,7 +264,9 @@ public class BiPersistenceConverter {
                 row.getCreatedAt(),
                 row.getUpdatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiDashboardWidgetDO toDashboardWidgetRow(Long tenantId, Long dashboardId, String chartKey, Long chartId) {
         BiDashboardWidgetDO row = new BiDashboardWidgetDO();
         row.setTenantId(tenantId);
@@ -250,7 +280,9 @@ public class BiPersistenceConverter {
         row.setInteractionJson("{}");
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiResourcePermissionDO toPermissionRow(BiPermissionGrant grant) {
         if (grant == null) {
             return null;
@@ -269,7 +301,9 @@ public class BiPersistenceConverter {
         row.setCreatedAt(grant.createdAt());
         return row;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     public BiPermissionGrant toPermissionGrant(BiResourcePermissionDO row) {
         if (row == null) {
             return null;
@@ -287,15 +321,24 @@ public class BiPersistenceConverter {
                 row.getCreatedBy(),
                 row.getCreatedAt());
     }
-
+    /**
+     * 执行 safe 相关处理。
+     */
     private static <T> List<T> safe(List<T> values) {
         return values == null ? List.of() : values;
     }
-
+    /**
+     * SimpleBiJsonCodec 业务对象。
+     */
     static final class SimpleBiJsonCodec {
+        /**
+         * 执行 Simple Bi Json Codec 相关处理。
+         */
         private SimpleBiJsonCodec() {
         }
-
+        /**
+         * 转换为目标数据结构。
+         */
         static String toJson(Map<String, Object> value) {
             if (value == null || value.isEmpty()) {
                 return "{}";
@@ -311,7 +354,9 @@ public class BiPersistenceConverter {
             }
             return builder.append('}').toString();
         }
-
+        /**
+         * 从输入值构建目标对象。
+         */
         static Map<String, Object> fromJsonObject(String json) {
             if (json == null || json.isBlank()) {
                 return Map.of();
@@ -336,7 +381,9 @@ public class BiPersistenceConverter {
             }
             return Map.copyOf(result);
         }
-
+        /**
+         * 执行 value To Json 相关处理。
+         */
         private static String valueToJson(Object value) {
             if (value == null) {
                 return "null";
@@ -358,11 +405,15 @@ public class BiPersistenceConverter {
             }
             return quote(String.valueOf(value));
         }
-
+        /**
+         * 执行 quote 相关处理。
+         */
         private static String quote(String value) {
             return "\"" + String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         }
-
+        /**
+         * 执行 unquote 相关处理。
+         */
         private static String unquote(String value) {
             String trimmed = value == null ? "" : value.trim();
             if (trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2) {

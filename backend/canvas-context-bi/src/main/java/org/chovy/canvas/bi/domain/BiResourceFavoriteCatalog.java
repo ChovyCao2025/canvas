@@ -8,11 +8,18 @@ import java.util.Comparator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
+/**
+ * BiResourceFavoriteCatalog 目录服务。
+ */
 public class BiResourceFavoriteCatalog {
-
+    /**
+     * favorites 对应的数据集合。
+     */
     private final Map<FavoriteKey, BiResourceFavoriteView> favorites = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 favorite 相关处理。
+     */
     public BiResourceFavoriteView favorite(Long tenantId,
                                            String actor,
                                            BiResourceFavoriteCommand command,
@@ -30,7 +37,9 @@ public class BiResourceFavoriteCatalog {
                 now,
                 now));
     }
-
+    /**
+     * 查询列表数据。
+     */
     public java.util.List<BiResourceFavoriteView> list(Long tenantId, String actor, String resourceType) {
         FavoriteScope scope = scope(tenantId, actor);
         String normalizedType = resourceType == null || resourceType.isBlank() ? null : normalizeType(resourceType);
@@ -42,11 +51,15 @@ public class BiResourceFavoriteCatalog {
                         .thenComparing(BiResourceFavoriteView::resourceKey))
                 .toList();
     }
-
+    /**
+     * 删除业务数据。
+     */
     public void remove(Long tenantId, String actor, String resourceType, String resourceKey) {
         favorites.remove(key(tenantId, actor, resourceType, resourceKey));
     }
-
+    /**
+     * 执行 key 相关处理。
+     */
     private static FavoriteKey key(Long tenantId, String actor, String resourceType, String resourceKey) {
         FavoriteScope scope = scope(tenantId, actor);
         return new FavoriteKey(
@@ -55,11 +68,15 @@ public class BiResourceFavoriteCatalog {
                 normalizeType(resourceType),
                 BiResourceKey.of(resourceKey, "resourceKey").value());
     }
-
+    /**
+     * 执行 scope 相关处理。
+     */
     private static FavoriteScope scope(Long tenantId, String actor) {
         return new FavoriteScope(tenantId == null || tenantId < 0 ? 0L : tenantId, defaultActor(actor));
     }
-
+    /**
+     * 规范化输入值。
+     */
     private static String normalizeType(String resourceType) {
         if (resourceType == null || resourceType.isBlank()) {
             throw new IllegalArgumentException("resourceType is required");
@@ -73,18 +90,26 @@ public class BiResourceFavoriteCatalog {
         }
         return normalized;
     }
-
+    /**
+     * 生成默认值。
+     */
     private static String defaultActor(String actor) {
         return actor == null || actor.isBlank() ? "system" : actor.trim();
     }
-
+    /**
+     * 执行 title Or Default 相关处理。
+     */
     private static String titleOrDefault(String title, String resourceKey) {
         return title == null || title.isBlank() ? resourceKey : title.trim();
     }
-
+    /**
+     * FavoriteScope 不可变数据载体。
+     */
     private record FavoriteScope(Long tenantId, String actor) {
     }
-
+    /**
+     * FavoriteKey 不可变数据载体。
+     */
     private record FavoriteKey(Long tenantId, String actor, String resourceType, String resourceKey) {
     }
 }

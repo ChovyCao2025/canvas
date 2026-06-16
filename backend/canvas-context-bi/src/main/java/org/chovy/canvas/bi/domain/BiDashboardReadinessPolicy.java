@@ -5,9 +5,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
+/**
+ * BiDashboardReadinessPolicy 策略。
+ */
 public class BiDashboardReadinessPolicy {
-
+    /**
+     * 执行 evaluate 相关处理。
+     */
     public BiDashboardReadinessReport evaluate(BiDashboard dashboard, List<BiChart> charts, List<BiDataset> datasets) {
         if (dashboard == null) {
             throw new IllegalArgumentException("dashboard is required");
@@ -48,15 +52,21 @@ public class BiDashboardReadinessPolicy {
                 blockers,
                 List.of());
     }
-
+    /**
+     * 执行 safe Charts 相关处理。
+     */
     private static List<BiChart> safeCharts(List<BiChart> charts) {
         return charts == null ? List.of() : charts;
     }
-
+    /**
+     * 执行 safe Datasets 相关处理。
+     */
     private static List<BiDataset> safeDatasets(List<BiDataset> datasets) {
         return datasets == null ? List.of() : datasets;
     }
-
+    /**
+     * 执行 issue 相关处理。
+     */
     private static BiDashboardReadinessIssue issue(String severity,
                                                    String code,
                                                    String itemType,

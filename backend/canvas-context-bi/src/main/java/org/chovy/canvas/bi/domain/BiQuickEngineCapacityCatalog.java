@@ -17,17 +17,43 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-
+/**
+ * BiQuickEngineCapacityCatalog 目录服务。
+ */
 public class BiQuickEngineCapacityCatalog {
-
+    /**
+     * DEFAULT_LIMIT 字段值。
+     */
     private static final int DEFAULT_LIMIT = 50;
+
+    /**
+     * MAX_LIMIT 字段值。
+     */
     private static final int MAX_LIMIT = 200;
+
+    /**
+     * SNAPSHOT_TIME 对应的时间。
+     */
     private static final LocalDateTime SNAPSHOT_TIME = LocalDateTime.parse("2026-06-06T10:00:00");
+
+    /**
+     * POOL_KEY_PATTERN 字段值。
+     */
     private static final Pattern POOL_KEY_PATTERN = Pattern.compile("[A-Z0-9_-]{1,64}");
 
+    /**
+     * alertPolicies 对应的数据集合。
+     */
     private final Map<Long, BiQuickEngineCapacityAlertPolicyView> alertPolicies = new ConcurrentHashMap<>();
+
+    /**
+     * tenantPoolPolicies 对应的数据集合。
+     */
     private final Map<Long, BiQuickEngineTenantPoolPolicyView> tenantPoolPolicies = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 summary 相关处理。
+     */
     public BiQuickEngineCapacitySummaryView summary(Long tenantId, Integer limit) {
         Long scopedTenantId = safeTenantId(tenantId);
         int normalizedLimit = normalizeLimit(limit);
@@ -70,7 +96,9 @@ public class BiQuickEngineCapacityCatalog {
                 details,
                 userRankings);
     }
-
+    /**
+     * 执行 update Alert Policy 相关处理。
+     */
     public BiQuickEngineCapacityAlertPolicyView updateAlertPolicy(Long tenantId,
                                                                   BiQuickEngineCapacityAlertPolicyCommand command,
                                                                   String actor,
@@ -101,7 +129,9 @@ public class BiQuickEngineCapacityCatalog {
         alertPolicies.put(scopedTenantId, updated);
         return updated;
     }
-
+    /**
+     * 执行 update Tenant Pool Policy 相关处理。
+     */
     public BiQuickEngineTenantPoolPolicyView updateTenantPoolPolicy(Long tenantId,
                                                                     BiQuickEngineTenantPoolPolicyCommand command,
                                                                     String actor,
@@ -130,7 +160,9 @@ public class BiQuickEngineCapacityCatalog {
         tenantPoolPolicies.put(scopedTenantId, updated);
         return updated;
     }
-
+    /**
+     * 执行 queue Snapshot 相关处理。
+     */
     public BiQuickEngineQueueSnapshotView queueSnapshot(Long tenantId, String poolKey, String status, Integer limit) {
         String normalizedPoolKey = normalizeOptional(poolKey);
         String normalizedStatus = normalizeOptional(status);
@@ -152,7 +184,9 @@ public class BiQuickEngineCapacityCatalog {
                 15L,
                 jobs);
     }
-
+    /**
+     * 执行 capacity Details 相关处理。
+     */
     private static List<Map<String, Object>> capacityDetails() {
         return List.of(
                 Map.of(
@@ -180,7 +214,9 @@ public class BiQuickEngineCapacityCatalog {
                         "owner", "operator",
                         "lastAccessedAt", SNAPSHOT_TIME.minusDays(1)));
     }
-
+    /**
+     * 执行 queue Jobs 相关处理。
+     */
     private static List<BiQuickEngineQueueItemView> queueJobs(Long tenantId) {
         return List.of(
                 job(81L, tenantId, "GOLD", "hash-queue-a", "canvas_daily_stats", "analyst", "QUEUED", 0,
@@ -198,7 +234,9 @@ public class BiQuickEngineCapacityCatalog {
                 job(87L, tenantId, "STANDARD", "hash-completed-a", "audience_segment_stats", "operator", "COMPLETED", 0,
                         SNAPSHOT_TIME.minusMinutes(30), SNAPSHOT_TIME.minusMinutes(29), "worker-c"));
     }
-
+    /**
+     * 执行 user Rankings 相关处理。
+     */
     private static List<Map<String, Object>> userRankings() {
         return List.of(
                 Map.of(
@@ -212,7 +250,9 @@ public class BiQuickEngineCapacityCatalog {
                         "resourceCount", 2,
                         "activeTableCount", 3));
     }
-
+    /**
+     * 执行 job 相关处理。
+     */
     private static BiQuickEngineQueueItemView job(Long id,
                                                   Long tenantId,
                                                   String poolKey,
@@ -244,15 +284,21 @@ public class BiQuickEngineCapacityCatalog {
                 createdAt,
                 completedAt == null ? createdAt : completedAt);
     }
-
+    /**
+     * 执行 alert Policy 相关处理。
+     */
     private BiQuickEngineCapacityAlertPolicyView alertPolicy(Long tenantId) {
         return alertPolicies.computeIfAbsent(safeTenantId(tenantId), ignored -> defaultAlertPolicy());
     }
-
+    /**
+     * 执行 tenant Pool Policy 相关处理。
+     */
     private BiQuickEngineTenantPoolPolicyView tenantPoolPolicy(Long tenantId) {
         return tenantPoolPolicies.computeIfAbsent(safeTenantId(tenantId), ignored -> defaultTenantPoolPolicy());
     }
-
+    /**
+     * 生成默认值。
+     */
     private static BiQuickEngineCapacityAlertPolicyView defaultAlertPolicy() {
         return new BiQuickEngineCapacityAlertPolicyView(
                 false,
@@ -264,7 +310,9 @@ public class BiQuickEngineCapacityCatalog {
                 "system",
                 SNAPSHOT_TIME);
     }
-
+    /**
+     * 生成默认值。
+     */
     private static BiQuickEngineTenantPoolPolicyView defaultTenantPoolPolicy() {
         return new BiQuickEngineTenantPoolPolicyView(
                 "STANDARD",
@@ -275,7 +323,9 @@ public class BiQuickEngineCapacityCatalog {
                 "analyst",
                 SNAPSHOT_TIME);
     }
-
+    /**
+     * 执行 pool 相关处理。
+     */
     private static BiQuickEnginePoolView pool(BiQuickEngineTenantPoolPolicyView policy) {
         return new BiQuickEnginePoolView(
                 policy.poolKey(),
@@ -284,7 +334,9 @@ public class BiQuickEngineCapacityCatalog {
                 policy.queueTimeoutSeconds(),
                 policy.poolWeight());
     }
-
+    /**
+     * 校验输入参数。
+     */
     private static void validateAlertPolicy(BiQuickEngineCapacityAlertPolicyView policy) {
         if (policy.capacityLimitRows() == null || policy.capacityLimitRows() <= 0) {
             throw new IllegalArgumentException("capacityLimitRows must be positive");
@@ -296,13 +348,17 @@ public class BiQuickEngineCapacityCatalog {
                     "warningThresholdPercent must be less than criticalThresholdPercent");
         }
     }
-
+    /**
+     * 校验输入参数。
+     */
     private static void validateThreshold(Integer value, String fieldName) {
         if (value == null || value < 1 || value > 100) {
             throw new IllegalArgumentException(fieldName + " must be between 1 and 100");
         }
     }
-
+    /**
+     * 校验输入参数。
+     */
     private static void validateTenantPoolPolicy(BiQuickEngineTenantPoolPolicyView policy) {
         if (policy.poolKey() == null || !POOL_KEY_PATTERN.matcher(policy.poolKey()).matches()) {
             throw new IllegalArgumentException("poolKey must match [A-Z0-9_-]{1,64}");
@@ -312,13 +368,17 @@ public class BiQuickEngineCapacityCatalog {
         validatePositiveBounded(policy.queueTimeoutSeconds(), "queueTimeoutSeconds", 86_400);
         validatePositiveBounded(policy.poolWeight(), "poolWeight", 10_000);
     }
-
+    /**
+     * 校验输入参数。
+     */
     private static void validatePositiveBounded(Integer value, String fieldName, int max) {
         if (value == null || value < 1 || value > max) {
             throw new IllegalArgumentException(fieldName + " must be between 1 and " + max);
         }
     }
-
+    /**
+     * 规范化输入值。
+     */
     private static List<String> normalizeValues(List<String> values, boolean uppercase, String fieldName, int max) {
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
         for (String value : values == null ? List.<String>of() : values) {
@@ -333,7 +393,9 @@ public class BiQuickEngineCapacityCatalog {
         }
         return List.copyOf(normalized);
     }
-
+    /**
+     * 规范化输入值。
+     */
     private static int normalizeLimit(Integer limit) {
         if (limit == null) {
             return DEFAULT_LIMIT;
@@ -343,14 +405,18 @@ public class BiQuickEngineCapacityCatalog {
         }
         return Math.min(limit, MAX_LIMIT);
     }
-
+    /**
+     * 规范化输入值。
+     */
     private static String normalizeOptional(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
         return value.trim().toUpperCase(Locale.ROOT);
     }
-
+    /**
+     * 执行 safe Tenant Id 相关处理。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }

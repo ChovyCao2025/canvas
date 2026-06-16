@@ -1,13 +1,33 @@
 package org.chovy.canvas.bi.domain;
 
 import java.util.Locale;
-
+/**
+ * BiMetric 指标模型。
+ */
 public record BiMetric(
+        /**
+         * 指标键。
+         */
         BiResourceKey metricKey,
+        /**
+         * displayName 字段值。
+         */
         String displayName,
+        /**
+         * expression 字段值。
+         */
         String expression,
+        /**
+         * aggregation 字段值。
+         */
         String aggregation,
+        /**
+         * dataType 字段值。
+         */
         String dataType,
+        /**
+         * 计量单位。
+         */
         String unit
 ) {
     public BiMetric {

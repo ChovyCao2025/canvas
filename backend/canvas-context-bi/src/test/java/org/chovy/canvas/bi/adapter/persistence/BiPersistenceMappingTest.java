@@ -13,11 +13,18 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
+/**
+ * BiPersistenceMappingTest 测试类。
+ */
 class BiPersistenceMappingTest {
-
+    /**
+     * converter 字段值。
+     */
     private final BiPersistenceConverter converter = new BiPersistenceConverter();
 
+    /**
+     * 执行 bi Do Classes Own Representative Legacy Tables Inside Bi Persistence Adapter 相关处理。
+     */
     @Test
     void biDoClassesOwnRepresentativeLegacyTablesInsideBiPersistenceAdapter() {
         assertThat(BiWorkspaceDO.class.getAnnotation(TableName.class).value()).isEqualTo("bi_workspace");
@@ -45,7 +52,9 @@ class BiPersistenceMappingTest {
         assertThat(BaseMapper.class).isAssignableFrom(BiDatasourceSchemaSnapshotMapper.class);
         assertThat(BaseMapper.class).isAssignableFrom(BiDatasourceHealthSnapshotMapper.class);
     }
-
+    /**
+     * 执行 converter Round Trips Dataset And Permission Rows 相关处理。
+     */
     @Test
     void converterRoundTripsDatasetAndPermissionRows() {
         BiDataset dataset = new BiDataset(

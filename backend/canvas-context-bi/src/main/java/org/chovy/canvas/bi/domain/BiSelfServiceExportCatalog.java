@@ -18,12 +18,23 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-
+/**
+ * BiSelfServiceExportCatalog 目录服务。
+ */
 public class BiSelfServiceExportCatalog {
-
+    /**
+     * jobIds 对应的数据集合。
+     */
     private final AtomicLong jobIds = new AtomicLong(900L);
+
+    /**
+     * jobs 对应的数据集合。
+     */
     private final Map<Long, BiSelfServiceExportJobView> jobs = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 preview 相关处理。
+     */
     public Map<String, Object> preview(Long tenantId, String actor, String role, BiSelfServicePreviewCommand command) {
         Map<String, Object> query = command == null ? Map.of() : command.query();
         int limit = Math.max(0, command == null || command.previewLimit() == null ? 20 : command.previewLimit());
@@ -44,7 +55,9 @@ public class BiSelfServiceExportCatalog {
                         Map.of("name", "datasetKey", "type", "STRING")),
                 "rows", rows);
     }
-
+    /**
+     * 执行 create 相关处理。
+     */
     public BiSelfServiceExportJobView create(
             Long tenantId,
             String actor,
@@ -77,7 +90,9 @@ public class BiSelfServiceExportCatalog {
         jobs.put(id, view);
         return view;
     }
-
+    /**
+     * 查询列表数据。
+     */
     public List<BiSelfServiceExportJobView> list(Long tenantId, int limit) {
         return limited(jobs.values().stream()
                 .filter(job -> job.tenantId().equals(safeTenantId(tenantId)))
@@ -85,7 +100,9 @@ public class BiSelfServiceExportCatalog {
                         .thenComparing(Comparator.comparing(BiSelfServiceExportJobView::id).reversed()))
                 .toList(), limit);
     }
-
+    /**
+     * 执行 review 相关处理。
+     */
     public BiSelfServiceExportJobView review(
             Long tenantId,
             Long id,
@@ -106,7 +123,9 @@ public class BiSelfServiceExportCatalog {
         jobs.put(id, updated);
         return updated;
     }
-
+    /**
+     * 执行 detail 相关处理。
+     */
     public BiSelfServiceExportJobDetailView detail(Long tenantId, Long id) {
         BiSelfServiceExportJobView job = require(tenantId, id);
         return new BiSelfServiceExportJobDetailView(
@@ -114,7 +133,9 @@ public class BiSelfServiceExportCatalog {
                 Map.of("tenantId", job.tenantId(), "resourceType", job.resourceType(), "resourceKey", job.resourceKey()),
                 Map.of("requestedBy", job.requestedBy(), "approvalStatus", job.approvalStatus()));
     }
-
+    /**
+     * 执行 download 相关处理。
+     */
     public BiSelfServiceExportDownload download(Long tenantId, String actor, Long id) {
         BiSelfServiceExportJobView job = require(tenantId, id);
         String format = job.exportFormat().toLowerCase(Locale.ROOT);
@@ -124,7 +145,9 @@ public class BiSelfServiceExportCatalog {
                 "csv".equals(format) ? "text/csv" : "application/octet-stream",
                 content.getBytes(StandardCharsets.UTF_8));
     }
-
+    /**
+     * 执行 cancel 相关处理。
+     */
     public BiSelfServiceExportJobView cancel(Long tenantId, String actor, Long id, LocalDateTime now) {
         BiSelfServiceExportJobView existing = require(tenantId, id);
         BiSelfServiceExportJobView updated = copy(existing, "CANCELLED", existing.approvalStatus(),
@@ -132,12 +155,16 @@ public class BiSelfServiceExportCatalog {
         jobs.put(id, updated);
         return updated;
     }
-
+    /**
+     * 执行 cleanup 相关处理。
+     */
     public BiSelfServiceExportCleanupResult cleanup(Long tenantId, int limit) {
         int checked = Math.max(limit, 0);
         return new BiSelfServiceExportCleanupResult(checked, 0, list(tenantId, Integer.MAX_VALUE).size());
     }
-
+    /**
+     * 执行 retry 相关处理。
+     */
     public BiSelfServiceExportRetryResult retry(Long tenantId, String actor, String role, int limit, LocalDateTime now) {
         List<BiSelfServiceExportJobView> retryable = limited(list(tenantId, Integer.MAX_VALUE).stream()
                 .filter(job -> "FAILED".equals(job.status()) || "CANCELLED".equals(job.status()))
@@ -150,7 +177,9 @@ public class BiSelfServiceExportCatalog {
         int retried = queued.isEmpty() && !list(tenantId, Integer.MAX_VALUE).isEmpty() ? 1 : queued.size();
         return new BiSelfServiceExportRetryResult(Math.max(limit, 0), retried, queued);
     }
-
+    /**
+     * 执行 run Queue 相关处理。
+     */
     public BiSelfServiceExportQueueResult runQueue(
             Long tenantId,
             String actor,
@@ -167,7 +196,9 @@ public class BiSelfServiceExportCatalog {
         completed.forEach(job -> jobs.put(job.id(), job));
         return new BiSelfServiceExportQueueResult(Math.max(limit, 0), completed.size(), 0, completed);
     }
-
+    /**
+     * 执行 require 相关处理。
+     */
     private BiSelfServiceExportJobView require(Long tenantId, Long id) {
         BiSelfServiceExportJobView job = jobs.get(id);
         if (job == null || !job.tenantId().equals(safeTenantId(tenantId))) {
@@ -175,7 +206,9 @@ public class BiSelfServiceExportCatalog {
         }
         return job;
     }
-
+    /**
+     * 执行 copy 相关处理。
+     */
     private static BiSelfServiceExportJobView copy(
             BiSelfServiceExportJobView source,
             String status,
@@ -203,27 +236,39 @@ public class BiSelfServiceExportCatalog {
                 source.createdAt(),
                 updatedAt);
     }
-
+    /**
+     * 执行 limited 相关处理。
+     */
     private static <T> List<T> limited(List<T> values, int limit) {
         return limit < 0 || limit >= values.size() ? values : values.subList(0, limit);
     }
-
+    /**
+     * 执行 safe Tenant Id 相关处理。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null ? 7L : tenantId;
     }
-
+    /**
+     * 生成默认值。
+     */
     private static String defaultActor(String actor) {
         return actor == null || actor.isBlank() ? "analyst" : actor.trim();
     }
-
+    /**
+     * 生成默认值。
+     */
     private static String defaultRole(String role) {
         return role == null || role.isBlank() ? "ANALYST" : role.trim().toUpperCase(Locale.ROOT);
     }
-
+    /**
+     * 规范化输入值。
+     */
     private static String normalizeType(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim().toUpperCase(Locale.ROOT);
     }
-
+    /**
+     * 执行 text 相关处理。
+     */
     private static String text(Object value, String fallback) {
         return value == null || value.toString().isBlank() ? fallback : value.toString().trim();
     }

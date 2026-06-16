@@ -7,11 +7,18 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
+/**
+ * BiDashboardReadinessPolicyTest 测试类。
+ */
 class BiDashboardReadinessPolicyTest {
-
+    /**
+     * policy 字段值。
+     */
     private final BiDashboardReadinessPolicy policy = new BiDashboardReadinessPolicy();
 
+    /**
+     * 验证对应业务场景。
+     */
     @Test
     void dashboardIsBlockedWhenReferencedChartIsMissingOrDatasetIsNotPublished() {
         BiDashboard dashboard = dashboard(List.of("orders-trend", "gmv-card"));
@@ -27,7 +34,9 @@ class BiDashboardReadinessPolicyTest {
         assertThat(report.publishedChartCount()).isEqualTo(1);
         assertThat(report.draftDatasetCount()).isEqualTo(1);
     }
-
+    /**
+     * 验证对应业务场景。
+     */
     @Test
     void dashboardIsProductionReadyWhenAllChartsAndDatasetsArePublished() {
         BiDashboard dashboard = dashboard(List.of("orders-trend"));
@@ -40,7 +49,9 @@ class BiDashboardReadinessPolicyTest {
         assertThat(report.status()).isEqualTo("READY");
         assertThat(report.blockers()).isEmpty();
     }
-
+    /**
+     * 执行 dashboard 相关处理。
+     */
     private static BiDashboard dashboard(List<String> chartKeys) {
         return new BiDashboard(
                 10L,
@@ -58,7 +69,9 @@ class BiDashboardReadinessPolicyTest {
                 LocalDateTime.parse("2026-06-01T00:00:00"),
                 LocalDateTime.parse("2026-06-01T00:00:00"));
     }
-
+    /**
+     * 执行 dataset 相关处理。
+     */
     private static BiDataset dataset(Long id, String key, String status) {
         return new BiDataset(
                 id,
@@ -78,7 +91,9 @@ class BiDashboardReadinessPolicyTest {
                 LocalDateTime.parse("2026-06-01T00:00:00"),
                 LocalDateTime.parse("2026-06-01T00:00:00"));
     }
-
+    /**
+     * 执行 chart 相关处理。
+     */
     private static BiChart chart(Long id, String key, Long datasetId, String datasetKey, String status) {
         return new BiChart(
                 id,

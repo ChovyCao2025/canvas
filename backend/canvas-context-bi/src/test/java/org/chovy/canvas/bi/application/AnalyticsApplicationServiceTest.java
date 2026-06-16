@@ -6,9 +6,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.chovy.canvas.bi.api.AnalyticsViews.AlertPreviewRequest;
 import org.chovy.canvas.bi.api.AnalyticsViews.ExportRequest;
 import org.junit.jupiter.api.Test;
-
+/**
+ * AnalyticsApplicationServiceTest 测试类。
+ */
 class AnalyticsApplicationServiceTest {
-
+    /**
+     * 执行 returns Deterministic Analytics Views For Legacy Route Aliases 相关处理。
+     */
     @Test
     void returnsDeterministicAnalyticsViewsForLegacyRouteAliases() {
         AnalyticsApplicationService service = new AnalyticsApplicationService();
