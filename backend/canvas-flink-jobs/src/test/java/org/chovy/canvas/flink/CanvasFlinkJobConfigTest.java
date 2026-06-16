@@ -8,8 +8,14 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证 Flink 作业环境配置的解析和占位符生成规则。
+ */
 class CanvasFlinkJobConfigTest {
 
+    /**
+     * 缺少 pipeline key 时应拒绝启动配置。
+     */
     @Test
     void rejectsMissingPipelineKey() {
         Map<String, String> env = validEnv();
@@ -20,6 +26,9 @@ class CanvasFlinkJobConfigTest {
                 .hasMessageContaining("CANVAS_FLINK_JOB_PIPELINE_KEY");
     }
 
+    /**
+     * MySQL CDC 管道缺少 MySQL 连接串时应拒绝启动配置。
+     */
     @Test
     void rejectsMissingMysqlConnectionForMysqlSourcePipeline() {
         Map<String, String> env = validEnv();
@@ -30,6 +39,9 @@ class CanvasFlinkJobConfigTest {
                 .hasMessageContaining("CANVAS_FLINK_MYSQL_URL");
     }
 
+    /**
+     * Doris 内部加工管道不应强制要求 MySQL 连接信息。
+     */
     @Test
     void doesNotRequireMysqlConnectionForDorisOnlyPipeline() {
         Map<String, String> env = validEnv();
@@ -43,6 +55,9 @@ class CanvasFlinkJobConfigTest {
         assertThat(config.pipelineKey()).isEqualTo("doris_ods_cdp_event_to_dwd_fact");
     }
 
+    /**
+     * 缺少 Doris 节点配置时应拒绝启动配置。
+     */
     @Test
     void rejectsMissingDorisEndpoints() {
         Map<String, String> env = validEnv();
@@ -53,6 +68,9 @@ class CanvasFlinkJobConfigTest {
                 .hasMessageContaining("CANVAS_FLINK_DORIS_FE_NODES");
     }
 
+    /**
+     * 缺少 checkpoint 上报地址时应拒绝启动配置。
+     */
     @Test
     void rejectsMissingCheckpointEndpoint() {
         Map<String, String> env = validEnv();
@@ -63,6 +81,9 @@ class CanvasFlinkJobConfigTest {
                 .hasMessageContaining("CANVAS_FLINK_CHECKPOINT_ENDPOINT");
     }
 
+    /**
+     * 有效配置应暴露 SQL 渲染需要的全部占位符。
+     */
     @Test
     void validConfigExposesPlaceholderValuesForSqlRendering() {
         CanvasFlinkJobConfig config = CanvasFlinkJobConfig.from(validEnv());
@@ -94,6 +115,9 @@ class CanvasFlinkJobConfigTest {
                 .containsEntry("DORIS_LABEL_SUFFIX", "");
     }
 
+    /**
+     * schema 版本是可选运行证据，配置后应保留原值。
+     */
     @Test
     void schemaVersionsAreOptionalRuntimeEvidence() {
         Map<String, String> env = validEnv();
@@ -106,6 +130,9 @@ class CanvasFlinkJobConfigTest {
         assertThat(config.sinkSchemaVersion()).isEqualTo("sink-v1");
     }
 
+    /**
+     * Doris label 后缀可选且允许安全字符。
+     */
     @Test
     void dorisLabelSuffixIsOptionalAndSanitized() {
         Map<String, String> env = validEnv();
@@ -117,6 +144,9 @@ class CanvasFlinkJobConfigTest {
         assertThat(config.placeholders()).containsEntry("DORIS_LABEL_SUFFIX", "_live_20260606_123");
     }
 
+    /**
+     * Doris label 后缀包含 SQL 危险字符时应拒绝。
+     */
     @Test
     void rejectsUnsafeDorisLabelSuffix() {
         Map<String, String> env = validEnv();
@@ -127,6 +157,11 @@ class CanvasFlinkJobConfigTest {
                 .hasMessageContaining("CANVAS_FLINK_DORIS_LABEL_SUFFIX");
     }
 
+    /**
+     * 构造覆盖必填项的有效环境变量。
+     *
+     * @return 可用于大多数配置用例的环境变量映射
+     */
     private Map<String, String> validEnv() {
         Map<String, String> env = new LinkedHashMap<>();
         env.put("CANVAS_FLINK_JOB_PIPELINE_KEY", "mysql_cdp_event_log_to_doris_ods");

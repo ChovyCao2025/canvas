@@ -8,10 +8,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * CanvasFlinkSqlTemplateLoader 支撑 flink 场景的后端处理。
+ * 加载并渲染随 job 包发布的 Flink SQL 模板。
+ *
+ * <p>模板占位符采用大写 `${PLACEHOLDER}` 形式；缺失值会在提交 Flink 前失败，避免运行期提交半渲染 SQL。
  */
 public final class CanvasFlinkSqlTemplateLoader {
 
+    /**
+     * 支持渲染的 SQL 模板占位符模式。
+     */
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Z0-9_]+)}");
 
     /**
@@ -38,7 +43,6 @@ public final class CanvasFlinkSqlTemplateLoader {
                 throw new IllegalArgumentException("SQL asset not found: " + assetPath);
             }
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to read SQL asset: " + assetPath, ex);
         }
@@ -54,14 +58,12 @@ public final class CanvasFlinkSqlTemplateLoader {
      * @return 渲染后的 Flink SQL
      */
     public static String render(String template, Map<String, String> placeholders) {
-        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (template == null) {
             throw new IllegalArgumentException("SQL template is required");
         }
         Map<String, String> values = placeholders == null ? Map.of() : placeholders;
         Matcher matcher = PLACEHOLDER.matcher(template);
         StringBuilder rendered = new StringBuilder();
-        // 遍历候选数据并按业务规则筛选、转换或聚合。
         while (matcher.find()) {
             String key = matcher.group(1);
             if (!values.containsKey(key)) {
@@ -74,7 +76,6 @@ public final class CanvasFlinkSqlTemplateLoader {
         if (remaining.find()) {
             throw new IllegalArgumentException("Unresolved SQL placeholder: " + remaining.group(1));
         }
-        // 汇总前面计算出的状态和明细，返回给调用方。
         return rendered.toString();
     }
 }
