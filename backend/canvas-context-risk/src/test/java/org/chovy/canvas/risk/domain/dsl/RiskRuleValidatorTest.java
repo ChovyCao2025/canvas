@@ -10,6 +10,9 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 定义 RiskRuleValidatorTest 的风控模块职责和数据契约。
+ */
 class RiskRuleValidatorTest {
 
     private final RiskRuleParser parser = new RiskRuleParser(new JacksonRiskRuleJsonCodec());
@@ -31,6 +34,10 @@ class RiskRuleValidatorTest {
     };
     private final RiskRuleValidator validator = new RiskRuleValidator(factorCatalog, listCatalog);
 
+
+    /**
+     * 执行 rejectsUnknownFeature 相关的风控处理逻辑。
+     */
     @Test
     void rejectsUnknownFeature() {
         RiskRuleValidationResult result = validator.validate(parser.parse("""
@@ -54,6 +61,9 @@ class RiskRuleValidatorTest {
         });
     }
 
+    /**
+     * 执行 rejectsOfflineOnlyFeatureForEnforceMode 相关的风控处理逻辑。
+     */
     @Test
     void rejectsOfflineOnlyFeatureForEnforceMode() {
         RiskRuleValidationResult result = validator.validate(parser.parse("""
@@ -77,6 +87,9 @@ class RiskRuleValidatorTest {
         });
     }
 
+    /**
+     * 执行 allowsOfflineOnlyFeatureForSimulationMode 相关的风控处理逻辑。
+     */
     @Test
     void allowsOfflineOnlyFeatureForSimulationMode() {
         RiskRuleValidationResult result = validator.validate(parser.parse("""
@@ -97,6 +110,9 @@ class RiskRuleValidatorTest {
         assertThat(result.errors()).isEmpty();
     }
 
+    /**
+     * 执行 rejectsListSubjectMismatch 相关的风控处理逻辑。
+     */
     @Test
     void rejectsListSubjectMismatch() {
         RiskRuleValidationResult result = validator.validate(parser.parse("""
@@ -120,6 +136,9 @@ class RiskRuleValidatorTest {
         });
     }
 
+    /**
+     * 执行 rejectsNestingDepthGreaterThanFive 相关的风控处理逻辑。
+     */
     @Test
     void rejectsNestingDepthGreaterThanFive() {
         RiskRuleGroupNode root = new RiskRuleGroupNode(RiskRuleLogic.AND, List.of(), List.of());
@@ -134,6 +153,9 @@ class RiskRuleValidatorTest {
                 assertThat(error.code()).isEqualTo(RiskValidationErrorCode.MAX_DEPTH_EXCEEDED));
     }
 
+    /**
+     * 执行 rejectsMoreThanOneHundredConditions 相关的风控处理逻辑。
+     */
     @Test
     void rejectsMoreThanOneHundredConditions() {
         List<RiskRuleConditionNode> conditions = IntStream.range(0, 101)
@@ -151,6 +173,9 @@ class RiskRuleValidatorTest {
                 assertThat(error.code()).isEqualTo(RiskValidationErrorCode.MAX_CONDITIONS_EXCEEDED));
     }
 
+    /**
+     * 执行 rejectsNumericOperatorWithStringLiteral 相关的风控处理逻辑。
+     */
     @Test
     void rejectsNumericOperatorWithStringLiteral() {
         RiskRuleValidationResult result = validator.validate(parser.parse("""

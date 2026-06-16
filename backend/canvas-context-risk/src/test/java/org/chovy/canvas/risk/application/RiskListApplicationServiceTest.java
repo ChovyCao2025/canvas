@@ -20,13 +20,22 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+/**
+ * 定义 RiskListApplicationServiceTest 的风控模块职责和数据契约。
+ */
 class RiskListApplicationServiceTest {
 
+    /**
+     * 执行 initMyBatisPlusTableInfo 相关的风控处理逻辑。
+     */
     @BeforeAll
     static void initMyBatisPlusTableInfo() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), RiskListDO.class);
     }
 
+    /**
+     * 执行 listListsReturnsRepositoryRowsForTenantWithoutSeedingDefaults 相关的风控处理逻辑。
+     */
     @Test
     void listListsReturnsRepositoryRowsForTenantWithoutSeedingDefaults() {
         FakeRepository repository = new FakeRepository(List.of(list("coupon_abuse")));
@@ -54,6 +63,9 @@ class RiskListApplicationServiceTest {
                         "risk-ops"));
     }
 
+    /**
+     * 执行 listListsReturnsEmptyRepositoryResultWithoutSyntheticSeedRows 相关的风控处理逻辑。
+     */
     @Test
     void listListsReturnsEmptyRepositoryResultWithoutSyntheticSeedRows() {
         FakeRepository repository = new FakeRepository(List.of());
@@ -65,6 +77,9 @@ class RiskListApplicationServiceTest {
         assertThat(lists).isEmpty();
     }
 
+    /**
+     * 执行 mybatisRepositoryQueriesRequestedTenantOrderedByListKey 相关的风控处理逻辑。
+     */
     @Test
     void mybatisRepositoryQueriesRequestedTenantOrderedByListKey() {
         RiskListMapper mapper = mock(RiskListMapper.class);
@@ -90,6 +105,9 @@ class RiskListApplicationServiceTest {
         assertThat(lists).containsExactly(list("coupon_abuse"));
     }
 
+    /**
+     * 执行 list 相关的风控处理逻辑。
+     */
     private static RiskListView list(String listKey) {
         return new RiskListView(
                 42L,
@@ -101,7 +119,13 @@ class RiskListApplicationServiceTest {
                 "risk-ops");
     }
 
+    /**
+     * 定义 FakeRepository 的风控模块职责和数据契约。
+     */
     private static final class FakeRepository implements RiskListRepository {
+        /**
+         * 保存 rows 对应的风控状态或配置。
+         */
         private final List<RiskListView> rows;
         private final java.util.ArrayList<Long> tenantIds = new java.util.ArrayList<>();
 
@@ -109,6 +133,9 @@ class RiskListApplicationServiceTest {
             this.rows = rows;
         }
 
+        /**
+         * 执行 listLists 相关的风控处理逻辑。
+         */
         @Override
         public List<RiskListView> listLists(Long tenantId) {
             tenantIds.add(tenantId);

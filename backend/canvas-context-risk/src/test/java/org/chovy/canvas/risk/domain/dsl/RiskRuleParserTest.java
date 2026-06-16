@@ -7,10 +7,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 定义 RiskRuleParserTest 的风控模块职责和数据契约。
+ */
 class RiskRuleParserTest {
 
     private final RiskRuleParser parser = new RiskRuleParser(new JacksonRiskRuleJsonCodec());
 
+
+    /**
+     * 执行 parsesNestedAndOrRuleGroup 相关的风控处理逻辑。
+     */
     @Test
     void parsesNestedAndOrRuleGroup() {
         RiskRuleGroupNode node = parser.parse("""
@@ -53,6 +60,9 @@ class RiskRuleParserTest {
         assertThat(node.conditions().get(1).left()).isEqualTo(RiskRuleOperand.event("amount"));
     }
 
+    /**
+     * 执行 parsesAllSupportedOperandTypes 相关的风控处理逻辑。
+     */
     @Test
     void parsesAllSupportedOperandTypes() {
         RiskRuleGroupNode node = parser.parse("""
@@ -80,6 +90,9 @@ class RiskRuleParserTest {
         assertThat(node.conditions().get(1).right()).isEqualTo(RiskRuleOperand.literal("CANVAS_NODE"));
     }
 
+    /**
+     * 执行 rejectsInvalidJson 相关的风控处理逻辑。
+     */
     @Test
     void rejectsInvalidJson() {
         assertThatExceptionOfType(RiskRuleParseException.class)
@@ -90,6 +103,9 @@ class RiskRuleParserTest {
                 });
     }
 
+    /**
+     * 执行 rejectsUnknownOperator 相关的风控处理逻辑。
+     */
     @Test
     void rejectsUnknownOperator() {
         assertThatExceptionOfType(RiskRuleParseException.class)
@@ -112,6 +128,9 @@ class RiskRuleParserTest {
                 });
     }
 
+    /**
+     * 执行 rejectsUnsafeScriptOperand 相关的风控处理逻辑。
+     */
     @Test
     void rejectsUnsafeScriptOperand() {
         assertThatThrownBy(() -> parser.parse("""

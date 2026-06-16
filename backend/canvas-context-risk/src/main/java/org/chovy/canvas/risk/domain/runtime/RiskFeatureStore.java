@@ -8,7 +8,13 @@ import java.util.Optional;
  */
 public interface RiskFeatureStore {
 
+    /**
+     * 执行 set 相关的风控处理逻辑。
+     */
     void set(Long tenantId, String featureKey, String subjectHash, Object value, Duration ttl);
 
+    /**
+     * 执行 get 相关的风控处理逻辑。
+     */
     Optional<Object> get(Long tenantId, String featureKey, String subjectHash);
 }

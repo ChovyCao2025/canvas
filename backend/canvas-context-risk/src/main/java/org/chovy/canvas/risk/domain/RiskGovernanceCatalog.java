@@ -7,10 +7,17 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 定义 RiskGovernanceCatalog 的风控模块职责和数据契约。
+ */
 public class RiskGovernanceCatalog {
 
     private final Map<Long, TenantRiskGovernance> tenants = new LinkedHashMap<>();
 
+
+    /**
+     * 执行 decisionTraces 相关的风控处理逻辑。
+     */
     public List<Map<String, Object>> decisionTraces(Long tenantId, String sceneKey, int limit) {
         TenantRiskGovernance governance = governance(tenantId);
         if (governance.traces.isEmpty()) {
@@ -23,6 +30,9 @@ public class RiskGovernanceCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 createList 相关的风控处理逻辑。
+     */
     public Map<String, Object> createList(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "listKey");
         TenantRiskGovernance governance = governance(tenantId);
@@ -38,6 +48,9 @@ public class RiskGovernanceCatalog {
         return copy(list);
     }
 
+    /**
+     * 执行 addListEntry 相关的风控处理逻辑。
+     */
     public Map<String, Object> addListEntry(Long tenantId, String listKey, Map<String, Object> payload,
                                             String actor) {
         requiredString(listKey, "listKey");
@@ -54,6 +67,9 @@ public class RiskGovernanceCatalog {
         return copy(entry);
     }
 
+    /**
+     * 执行 listEntries 相关的风控处理逻辑。
+     */
     public List<Map<String, Object>> listEntries(Long tenantId, String listKey) {
         requiredString(listKey, "listKey");
         return governance(tenantId).entries.stream()
@@ -63,6 +79,9 @@ public class RiskGovernanceCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 removeListEntry 相关的风控处理逻辑。
+     */
     public Map<String, Object> removeListEntry(Long tenantId, String listKey, Long entryId, String actor) {
         Map<String, Object> entry = find(governance(tenantId).entries, "entryId", entryId, "entry not found");
         if (!Objects.equals(entry.get("listKey"), listKey)) {
@@ -73,6 +92,9 @@ public class RiskGovernanceCatalog {
         return Map.of("tenantId", tenantId, "listKey", listKey, "entryId", entryId, "removed", true);
     }
 
+    /**
+     * 执行 importListEntries 相关的风控处理逻辑。
+     */
     public Map<String, Object> importListEntries(Long tenantId, String listKey, Map<String, Object> payload,
                                                  String actor) {
         requiredString(listKey, "listKey");
@@ -83,6 +105,9 @@ public class RiskGovernanceCatalog {
         return Map.of("tenantId", tenantId, "listKey", listKey, "importedCount", imported, "updatedBy", actor);
     }
 
+    /**
+     * 执行 createStrategyDraft 相关的风控处理逻辑。
+     */
     public Map<String, Object> createStrategyDraft(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "strategyKey");
         TenantRiskGovernance governance = governance(tenantId);
@@ -101,10 +126,16 @@ public class RiskGovernanceCatalog {
         return copy(strategy);
     }
 
+    /**
+     * 执行 getStrategy 相关的风控处理逻辑。
+     */
     public Map<String, Object> getStrategy(Long tenantId, String strategyKey) {
         return copy(strategy(tenantId, strategyKey));
     }
 
+    /**
+     * 执行 listStrategyVersions 相关的风控处理逻辑。
+     */
     public List<Map<String, Object>> listStrategyVersions(Long tenantId, String strategyKey) {
         return governance(tenantId).versions.stream()
                 .filter(item -> matches(item, "strategyKey", strategyKey))
@@ -112,6 +143,9 @@ public class RiskGovernanceCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 validateStrategyVersion 相关的风控处理逻辑。
+     */
     public Map<String, Object> validateStrategyVersion(Long tenantId, String strategyKey, int version, String actor) {
         Map<String, Object> row = version(tenantId, strategyKey, version);
         row.put("validationStatus", "PASSED");
@@ -119,6 +153,9 @@ public class RiskGovernanceCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 simulateStrategyVersion 相关的风控处理逻辑。
+     */
     public Map<String, Object> simulateStrategyVersion(Long tenantId, String strategyKey, int version, String actor) {
         Map<String, Object> row = version(tenantId, strategyKey, version);
         row.put("simulationStatus", "PASSED");
@@ -126,14 +163,23 @@ public class RiskGovernanceCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 submitStrategyVersion 相关的风控处理逻辑。
+     */
     public Map<String, Object> submitStrategyVersion(Long tenantId, String strategyKey, int version, String actor) {
         return transition(tenantId, strategyKey, version, "SUBMITTED", actor);
     }
 
+    /**
+     * 执行 approveStrategyVersion 相关的风控处理逻辑。
+     */
     public Map<String, Object> approveStrategyVersion(Long tenantId, String strategyKey, int version, String actor) {
         return transition(tenantId, strategyKey, version, "APPROVED", actor);
     }
 
+    /**
+     * 执行 activateStrategyVersion 相关的风控处理逻辑。
+     */
     public Map<String, Object> activateStrategyVersion(Long tenantId, String strategyKey, int version, String actor) {
         Map<String, Object> strategy = strategy(tenantId, strategyKey);
         strategy.put("activeVersion", version);
@@ -143,6 +189,9 @@ public class RiskGovernanceCatalog {
         return copy(strategy);
     }
 
+    /**
+     * 执行 rollbackStrategy 相关的风控处理逻辑。
+     */
     public Map<String, Object> rollbackStrategy(Long tenantId, String strategyKey, Map<String, Object> payload,
                                                 String actor) {
         Map<String, Object> strategy = strategy(tenantId, strategyKey);
@@ -153,6 +202,9 @@ public class RiskGovernanceCatalog {
         return copy(strategy);
     }
 
+    /**
+     * 执行 pauseStrategy 相关的风控处理逻辑。
+     */
     public Map<String, Object> pauseStrategy(Long tenantId, String strategyKey, String actor) {
         Map<String, Object> strategy = strategy(tenantId, strategyKey);
         strategy.put("status", "PAUSED");
@@ -160,11 +212,17 @@ public class RiskGovernanceCatalog {
         return copy(strategy);
     }
 
+    /**
+     * 执行 diffStrategyVersions 相关的风控处理逻辑。
+     */
     public Map<String, Object> diffStrategyVersions(Long tenantId, String strategyKey, int left, int right) {
         return Map.of("tenantId", tenantId, "strategyKey", strategyKey, "left", left, "right", right,
                 "changeCount", left == right ? 0 : 1);
     }
 
+    /**
+     * 执行 startSimulation 相关的风控处理逻辑。
+     */
     public Map<String, Object> startSimulation(Long tenantId, Map<String, Object> payload, String actor) {
         TenantRiskGovernance governance = governance(tenantId);
         Map<String, Object> simulation = record(payload);
@@ -179,6 +237,9 @@ public class RiskGovernanceCatalog {
         return copy(simulation);
     }
 
+    /**
+     * 执行 listSimulations 相关的风控处理逻辑。
+     */
     public List<Map<String, Object>> listSimulations(Long tenantId, String sceneKey, int limit) {
         return governance(tenantId).simulations.stream()
                 .filter(item -> matches(item, "sceneKey", sceneKey))
@@ -187,10 +248,16 @@ public class RiskGovernanceCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 governance 相关的风控处理逻辑。
+     */
     private TenantRiskGovernance governance(Long tenantId) {
         return tenants.computeIfAbsent(tenantId, ignored -> new TenantRiskGovernance());
     }
 
+    /**
+     * 执行 strategy 相关的风控处理逻辑。
+     */
     private Map<String, Object> strategy(Long tenantId, String strategyKey) {
         requiredString(strategyKey, "strategyKey");
         Map<String, Object> strategy = governance(tenantId).strategies.get(strategyKey);
@@ -200,10 +267,16 @@ public class RiskGovernanceCatalog {
         return strategy;
     }
 
+    /**
+     * 执行 version 相关的风控处理逻辑。
+     */
     private Map<String, Object> version(Long tenantId, String strategyKey, int version) {
         return find(governance(tenantId).versions, "version", version, "version not found", "strategyKey", strategyKey);
     }
 
+    /**
+     * 执行 transition 相关的风控处理逻辑。
+     */
     private Map<String, Object> transition(Long tenantId, String strategyKey, int version, String status,
                                            String actor) {
         Map<String, Object> row = version(tenantId, strategyKey, version);
@@ -212,12 +285,18 @@ public class RiskGovernanceCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 nextVersion 相关的风控处理逻辑。
+     */
     private static int nextVersion(TenantRiskGovernance governance, String strategyKey) {
         return (int) governance.versions.stream()
                 .filter(item -> matches(item, "strategyKey", strategyKey))
                 .count() + 1;
     }
 
+    /**
+     * 执行 seedList 相关的风控处理逻辑。
+     */
     private static Map<String, Object> seedList(Long tenantId, String listKey) {
         Map<String, Object> list = new LinkedHashMap<>();
         list.put("tenantId", tenantId);
@@ -228,6 +307,9 @@ public class RiskGovernanceCatalog {
         return list;
     }
 
+    /**
+     * 执行 versionRow 相关的风控处理逻辑。
+     */
     private static Map<String, Object> versionRow(Long tenantId, String strategyKey, int version, String status) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("tenantId", tenantId);
@@ -237,22 +319,37 @@ public class RiskGovernanceCatalog {
         return row;
     }
 
+    /**
+     * 执行 trace 相关的风控处理逻辑。
+     */
     private static Map<String, Object> trace(Long tenantId, String sceneKey, String traceKey) {
         return Map.of("tenantId", tenantId, "traceKey", traceKey, "sceneKey", sceneKey, "decision", "ALLOW");
     }
 
+    /**
+     * 执行 record 相关的风控处理逻辑。
+     */
     private static Map<String, Object> record(Map<String, Object> payload) {
         return new LinkedHashMap<>(payload);
     }
 
+    /**
+     * 执行 copy 相关的风控处理逻辑。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }
 
+    /**
+     * 执行 matches 相关的风控处理逻辑。
+     */
     private static boolean matches(Map<String, Object> item, String field, Object expected) {
         return expected == null || String.valueOf(expected).isBlank() || Objects.equals(item.get(field), expected);
     }
 
+    /**
+     * 执行 find 相关的风控处理逻辑。
+     */
     private static Map<String, Object> find(List<Map<String, Object>> rows, String key, Object value, String message) {
         return rows.stream()
                 .filter(row -> Objects.equals(row.get(key), value))
@@ -261,6 +358,9 @@ public class RiskGovernanceCatalog {
                 .orElseThrow(() -> new IllegalArgumentException(message));
     }
 
+    /**
+     * 执行 find 相关的风控处理逻辑。
+     */
     private static Map<String, Object> find(List<Map<String, Object>> rows, String key, Object value, String message,
                                             String secondKey, Object secondValue) {
         return rows.stream()
@@ -270,6 +370,9 @@ public class RiskGovernanceCatalog {
                 .orElseThrow(() -> new IllegalArgumentException(message));
     }
 
+    /**
+     * 执行 required 相关的风控处理逻辑。
+     */
     private static void required(Map<String, Object> payload, String key) {
         Object value = payload.get(key);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -277,16 +380,25 @@ public class RiskGovernanceCatalog {
         }
     }
 
+    /**
+     * 执行 requiredString 相关的风控处理逻辑。
+     */
     private static void requiredString(String value, String key) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(key + " is required");
         }
     }
 
+    /**
+     * 执行 value 相关的风控处理逻辑。
+     */
     private static String value(Object value, String fallback) {
         return value == null || String.valueOf(value).isBlank() ? fallback : String.valueOf(value);
     }
 
+    /**
+     * 执行 intValue 相关的风控处理逻辑。
+     */
     private static int intValue(Object value, int fallback) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -297,10 +409,16 @@ public class RiskGovernanceCatalog {
         return Integer.parseInt(String.valueOf(value));
     }
 
+    /**
+     * 执行 upper 相关的风控处理逻辑。
+     */
     private static String upper(String value) {
         return value == null || value.isBlank() ? value : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 执行 values 相关的风控处理逻辑。
+     */
     private static List<String> values(Map<String, Object> payload) {
         Object values = payload.get("values");
         if (values instanceof Iterable<?> iterable) {
@@ -325,6 +443,9 @@ public class RiskGovernanceCatalog {
         return result;
     }
 
+    /**
+     * 定义 TenantRiskGovernance 的风控模块职责和数据契约。
+     */
     private static final class TenantRiskGovernance {
         private final Map<String, Map<String, Object>> lists = new LinkedHashMap<>();
         private final List<Map<String, Object>> entries = new ArrayList<>();

@@ -5,6 +5,9 @@ package org.chovy.canvas.risk.domain.dsl;
  */
 public enum RiskFeatureAvailability {
     /** 在线决策链路可实时读取。 */
+    /**
+     * 表示 成员 枚举值。
+     */
     ONLINE,
     /** 仅离线分析或仿真可用。 */
     OFFLINE_ONLY

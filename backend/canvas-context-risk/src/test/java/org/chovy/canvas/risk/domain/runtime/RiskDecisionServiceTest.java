@@ -20,6 +20,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+/**
+ * 定义 RiskDecisionServiceTest 的风控模块职责和数据契约。
+ */
 class RiskDecisionServiceTest {
 
     private final FakeStrategyReader strategyReader = new FakeStrategyReader();
@@ -33,6 +36,10 @@ class RiskDecisionServiceTest {
             new RiskDecisionMerger(),
             Clock.fixed(Instant.parse("2026-06-08T10:00:00Z"), ZoneOffset.UTC));
 
+
+    /**
+     * 执行 evaluatesActiveStrategyForScene 相关的风控处理逻辑。
+     */
     @Test
     void evaluatesActiveStrategyForScene() {
         strategyReader.strategy = strategyWithRules(rule("score-high",
@@ -51,6 +58,9 @@ class RiskDecisionServiceTest {
         assertThat(response.matchedRules()).containsExactly("velocity:score-high");
     }
 
+    /**
+     * 执行 repeatedRequestIdWithSameCanonicalPayloadReturnsPersistedDecision 相关的风控处理逻辑。
+     */
     @Test
     void repeatedRequestIdWithSameCanonicalPayloadReturnsPersistedDecision() {
         strategyReader.strategy = strategyWithRules(rule("score-high",
@@ -68,6 +78,9 @@ class RiskDecisionServiceTest {
         assertThat(ledger.savedRuns).hasSize(1);
     }
 
+    /**
+     * 执行 repeatedRequestIdWithDifferentPayloadThrowsReplayMismatch 相关的风控处理逻辑。
+     */
     @Test
     void repeatedRequestIdWithDifferentPayloadThrowsReplayMismatch() {
         strategyReader.strategy = strategyWithRules();
@@ -79,6 +92,9 @@ class RiskDecisionServiceTest {
                 .isThrownBy(() -> service.evaluate(changed));
     }
 
+    /**
+     * 执行 featureResolverReceivesRequiredFeaturesOnly 相关的风控处理逻辑。
+     */
     @Test
     void featureResolverReceivesRequiredFeaturesOnly() {
         strategyReader.strategy = strategyWithRules(
@@ -93,6 +109,9 @@ class RiskDecisionServiceTest {
         assertThat(featureResolver.resolvedFeatureKeys).containsExactly("risk.score");
     }
 
+    /**
+     * 执行 persistsDecisionRunBeforeReturning 相关的风控处理逻辑。
+     */
     @Test
     void persistsDecisionRunBeforeReturning() {
         strategyReader.strategy = strategyWithRules();
@@ -104,6 +123,9 @@ class RiskDecisionServiceTest {
         assertThat(ledger.savedRuns.getFirst().response()).isEqualTo(response);
     }
 
+    /**
+     * 执行 persistsRuleHitsForEffectiveAndShadowSignals 相关的风控处理逻辑。
+     */
     @Test
     void persistsRuleHitsForEffectiveAndShadowSignals() {
         strategyReader.strategy = strategyWithRules(
@@ -122,6 +144,9 @@ class RiskDecisionServiceTest {
         assertThat(ledger.savedHits).extracting(RiskDecisionRuleHit::shadow).containsExactly(false, true);
     }
 
+    /**
+     * 执行 appliesFailOpenWhenRuntimeDependencyFails 相关的风控处理逻辑。
+     */
     @Test
     void appliesFailOpenWhenRuntimeDependencyFails() {
         strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_OPEN);
@@ -133,6 +158,9 @@ class RiskDecisionServiceTest {
         assertThat(response.reasons()).contains("RUNTIME_FAILURE:feature resolver failed");
     }
 
+    /**
+     * 执行 appliesFailReviewWhenRuntimeDependencyFails 相关的风控处理逻辑。
+     */
     @Test
     void appliesFailReviewWhenRuntimeDependencyFails() {
         strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_REVIEW);
@@ -143,6 +171,9 @@ class RiskDecisionServiceTest {
         assertThat(response.action()).isEqualTo(RiskDecisionAction.REVIEW);
     }
 
+    /**
+     * 执行 appliesFailClosedWhenRuntimeDependencyFails 相关的风控处理逻辑。
+     */
     @Test
     void appliesFailClosedWhenRuntimeDependencyFails() {
         strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_CLOSED);
@@ -153,6 +184,9 @@ class RiskDecisionServiceTest {
         assertThat(response.action()).isEqualTo(RiskDecisionAction.BLOCK);
     }
 
+    /**
+     * 执行 deadlineExceededUsesSceneFailPolicy 相关的风控处理逻辑。
+     */
     @Test
     void deadlineExceededUsesSceneFailPolicy() {
         strategyReader.strategy = strategyWithRules().withFailPolicy(RiskFailPolicy.FAIL_CLOSED);
@@ -163,6 +197,9 @@ class RiskDecisionServiceTest {
         assertThat(response.reasons()).contains("RUNTIME_FAILURE:deadline exceeded");
     }
 
+    /**
+     * 执行 inputSnapshotMasksRawPiiBeforePersistence 相关的风控处理逻辑。
+     */
     @Test
     void inputSnapshotMasksRawPiiBeforePersistence() {
         strategyReader.strategy = strategyWithRules();
@@ -179,6 +216,9 @@ class RiskDecisionServiceTest {
         assertThat(snapshot).contains("***4567");
     }
 
+    /**
+     * 执行 request 相关的风控处理逻辑。
+     */
     private RiskDecisionRequest request(String requestId) {
         return new RiskDecisionRequest(
                 10L,
@@ -192,6 +232,9 @@ class RiskDecisionServiceTest {
                 50);
     }
 
+    /**
+     * 执行 strategyWithRules 相关的风控处理逻辑。
+     */
     private RiskCompiledStrategy strategyWithRules(RiskCompiledRule... rules) {
         return new RiskCompiledStrategy(
                 "MARKETING_BENEFIT_ISSUE",
@@ -203,6 +246,9 @@ class RiskDecisionServiceTest {
                 List.of(rules));
     }
 
+    /**
+     * 执行 rule 相关的风控处理逻辑。
+     */
     private RiskCompiledRule rule(String ruleKey,
                                   RiskRuleOperand left,
                                   RiskRuleOperator operator,
@@ -221,6 +267,9 @@ class RiskDecisionServiceTest {
                 false);
     }
 
+    /**
+     * 执行 orderedMap 相关的风控处理逻辑。
+     */
     private Map<String, Object> orderedMap(Object... pairs) {
         Map<String, Object> map = new LinkedHashMap<>();
         for (int i = 0; i < pairs.length; i += 2) {
@@ -229,19 +278,36 @@ class RiskDecisionServiceTest {
         return map;
     }
 
+    /**
+     * 定义 FakeStrategyReader 的风控模块职责和数据契约。
+     */
     private static final class FakeStrategyReader implements RiskActiveStrategyReader {
+        /**
+         * 保存 strategy 对应的风控状态或配置。
+         */
         private RiskCompiledStrategy strategy;
 
+
+        /**
+         * 执行 findActiveStrategy 相关的风控处理逻辑。
+         */
         @Override
         public RiskCompiledStrategy findActiveStrategy(Long tenantId, String sceneKey) {
             return strategy;
         }
     }
 
+    /**
+     * 定义 FakeLedger 的风控模块职责和数据契约。
+     */
     private static final class FakeLedger implements RiskDecisionLedger {
         private final List<RiskDecisionRunRecord> savedRuns = new ArrayList<>();
         private final List<RiskDecisionRuleHit> savedHits = new ArrayList<>();
 
+
+        /**
+         * 执行 findByRequest 相关的风控处理逻辑。
+         */
         @Override
         public Optional<RiskDecisionRunRecord> findByRequest(Long tenantId, String requestId) {
             return savedRuns.stream()
@@ -249,6 +315,9 @@ class RiskDecisionServiceTest {
                     .findFirst();
         }
 
+        /**
+         * 执行 saveRun 相关的风控处理逻辑。
+         */
         @Override
         public RiskDecisionRunRecord saveRun(RiskDecisionRunRecord run) {
             RiskDecisionRunRecord saved = run.withDecisionRunId("rd-" + (savedRuns.size() + 1));
@@ -256,17 +325,31 @@ class RiskDecisionServiceTest {
             return saved;
         }
 
+        /**
+         * 执行 saveRuleHits 相关的风控处理逻辑。
+         */
         @Override
         public void saveRuleHits(String decisionRunId, List<RiskDecisionRuleHit> hits) {
             savedHits.addAll(hits);
         }
     }
 
+    /**
+     * 定义 RecordingFeatureResolver 的风控模块职责和数据契约。
+     */
     private static final class RecordingFeatureResolver implements RiskRequestFeatureResolver {
         private final Map<RiskRuleOperand, RiskResolvedValue> values = new LinkedHashMap<>();
         private final List<String> resolvedFeatureKeys = new ArrayList<>();
+
+        /**
+         * 保存 fail 对应的风控状态或配置。
+         */
         private boolean fail;
 
+
+        /**
+         * 执行 resolve 相关的风控处理逻辑。
+         */
         @Override
         public RiskResolvedValue resolve(RiskDecisionRequest request, RiskRuleOperand operand) {
             if (fail) {

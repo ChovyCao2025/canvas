@@ -8,6 +8,9 @@ import org.chovy.canvas.risk.api.RiskSceneView;
 import org.chovy.canvas.risk.domain.governance.RiskSceneRepository;
 import org.springframework.stereotype.Service;
 
+/**
+ * 定义 RiskSceneApplicationService 的风控模块职责和数据契约。
+ */
 @Service
 public class RiskSceneApplicationService implements RiskSceneFacade {
 
@@ -61,12 +64,19 @@ public class RiskSceneApplicationService implements RiskSceneFacade {
                     80,
                     "risk-ai"));
 
+
+    /**
+     * 保存 repository 对应的风控状态或配置。
+     */
     private final RiskSceneRepository repository;
 
     public RiskSceneApplicationService(RiskSceneRepository repository) {
         this.repository = repository;
     }
 
+    /**
+     * 执行 listScenes 相关的风控处理逻辑。
+     */
     @Override
     public List<RiskSceneView> listScenes(Long tenantId) {
         Objects.requireNonNull(tenantId, "tenantId");
@@ -79,32 +89,203 @@ public class RiskSceneApplicationService implements RiskSceneFacade {
         return defaults;
     }
 
+    /**
+     * 执行 defaultScenes 相关的风控处理逻辑。
+     */
     private static List<RiskSceneView> defaultScenes(Long tenantId) {
         return DEFAULT_SCENES.stream()
                 .map(scene -> scene.toView(tenantId))
                 .toList();
     }
 
-    private record SceneDefinition(
-            String sceneKey,
-            String displayName,
-            String eventSchemaKey,
-            String defaultMode,
-            String failPolicy,
-            Integer latencyBudgetMs,
-            String owner) {
+    /**
+     * 定义 SceneDefinition 的风控模块职责和数据契约。
+     */
+    private static final class SceneDefinition {
 
-        private RiskSceneView toView(Long tenantId) {
-            return new RiskSceneView(
-                    tenantId,
-                    sceneKey,
-                    displayName,
-                    eventSchemaKey,
-                    "ACTIVE",
-                    defaultMode,
-                    failPolicy,
-                    latencyBudgetMs,
-                    owner);
+        /**
+         * SceneDefinition 的 sceneKey 字段。
+         */
+        private final String sceneKey;
+
+
+        /**
+         * SceneDefinition 的 displayName 字段。
+         */
+        private final String displayName;
+
+
+        /**
+         * SceneDefinition 的 eventSchemaKey 字段。
+         */
+        private final String eventSchemaKey;
+
+
+        /**
+         * SceneDefinition 的 defaultMode 字段。
+         */
+        private final String defaultMode;
+
+
+        /**
+         * SceneDefinition 的 failPolicy 字段。
+         */
+        private final String failPolicy;
+
+
+        /**
+         * SceneDefinition 的 latencyBudgetMs 字段。
+         */
+        private final Integer latencyBudgetMs;
+
+
+        /**
+         * SceneDefinition 的 owner 字段。
+         */
+        private final String owner;
+
+
+        /**
+         * 创建 SceneDefinition。
+         *
+         * @param sceneKey SceneDefinition 的 sceneKey 字段
+         * @param displayName SceneDefinition 的 displayName 字段
+         * @param eventSchemaKey SceneDefinition 的 eventSchemaKey 字段
+         * @param defaultMode SceneDefinition 的 defaultMode 字段
+         * @param failPolicy SceneDefinition 的 failPolicy 字段
+         * @param latencyBudgetMs SceneDefinition 的 latencyBudgetMs 字段
+         * @param owner SceneDefinition 的 owner 字段
+         */
+        public SceneDefinition(String sceneKey, String displayName, String eventSchemaKey, String defaultMode, String failPolicy, Integer latencyBudgetMs, String owner) {
+            this.sceneKey = sceneKey;
+            this.displayName = displayName;
+            this.eventSchemaKey = eventSchemaKey;
+            this.defaultMode = defaultMode;
+            this.failPolicy = failPolicy;
+            this.latencyBudgetMs = latencyBudgetMs;
+            this.owner = owner;
         }
+
+        /**
+         * 返回 SceneDefinition 的 sceneKey 字段。
+         *
+         * @return sceneKey 字段值
+         */
+        public String sceneKey() {
+            return sceneKey;
+        }
+
+        /**
+         * 返回 SceneDefinition 的 displayName 字段。
+         *
+         * @return displayName 字段值
+         */
+        public String displayName() {
+            return displayName;
+        }
+
+        /**
+         * 返回 SceneDefinition 的 eventSchemaKey 字段。
+         *
+         * @return eventSchemaKey 字段值
+         */
+        public String eventSchemaKey() {
+            return eventSchemaKey;
+        }
+
+        /**
+         * 返回 SceneDefinition 的 defaultMode 字段。
+         *
+         * @return defaultMode 字段值
+         */
+        public String defaultMode() {
+            return defaultMode;
+        }
+
+        /**
+         * 返回 SceneDefinition 的 failPolicy 字段。
+         *
+         * @return failPolicy 字段值
+         */
+        public String failPolicy() {
+            return failPolicy;
+        }
+
+        /**
+         * 返回 SceneDefinition 的 latencyBudgetMs 字段。
+         *
+         * @return latencyBudgetMs 字段值
+         */
+        public Integer latencyBudgetMs() {
+            return latencyBudgetMs;
+        }
+
+        /**
+         * 返回 SceneDefinition 的 owner 字段。
+         *
+         * @return owner 字段值
+         */
+        public String owner() {
+            return owner;
+        }
+
+        /**
+         * 比较当前 SceneDefinition 与其他对象是否相等。
+         *
+         * @param o 待比较对象
+         * @return 相等时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof SceneDefinition other)) {
+                return false;
+            }
+            return Objects.equals(sceneKey, other.sceneKey)
+                    && Objects.equals(displayName, other.displayName)
+                    && Objects.equals(eventSchemaKey, other.eventSchemaKey)
+                    && Objects.equals(defaultMode, other.defaultMode)
+                    && Objects.equals(failPolicy, other.failPolicy)
+                    && Objects.equals(latencyBudgetMs, other.latencyBudgetMs)
+                    && Objects.equals(owner, other.owner);
+        }
+
+        /**
+         * 计算 SceneDefinition 的哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(sceneKey, displayName, eventSchemaKey, defaultMode, failPolicy, latencyBudgetMs, owner);
+        }
+
+        /**
+         * 返回 SceneDefinition 的调试字符串。
+         *
+         * @return 调试字符串
+         */
+        @Override
+        public String toString() {
+            return "SceneDefinition[sceneKey=" + sceneKey + ", displayName=" + displayName + ", eventSchemaKey=" + eventSchemaKey + ", defaultMode=" + defaultMode + ", failPolicy=" + failPolicy + ", latencyBudgetMs=" + latencyBudgetMs + ", owner=" + owner + "]";
+        }
+
+        /**
+         * 执行 toView 相关的风控处理逻辑。
+         */
+        private RiskSceneView toView(Long tenantId) {
+                    return new RiskSceneView(
+                            tenantId,
+                            sceneKey,
+                            displayName,
+                            eventSchemaKey,
+                            "ACTIVE",
+                            defaultMode,
+                            failPolicy,
+                            latencyBudgetMs,
+                            owner);
+                }
     }
 }

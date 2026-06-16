@@ -15,19 +15,48 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 风控决策服务，使用当前生效策略评估请求，并持久化不可变的决策轨迹。
  */
 public class RiskDecisionService {
 
+    /**
+     * 保存 strategyReader 对应的风控状态或配置。
+     */
     private final RiskActiveStrategyReader strategyReader;
+
+    /**
+     * 保存 ledger 对应的风控状态或配置。
+     */
     private final RiskDecisionLedger ledger;
+
+    /**
+     * 保存 featureResolver 对应的风控状态或配置。
+     */
     private final RiskRequestFeatureResolver featureResolver;
+
+    /**
+     * 保存 evaluator 对应的风控状态或配置。
+     */
     private final RiskRuleEvaluator evaluator;
+
+    /**
+     * 保存 merger 对应的风控状态或配置。
+     */
     private final RiskDecisionMerger merger;
+
+    /**
+     * 保存 clock 对应的风控状态或配置。
+     */
     private final Clock clock;
+
+    /**
+     * 保存 metrics 对应的风控状态或配置。
+     */
     private final RiskDecisionMetrics metrics;
+
 
     /**
      * 构造不带指标采集器的决策服务。
@@ -466,12 +495,139 @@ public class RiskDecisionService {
     /**
      * ProjectedDecision 数据记录。
      */
-    private record ProjectedDecision(
-            RiskDecisionAction action,
-            int score,
-            RiskBand riskBand,
-            List<String> reasons,
-            List<String> labels
-    ) {
+    private static final class ProjectedDecision {
+
+        /**
+         * ProjectedDecision 的 action 字段。
+         */
+        private final RiskDecisionAction action;
+
+
+        /**
+         * ProjectedDecision 的 score 字段。
+         */
+        private final int score;
+
+
+        /**
+         * ProjectedDecision 的 riskBand 字段。
+         */
+        private final RiskBand riskBand;
+
+
+        /**
+         * ProjectedDecision 的 reasons 字段。
+         */
+        private final List<String> reasons;
+
+
+        /**
+         * ProjectedDecision 的 labels 字段。
+         */
+        private final List<String> labels;
+
+
+        /**
+         * 创建 ProjectedDecision。
+         *
+         * @param action ProjectedDecision 的 action 字段
+         * @param score ProjectedDecision 的 score 字段
+         * @param riskBand ProjectedDecision 的 riskBand 字段
+         * @param reasons ProjectedDecision 的 reasons 字段
+         * @param labels ProjectedDecision 的 labels 字段
+         */
+        public ProjectedDecision(RiskDecisionAction action, int score, RiskBand riskBand, List<String> reasons, List<String> labels) {
+            this.action = action;
+            this.score = score;
+            this.riskBand = riskBand;
+            this.reasons = reasons;
+            this.labels = labels;
+        }
+
+        /**
+         * 返回 ProjectedDecision 的 action 字段。
+         *
+         * @return action 字段值
+         */
+        public RiskDecisionAction action() {
+            return action;
+        }
+
+        /**
+         * 返回 ProjectedDecision 的 score 字段。
+         *
+         * @return score 字段值
+         */
+        public int score() {
+            return score;
+        }
+
+        /**
+         * 返回 ProjectedDecision 的 riskBand 字段。
+         *
+         * @return riskBand 字段值
+         */
+        public RiskBand riskBand() {
+            return riskBand;
+        }
+
+        /**
+         * 返回 ProjectedDecision 的 reasons 字段。
+         *
+         * @return reasons 字段值
+         */
+        public List<String> reasons() {
+            return reasons;
+        }
+
+        /**
+         * 返回 ProjectedDecision 的 labels 字段。
+         *
+         * @return labels 字段值
+         */
+        public List<String> labels() {
+            return labels;
+        }
+
+        /**
+         * 比较当前 ProjectedDecision 与其他对象是否相等。
+         *
+         * @param o 待比较对象
+         * @return 相等时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ProjectedDecision other)) {
+                return false;
+            }
+            return Objects.equals(action, other.action)
+                    && score == other.score
+                    && Objects.equals(riskBand, other.riskBand)
+                    && Objects.equals(reasons, other.reasons)
+                    && Objects.equals(labels, other.labels);
+        }
+
+        /**
+         * 计算 ProjectedDecision 的哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(action, score, riskBand, reasons, labels);
+        }
+
+        /**
+         * 返回 ProjectedDecision 的调试字符串。
+         *
+         * @return 调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ProjectedDecision[action=" + action + ", score=" + score + ", riskBand=" + riskBand + ", reasons=" + reasons + ", labels=" + labels + "]";
+        }
     }
 }
