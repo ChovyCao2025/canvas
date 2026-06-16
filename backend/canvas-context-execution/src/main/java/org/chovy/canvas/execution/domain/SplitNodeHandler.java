@@ -5,10 +5,18 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+/**
+ * 定义 SplitNodeHandler 的执行上下文数据结构或业务契约。
+ */
 @Component
 @NodeHandlerType("SPLIT")
 public class SplitNodeHandler implements NodeHandler {
 
+    /**
+     * 执行 execute 对应的业务处理。
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         List<Map<String, Object>> branches = NodeHandlerSupport.listOfMaps(context.node().config().get("branches"));
@@ -29,6 +37,10 @@ public class SplitNodeHandler implements NodeHandler {
                 Map.of("branch-" + branchId, target));
     }
 
+    /**
+     * 执行 selectedIndex 对应的业务处理。
+     * @param branches branches 参数
+     */
     private int selectedIndex(List<Map<String, Object>> branches) {
         for (int i = 0; i < branches.size(); i++) {
             if (NodeHandlerSupport.bool(branches.get(i).get("selected"))) {

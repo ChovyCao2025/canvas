@@ -5,14 +5,29 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * 定义 TraceExplanationFacade 的执行上下文数据结构或业务契约。
+ */
 public class TraceExplanationFacade {
 
+    /**
+     * 保存 traceReader 对应的状态或配置。
+     */
     private final TraceReader traceReader;
 
+    /**
+     * 执行 TraceExplanationFacade 对应的业务处理。
+     * @param traceReader traceReader 参数
+     */
     public TraceExplanationFacade(TraceReader traceReader) {
         this.traceReader = Objects.requireNonNull(traceReader, "traceReader is required");
     }
 
+    /**
+     * 执行 explain 对应的业务处理。
+     * @param request request 参数
+     * @return 处理后的结果
+     */
     public TraceExplanation explain(TraceExplanationRequest request) {
         Objects.requireNonNull(request, "request is required");
         ExecutionTraceView trace = Objects.requireNonNull(
@@ -21,6 +36,7 @@ public class TraceExplanationFacade {
         Optional<ExecutionTraceView.NodeResultView> failedNode = trace.nodeResults().stream()
                 .filter(TraceExplanationFacade::isFailure)
                 .findFirst();
+        // 优先使用失败节点错误；节点没有错误时再回退到执行级失败原因。
         String error = failedNode
                 .map(ExecutionTraceView.NodeResultView::error)
                 .filter(value -> !value.isBlank())
@@ -38,13 +54,23 @@ public class TraceExplanationFacade {
                 recommendedActions(errorType));
     }
 
+    /**
+     * 执行 isFailure 对应的业务处理。
+     * @param node node 参数
+     */
     private static boolean isFailure(ExecutionTraceView.NodeResultView node) {
         String status = node.status().toUpperCase(Locale.ROOT);
         return "FAILED".equals(status) || "ERROR".equals(status) || !node.error().isBlank();
     }
 
+    /**
+     * 执行 classify 对应的业务处理。
+     * @param error error 参数
+     * @return 处理后的结果
+     */
     private static String classify(String error) {
         String normalized = error == null ? "" : error.toLowerCase(Locale.ROOT);
+        // 分类规则保持轻量级字符串匹配，避免解释接口依赖外部诊断服务。
         if (normalized.contains("timeout") || normalized.contains("timed out")) {
             return "TIMEOUT";
         }
@@ -73,6 +99,11 @@ public class TraceExplanationFacade {
         return "Execution " + trace.executionId() + " failed with " + errorType + ": " + detail + ".";
     }
 
+    /**
+     * 执行 recommendedActions 对应的业务处理。
+     * @param errorType errorType 参数
+     * @return 处理后的结果
+     */
     private static List<String> recommendedActions(String errorType) {
         return switch (errorType) {
             case "TIMEOUT" -> List.of("Check provider latency, retry policy, and timeout configuration.");
@@ -83,11 +114,24 @@ public class TraceExplanationFacade {
         };
     }
 
+    /**
+     * 定义 TraceReader 的执行上下文数据结构或业务契约。
+     */
     @FunctionalInterface
     public interface TraceReader {
+        /**
+         * 执行 trace 对应的业务处理。
+         * @param request request 参数
+         * @return 处理后的结果
+         */
         ExecutionTraceView trace(TraceLookupRequest request);
     }
 
+    /**
+     * 定义 TraceExplanationRequest 的执行上下文数据结构或业务契约。
+     * @param tenantId tenantId 对应的数据字段
+     * @param executionId executionId 对应的数据字段
+     */
     public record TraceExplanationRequest(Long tenantId, String executionId) {
 
         public TraceExplanationRequest {
@@ -100,6 +144,11 @@ public class TraceExplanationFacade {
         }
     }
 
+    /**
+     * 定义 TraceLookupRequest 的执行上下文数据结构或业务契约。
+     * @param tenantId tenantId 对应的数据字段
+     * @param executionId executionId 对应的数据字段
+     */
     public record TraceLookupRequest(Long tenantId, String executionId) {
 
         public TraceLookupRequest {
@@ -112,6 +161,16 @@ public class TraceExplanationFacade {
         }
     }
 
+    /**
+     * 定义 TraceExplanation 的执行上下文数据结构或业务契约。
+     * @param executionId executionId 对应的数据字段
+     * @param status status 对应的数据字段
+     * @param failedNodeId failedNodeId 对应的数据字段
+     * @param failedNodeType failedNodeType 对应的数据字段
+     * @param errorType errorType 对应的数据字段
+     * @param summary summary 对应的数据字段
+     * @param recommendedActions recommendedActions 对应的数据字段
+     */
     public record TraceExplanation(
             String executionId,
             String status,

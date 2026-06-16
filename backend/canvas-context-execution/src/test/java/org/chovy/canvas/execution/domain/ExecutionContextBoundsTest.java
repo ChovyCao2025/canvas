@@ -7,8 +7,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 ExecutionContextBoundsTest 的执行上下文数据结构或业务契约。
+ */
 class ExecutionContextBoundsTest {
 
+    /**
+     * 执行 nodeOutputsAreImmutableAndBounded 对应的业务处理。
+     */
     @Test
     void nodeOutputsAreImmutableAndBounded() {
         ExecutionContext context = new ExecutionContext("exec-1", 1L, 2L, 64);

@@ -8,6 +8,9 @@ import java.util.Objects;
 import org.chovy.canvas.execution.api.AsyncTaskFacade.AsyncTaskQuery;
 import org.chovy.canvas.execution.api.AsyncTaskFacade.AsyncTaskView;
 
+/**
+ * 定义 AsyncTaskCatalog 的执行上下文数据结构或业务契约。
+ */
 public class AsyncTaskCatalog {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.parse("2026-06-15T06:00:00");
@@ -24,6 +27,11 @@ public class AsyncTaskCatalog {
             task("task-admin-only", "WAREHOUSE_SYNC", "WAREHOUSE", "warehouse-1",
                     "Warehouse sync", "FAILED", 100, null, "timeout", "analyst-3", List.of()));
 
+    /**
+     * 执行 listTasks 对应的业务处理。
+     * @param query query 参数
+     * @return 处理后的结果
+     */
     public List<AsyncTaskView> listTasks(AsyncTaskQuery query) {
         AsyncTaskQuery safeQuery = query == null
                 ? new AsyncTaskQuery(null, null, List.of(), List.of(), "system", false, 1, 100)
@@ -45,6 +53,12 @@ public class AsyncTaskCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 getTask 对应的业务处理。
+     * @param taskId taskId 参数
+     * @param username username 参数
+     * @param admin admin 参数
+     */
     public AsyncTaskView getTask(String taskId, String username, boolean admin) {
         return tasks.stream()
                 .filter(task -> Objects.equals(task.view().taskId(), taskId))
@@ -54,10 +68,21 @@ public class AsyncTaskCatalog {
                 .orElseThrow(() -> new IllegalArgumentException("Async task not found: " + taskId));
     }
 
+    /**
+     * 执行 matches 对应的业务处理。
+     * @param expected expected 参数
+     * @param actual actual 参数
+     * @return 处理后的结果
+     */
     private static boolean matches(String expected, String actual) {
         return expected == null || expected.isBlank() || Objects.equals(expected, actual);
     }
 
+    /**
+     * 执行 canView 对应的业务处理。
+     * @param task task 参数
+     * @param username username 参数
+     */
     private static boolean canView(TaskEntry task, String username) {
         String actor = username == null || username.isBlank() ? "system" : username;
         return actor.equals(task.view().createdBy()) || task.subscribers().contains(actor);
@@ -101,10 +126,20 @@ public class AsyncTaskCatalog {
                 subscribers);
     }
 
+    /**
+     * 执行 startedAt 对应的业务处理。
+     * @param status status 参数
+     * @param createdAt createdAt 参数
+     */
     private static LocalDateTime startedAt(String status, LocalDateTime createdAt) {
         return "QUEUED".equals(status) ? null : createdAt.plusSeconds(30);
     }
 
+    /**
+     * 执行 finishedAt 对应的业务处理。
+     * @param status status 参数
+     * @param createdAt createdAt 参数
+     */
     private static LocalDateTime finishedAt(String status, LocalDateTime createdAt) {
         return switch (status) {
             case "SUCCEEDED", "FAILED", "CANCELED" -> createdAt.plusMinutes(2);
@@ -112,6 +147,11 @@ public class AsyncTaskCatalog {
         };
     }
 
+    /**
+     * 定义 TaskEntry 的执行上下文数据结构或业务契约。
+     * @param view view 对应的数据字段
+     * @param subscribers subscribers 对应的数据字段
+     */
     private record TaskEntry(AsyncTaskView view, List<String> subscribers) {
     }
 }

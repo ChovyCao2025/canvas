@@ -12,8 +12,14 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerRegistry;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 OfficialApprovalPluginTest 的执行上下文数据结构或业务契约。
+ */
 class OfficialApprovalPluginTest {
 
+    /**
+     * 执行 registersApprovalRequestHandlerThroughExecutionRegistry 对应的业务处理。
+     */
     @Test
     void registersApprovalRequestHandlerThroughExecutionRegistry() {
         NodeHandlerRegistry registry = new NodeHandlerRegistry(List.of(new OfficialApprovalNodeHandler()));
@@ -23,6 +29,9 @@ class OfficialApprovalPluginTest {
                 .containsExactly("approval.request");
     }
 
+    /**
+     * 执行 returnsDeterministicApprovalRequestEnvelope 对应的业务处理。
+     */
     @Test
     void returnsDeterministicApprovalRequestEnvelope() {
         NodeHandler handler = new OfficialApprovalNodeHandler();
@@ -53,6 +62,9 @@ class OfficialApprovalPluginTest {
         assertThat(result.output().get("context")).isEqualTo(Map.of("tenantId", "tenant-a"));
     }
 
+    /**
+     * 执行 trimsApprovalCodeAndDefaultsRequesterToAnonymousWhenUserIdIsMissing 对应的业务处理。
+     */
     @Test
     void trimsApprovalCodeAndDefaultsRequesterToAnonymousWhenUserIdIsMissing() {
         NodeHandler handler = new OfficialApprovalNodeHandler();
@@ -70,6 +82,9 @@ class OfficialApprovalPluginTest {
                 .containsEntry("requester", "anonymous");
     }
 
+    /**
+     * 执行 failsWhenApprovalCodeIsMissing 对应的业务处理。
+     */
     @Test
     void failsWhenApprovalCodeIsMissing() {
         NodeHandler handler = new OfficialApprovalNodeHandler();
@@ -86,6 +101,9 @@ class OfficialApprovalPluginTest {
         assertThat(result.error()).contains("approval code is required");
     }
 
+    /**
+     * 执行 failsWhenApprovalCodeIsBlank 对应的业务处理。
+     */
     @Test
     void failsWhenApprovalCodeIsBlank() {
         NodeHandler handler = new OfficialApprovalNodeHandler();

@@ -12,8 +12,14 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerRegistry;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 OfficialCouponPluginTest 的执行上下文数据结构或业务契约。
+ */
 class OfficialCouponPluginTest {
 
+    /**
+     * 执行 registersCouponGrantHandlerThroughExecutionRegistry 对应的业务处理。
+     */
     @Test
     void registersCouponGrantHandlerThroughExecutionRegistry() {
         NodeHandlerRegistry registry = new NodeHandlerRegistry(List.of(new OfficialCouponNodeHandler()));
@@ -23,6 +29,9 @@ class OfficialCouponPluginTest {
                 .containsExactly("coupon.grant");
     }
 
+    /**
+     * 执行 returnsDeterministicCouponGrantEnvelope 对应的业务处理。
+     */
     @Test
     void returnsDeterministicCouponGrantEnvelope() {
         NodeHandler handler = new OfficialCouponNodeHandler();
@@ -53,6 +62,9 @@ class OfficialCouponPluginTest {
         assertThat(result.output().get("context")).isEqualTo(Map.of("tenantId", "tenant-a"));
     }
 
+    /**
+     * 执行 trimsCouponKeyAndDefaultsRecipientToAnonymousWhenUserIdIsMissing 对应的业务处理。
+     */
     @Test
     void trimsCouponKeyAndDefaultsRecipientToAnonymousWhenUserIdIsMissing() {
         NodeHandler handler = new OfficialCouponNodeHandler();
@@ -70,6 +82,9 @@ class OfficialCouponPluginTest {
                 .containsEntry("recipient", "anonymous");
     }
 
+    /**
+     * 执行 failsWhenCouponKeyIsMissing 对应的业务处理。
+     */
     @Test
     void failsWhenCouponKeyIsMissing() {
         NodeHandler handler = new OfficialCouponNodeHandler();
@@ -86,6 +101,9 @@ class OfficialCouponPluginTest {
         assertThat(result.error()).contains("coupon key is required");
     }
 
+    /**
+     * 执行 failsWhenCouponKeyIsBlank 对应的业务处理。
+     */
     @Test
     void failsWhenCouponKeyIsBlank() {
         NodeHandler handler = new OfficialCouponNodeHandler();

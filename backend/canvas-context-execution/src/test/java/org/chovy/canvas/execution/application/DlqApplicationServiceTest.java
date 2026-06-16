@@ -8,8 +8,14 @@ import java.util.Map;
 import org.chovy.canvas.execution.api.DlqFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 DlqApplicationServiceTest 的执行上下文数据结构或业务契约。
+ */
 class DlqApplicationServiceTest {
 
+    /**
+     * 执行 listsWithCanvasFilterAndOneBasedPaging 对应的业务处理。
+     */
     @Test
     void listsWithCanvasFilterAndOneBasedPaging() {
         DlqFacade service = new DlqApplicationService();
@@ -33,6 +39,9 @@ class DlqApplicationServiceTest {
         assertThat(normalized.total()).isEqualTo(3);
     }
 
+    /**
+     * 执行 replayUsesOriginalDeadLetterMetadataAndKeepsEntryForExplicitDelete 对应的业务处理。
+     */
     @Test
     void replayUsesOriginalDeadLetterMetadataAndKeepsEntryForExplicitDelete() {
         DlqFacade service = new DlqApplicationService();
@@ -54,6 +63,9 @@ class DlqApplicationServiceTest {
                 .contains(1001L);
     }
 
+    /**
+     * 执行 deleteRemovesDeadLetterAndMissingReplayFollowsCompatibilityMessage 对应的业务处理。
+     */
     @Test
     void deleteRemovesDeadLetterAndMissingReplayFollowsCompatibilityMessage() {
         DlqFacade service = new DlqApplicationService();
@@ -70,6 +82,9 @@ class DlqApplicationServiceTest {
                 .hasMessageContaining("DLQ 记录不存在: 1002");
     }
 
+    /**
+     * 执行 supportsRegisteringAdditionalDeadLettersForCompatibilityFixtures 对应的业务处理。
+     */
     @Test
     void supportsRegisteringAdditionalDeadLettersForCompatibilityFixtures() {
         DlqFacade service = new DlqApplicationService();

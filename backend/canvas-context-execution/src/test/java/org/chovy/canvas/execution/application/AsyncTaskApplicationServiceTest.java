@@ -8,8 +8,14 @@ import java.util.List;
 import org.chovy.canvas.execution.api.AsyncTaskFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 AsyncTaskApplicationServiceTest 的执行上下文数据结构或业务契约。
+ */
 class AsyncTaskApplicationServiceTest {
 
+    /**
+     * 执行 listAppliesFiltersPagingAndNonAdminVisibility 对应的业务处理。
+     */
     @Test
     void listAppliesFiltersPagingAndNonAdminVisibility() {
         AsyncTaskFacade service = new AsyncTaskApplicationService();
@@ -32,6 +38,9 @@ class AsyncTaskApplicationServiceTest {
         assertThat(tasks.get(1).resultSummary()).isEqualTo("matched 120 users");
     }
 
+    /**
+     * 执行 getHonorsOwnerSubscriberAdminVisibilityAndRejectsMissingTask 对应的业务处理。
+     */
     @Test
     void getHonorsOwnerSubscriberAdminVisibilityAndRejectsMissingTask() {
         AsyncTaskFacade service = new AsyncTaskApplicationService();

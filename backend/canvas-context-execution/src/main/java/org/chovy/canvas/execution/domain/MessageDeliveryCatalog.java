@@ -10,11 +10,17 @@ import java.util.Optional;
 
 import org.chovy.canvas.execution.api.MessageDeliveryFacade;
 
+/**
+ * 定义 MessageDeliveryCatalog 的执行上下文数据结构或业务契约。
+ */
 public class MessageDeliveryCatalog {
 
     private final List<Delivery> deliveries = new ArrayList<>();
     private final List<Receipt> receipts = new ArrayList<>();
 
+    /**
+     * 执行 MessageDeliveryCatalog 对应的业务处理。
+     */
     public MessageDeliveryCatalog() {
         deliveries.add(new Delivery(
                 1001L,
@@ -138,12 +144,22 @@ public class MessageDeliveryCatalog {
         return new MessageDeliveryFacade.DeliveryPageView(filtered.size(), filtered.subList(from, to));
     }
 
+    /**
+     * 执行 findById 对应的业务处理。
+     * @param id id 参数
+     * @return 处理后的结果
+     */
     public synchronized Optional<Delivery> findById(Long id) {
         return deliveries.stream()
                 .filter(delivery -> Objects.equals(delivery.id, id))
                 .findFirst();
     }
 
+    /**
+     * 执行 receipts 对应的业务处理。
+     * @param outboxId outboxId 参数
+     * @return 处理后的结果
+     */
     public synchronized List<Receipt> receipts(Long outboxId) {
         return receipts.stream()
                 .filter(receipt -> Objects.equals(receipt.outboxId, outboxId))
@@ -151,6 +167,11 @@ public class MessageDeliveryCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 replay 对应的业务处理。
+     * @param id id 参数
+     * @return 处理后的结果
+     */
     public synchronized MessageDeliveryFacade.ReplayResultView replay(Long id) {
         Optional<Delivery> delivery = findById(id);
         if (delivery.isEmpty() || !"DEAD".equalsIgnoreCase(delivery.get().status)) {
@@ -162,6 +183,10 @@ public class MessageDeliveryCatalog {
         return new MessageDeliveryFacade.ReplayResultView(id, "PENDING", true);
     }
 
+    /**
+     * 执行 reconcile 对应的业务处理。
+     * @return 处理后的结果
+     */
     public synchronized MessageDeliveryFacade.ReconcileResultView reconcile() {
         int requeued = 0;
         for (int index = 0; index < deliveries.size(); index++) {
@@ -174,23 +199,59 @@ public class MessageDeliveryCatalog {
         return new MessageDeliveryFacade.ReconcileResultView(requeued);
     }
 
+    /**
+     * 执行 matches 对应的业务处理。
+     * @param expected expected 参数
+     * @param actual actual 参数
+     * @return 处理后的结果
+     */
     private static boolean matches(Long expected, Long actual) {
         return expected == null || Objects.equals(expected, actual);
     }
 
+    /**
+     * 执行 matchesText 对应的业务处理。
+     * @param expected expected 参数
+     * @param actual actual 参数
+     */
     private static boolean matchesText(String expected, String actual) {
         return expected == null || expected.isBlank() || Objects.equals(expected, actual);
     }
 
+    /**
+     * 执行 matchesNormalized 对应的业务处理。
+     * @param expected expected 参数
+     * @param actual actual 参数
+     */
     private static boolean matchesNormalized(String expected, String actual) {
         return expected == null || expected.isBlank()
                 || normalize(expected).equals(normalize(actual));
     }
 
+    /**
+     * 执行 normalize 对应的业务处理。
+     * @param value value 参数
+     * @return 处理后的结果
+     */
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 定义 Delivery 的执行上下文数据结构或业务契约。
+     * @param id id 对应的数据字段
+     * @param tenantId tenantId 对应的数据字段
+     * @param canvasId canvasId 对应的数据字段
+     * @param executionId executionId 对应的数据字段
+     * @param messageSendRecordId messageSendRecordId 对应的数据字段
+     * @param userId userId 对应的数据字段
+     * @param nodeType nodeType 对应的数据字段
+     * @param channel channel 对应的数据字段
+     * @param provider provider 对应的数据字段
+     * @param payload payload 对应的数据字段
+     * @param idempotencyKey idempotencyKey 对应的数据字段
+     * @param status status 对应的数据字段
+     */
     public record Delivery(
             Long id,
             Long tenantId,
@@ -222,6 +283,19 @@ public class MessageDeliveryCatalog {
         }
     }
 
+    /**
+     * 定义 Receipt 的执行上下文数据结构或业务契约。
+     * @param id id 对应的数据字段
+     * @param tenantId tenantId 对应的数据字段
+     * @param outboxId outboxId 对应的数据字段
+     * @param provider provider 对应的数据字段
+     * @param providerMessageId providerMessageId 对应的数据字段
+     * @param receiptType receiptType 对应的数据字段
+     * @param payload payload 对应的数据字段
+     * @param idempotencyKey idempotencyKey 对应的数据字段
+     * @param receivedAt receivedAt 对应的数据字段
+     * @param createdAt createdAt 对应的数据字段
+     */
     public record Receipt(
             Long id,
             Long tenantId,

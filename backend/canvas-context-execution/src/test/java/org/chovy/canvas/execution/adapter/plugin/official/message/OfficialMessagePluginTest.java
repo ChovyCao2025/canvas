@@ -11,8 +11,14 @@ import org.chovy.canvas.execution.domain.NodeExecutionResult;
 import org.chovy.canvas.execution.domain.NodeHandlerRegistry;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 OfficialMessagePluginTest 的执行上下文数据结构或业务契约。
+ */
 class OfficialMessagePluginTest {
 
+    /**
+     * 执行 registersMessageSendHandlerThroughExecutionRegistry 对应的业务处理。
+     */
     @Test
     void registersMessageSendHandlerThroughExecutionRegistry() {
         NodeHandlerRegistry registry = new NodeHandlerRegistry(List.of(new OfficialMessageNodeHandler()));
@@ -22,6 +28,9 @@ class OfficialMessagePluginTest {
                 .containsExactly("message.send");
     }
 
+    /**
+     * 执行 returnsNormalizedMessageSendEnvelope 对应的业务处理。
+     */
     @Test
     void returnsNormalizedMessageSendEnvelope() {
         OfficialMessageNodeHandler handler = new OfficialMessageNodeHandler();
@@ -56,6 +65,9 @@ class OfficialMessagePluginTest {
         assertThat(result.output().get("context")).isEqualTo(Map.of("tenantId", "tenant-a"));
     }
 
+    /**
+     * 执行 defaultsChannelRecipientAndTrimsTemplateConfig 对应的业务处理。
+     */
     @Test
     void defaultsChannelRecipientAndTrimsTemplateConfig() {
         OfficialMessageNodeHandler handler = new OfficialMessageNodeHandler();
@@ -81,6 +93,9 @@ class OfficialMessagePluginTest {
                 .containsEntry("recipient", "user-1");
     }
 
+    /**
+     * 执行 preservesLiteralRecipientWhenConfiguredValueDoesNotResolve 对应的业务处理。
+     */
     @Test
     void preservesLiteralRecipientWhenConfiguredValueDoesNotResolve() {
         OfficialMessageNodeHandler handler = new OfficialMessageNodeHandler();
@@ -104,6 +119,9 @@ class OfficialMessagePluginTest {
         assertThat(result.output()).containsEntry("recipient", "+15550001111");
     }
 
+    /**
+     * 执行 fallsBackWhenConfiguredRecipientReferenceDoesNotResolve 对应的业务处理。
+     */
     @Test
     void fallsBackWhenConfiguredRecipientReferenceDoesNotResolve() {
         OfficialMessageNodeHandler handler = new OfficialMessageNodeHandler();
@@ -143,6 +161,9 @@ class OfficialMessagePluginTest {
         assertThat(pathReferenceResult.output()).containsEntry("recipient", "user-1");
     }
 
+    /**
+     * 执行 fallsBackToAnonymousWhenRecipientAndUserIdAreMissing 对应的业务处理。
+     */
     @Test
     void fallsBackToAnonymousWhenRecipientAndUserIdAreMissing() {
         OfficialMessageNodeHandler handler = new OfficialMessageNodeHandler();
@@ -159,6 +180,9 @@ class OfficialMessagePluginTest {
         assertThat(result.output()).containsEntry("recipient", "anonymous");
     }
 
+    /**
+     * 执行 failsWhenMessageTemplateIsMissing 对应的业务处理。
+     */
     @Test
     void failsWhenMessageTemplateIsMissing() {
         OfficialMessageNodeHandler handler = new OfficialMessageNodeHandler();

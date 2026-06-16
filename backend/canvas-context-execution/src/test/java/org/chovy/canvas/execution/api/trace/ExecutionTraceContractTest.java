@@ -11,8 +11,14 @@ import java.util.Map;
 import org.chovy.canvas.execution.api.CanvasExecutionFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 ExecutionTraceContractTest 的执行上下文数据结构或业务契约。
+ */
 class ExecutionTraceContractTest {
 
+    /**
+     * 执行 traceViewIsImmutableAndReadableThroughExecutionFacade 对应的业务处理。
+     */
     @Test
     void traceViewIsImmutableAndReadableThroughExecutionFacade() {
         List<ExecutionTraceView.NodeResultView> nodeResults = new ArrayList<>();
@@ -42,12 +48,27 @@ class ExecutionTraceContractTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    /**
+     * 定义 StaticTraceFacade 的执行上下文数据结构或业务契约。
+     * @param trace trace 对应的数据字段
+     */
     private record StaticTraceFacade(ExecutionTraceView trace) implements CanvasExecutionFacade {
+        /**
+         * 执行 trigger 对应的业务处理。
+         * @param command command 参数
+         * @return 处理后的结果
+         */
         @Override
         public ExecutionResultView trigger(ExecutionRequestCommand command) {
             return new ExecutionResultView("exec-1", "STARTED");
         }
 
+        /**
+         * 执行 trace 对应的业务处理。
+         * @param tenantId tenantId 参数
+         * @param executionId executionId 参数
+         * @return 处理后的结果
+         */
         @Override
         public ExecutionTraceView trace(Long tenantId, String executionId) {
             return trace;

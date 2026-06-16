@@ -8,8 +8,14 @@ import org.chovy.canvas.canvas.application.UserInputResumeRequest;
 import org.chovy.canvas.execution.api.trace.ExecutionTraceView;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 ExecutionRecoveryApplicationServiceTest 的执行上下文数据结构或业务契约。
+ */
 class ExecutionRecoveryApplicationServiceTest {
 
+    /**
+     * 执行 userInputResumePortRecordsResumeTrace 对应的业务处理。
+     */
     @Test
     void userInputResumePortRecordsResumeTrace() {
         ExecutionTraceService traceService = new ExecutionTraceService(new InMemoryExecutionTraceRepository());

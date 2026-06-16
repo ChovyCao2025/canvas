@@ -11,8 +11,14 @@ import org.chovy.canvas.canvas.api.PublishedCanvasEdgeDefinition;
 import org.chovy.canvas.canvas.api.PublishedCanvasNodeDefinition;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 DagParserTest 的执行上下文数据结构或业务契约。
+ */
 class DagParserTest {
 
+    /**
+     * 执行 parserReadsPublishedCanvasDefinitionInsteadOfCanvasPersistence 对应的业务处理。
+     */
     @Test
     void parserReadsPublishedCanvasDefinitionInsteadOfCanvasPersistence() {
         PublishedCanvasDefinition definition = new PublishedCanvasDefinition(

@@ -10,8 +10,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 TemplateDryRunContractTest 的执行上下文数据结构或业务契约。
+ */
 class TemplateDryRunContractTest {
 
+    /**
+     * 执行 dryRunsTemplatePackSamplesAgainstExpectedTraceWithoutPublishing 对应的业务处理。
+     */
     @Test
     void dryRunsTemplatePackSamplesAgainstExpectedTraceWithoutPublishing() {
         RecordingTemplateDryRunFacade facade = new RecordingTemplateDryRunFacade();
@@ -43,6 +49,9 @@ class TemplateDryRunContractTest {
                 .containsExactly("new-user-welcome", "dormant-user-winback", "coupon-approval-release");
     }
 
+    /**
+     * 执行 commandAndResultDefensivelyCopyMutableTemplatePackCollections 对应的业务处理。
+     */
     @Test
     void commandAndResultDefensivelyCopyMutableTemplatePackCollections() {
         List<String> requiredPlugins = new ArrayList<>(List.of("canvas-plugin-message"));
@@ -72,6 +81,9 @@ class TemplateDryRunContractTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    /**
+     * 执行 reportsDependencyAndExpectedTraceViolationsInPublicResult 对应的业务处理。
+     */
     @Test
     void reportsDependencyAndExpectedTraceViolationsInPublicResult() {
         RecordingTemplateDryRunFacade facade = new RecordingTemplateDryRunFacade();
@@ -109,14 +121,31 @@ class TemplateDryRunContractTest {
                 true);
     }
 
+    /**
+     * 执行 expected 对应的业务处理。
+     * @param nodeId nodeId 参数
+     * @param nodeType nodeType 参数
+     * @param outcome outcome 参数
+     * @return 处理后的结果
+     */
     private static TemplateDryRunFacade.ExpectedTraceStep expected(String nodeId, String nodeType, String outcome) {
         return new TemplateDryRunFacade.ExpectedTraceStep(nodeId, nodeType, outcome, nodeId + " summary");
     }
 
+    /**
+     * 定义 RecordingTemplateDryRunFacade 的执行上下文数据结构或业务契约。
+     */
     private static final class RecordingTemplateDryRunFacade implements TemplateDryRunFacade {
+        /**
+         * 保存 publishCalls 对应的状态或配置。
+         */
         private int publishCalls;
         private final List<TemplateDryRunCommand> commands = new ArrayList<>();
 
+        /**
+         * 执行 dryRun 对应的业务处理。
+         * @param command command 参数
+         */
         @Override
         public TemplateDryRunResultView dryRun(TemplateDryRunCommand command) {
             this.commands.add(command);
