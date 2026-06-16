@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.CanvasPreferenceFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasPreferenceApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasPreferenceApplicationServiceTest {
 
+    /**
+     * 处理editorPreferencesDefaultMergeAndRemainTenantUserScoped。
+     */
     @Test
     void editorPreferencesDefaultMergeAndRemainTenantUserScoped() {
         CanvasPreferenceFacade service = new CanvasPreferenceApplicationService();
@@ -38,6 +44,9 @@ class CanvasPreferenceApplicationServiceTest {
         assertThat(otherTenant.preferenceJson()).containsEntry("theme", "system");
     }
 
+    /**
+     * 处理editorPreferenceRejectsUnsupportedPatchKeys。
+     */
     @Test
     void editorPreferenceRejectsUnsupportedPatchKeys() {
         CanvasPreferenceFacade service = new CanvasPreferenceApplicationService();

@@ -6,9 +6,15 @@ import java.util.Locale;
 import org.chovy.canvas.canvas.api.ContactabilityFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 封装ContactabilityApplicationService相关的业务逻辑。
+ */
 @Service
 public class ContactabilityApplicationService implements ContactabilityFacade {
 
+    /**
+     * 处理explain。
+     */
     @Override
     public Report explain(Request request) {
         String channel = normalize(request.channel());
@@ -21,6 +27,9 @@ public class ContactabilityApplicationService implements ContactabilityFacade {
         return new Report(request.userId(), channel, true, checks);
     }
 
+    /**
+     * 规范化。
+     */
     private static String normalize(String channel) {
         return channel == null || channel.isBlank() ? "ALL" : channel.toUpperCase(Locale.ROOT);
     }

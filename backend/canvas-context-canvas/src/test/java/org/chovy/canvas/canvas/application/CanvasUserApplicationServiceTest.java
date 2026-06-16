@@ -10,8 +10,14 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.CanvasUserFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasUserApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasUserApplicationServiceTest {
 
+    /**
+     * 列出sGetsAndTracesUsersWithinCanvasScope。
+     */
     @Test
     void listsGetsAndTracesUsersWithinCanvasScope() {
         CanvasUserFacade service = new CanvasUserApplicationService();
@@ -38,6 +44,9 @@ class CanvasUserApplicationServiceTest {
                 .returns("SUCCESS", CanvasUserFacade.CanvasExecutionView::status);
     }
 
+    /**
+     * 处理validationAndMissingRowsFollowCompatibilityContract。
+     */
     @Test
     void validationAndMissingRowsFollowCompatibilityContract() {
         CanvasUserFacade service = new CanvasUserApplicationService();

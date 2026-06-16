@@ -12,11 +12,20 @@ import org.chovy.canvas.canvas.api.PublishedCanvasNodeDefinition;
 import org.chovy.canvas.canvas.domain.Canvas;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
 
+/**
+ * 封装PublishedCanvasDefinitionAssembler相关的业务逻辑。
+ */
 final class PublishedCanvasDefinitionAssembler {
 
+    /**
+     * 创建当前对象实例。
+     */
     private PublishedCanvasDefinitionAssembler() {
     }
 
+    /**
+     * 处理assemble。
+     */
     static PublishedCanvasDefinition assemble(Canvas canvas, CanvasVersion version, Instant publishedAt) {
         Map<String, Object> options = new LinkedHashMap<>(canvas.runtimeOptions().toExecutionOptions());
         options.put("source", "canvas-context-canvas");
@@ -33,6 +42,9 @@ final class PublishedCanvasDefinitionAssembler {
                 edges(graph.get("edges")));
     }
 
+    /**
+     * 处理nodes。
+     */
     private static List<PublishedCanvasNodeDefinition> nodes(Object rawNodes) {
         List<PublishedCanvasNodeDefinition> result = new ArrayList<>();
         for (Map<String, Object> node : mapList(rawNodes)) {
@@ -53,6 +65,9 @@ final class PublishedCanvasDefinitionAssembler {
         return result;
     }
 
+    /**
+     * 处理edges。
+     */
     private static List<PublishedCanvasEdgeDefinition> edges(Object rawEdges) {
         List<PublishedCanvasEdgeDefinition> result = new ArrayList<>();
         for (Map<String, Object> edge : mapList(rawEdges)) {
@@ -69,6 +84,9 @@ final class PublishedCanvasDefinitionAssembler {
         return result;
     }
 
+    /**
+     * 处理mapList。
+     */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> mapList(Object value) {
         if (!(value instanceof List<?> list)) {
@@ -83,6 +101,9 @@ final class PublishedCanvasDefinitionAssembler {
         return result;
     }
 
+    /**
+     * 处理objectMap。
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> objectMap(Object value) {
         if (value instanceof Map<?, ?> map) {
@@ -91,6 +112,9 @@ final class PublishedCanvasDefinitionAssembler {
         return Map.of();
     }
 
+    /**
+     * 处理jsonObject。
+     */
     private static String jsonObject(Object value) {
         if (value == null) {
             return "{}";
@@ -101,6 +125,9 @@ final class PublishedCanvasDefinitionAssembler {
         return JsonSupport.toJson(value);
     }
 
+    /**
+     * 处理first。
+     */
     private static Object first(Map<String, Object> map, String... keys) {
         for (String key : keys) {
             if (map.containsKey(key)) {
@@ -110,6 +137,9 @@ final class PublishedCanvasDefinitionAssembler {
         return null;
     }
 
+    /**
+     * 处理text。
+     */
     private static String text(Object value) {
         return value == null ? null : String.valueOf(value);
     }

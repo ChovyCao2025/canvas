@@ -15,21 +15,48 @@ import org.chovy.canvas.canvas.api.MqDefinitionFacade.MqDefinitionListQuery;
 import org.chovy.canvas.canvas.api.MqDefinitionFacade.MqDefinitionView;
 import org.chovy.canvas.canvas.api.MqDefinitionFacade.PageView;
 
+/**
+ * 封装MqDefinitionCatalog相关的业务逻辑。
+ */
 public class MqDefinitionCatalog {
 
+    /**
+     * 保存内存场景下生成标识或统计次数的原子计数器。
+     */
     private final AtomicLong ids = new AtomicLong();
+
+    /**
+     * 保存内存实现使用的rows映射数据。
+     */
     private final Map<Long, MqRow> rows = new LinkedHashMap<>();
+
+    /**
+     * 保存内存场景下生成标识或统计次数的原子计数器。
+     */
     private final AtomicInteger rebuildCount = new AtomicInteger();
+
+    /**
+     * 保存routeRebuilder。
+     */
     private final IntConsumer routeRebuilder;
 
+    /**
+     * 创建当前对象实例。
+     */
     public MqDefinitionCatalog() {
         this(null);
     }
 
+    /**
+     * 创建当前对象实例。
+     */
     public MqDefinitionCatalog(IntConsumer routeRebuilder) {
         this.routeRebuilder = routeRebuilder;
     }
 
+    /**
+     * 列出。
+     */
     public synchronized PageView<MqDefinitionView> list(MqDefinitionListQuery query) {
         int page = query.page() <= 0 ? 1 : query.page();
         int size = query.size() <= 0 ? 20 : query.size();
@@ -43,6 +70,9 @@ public class MqDefinitionCatalog {
         return new PageView<>(filtered.size(), filtered.subList(from, to));
     }
 
+    /**
+     * 创建。
+     */
     public synchronized MqDefinitionView create(MqDefinitionCommand command) {
         MqDefinitionCommand safe = requireCommand(command);
         requireText(safe.messageCode(), "messageCode is required");
@@ -65,6 +95,9 @@ public class MqDefinitionCatalog {
         return view(row);
     }
 
+    /**
+     * 更新。
+     */
     public synchronized MqDefinitionView update(Long id, MqDefinitionCommand command) {
         if (id == null) {
             throw new IllegalArgumentException("mq definition not found: " + id);
@@ -103,6 +136,9 @@ public class MqDefinitionCatalog {
         return view(existing);
     }
 
+    /**
+     * 删除。
+     */
     public synchronized void delete(Long id) {
         if (rows.remove(id) == null) {
             throw new IllegalArgumentException("mq definition not found: " + id);
@@ -110,10 +146,16 @@ public class MqDefinitionCatalog {
         rebuildRoutes();
     }
 
+    /**
+     * 处理rebuildCount。
+     */
     public int rebuildCount() {
         return rebuildCount.get();
     }
 
+    /**
+     * 处理rebuildRoutes。
+     */
     private void rebuildRoutes() {
         int count = rebuildCount.incrementAndGet();
         if (routeRebuilder != null) {
@@ -121,6 +163,9 @@ public class MqDefinitionCatalog {
         }
     }
 
+    /**
+     * 校验并返回命令。
+     */
     private static MqDefinitionCommand requireCommand(MqDefinitionCommand command) {
         if (command == null) {
             return new MqDefinitionCommand(null, null, null, null, null, null, null, null);
@@ -128,6 +173,9 @@ public class MqDefinitionCatalog {
         return command;
     }
 
+    /**
+     * 校验并返回Text。
+     */
     private static String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(message);
@@ -135,22 +183,72 @@ public class MqDefinitionCatalog {
         return value.trim();
     }
 
+    /**
+     * 处理view。
+     */
     private static MqDefinitionView view(MqRow row) {
         return new MqDefinitionView(row.id, row.messageCode, row.topic, row.tags, row.consumerGroup,
                 row.payloadSchema, row.description, row.enabled, row.createdBy, row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 封装MqRow相关的业务逻辑。
+     */
     private static final class MqRow {
+
+        /**
+         * 保存标识。
+         */
         private Long id;
+
+        /**
+         * 保存messageCode。
+         */
         private String messageCode;
+
+        /**
+         * 保存topic。
+         */
         private String topic;
+
+        /**
+         * 保存tags。
+         */
         private String tags;
+
+        /**
+         * 保存consumerGroup。
+         */
         private String consumerGroup;
+
+        /**
+         * 保存payloadSchema。
+         */
         private String payloadSchema;
+
+        /**
+         * 保存描述。
+         */
         private String description;
+
+        /**
+         * 保存启用状态。
+         */
         private Integer enabled;
+
+        /**
+         * 保存创建人。
+         */
         private String createdBy;
+
+        /**
+         * 保存创建时间。
+         */
         private LocalDateTime createdAt;
+
+        /**
+         * 保存更新时间。
+         */
         private LocalDateTime updatedAt;
     }
 }

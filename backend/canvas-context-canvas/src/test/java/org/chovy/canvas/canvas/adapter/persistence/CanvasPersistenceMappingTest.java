@@ -15,8 +15,14 @@ import org.chovy.canvas.canvas.domain.CanvasRuntimeOptions;
 import org.chovy.canvas.canvas.domain.CanvasStatus;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasPersistenceMappingTest相关的业务逻辑。
+ */
 class CanvasPersistenceMappingTest {
 
+    /**
+     * 处理mapsCanvasDomainToPersistenceRowAndBack。
+     */
     @Test
     void mapsCanvasDomainToPersistenceRowAndBack() {
         Canvas canvas = Canvas.createDraft(7L, 9L, "Welcome", "desc", "creator").publish(77L);
@@ -33,6 +39,9 @@ class CanvasPersistenceMappingTest {
         assertThat(restored.publishedVersionId()).isEqualTo(77L);
     }
 
+    /**
+     * 处理mapsRuntimePolicyFieldsWithoutForcingNullRuntimeUpdates。
+     */
     @Test
     void mapsRuntimePolicyFieldsWithoutForcingNullRuntimeUpdates() {
         Canvas canvas = Canvas.createDraft(7L, 9L, "Welcome", "desc", "creator")
@@ -69,6 +78,9 @@ class CanvasPersistenceMappingTest {
         assertThat(fieldStrategy("cooldownSeconds")).isNotEqualTo(FieldStrategy.ALWAYS);
     }
 
+    /**
+     * 处理nullableLifecyclePointersUseAlwaysUpdateStrategySoTheyCanBeCleared。
+     */
     @Test
     void nullableLifecyclePointersUseAlwaysUpdateStrategySoTheyCanBeCleared() {
         assertThat(fieldStrategy("publishedVersionId")).isEqualTo(FieldStrategy.ALWAYS);
@@ -77,6 +89,9 @@ class CanvasPersistenceMappingTest {
         assertThat(fieldStrategy("previousVersionId")).isEqualTo(FieldStrategy.ALWAYS);
     }
 
+    /**
+     * 处理canvasRepositoryRejectsStaleUpdates。
+     */
     @Test
     void canvasRepositoryRejectsStaleUpdates() {
         CanvasMapper mapper = mock(CanvasMapper.class);
@@ -88,6 +103,9 @@ class CanvasPersistenceMappingTest {
                 .hasMessageContaining("Canvas update affected 0 rows");
     }
 
+    /**
+     * 处理fieldStrategy。
+     */
     private static FieldStrategy fieldStrategy(String fieldName) {
         try {
             Field field = CanvasDO.class.getDeclaredField(fieldName);

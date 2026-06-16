@@ -7,8 +7,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasCompatibilityApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasCompatibilityApplicationServiceTest {
 
+    /**
+     * 创建GetUpdateAndListAreTenantScopedWithDeterministicOrdering。
+     */
     @Test
     void createGetUpdateAndListAreTenantScopedWithDeterministicOrdering() {
         CanvasCompatibilityApplicationService service = new CanvasCompatibilityApplicationService();
@@ -51,6 +57,9 @@ class CanvasCompatibilityApplicationServiceTest {
                 .containsExactly(8L);
     }
 
+    /**
+     * 处理workflowOperationsModelReviewPrepublishCloneRevertCanaryAndImportExport。
+     */
     @Test
     void workflowOperationsModelReviewPrepublishCloneRevertCanaryAndImportExport() {
         CanvasCompatibilityApplicationService service = new CanvasCompatibilityApplicationService();
@@ -102,6 +111,9 @@ class CanvasCompatibilityApplicationServiceTest {
                 .returns("importer", CanvasCompatibilityApplicationService.CanvasView::createdBy);
     }
 
+    /**
+     * 处理safeUpdateRejectsStaleEditVersion。
+     */
     @Test
     void safeUpdateRejectsStaleEditVersion() {
         CanvasCompatibilityApplicationService service = new CanvasCompatibilityApplicationService();
@@ -121,6 +133,9 @@ class CanvasCompatibilityApplicationServiceTest {
                 .returns(3, CanvasCompatibilityApplicationService.CanvasView::editVersion);
     }
 
+    /**
+     * 处理templateRoutesListSaveCreateCanvasAndExposePendingReviews。
+     */
     @Test
     void templateRoutesListSaveCreateCanvasAndExposePendingReviews() {
         CanvasCompatibilityApplicationService service = new CanvasCompatibilityApplicationService();
@@ -160,6 +175,9 @@ class CanvasCompatibilityApplicationServiceTest {
                 .containsExactly("review-1000");
     }
 
+    /**
+     * 处理batchOperationsNormalizeOperationAndReturnPerCanvasStatuses。
+     */
     @Test
     void batchOperationsNormalizeOperationAndReturnPerCanvasStatuses() {
         CanvasCompatibilityApplicationService service = new CanvasCompatibilityApplicationService();

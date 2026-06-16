@@ -7,8 +7,14 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasProjectFolderPersistenceMappingTest相关的业务逻辑。
+ */
 class CanvasProjectFolderPersistenceMappingTest {
 
+    /**
+     * 处理projectIdCanBeClearedWhenProjectAssignmentIsRemoved。
+     */
     @Test
     void projectIdCanBeClearedWhenProjectAssignmentIsRemoved() throws Exception {
         Field field = CanvasProjectFolderDO.class.getDeclaredField("projectId");

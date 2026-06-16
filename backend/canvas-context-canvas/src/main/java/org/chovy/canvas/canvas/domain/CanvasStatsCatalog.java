@@ -6,14 +6,26 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 封装CanvasStatsCatalog相关的业务逻辑。
+ */
 public class CanvasStatsCatalog {
 
+    /**
+     * 保存时钟。
+     */
     private final Clock clock;
 
+    /**
+     * 创建当前对象实例。
+     */
     public CanvasStatsCatalog(Clock clock) {
         this.clock = clock;
     }
 
+    /**
+     * 处理trace。
+     */
     public List<Map<String, Object>> trace(Long canvasId, String executionId) {
         requireCanvasId(canvasId);
         if (executionId == null || executionId.isBlank()) {
@@ -30,6 +42,9 @@ public class CanvasStatsCatalog {
                 "durationMs", 0L));
     }
 
+    /**
+     * 处理recentExecutions。
+     */
     public List<Map<String, Object>> recentExecutions(Long canvasId, int size) {
         requireCanvasId(canvasId);
         if (size < 1 || size > 100) {
@@ -43,6 +58,9 @@ public class CanvasStatsCatalog {
                 "createdAt", LocalDate.now(clock).atStartOfDay().toString()));
     }
 
+    /**
+     * 处理stats。
+     */
     public Map<String, Object> stats(Long canvasId, int days, String since, String until) {
         requireCanvasId(canvasId);
         validateRange(days, since, until);
@@ -55,6 +73,9 @@ public class CanvasStatsCatalog {
                 "uniqueUsers", 1L);
     }
 
+    /**
+     * 处理funnel。
+     */
     public List<Map<String, Object>> funnel(Long canvasId) {
         requireCanvasId(canvasId);
         return List.of(row(
@@ -69,6 +90,9 @@ public class CanvasStatsCatalog {
                 "avgDurationSec", 0.0));
     }
 
+    /**
+     * 处理trend。
+     */
     public List<Map<String, Object>> trend(Long canvasId, int days, String since, String until) {
         requireCanvasId(canvasId);
         DateRange range = validateRange(days, since, until);
@@ -77,11 +101,17 @@ public class CanvasStatsCatalog {
                 .toList();
     }
 
+    /**
+     * 处理receipts。
+     */
     public Map<String, Object> receipts(Long canvasId) {
         requireCanvasId(canvasId);
         return row("delivered", 1L, "failed", 0L);
     }
 
+    /**
+     * 处理attributionSummary。
+     */
     public Map<String, Object> attributionSummary(Long canvasId) {
         requireCanvasId(canvasId);
         return row(
@@ -92,6 +122,9 @@ public class CanvasStatsCatalog {
                 "models", "LAST_TOUCH");
     }
 
+    /**
+     * 处理validateRange。
+     */
     private DateRange validateRange(int days, String since, String until) {
         if (days < 1 || days > 365) {
             throw new IllegalArgumentException("days must be between 1 and 365");
@@ -104,12 +137,18 @@ public class CanvasStatsCatalog {
         return new DateRange(sinceDate, untilDate);
     }
 
+    /**
+     * 校验并返回画布标识。
+     */
     private static void requireCanvasId(Long canvasId) {
         if (canvasId == null || canvasId <= 0) {
             throw new IllegalArgumentException("canvasId must be positive");
         }
     }
 
+    /**
+     * 处理row。
+     */
     private static Map<String, Object> row(Object... keysAndValues) {
         Map<String, Object> row = new LinkedHashMap<>();
         for (int i = 0; i < keysAndValues.length; i += 2) {
@@ -118,6 +157,9 @@ public class CanvasStatsCatalog {
         return row;
     }
 
+    /**
+     * 承载DateRange的数据快照。
+     */
     private record DateRange(LocalDate since, LocalDate until) {
     }
 }

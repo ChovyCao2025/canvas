@@ -8,20 +8,39 @@ import java.util.Objects;
 
 import org.chovy.canvas.canvas.api.ai.AiJourneyDraftProposal;
 
+/**
+ * 封装JourneyGenerationService相关的业务逻辑。
+ */
 public class JourneyGenerationService {
 
+    /**
+     * 保存provider。
+     */
     private final JourneyDraftProvider provider;
+
+    /**
+     * 保存时钟。
+     */
     private final Clock clock;
 
+    /**
+     * 创建当前对象实例。
+     */
     public JourneyGenerationService(JourneyDraftProvider provider, Clock clock) {
         this.provider = Objects.requireNonNull(provider, "provider is required");
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
+    /**
+     * 处理mock。
+     */
     public static JourneyGenerationService mock(Clock clock) {
         return new JourneyGenerationService(new MockJourneyDraftProvider(), clock);
     }
 
+    /**
+     * 处理generateDraft。
+     */
     public AiJourneyDraftProposal generateDraft(GenerationRequest request) {
         Objects.requireNonNull(request, "request is required");
         GeneratedDraft draft = provider.generate(request);
@@ -36,11 +55,17 @@ public class JourneyGenerationService {
                 now);
     }
 
+    /**
+     * 处理proposal标识。
+     */
     private static String proposalId(GenerationRequest request, Instant createdAt) {
         String slug = slug(request.prompt().isBlank() ? "marketing journey" : request.prompt());
         return "ai-journey-" + slug + "-" + createdAt.toEpochMilli();
     }
 
+    /**
+     * 处理slug。
+     */
     private static String slug(String value) {
         String normalized = value.toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "-")
@@ -51,15 +76,40 @@ public class JourneyGenerationService {
         return normalized.length() <= 48 ? normalized : normalized.substring(0, 48).replaceAll("-$", "");
     }
 
+    /**
+     * 定义JourneyDraftProvider对外提供的能力契约。
+     */
     public interface JourneyDraftProvider {
+
+        /**
+         * 处理generate。
+         */
         GeneratedDraft generate(GenerationRequest request);
     }
 
+    /**
+     * 承载GenerationRequest的数据快照。
+     */
     public record GenerationRequest(
+            /**
+             * 记录租户标识。
+             */
             Long tenantId,
+            /**
+             * 记录prompt。
+             */
             String prompt,
+            /**
+             * 记录riskFindings。
+             */
             List<AiJourneyDraftProposal.RiskFinding> riskFindings,
+            /**
+             * 记录traceReferences。
+             */
             List<AiJourneyDraftProposal.TraceReference> traceReferences,
+            /**
+             * 记录操作人。
+             */
             String operator) {
 
         public GenerationRequest {
@@ -73,6 +123,9 @@ public class JourneyGenerationService {
         }
     }
 
+    /**
+     * 承载GeneratedDraft的数据快照。
+     */
     public record GeneratedDraft(String dslDraft) {
 
         public GeneratedDraft {
@@ -82,8 +135,14 @@ public class JourneyGenerationService {
         }
     }
 
+    /**
+     * 封装MockJourneyDraftProvider相关的业务逻辑。
+     */
     private static final class MockJourneyDraftProvider implements JourneyDraftProvider {
 
+        /**
+         * 处理generate。
+         */
         @Override
         public GeneratedDraft generate(GenerationRequest request) {
             String prompt = request.prompt().toLowerCase(Locale.ROOT);

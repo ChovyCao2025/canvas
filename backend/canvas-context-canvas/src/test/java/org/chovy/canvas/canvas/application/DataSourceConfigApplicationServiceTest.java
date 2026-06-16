@@ -13,8 +13,14 @@ import org.chovy.canvas.canvas.api.DataSourceConfigFacade.PageView;
 import org.chovy.canvas.canvas.api.DataSourceConfigFacade.TenantIdentity;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装DataSourceConfigApplicationServiceTest相关的业务逻辑。
+ */
 class DataSourceConfigApplicationServiceTest {
 
+    /**
+     * 处理filtersByTenantTypeAndEnabledWhileKeepingPasswordsRedacted。
+     */
     @Test
     void filtersByTenantTypeAndEnabledWhileKeepingPasswordsRedacted() {
         DataSourceConfigFacade service = new DataSourceConfigApplicationService();
@@ -66,6 +72,9 @@ class DataSourceConfigApplicationServiceTest {
                         .returns("******", DataSourceConfigView::password));
     }
 
+    /**
+     * 处理supportsSuperAdminTenantFilterButPreventsTenantCrossAccess。
+     */
     @Test
     void supportsSuperAdminTenantFilterButPreventsTenantCrossAccess() {
         DataSourceConfigFacade service = new DataSourceConfigApplicationService();
@@ -110,6 +119,9 @@ class DataSourceConfigApplicationServiceTest {
                 .hasMessageContaining("Data source not found");
     }
 
+    /**
+     * 更新sAndDeletesWithinTenantScope。
+     */
     @Test
     void updatesAndDeletesWithinTenantScope() {
         DataSourceConfigFacade service = new DataSourceConfigApplicationService();
@@ -146,6 +158,9 @@ class DataSourceConfigApplicationServiceTest {
                 .isZero();
     }
 
+    /**
+     * 处理validatesUnsupportedTypesMissingFieldsAndTableMetadataFailures。
+     */
     @Test
     void validatesUnsupportedTypesMissingFieldsAndTableMetadataFailures() {
         DataSourceConfigFacade service = new DataSourceConfigApplicationService();
@@ -205,6 +220,9 @@ class DataSourceConfigApplicationServiceTest {
                 .hasMessageContaining("Data source not found");
     }
 
+    /**
+     * 创建测试使用的数据源配置命令。
+     */
     private static DataSourceConfigCommand command(Long tenantId,
                                                    String name,
                                                    String type,

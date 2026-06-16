@@ -13,8 +13,14 @@ import org.chovy.canvas.canvas.api.EventDefinitionFacade.PageView;
 import org.chovy.canvas.canvas.domain.EventDefinitionCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装EventDefinitionApplicationServiceTest相关的业务逻辑。
+ */
 class EventDefinitionApplicationServiceTest {
 
+    /**
+     * 列出sByEnabledFilterAndAscendingIdWithPaging。
+     */
     @Test
     void listsByEnabledFilterAndAscendingIdWithPaging() {
         EventDefinitionFacade service = new EventDefinitionApplicationService();
@@ -31,6 +37,9 @@ class EventDefinitionApplicationServiceTest {
                 .containsExactly(first.id(), third.id());
     }
 
+    /**
+     * 更新AndDeleteInvalidateOldAndNewEventCodes。
+     */
     @Test
     void updateAndDeleteInvalidateOldAndNewEventCodes() {
         List<String> invalidated = new ArrayList<>();
@@ -52,6 +61,9 @@ class EventDefinitionApplicationServiceTest {
         assertThat(invalidated).containsExactly("ORDER_COMPLETED");
     }
 
+    /**
+     * 处理命令。
+     */
     private static EventDefinitionCommand command(String name, String eventCode, Integer enabled) {
         return new EventDefinitionCommand(
                 name,

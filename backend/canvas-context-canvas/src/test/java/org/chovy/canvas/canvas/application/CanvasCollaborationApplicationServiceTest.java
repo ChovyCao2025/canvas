@@ -7,8 +7,14 @@ import java.util.List;
 import org.chovy.canvas.canvas.api.CanvasCollaborationFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasCollaborationApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasCollaborationApplicationServiceTest {
 
+    /**
+     * 处理returnsLegacyDefaultSummaryWhenRepositoryHasNoSummary。
+     */
     @Test
     void returnsLegacyDefaultSummaryWhenRepositoryHasNoSummary() {
         CanvasCollaborationFacade service = new CanvasCollaborationApplicationService();
@@ -22,6 +28,9 @@ class CanvasCollaborationApplicationServiceTest {
         assertThat(summary.unreadNotificationCount()).isZero();
     }
 
+    /**
+     * 处理readsSummaryByTenantAndCanvas。
+     */
     @Test
     void readsSummaryByTenantAndCanvas() {
         CanvasCollaborationApplicationService service = new CanvasCollaborationApplicationService((tenantId, canvasId) -> {

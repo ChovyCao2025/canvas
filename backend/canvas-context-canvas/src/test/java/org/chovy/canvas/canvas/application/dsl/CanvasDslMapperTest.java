@@ -5,8 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.chovy.canvas.canvas.api.dsl.CanvasDslDocument;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasDslMapperTest相关的业务逻辑。
+ */
 class CanvasDslMapperTest {
 
+    /**
+     * 处理mapsDslJourneyToGraphJsonWithoutReplacingFullGraphSemantics。
+     */
     @Test
     void mapsDslJourneyToGraphJsonWithoutReplacingFullGraphSemantics() {
         CanvasDslMapper mapper = new CanvasDslMapper();
@@ -19,6 +25,9 @@ class CanvasDslMapperTest {
         assertThat(result.graphJson()).contains("\"from\":\"segment\"");
     }
 
+    /**
+     * 处理mapsGraphJsonBackToStableDslProjection。
+     */
     @Test
     void mapsGraphJsonBackToStableDslProjection() {
         CanvasDslMapper mapper = new CanvasDslMapper();
@@ -33,6 +42,9 @@ class CanvasDslMapperTest {
                 .containsExactly("segment", "send", "end");
     }
 
+    /**
+     * 处理exportsDslProjectionFromCurrentGraphJsonShape。
+     */
     @Test
     void exportsDslProjectionFromCurrentGraphJsonShape() {
         CanvasDslMapper mapper = new CanvasDslMapper();
@@ -59,6 +71,9 @@ class CanvasDslMapperTest {
         assertThat(document.spec().edges()).containsExactly(new CanvasDslDocument.Edge("send", "end"));
     }
 
+    /**
+     * 处理preservesMetadataTitleAsPublicDslFieldWhenMapping。
+     */
     @Test
     void preservesMetadataTitleAsPublicDslFieldWhenMapping() {
         CanvasDslMapper mapper = new CanvasDslMapper();
@@ -71,6 +86,9 @@ class CanvasDslMapperTest {
         assertThat(exported.metadata().title()).isEqualTo("New user welcome");
     }
 
+    /**
+     * 处理reportsStableDiffBetweenDslDocuments。
+     */
     @Test
     void reportsStableDiffBetweenDslDocuments() {
         CanvasDslMapper mapper = new CanvasDslMapper();

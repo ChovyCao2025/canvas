@@ -10,9 +10,15 @@ import java.util.Set;
 import org.chovy.canvas.canvas.api.dsl.CanvasDslDocument;
 import org.springframework.stereotype.Component;
 
+/**
+ * 封装CanvasDslValidator相关的业务逻辑。
+ */
 @Component
 public class CanvasDslValidator {
 
+    /**
+     * 保存SUPPORTED_API_VERSION。
+     */
     public static final String SUPPORTED_API_VERSION = "canvas/v1";
 
     private static final Set<String> SUPPORTED_NODE_TYPES = Set.of(
@@ -25,6 +31,9 @@ public class CanvasDslValidator {
             "risk-check",
             "end");
 
+    /**
+     * 处理validate。
+     */
     public CanvasDslValidationResult validate(CanvasDslDocument document) {
         List<CanvasDslValidationResult.Violation> violations = new ArrayList<>();
         if (!SUPPORTED_API_VERSION.equals(document.apiVersion())) {
@@ -91,6 +100,9 @@ public class CanvasDslValidator {
         return CanvasDslValidationResult.failed(violations);
     }
 
+    /**
+     * 处理containsCycle。
+     */
     private static boolean containsCycle(Set<String> nodeIds, List<CanvasDslDocument.Edge> edges) {
         Map<String, List<String>> adjacency = new HashMap<>();
         for (String nodeId : nodeIds) {
@@ -111,6 +123,9 @@ public class CanvasDslValidator {
         return false;
     }
 
+    /**
+     * 检测 DSL 节点图中是否存在环路。
+     */
     private static boolean hasCycle(String nodeId,
                                     Map<String, List<String>> adjacency,
                                     Set<String> visiting,
@@ -119,6 +134,7 @@ public class CanvasDslValidator {
             return false;
         }
         if (!visiting.add(nodeId)) {
+            // 再次进入当前递归栈中的节点即形成有向环。
             return true;
         }
         for (String next : adjacency.getOrDefault(nodeId, List.of())) {
@@ -126,6 +142,7 @@ public class CanvasDslValidator {
                 return true;
             }
         }
+        // 退出递归栈后标记为已确认无环，后续入口无需重复遍历。
         visiting.remove(nodeId);
         visited.add(nodeId);
         return false;

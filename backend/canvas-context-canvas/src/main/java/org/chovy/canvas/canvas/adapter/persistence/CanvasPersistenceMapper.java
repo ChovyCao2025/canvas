@@ -6,11 +6,20 @@ import org.chovy.canvas.canvas.domain.Canvas;
 import org.chovy.canvas.canvas.domain.CanvasRuntimeOptions;
 import org.chovy.canvas.canvas.domain.CanvasStatus;
 
+/**
+ * 封装CanvasPersistenceMapper相关的业务逻辑。
+ */
 final class CanvasPersistenceMapper {
 
+    /**
+     * 创建当前对象实例。
+     */
     private CanvasPersistenceMapper() {
     }
 
+    /**
+     * 转换为Row。
+     */
     static CanvasDO toRow(Canvas canvas) {
         CanvasDO row = new CanvasDO();
         row.setId(canvas.id());
@@ -39,6 +48,9 @@ final class CanvasPersistenceMapper {
         return row;
     }
 
+    /**
+     * 转换为Domain。
+     */
     static Canvas toDomain(CanvasDO row) {
         if (row == null) {
             return null;
@@ -70,10 +82,16 @@ final class CanvasPersistenceMapper {
                         row.getAttributionModel()));
     }
 
+    /**
+     * 处理parseDateTime。
+     */
     private static LocalDateTime parseDateTime(String value) {
         return value == null || value.isBlank() ? null : LocalDateTime.parse(value);
     }
 
+    /**
+     * 处理formatDateTime。
+     */
     private static String formatDateTime(LocalDateTime value) {
         return value == null ? null : value.toString();
     }

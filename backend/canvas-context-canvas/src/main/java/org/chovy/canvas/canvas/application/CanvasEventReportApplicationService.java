@@ -6,9 +6,15 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.CanvasEventReportFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 封装CanvasEventReportApplicationService相关的业务逻辑。
+ */
 @Service
 public class CanvasEventReportApplicationService implements CanvasEventReportFacade {
 
+    /**
+     * 处理report。
+     */
     @Override
     public Map<String, Object> report(String rawBody) {
         Map<String, Object> request = JsonSupport.parseObject(rawBody == null || rawBody.isBlank() ? "{}" : rawBody);
@@ -27,6 +33,9 @@ public class CanvasEventReportApplicationService implements CanvasEventReportFac
         return result;
     }
 
+    /**
+     * 校验并返回dString。
+     */
     private static String requiredString(Map<String, Object> request, String field) {
         String value = stringValue(request.get(field));
         if (value == null || value.isBlank()) {
@@ -35,10 +44,16 @@ public class CanvasEventReportApplicationService implements CanvasEventReportFac
         return value;
     }
 
+    /**
+     * 处理stringValue。
+     */
     private static String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
 
+    /**
+     * 处理triggeredCanvasCount。
+     */
     private static int triggeredCanvasCount(String eventCode) {
         return Math.floorMod(eventCode.hashCode(), 3) + 1;
     }

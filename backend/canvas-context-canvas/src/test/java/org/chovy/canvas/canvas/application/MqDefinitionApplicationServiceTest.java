@@ -14,8 +14,14 @@ import org.chovy.canvas.canvas.api.MqDefinitionFacade.PageView;
 import org.chovy.canvas.canvas.domain.MqDefinitionCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装MqDefinitionApplicationServiceTest相关的业务逻辑。
+ */
 class MqDefinitionApplicationServiceTest {
 
+    /**
+     * 列出sEnabledDefinitionsByAscendingIdWithLegacyPageShape。
+     */
     @Test
     void listsEnabledDefinitionsByAscendingIdWithLegacyPageShape() {
         MqDefinitionFacade service = new MqDefinitionApplicationService();
@@ -30,6 +36,9 @@ class MqDefinitionApplicationServiceTest {
         assertThat(page.list()).extracting(MqDefinitionView::id).containsExactly(first.id(), third.id());
     }
 
+    /**
+     * 创建UpdateAndDeleteRebuildRoutesAndPathIdIsAuthoritative。
+     */
     @Test
     void createUpdateAndDeleteRebuildRoutesAndPathIdIsAuthoritative() {
         List<Integer> rebuilds = new ArrayList<>();
@@ -58,6 +67,9 @@ class MqDefinitionApplicationServiceTest {
         assertThat(service.list(new MqDefinitionListQuery(1, 20, null)).total()).isZero();
     }
 
+    /**
+     * 处理validatesRequiredMessageCodeAndTopicAndMissingDelete。
+     */
     @Test
     void validatesRequiredMessageCodeAndTopicAndMissingDelete() {
         MqDefinitionFacade service = new MqDefinitionApplicationService();
@@ -73,6 +85,9 @@ class MqDefinitionApplicationServiceTest {
                 .hasMessage("mq definition not found: 99");
     }
 
+    /**
+     * 处理命令。
+     */
     private static MqDefinitionCommand command(String messageCode, String topic, Integer enabled) {
         return new MqDefinitionCommand(
                 messageCode,

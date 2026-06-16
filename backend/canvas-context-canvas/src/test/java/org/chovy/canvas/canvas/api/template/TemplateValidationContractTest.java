@@ -7,8 +7,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装TemplateValidationContractTest相关的业务逻辑。
+ */
 class TemplateValidationContractTest {
 
+    /**
+     * 处理validationBlocksDraftCreationWhenRequiredPluginIsMissing。
+     */
     @Test
     void validationBlocksDraftCreationWhenRequiredPluginIsMissing() {
         BlockingTemplateValidationPort port = new BlockingTemplateValidationPort();
@@ -32,7 +38,14 @@ class TemplateValidationContractTest {
         assertThat(draftCreator.created).isFalse();
     }
 
+    /**
+     * 封装BlockingTemplateValidationPort相关的业务逻辑。
+     */
     private static final class BlockingTemplateValidationPort implements TemplateValidationPort {
+
+        /**
+         * 处理validateTemplate。
+         */
         @Override
         public TemplateValidationResult validateTemplate(TemplateValidationCommand command) {
             return TemplateValidationResult.blocked(List.of(
@@ -40,9 +53,19 @@ class TemplateValidationContractTest {
         }
     }
 
+    /**
+     * 封装DraftCreator相关的业务逻辑。
+     */
     private static final class DraftCreator {
+
+        /**
+         * 保存created。
+         */
         private boolean created;
 
+        /**
+         * 创建Draft。
+         */
         private void createDraft() {
             this.created = true;
         }

@@ -5,15 +5,27 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 封装DslJsonSupport相关的业务逻辑。
+ */
 final class DslJsonSupport {
 
+    /**
+     * 创建当前对象实例。
+     */
     private DslJsonSupport() {
     }
 
+    /**
+     * 处理parse。
+     */
     static Object parse(String json) {
         return new Parser(json).parse();
     }
 
+    /**
+     * 处理parseObject。
+     */
     @SuppressWarnings("unchecked")
     static Map<String, Object> parseObject(String json) {
         Object parsed = parse(json);
@@ -23,12 +35,18 @@ final class DslJsonSupport {
         throw new IllegalArgumentException("JSON root must be an object");
     }
 
+    /**
+     * 转换为Json。
+     */
     static String toJson(Object value) {
         StringBuilder out = new StringBuilder();
         writeJson(value, out);
         return out.toString();
     }
 
+    /**
+     * 处理writeJSON 内容。
+     */
     private static void writeJson(Object value, StringBuilder out) {
         if (value == null) {
             out.append("null");
@@ -65,6 +83,9 @@ final class DslJsonSupport {
         }
     }
 
+    /**
+     * 处理writeString。
+     */
     private static void writeString(String value, StringBuilder out) {
         out.append('"');
         for (int i = 0; i < value.length(); i++) {
@@ -89,14 +110,31 @@ final class DslJsonSupport {
         out.append('"');
     }
 
+    /**
+     * 封装Parser相关的业务逻辑。
+     */
     private static final class Parser {
+
+        /**
+         * 保存text。
+         */
         private final String text;
+
+        /**
+         * 保存index。
+         */
         private int index;
 
+        /**
+         * 创建当前对象实例。
+         */
         private Parser(String text) {
             this.text = text == null ? "" : text;
         }
 
+        /**
+         * 处理parse。
+         */
         private Object parse() {
             skipWhitespace();
             Object value = parseValue();
@@ -107,6 +145,9 @@ final class DslJsonSupport {
             return value;
         }
 
+        /**
+         * 处理parseValue。
+         */
         private Object parseValue() {
             skipWhitespace();
             if (index >= text.length()) {
@@ -129,6 +170,9 @@ final class DslJsonSupport {
             };
         }
 
+        /**
+         * 处理parseObject。
+         */
         private Map<String, Object> parseObject() {
             expect('{');
             Map<String, Object> result = new LinkedHashMap<>();
@@ -152,6 +196,9 @@ final class DslJsonSupport {
             }
         }
 
+        /**
+         * 处理parseArray。
+         */
         private List<Object> parseArray() {
             expect('[');
             List<Object> result = new ArrayList<>();
@@ -171,6 +218,9 @@ final class DslJsonSupport {
             }
         }
 
+        /**
+         * 处理parseString。
+         */
         private String parseString() {
             expect('"');
             StringBuilder result = new StringBuilder();
@@ -203,6 +253,9 @@ final class DslJsonSupport {
             throw error("Unterminated JSON string");
         }
 
+        /**
+         * 处理parseUnicodeEscape。
+         */
         private char parseUnicodeEscape() {
             if (index + 4 > text.length()) {
                 throw error("Invalid unicode escape");
@@ -216,6 +269,9 @@ final class DslJsonSupport {
             }
         }
 
+        /**
+         * 处理parseLiteral。
+         */
         private Object parseLiteral(String literal, Object value) {
             if (!text.startsWith(literal, index)) {
                 throw error("Invalid JSON literal");
@@ -224,6 +280,9 @@ final class DslJsonSupport {
             return value;
         }
 
+        /**
+         * 处理parseNumber。
+         */
         private Number parseNumber() {
             int start = index;
             if (peek('-')) {
@@ -259,6 +318,9 @@ final class DslJsonSupport {
             }
         }
 
+        /**
+         * 处理readDigits。
+         */
         private void readDigits() {
             int start = index;
             while (index < text.length() && Character.isDigit(text.charAt(index))) {
@@ -269,16 +331,25 @@ final class DslJsonSupport {
             }
         }
 
+        /**
+         * 处理skipWhitespace。
+         */
         private void skipWhitespace() {
             while (index < text.length() && Character.isWhitespace(text.charAt(index))) {
                 index++;
             }
         }
 
+        /**
+         * 处理peek。
+         */
         private boolean peek(char expected) {
             return index < text.length() && text.charAt(index) == expected;
         }
 
+        /**
+         * 处理expect。
+         */
         private void expect(char expected) {
             if (!peek(expected)) {
                 throw error("Expected '" + expected + "'");
@@ -286,6 +357,9 @@ final class DslJsonSupport {
             index++;
         }
 
+        /**
+         * 处理error。
+         */
         private IllegalArgumentException error(String message) {
             return new IllegalArgumentException(message + " at JSON offset " + index);
         }

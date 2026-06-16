@@ -10,8 +10,14 @@ import org.chovy.canvas.canvas.domain.CanvasVersion;
 import org.chovy.canvas.canvas.domain.VersionStatus;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasVersionPersistenceMappingTest相关的业务逻辑。
+ */
 class CanvasVersionPersistenceMappingTest {
 
+    /**
+     * 处理mapsVersionDomainToPersistenceRowAndBack。
+     */
     @Test
     void mapsVersionDomainToPersistenceRowAndBack() {
         CanvasVersion version = CanvasVersion.published(11L, 7L, 9L, 3, "{\"nodes\":[]}", "publisher");
@@ -25,6 +31,9 @@ class CanvasVersionPersistenceMappingTest {
         assertThat(restored.version()).isEqualTo(3);
     }
 
+    /**
+     * 处理versionRepositoryRejectsStaleUpdates。
+     */
     @Test
     void versionRepositoryRejectsStaleUpdates() {
         CanvasVersionMapper mapper = mock(CanvasVersionMapper.class);

@@ -4,11 +4,20 @@ import org.chovy.canvas.canvas.domain.UserInputForm;
 import org.chovy.canvas.canvas.domain.UserInputResponse;
 import org.chovy.canvas.canvas.domain.UserInputStatus;
 
+/**
+ * 封装UserInputPersistenceMapper相关的业务逻辑。
+ */
 final class UserInputPersistenceMapper {
 
+    /**
+     * 创建当前对象实例。
+     */
     private UserInputPersistenceMapper() {
     }
 
+    /**
+     * 转换为FormRow。
+     */
     static UserInputFormDO toFormRow(UserInputForm form) {
         UserInputFormDO row = new UserInputFormDO();
         row.setId(form.id());
@@ -27,6 +36,9 @@ final class UserInputPersistenceMapper {
         return row;
     }
 
+    /**
+     * 转换为FormDomain。
+     */
     static UserInputForm toFormDomain(UserInputFormDO row) {
         if (row == null) {
             return null;
@@ -47,6 +59,9 @@ final class UserInputPersistenceMapper {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为ResponseRow。
+     */
     static UserInputResponseDO toResponseRow(UserInputResponse response) {
         UserInputResponseDO row = new UserInputResponseDO();
         row.setId(response.id());
@@ -68,6 +83,9 @@ final class UserInputPersistenceMapper {
         return row;
     }
 
+    /**
+     * 转换为ResponseDomain。
+     */
     static UserInputResponse toResponseDomain(UserInputResponseDO row) {
         if (row == null) {
             return null;

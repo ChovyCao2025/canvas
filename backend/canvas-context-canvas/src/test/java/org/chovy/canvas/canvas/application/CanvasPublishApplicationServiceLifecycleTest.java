@@ -19,8 +19,14 @@ import org.chovy.canvas.canvas.domain.VersionStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+/**
+ * 封装CanvasPublishApplicationServiceLifecycleTest相关的业务逻辑。
+ */
 class CanvasPublishApplicationServiceLifecycleTest {
 
+    /**
+     * 处理publishCreatesImmutableVersionUpdatesCanvasAndCallsExecutionPort。
+     */
     @Test
     void publishCreatesImmutableVersionUpdatesCanvasAndCallsExecutionPort() {
         CanvasDraftApplicationServiceTest.InMemoryCanvasRepository canvases =
@@ -47,6 +53,9 @@ class CanvasPublishApplicationServiceLifecycleTest {
         assertThat(port.published.graphJson()).contains("start");
     }
 
+    /**
+     * 处理publishIncludesRuntimeOptionsAndParsedGraphDefinitionForExecution。
+     */
     @Test
     void publishIncludesRuntimeOptionsAndParsedGraphDefinitionForExecution() {
         CanvasDraftApplicationServiceTest.InMemoryCanvasRepository canvases =
@@ -106,6 +115,9 @@ class CanvasPublishApplicationServiceLifecycleTest {
         assertThat(port.published.edges().get(0).metadata()).containsEntry("label", "yes");
     }
 
+    /**
+     * 处理publishDefersExecutionPublicationUntilAfterCommitWhenTransactionSynchronizationIsActive。
+     */
     @Test
     void publishDefersExecutionPublicationUntilAfterCommitWhenTransactionSynchronizationIsActive() {
         CanvasDraftApplicationServiceTest.InMemoryCanvasRepository canvases =
@@ -130,6 +142,9 @@ class CanvasPublishApplicationServiceLifecycleTest {
         }
     }
 
+    /**
+     * 处理unpublishClearsPublishedPointerAndCallsExecutionPort。
+     */
     @Test
     void unpublishClearsPublishedPointerAndCallsExecutionPort() {
         InMemoryCanvasRepository canvases = new InMemoryCanvasRepository();
@@ -147,16 +162,37 @@ class CanvasPublishApplicationServiceLifecycleTest {
         assertThat(port.unpublishedCanvasId).isEqualTo(canvas.id());
     }
 
+    /**
+     * 封装CapturingPublicationPort相关的业务逻辑。
+     */
     private static final class CapturingPublicationPort implements ExecutionPublicationPort {
+
+        /**
+         * 保存published。
+         */
         private PublishedCanvasDefinition published;
+
+        /**
+         * 保存unpublished tenant标识。
+         */
         private Long unpublishedTenantId;
+
+        /**
+         * 保存unpublished canvas标识。
+         */
         private Long unpublishedCanvasId;
 
+        /**
+         * 处理publish。
+         */
         @Override
         public void publish(PublishedCanvasDefinition definition) {
             this.published = definition;
         }
 
+        /**
+         * 处理unpublish。
+         */
         @Override
         public void unpublish(Long tenantId, Long canvasId) {
             this.unpublishedTenantId = tenantId;
@@ -164,9 +200,19 @@ class CanvasPublishApplicationServiceLifecycleTest {
         }
     }
 
+    /**
+     * 封装InMemoryCanvasRepository相关的业务逻辑。
+     */
     private static final class InMemoryCanvasRepository implements CanvasRepository {
+
+        /**
+         * 保存测试或内存实现使用的rows列表。
+         */
         private final List<Canvas> rows = new ArrayList<>();
 
+        /**
+         * 保存。
+         */
         @Override
         public Canvas save(Canvas canvas) {
             rows.removeIf(row -> row.id().equals(canvas.id()));
@@ -174,28 +220,47 @@ class CanvasPublishApplicationServiceLifecycleTest {
             return canvas;
         }
 
+        /**
+         * 查询by标识。
+         */
         @Override
         public Optional<Canvas> findById(Long canvasId) {
             return rows.stream().filter(row -> row.id().equals(canvasId)).findFirst();
         }
     }
 
+    /**
+     * 封装InMemoryCanvasVersionRepository相关的业务逻辑。
+     */
     private static final class InMemoryCanvasVersionRepository implements CanvasVersionRepository {
+
+        /**
+         * 保存。
+         */
         @Override
         public CanvasVersion save(CanvasVersion version) {
             return version;
         }
 
+        /**
+         * 处理latestDraft。
+         */
         @Override
         public Optional<CanvasVersion> latestDraft(Long canvasId) {
             return Optional.empty();
         }
 
+        /**
+         * 查询by标识。
+         */
         @Override
         public Optional<CanvasVersion> findById(Long versionId) {
             return Optional.empty();
         }
 
+        /**
+         * 查询by canvas标识。
+         */
         @Override
         public List<CanvasVersion> findByCanvasId(Long canvasId) {
             return List.of();

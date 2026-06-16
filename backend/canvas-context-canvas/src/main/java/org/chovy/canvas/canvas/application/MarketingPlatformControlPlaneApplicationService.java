@@ -6,9 +6,15 @@ import java.util.List;
 import org.chovy.canvas.canvas.api.MarketingPlatformControlPlaneFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 封装MarketingPlatformControlPlaneApplicationService相关的业务逻辑。
+ */
 @Service
 public class MarketingPlatformControlPlaneApplicationService implements MarketingPlatformControlPlaneFacade {
 
+    /**
+     * 处理summary。
+     */
     @Override
     public ControlPlaneSummaryView summary(Long tenantId) {
         Long scopedTenantId = tenantId == null ? 0L : tenantId;
