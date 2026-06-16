@@ -8,8 +8,14 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 PluginEnablementContractTest 的执行上下文数据结构或业务契约。
+ */
 class PluginEnablementContractTest {
 
+    /**
+     * 执行 exposesEnablementMetadataWithoutSecondRegistrySurface 对应的业务处理。
+     */
     @Test
     void exposesEnablementMetadataWithoutSecondRegistrySurface() {
         List<String> permissions = new ArrayList<>(List.of("message:send"));

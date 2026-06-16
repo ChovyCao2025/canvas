@@ -8,8 +8,14 @@ import org.chovy.canvas.execution.api.MessageSendRecordFacade.MessageSendRecordQ
 import org.chovy.canvas.execution.domain.MessageSendRecordCatalog.MessageSendRecord;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 MessageSendRecordApplicationServiceTest 的执行上下文数据结构或业务契约。
+ */
 class MessageSendRecordApplicationServiceTest {
 
+    /**
+     * 执行 searchesWithLegacyFiltersRangeSortingAndPagingBounds 对应的业务处理。
+     */
     @Test
     void searchesWithLegacyFiltersRangeSortingAndPagingBounds() {
         MessageSendRecordApplicationService service = new MessageSendRecordApplicationService();
@@ -42,6 +48,9 @@ class MessageSendRecordApplicationServiceTest {
                 .containsExactly(501L);
     }
 
+    /**
+     * 执行 detailReturnsRecordOrEmptyForLegacyFailureMapping 对应的业务处理。
+     */
     @Test
     void detailReturnsRecordOrEmptyForLegacyFailureMapping() {
         MessageSendRecordApplicationService service = new MessageSendRecordApplicationService();

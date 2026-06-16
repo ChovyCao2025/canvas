@@ -8,8 +8,14 @@ import java.util.Map;
 import org.chovy.canvas.execution.api.ExecutionRequestFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 ExecutionRequestApplicationServiceTest 的执行上下文数据结构或业务契约。
+ */
 class ExecutionRequestApplicationServiceTest {
 
+    /**
+     * 执行 listsWithFiltersAndOneBasedPaging 对应的业务处理。
+     */
     @Test
     void listsWithFiltersAndOneBasedPaging() {
         ExecutionRequestFacade service = new ExecutionRequestApplicationService();
@@ -34,6 +40,9 @@ class ExecutionRequestApplicationServiceTest {
         assertThat(normalized.total()).isEqualTo(3);
     }
 
+    /**
+     * 执行 singleReplayOnlyAllowsFailedOrRetryWithoutForceAndQueuesRequest 对应的业务处理。
+     */
     @Test
     void singleReplayOnlyAllowsFailedOrRetryWithoutForceAndQueuesRequest() {
         ExecutionRequestFacade service = new ExecutionRequestApplicationService();
@@ -55,6 +64,9 @@ class ExecutionRequestApplicationServiceTest {
                 .hasMessageContaining("只能重放 FAILED/RETRY 状态的执行请求");
     }
 
+    /**
+     * 执行 forceReplayBypassesStatusGuardAndMissingTenantAccessIsRejected 对应的业务处理。
+     */
     @Test
     void forceReplayBypassesStatusGuardAndMissingTenantAccessIsRejected() {
         ExecutionRequestFacade service = new ExecutionRequestApplicationService();
@@ -73,6 +85,9 @@ class ExecutionRequestApplicationServiceTest {
                 .hasMessageContaining("执行请求不存在: missing");
     }
 
+    /**
+     * 执行 batchReplayDefaultsToFailedAndRetryAndNormalizesLimit 对应的业务处理。
+     */
     @Test
     void batchReplayDefaultsToFailedAndRetryAndNormalizesLimit() {
         ExecutionRequestFacade service = new ExecutionRequestApplicationService();
@@ -86,6 +101,9 @@ class ExecutionRequestApplicationServiceTest {
         assertThat(result.dispatchFailureCount()).isZero();
     }
 
+    /**
+     * 执行 batchReplayRejectsNonReplayableExplicitStatusUnlessForced 对应的业务处理。
+     */
     @Test
     void batchReplayRejectsNonReplayableExplicitStatusUnlessForced() {
         ExecutionRequestFacade service = new ExecutionRequestApplicationService();
@@ -102,6 +120,9 @@ class ExecutionRequestApplicationServiceTest {
         assertThat(forced.requestIds()).containsExactly("req-3");
     }
 
+    /**
+     * 执行 supportsRegisteringAdditionalExecutionRequestsForCompatibilityFixtures 对应的业务处理。
+     */
     @Test
     void supportsRegisteringAdditionalExecutionRequestsForCompatibilityFixtures() {
         ExecutionRequestFacade service = new ExecutionRequestApplicationService();

@@ -14,8 +14,14 @@ import org.chovy.canvas.execution.application.ExecutionNodeTraceRecord;
 import org.chovy.canvas.execution.application.ExecutionTraceRecord;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 MyBatisExecutionTraceRepositoryTest 的执行上下文数据结构或业务契约。
+ */
 class MyBatisExecutionTraceRepositoryTest {
 
+    /**
+     * 执行 mapsTraceRecordsToExecutionAndTraceRows 对应的业务处理。
+     */
     @Test
     void mapsTraceRecordsToExecutionAndTraceRows() {
         MyBatisExecutionTraceRepository mapper = new MyBatisExecutionTraceRepository(null, null);
@@ -53,6 +59,9 @@ class MyBatisExecutionTraceRepositoryTest {
         assertThat(traceRow.outputData).contains("\"response\":{\"reason\":\"approved\"}");
     }
 
+    /**
+     * 执行 getMapsPersistedNodeTraceRowsIntoTraceView 对应的业务处理。
+     */
     @Test
     void getMapsPersistedNodeTraceRowsIntoTraceView() {
         CanvasExecutionMapper executionMapper = mock(CanvasExecutionMapper.class);
@@ -92,6 +101,9 @@ class MyBatisExecutionTraceRepositoryTest {
                 .containsEntry("segment", "vip");
     }
 
+    /**
+     * 执行 preservesWaitingNodeStatusForPausedTraceRows 对应的业务处理。
+     */
     @Test
     void preservesWaitingNodeStatusForPausedTraceRows() {
         MyBatisExecutionTraceRepository mapper = new MyBatisExecutionTraceRepository(null, null);

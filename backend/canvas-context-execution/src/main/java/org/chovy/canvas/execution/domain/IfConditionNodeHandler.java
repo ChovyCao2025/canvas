@@ -7,10 +7,18 @@ import java.util.Objects;
 
 import org.springframework.stereotype.Component;
 
+/**
+ * 定义 IfConditionNodeHandler 的执行上下文数据结构或业务契约。
+ */
 @Component
 @NodeHandlerType("IF_CONDITION")
 public class IfConditionNodeHandler implements NodeHandler {
 
+    /**
+     * 执行 execute 对应的业务处理。
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         List<Map<String, Object>> rules = NodeHandlerSupport.listOfMaps(context.node().config().get("rules"));
@@ -29,6 +37,12 @@ public class IfConditionNodeHandler implements NodeHandler {
         return NodeExecutionResult.routed(output, Map.of(passed ? "success" : "fail", target));
     }
 
+    /**
+     * 执行 evaluate 对应的业务处理。
+     * @param rule rule 参数
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     private boolean evaluate(Map<String, Object> rule, NodeExecutionContext context) {
         String field = NodeHandlerSupport.string(rule.getOrDefault("field", rule.get("key")), null);
         Object actual = NodeHandlerSupport.resolve(context, field);
@@ -48,6 +62,11 @@ public class IfConditionNodeHandler implements NodeHandler {
         };
     }
 
+    /**
+     * 执行 equalsValue 对应的业务处理。
+     * @param actual actual 参数
+     * @param expected expected 参数
+     */
     private boolean equalsValue(Object actual, Object expected) {
         Number actualNumber = NodeHandlerSupport.number(actual);
         Number expectedNumber = NodeHandlerSupport.number(expected);
@@ -58,6 +77,12 @@ public class IfConditionNodeHandler implements NodeHandler {
                 || (actual != null && expected != null && String.valueOf(actual).equals(String.valueOf(expected)));
     }
 
+    /**
+     * 执行 compare 对应的业务处理。
+     * @param actual actual 参数
+     * @param expected expected 参数
+     * @return 处理后的结果
+     */
     private int compare(Object actual, Object expected) {
         Number actualNumber = NodeHandlerSupport.number(actual);
         Number expectedNumber = NodeHandlerSupport.number(expected);
@@ -67,6 +92,12 @@ public class IfConditionNodeHandler implements NodeHandler {
         return Double.compare(actualNumber.doubleValue(), expectedNumber.doubleValue());
     }
 
+    /**
+     * 执行 firstConfigured 对应的业务处理。
+     * @param config config 参数
+     * @param first first 参数
+     * @param second second 参数
+     */
     private String firstConfigured(Map<String, Object> config, String first, String second) {
         String value = NodeHandlerSupport.string(config.get(first), null);
         return value == null ? NodeHandlerSupport.string(config.get(second), null) : value;

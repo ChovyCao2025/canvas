@@ -12,13 +12,28 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerType;
 import org.springframework.stereotype.Component;
 
+/**
+ * 定义 OfficialApprovalNodeHandler 的执行上下文数据结构或业务契约。
+ */
 @Component
 @NodeHandlerType(OfficialApprovalNodeHandler.NODE_TYPE)
 public class OfficialApprovalNodeHandler implements NodeHandler {
 
+    /**
+     * 保存 PLUGIN_ID 对应的状态或配置。
+     */
     static final String PLUGIN_ID = "canvas-plugin-approval";
+
+    /**
+     * 保存 NODE_TYPE 对应的状态或配置。
+     */
     static final String NODE_TYPE = "approval.request";
 
+    /**
+     * 执行 execute 对应的业务处理。
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         String approvalCode = stringConfig(context, "approvalCode");
@@ -38,6 +53,11 @@ public class OfficialApprovalNodeHandler implements NodeHandler {
         return NodeExecutionResult.success(output);
     }
 
+    /**
+     * 执行 requester 对应的业务处理。
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     private static String requester(NodeExecutionContext context) {
         return userOrAnonymous(context);
     }

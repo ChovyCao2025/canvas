@@ -13,8 +13,14 @@ import org.chovy.canvas.canvas.api.PublishedCanvasNodeDefinition;
 import org.chovy.canvas.execution.domain.DagRuntimeService;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 ExecutionPublicationApplicationServiceTest 的执行上下文数据结构或业务契约。
+ */
 class ExecutionPublicationApplicationServiceTest {
 
+    /**
+     * 执行 publishValidatesDagBeforeRegisteringRuntimeState 对应的业务处理。
+     */
     @Test
     void publishValidatesDagBeforeRegisteringRuntimeState() {
         ExecutionDefinitionRepository repository = new InMemoryExecutionDefinitionRepository();
@@ -57,6 +63,9 @@ class ExecutionPublicationApplicationServiceTest {
                         "0 0/5 * * * ?"));
     }
 
+    /**
+     * 执行 invalidDagDoesNotRegisterAnyRuntimeState 对应的业务处理。
+     */
     @Test
     void invalidDagDoesNotRegisterAnyRuntimeState() {
         ExecutionDefinitionRepository repository = new InMemoryExecutionDefinitionRepository();
@@ -82,6 +91,9 @@ class ExecutionPublicationApplicationServiceTest {
         assertThat(schedulerService.registrations()).isEmpty();
     }
 
+    /**
+     * 执行 unpublishRemovesDefinitionTriggersAndSchedules 对应的业务处理。
+     */
     @Test
     void unpublishRemovesDefinitionTriggersAndSchedules() {
         ExecutionDefinitionRepository repository = new InMemoryExecutionDefinitionRepository();
@@ -121,10 +133,22 @@ class ExecutionPublicationApplicationServiceTest {
                 edges);
     }
 
+    /**
+     * 执行 node 对应的业务处理。
+     * @param nodeId nodeId 参数
+     * @param nodeType nodeType 参数
+     * @return 处理后的结果
+     */
     private static PublishedCanvasNodeDefinition node(String nodeId, String nodeType) {
         return new PublishedCanvasNodeDefinition(nodeId, nodeType, nodeType, "{}", Map.of(), Map.of());
     }
 
+    /**
+     * 执行 edge 对应的业务处理。
+     * @param source source 参数
+     * @param target target 参数
+     * @return 处理后的结果
+     */
     private static PublishedCanvasEdgeDefinition edge(String source, String target) {
         return new PublishedCanvasEdgeDefinition(source + "-" + target, source, target, "{}", Map.of());
     }

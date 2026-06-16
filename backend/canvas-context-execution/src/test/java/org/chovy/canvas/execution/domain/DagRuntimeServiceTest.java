@@ -13,8 +13,14 @@ import org.chovy.canvas.canvas.api.PublishedCanvasNodeDefinition;
 import org.chovy.canvas.execution.adapter.external.SimpleNodeConfigParser;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 DagRuntimeServiceTest 的执行上下文数据结构或业务契约。
+ */
 class DagRuntimeServiceTest {
 
+    /**
+     * 执行 buildsRuntimeGraphFromPublishedDefinitionNodesAndEdges 对应的业务处理。
+     */
     @Test
     void buildsRuntimeGraphFromPublishedDefinitionNodesAndEdges() {
         PublishedCanvasDefinition definition = new PublishedCanvasDefinition(
@@ -42,6 +48,9 @@ class DagRuntimeServiceTest {
         assertThat(graph.node("decision").config()).containsEntry("nextNodeId", "ignored-by-edge-view");
     }
 
+    /**
+     * 执行 rejectsDuplicateNodesMissingTargetsAndCycles 对应的业务处理。
+     */
     @Test
     void rejectsDuplicateNodesMissingTargetsAndCycles() {
         DagRuntimeService service = new DagRuntimeService();
@@ -80,10 +89,23 @@ class DagRuntimeServiceTest {
                 edges);
     }
 
+    /**
+     * 执行 node 对应的业务处理。
+     * @param nodeId nodeId 参数
+     * @param nodeType nodeType 参数
+     * @param configJson configJson 参数
+     * @return 处理后的结果
+     */
     private static PublishedCanvasNodeDefinition node(String nodeId, String nodeType, String configJson) {
         return new PublishedCanvasNodeDefinition(nodeId, nodeType, nodeType, configJson, Map.of(), Map.of());
     }
 
+    /**
+     * 执行 edge 对应的业务处理。
+     * @param source source 参数
+     * @param target target 参数
+     * @return 处理后的结果
+     */
     private static PublishedCanvasEdgeDefinition edge(String source, String target) {
         return new PublishedCanvasEdgeDefinition(source + "-" + target, source, target, "{}", Map.of());
     }

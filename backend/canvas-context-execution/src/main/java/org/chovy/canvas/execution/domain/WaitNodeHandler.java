@@ -6,10 +6,18 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+/**
+ * 定义 WaitNodeHandler 的执行上下文数据结构或业务契约。
+ */
 @Component
 @NodeHandlerType("WAIT")
 public class WaitNodeHandler implements NodeHandler {
 
+    /**
+     * 执行 execute 对应的业务处理。
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         String resumeStatus = resumeStatus(context);
@@ -43,6 +51,10 @@ public class WaitNodeHandler implements NodeHandler {
         return NodeExecutionResult.pending(output);
     }
 
+    /**
+     * 执行 resumeStatus 对应的业务处理。
+     * @param context context 参数
+     */
     private String resumeStatus(NodeExecutionContext context) {
         Object configured = context.node().config().getOrDefault("waitResumeStatus", context.node().config().get("resumeStatus"));
         Object payload = context.payload().getOrDefault("waitResumeStatus", context.payload().get("resumeStatus"));
@@ -50,11 +62,19 @@ public class WaitNodeHandler implements NodeHandler {
         return NodeHandlerSupport.upper(configured != null ? configured : payload != null ? payload : contextValue, "");
     }
 
+    /**
+     * 执行 successNodeId 对应的业务处理。
+     * @param config config 参数
+     */
     private String successNodeId(Map<String, Object> config) {
         String next = NodeHandlerSupport.string(config.get("nextNodeId"), null);
         return next == null ? NodeHandlerSupport.string(config.get("successNodeId"), null) : next;
     }
 
+    /**
+     * 执行 durationMillis 对应的业务处理。
+     * @param value value 参数
+     */
     private long durationMillis(Object value) {
         if (value instanceof Number number) {
             return Duration.ofSeconds(number.longValue()).toMillis();
@@ -69,6 +89,12 @@ public class WaitNodeHandler implements NodeHandler {
         return 0;
     }
 
+    /**
+     * 执行 duration 对应的业务处理。
+     * @param amount amount 参数
+     * @param unit unit 参数
+     * @return 处理后的结果
+     */
     private Duration duration(long amount, String unit) {
         return switch (unit) {
             case "MINUTE", "MINUTES" -> Duration.ofMinutes(amount);
@@ -78,6 +104,12 @@ public class WaitNodeHandler implements NodeHandler {
         };
     }
 
+    /**
+     * 执行 putIfPresent 对应的业务处理。
+     * @param output output 参数
+     * @param key key 参数
+     * @param value value 参数
+     */
     private void putIfPresent(Map<String, Object> output, String key, String value) {
         if (value != null) {
             output.put(key, value);

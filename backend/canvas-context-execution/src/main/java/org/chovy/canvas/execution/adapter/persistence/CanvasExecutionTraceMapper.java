@@ -8,9 +8,16 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+/**
+ * 定义 CanvasExecutionTraceMapper 的执行上下文数据结构或业务契约。
+ */
 @Mapper
 public interface CanvasExecutionTraceMapper extends BaseMapper<CanvasExecutionTraceDO> {
 
+    /**
+     * 执行 Param 对应的业务处理。
+     * @param list list 参数
+     */
     void insertBatch(@Param("list") List<CanvasExecutionTraceDO> list);
 
     @Select("""
@@ -32,7 +39,17 @@ public interface CanvasExecutionTraceMapper extends BaseMapper<CanvasExecutionTr
             WHERE execution_id = #{executionId}
             ORDER BY started_at ASC, id ASC
             """)
+    /**
+     * 执行 Param 对应的业务处理。
+     * @param executionId executionId 参数
+     * @return 处理后的结果
+     */
     List<CanvasExecutionTraceDO> selectByExecutionId(@Param("executionId") String executionId);
 
+    /**
+     * 执行 Param 对应的业务处理。
+     * @param canvasId canvasId 参数
+     * @return 处理后的结果
+     */
     List<Map<String, Object>> selectFunnelByCanvasId(@Param("canvasId") Long canvasId);
 }

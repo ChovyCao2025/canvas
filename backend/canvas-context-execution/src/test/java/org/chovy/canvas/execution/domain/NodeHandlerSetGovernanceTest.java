@@ -7,8 +7,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 NodeHandlerSetGovernanceTest 的执行上下文数据结构或业务契约。
+ */
 class NodeHandlerSetGovernanceTest {
 
+    /**
+     * 执行 executionRegistersMigratedPureControlHandlers 对应的业务处理。
+     */
     @Test
     void executionRegistersMigratedPureControlHandlers() {
         NodeHandlerRegistry registry = new NodeHandlerRegistry(List.of(
@@ -37,6 +43,9 @@ class NodeHandlerSetGovernanceTest {
                 .allSatisfy(type -> assertThat(registry.has(type)).as(type).isTrue());
     }
 
+    /**
+     * 执行 externalProviderHandlersDeclareMissingAuthorizedApiDependencies 对应的业务处理。
+     */
     @Test
     void externalProviderHandlersDeclareMissingAuthorizedApiDependencies() {
         assertThat(NodeHandlerMigrationCatalog.dependencyGatedTypes())

@@ -10,10 +10,16 @@ import java.util.Optional;
 
 import org.chovy.canvas.execution.api.MessageSendRecordFacade;
 
+/**
+ * 定义 MessageSendRecordCatalog 的执行上下文数据结构或业务契约。
+ */
 public class MessageSendRecordCatalog {
 
     private final List<MessageSendRecord> records = new ArrayList<>();
 
+    /**
+     * 执行 MessageSendRecordCatalog 对应的业务处理。
+     */
     public MessageSendRecordCatalog() {
         records.add(new MessageSendRecord(
                 501L,
@@ -82,29 +88,70 @@ public class MessageSendRecordCatalog {
         return new MessageSendRecordFacade.MessageSendRecordPageView(filtered.size(), filtered.subList(from, to));
     }
 
+    /**
+     * 执行 findById 对应的业务处理。
+     * @param id id 参数
+     * @return 处理后的结果
+     */
     public synchronized Optional<MessageSendRecord> findById(Long id) {
         return records.stream()
                 .filter(record -> Objects.equals(record.id, id))
                 .findFirst();
     }
 
+    /**
+     * 执行 matches 对应的业务处理。
+     * @param expected expected 参数
+     * @param actual actual 参数
+     * @return 处理后的结果
+     */
     private static boolean matches(Long expected, Long actual) {
         return expected == null || Objects.equals(expected, actual);
     }
 
+    /**
+     * 执行 matchesText 对应的业务处理。
+     * @param expected expected 参数
+     * @param actual actual 参数
+     */
     private static boolean matchesText(String expected, String actual) {
         return expected == null || expected.isBlank() || Objects.equals(expected, actual);
     }
 
+    /**
+     * 执行 matchesNormalized 对应的业务处理。
+     * @param expected expected 参数
+     * @param actual actual 参数
+     */
     private static boolean matchesNormalized(String expected, String actual) {
         return expected == null || expected.isBlank()
                 || normalize(expected).equals(normalize(actual));
     }
 
+    /**
+     * 执行 normalize 对应的业务处理。
+     * @param value value 参数
+     * @return 处理后的结果
+     */
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 定义 MessageSendRecord 的执行上下文数据结构或业务契约。
+     * @param id id 对应的数据字段
+     * @param tenantId tenantId 对应的数据字段
+     * @param executionId executionId 对应的数据字段
+     * @param canvasId canvasId 对应的数据字段
+     * @param userId userId 对应的数据字段
+     * @param nodeId nodeId 对应的数据字段
+     * @param channel channel 对应的数据字段
+     * @param templateId templateId 对应的数据字段
+     * @param idempotencyKey idempotencyKey 对应的数据字段
+     * @param requestPayload requestPayload 对应的数据字段
+     * @param status status 对应的数据字段
+     * @param externalMessageId externalMessageId 对应的数据字段
+     */
     public record MessageSendRecord(
             Long id,
             Long tenantId,

@@ -10,17 +10,34 @@ import org.chovy.canvas.execution.application.TriggerRouteStore;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+/**
+ * 定义 RedisTriggerRouteAdapter 的执行上下文数据结构或业务契约。
+ */
 @Component
 public class RedisTriggerRouteAdapter implements TriggerRouteStore {
 
+    /**
+     * 保存 PREFIX 对应的状态或配置。
+     */
     private static final String PREFIX = "canvas:execution:trigger-route";
 
+    /**
+     * 保存 redisTemplate 对应的状态或配置。
+     */
     private final ReactiveStringRedisTemplate redisTemplate;
 
+    /**
+     * 执行 RedisTriggerRouteAdapter 对应的业务处理。
+     * @param redisTemplate redisTemplate 参数
+     */
     public RedisTriggerRouteAdapter(ReactiveStringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 
+    /**
+     * 执行 save 对应的业务处理。
+     * @param route route 参数
+     */
     @Override
     public void save(TriggerRoute route) {
         if (redisTemplate != null) {
@@ -30,6 +47,11 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
         }
     }
 
+    /**
+     * 执行 remove 对应的业务处理。
+     * @param tenantId tenantId 参数
+     * @param canvasId canvasId 参数
+     */
     @Override
     public void remove(Long tenantId, Long canvasId) {
         if (redisTemplate == null) {
@@ -37,6 +59,7 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
         }
         routeKeys(routeKey(tenantId, "*", "*")).stream()
                 .filter(key -> {
+                    // 删除时需要反查值中的 canvasId，避免误删同租户下其他画布路由。
                     String value = routeValue(key);
                     if (value == null || value.isBlank()) {
                         return false;
@@ -48,6 +71,10 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
                 .forEach(key -> redisTemplate.delete(key).block());
     }
 
+    /**
+     * 执行 routes 对应的业务处理。
+     * @return 处理后的结果
+     */
     @Override
     public List<TriggerRoute> routes() {
         if (redisTemplate == null) {
@@ -60,11 +87,18 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
                 .toList();
     }
 
+    /**
+     * 执行 routesFor 对应的业务处理。
+     * @param triggerType triggerType 参数
+     * @param matchKey matchKey 参数
+     * @return 处理后的结果
+     */
     @Override
     public List<TriggerRoute> routesFor(String triggerType, String matchKey) {
         if (redisTemplate == null) {
             return List.of();
         }
+        // 同时查询精确 matchKey 与空 matchKey，支持触发器默认路由回退。
         return Stream.concat(
                         routeKeys(routeKey(null, triggerType, matchKey)).stream(),
                         routeKeys(routeKey(null, triggerType, "")).stream())
@@ -75,6 +109,12 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
                 .toList();
     }
 
+    /**
+     * 执行 routeKey 对应的业务处理。
+     * @param tenantId tenantId 参数
+     * @param triggerType triggerType 参数
+     * @param matchKey matchKey 参数
+     */
     public String routeKey(Long tenantId, String triggerType, String matchKey) {
         String tenantPart = tenantId == null ? "*" : tenantId.toString();
         String typePart = triggerType == null || triggerType.isBlank()
@@ -84,11 +124,21 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
         return PREFIX + ":" + tenantPart + ":" + typePart + ":" + matchPart;
     }
 
+    /**
+     * 执行 serialize 对应的业务处理。
+     * @param route route 参数
+     * @return 处理后的结果
+     */
     public String serialize(TriggerRoute route) {
         return route.tenantId() + "|" + route.canvasId() + "|" + route.versionId() + "|"
                 + escape(route.triggerType()) + "|" + escape(route.matchKey());
     }
 
+    /**
+     * 执行 deserialize 对应的业务处理。
+     * @param serialized serialized 参数
+     * @return 处理后的结果
+     */
     public TriggerRoute deserialize(String serialized) {
         String[] parts = serialized.split("\\|", -1);
         if (parts.length != 5) {
@@ -102,14 +152,29 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
                 unescape(parts[4]));
     }
 
+    /**
+     * 执行 escape 对应的业务处理。
+     * @param value value 参数
+     * @return 处理后的结果
+     */
     private String escape(String value) {
         return value == null ? "" : value.replace("%", "%25").replace("|", "%7C");
     }
 
+    /**
+     * 执行 unescape 对应的业务处理。
+     * @param value value 参数
+     * @return 处理后的结果
+     */
     private String unescape(String value) {
         return value == null ? "" : value.replace("%7C", "|").replace("%25", "%");
     }
 
+    /**
+     * 执行 routeKeys 对应的业务处理。
+     * @param pattern pattern 参数
+     * @return 处理后的结果
+     */
     private List<String> routeKeys(String pattern) {
         List<String> keys = redisTemplate.keys(pattern)
                 .sort()
@@ -118,6 +183,10 @@ public class RedisTriggerRouteAdapter implements TriggerRouteStore {
         return keys == null ? List.of() : keys;
     }
 
+    /**
+     * 执行 routeValue 对应的业务处理。
+     * @param key key 参数
+     */
     private String routeValue(String key) {
         return redisTemplate.opsForValue().get(key).block();
     }

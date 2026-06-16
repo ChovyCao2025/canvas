@@ -13,13 +13,28 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerType;
 import org.springframework.stereotype.Component;
 
+/**
+ * 定义 OfficialRiskNodeHandler 的执行上下文数据结构或业务契约。
+ */
 @Component
 @NodeHandlerType(OfficialRiskNodeHandler.NODE_TYPE)
 public class OfficialRiskNodeHandler implements NodeHandler {
 
+    /**
+     * 保存 PLUGIN_ID 对应的状态或配置。
+     */
     static final String PLUGIN_ID = "canvas-plugin-risk";
+
+    /**
+     * 保存 NODE_TYPE 对应的状态或配置。
+     */
     static final String NODE_TYPE = "risk.check";
 
+    /**
+     * 执行 execute 对应的业务处理。
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         String policy = stringConfig(context, "policy");
@@ -42,11 +57,20 @@ public class OfficialRiskNodeHandler implements NodeHandler {
         return NodeExecutionResult.success(output);
     }
 
+    /**
+     * 执行 isAllowed 对应的业务处理。
+     * @param policy policy 参数
+     */
     private static boolean isAllowed(String policy) {
         String normalized = policy.toUpperCase(Locale.ROOT);
         return !normalized.contains("BLOCK") && !normalized.contains("COMPLIANCE");
     }
 
+    /**
+     * 执行 subject 对应的业务处理。
+     * @param context context 参数
+     * @return 处理后的结果
+     */
     private static String subject(NodeExecutionContext context) {
         return userOrAnonymous(context);
     }

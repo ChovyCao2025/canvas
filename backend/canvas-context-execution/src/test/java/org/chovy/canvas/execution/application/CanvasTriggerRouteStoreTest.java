@@ -11,8 +11,14 @@ import org.chovy.canvas.canvas.api.PublishedCanvasNodeDefinition;
 import org.chovy.canvas.execution.domain.DagRuntimeService;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 CanvasTriggerRouteStoreTest 的执行上下文数据结构或业务契约。
+ */
 class CanvasTriggerRouteStoreTest {
 
+    /**
+     * 执行 triggerServiceWritesRoutesThroughStorePort 对应的业务处理。
+     */
     @Test
     void triggerServiceWritesRoutesThroughStorePort() {
         InMemoryTriggerRouteStore store = new InMemoryTriggerRouteStore();

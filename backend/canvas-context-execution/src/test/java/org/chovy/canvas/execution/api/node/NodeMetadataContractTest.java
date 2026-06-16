@@ -8,8 +8,14 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 NodeMetadataContractTest 的执行上下文数据结构或业务契约。
+ */
 class NodeMetadataContractTest {
 
+    /**
+     * 执行 exposesSchemaAndPortsWithoutMutableRegistryState 对应的业务处理。
+     */
     @Test
     void exposesSchemaAndPortsWithoutMutableRegistryState() {
         List<String> inputPorts = new ArrayList<>(List.of("in"));

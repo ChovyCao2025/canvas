@@ -10,8 +10,14 @@ import java.util.concurrent.RejectedExecutionException;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 BackgroundTaskExecutorTest 的执行上下文数据结构或业务契约。
+ */
 class BackgroundTaskExecutorTest {
 
+    /**
+     * 执行 enforcesMaxConcurrentTasksAndReleasesPermitsWhenDone 对应的业务处理。
+     */
     @Test
     void enforcesMaxConcurrentTasksAndReleasesPermitsWhenDone() throws Exception {
         BackgroundTaskExecutor executor = new BackgroundTaskExecutor(

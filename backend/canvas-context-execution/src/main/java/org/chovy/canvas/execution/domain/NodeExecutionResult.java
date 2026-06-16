@@ -2,6 +2,14 @@ package org.chovy.canvas.execution.domain;
 
 import java.util.Map;
 
+/**
+ * 定义 NodeExecutionResult 的执行上下文数据结构或业务契约。
+ * @param success success 对应的数据字段
+ * @param pending pending 对应的数据字段
+ * @param output output 对应的数据字段
+ * @param routes routes 对应的数据字段
+ * @param error error 对应的数据字段
+ */
 public record NodeExecutionResult(
         boolean success,
         boolean pending,
