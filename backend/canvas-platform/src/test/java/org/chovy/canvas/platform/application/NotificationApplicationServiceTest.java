@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.api.NotificationFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖通知应用服务的筛选、已读、归档和票据行为。
+ */
 class NotificationApplicationServiceTest {
 
+    /**
+     * 验证通知列表按租户、用户、归档、未读和分页条件过滤。
+     */
     @Test
     void listAppliesTenantUserFiltersArchivedUnreadAndPageSizeBounds() {
         NotificationFacade service = new NotificationApplicationService();
@@ -43,6 +49,9 @@ class NotificationApplicationServiceTest {
                 .containsExactly("ntf_tenant8_001");
     }
 
+    /**
+     * 验证单条已读和归档操作按租户用户隔离并更新未读数量。
+     */
     @Test
     void readAndArchiveMutationsAreScopedAndUpdateUnreadCount() {
         NotificationFacade service = new NotificationApplicationService();
@@ -63,6 +72,9 @@ class NotificationApplicationServiceTest {
                 .containsExactly("ntf_archived_001", "ntf_canvas_001");
     }
 
+    /**
+     * 验证全部已读不会影响已归档通知且可重复执行。
+     */
     @Test
     void markAllReadKeepsArchivedRowsOutOfUnreadCountAndIsIdempotent() {
         NotificationFacade service = new NotificationApplicationService();
@@ -76,6 +88,9 @@ class NotificationApplicationServiceTest {
                 .containsExactly("READ", "READ");
     }
 
+    /**
+     * 验证 WebSocket 票据结构兼容旧接口且非法通知标识快速失败。
+     */
     @Test
     void websocketTicketPreservesLegacyShapeAndInvalidIdsFailFast() {
         NotificationFacade service = new NotificationApplicationService();

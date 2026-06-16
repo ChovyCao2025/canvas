@@ -5,17 +5,39 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * CanvasFlinkJobMain 支撑 flink 场景的后端处理。
+ * Flink SQL 作业的命令行启动入口。
+ *
+ * <p>入口负责解析运行环境、选择 SQL asset、提交 SQL，并把启动提交或失败信息上报为 checkpoint 证据。
  */
 public final class CanvasFlinkJobMain {
 
+    /**
+     * 启动阶段 checkpoint 使用的虚拟分区。
+     */
     private static final String STARTUP_PARTITION = "job-startup";
+
+    /**
+     * 启动阶段 checkpoint 使用的虚拟 offset。
+     */
     private static final String STARTUP_OFFSET = "submitted";
+
+    /**
+     * 启动提交成功时的状态，表示作业已提交但还不是运行期成功证据。
+     */
     private static final String STARTUP_STATUS = "WARN";
+
+    /**
+     * 启动阶段 checkpoint 的说明文案。
+     */
     private static final String STARTUP_MESSAGE = "startup submission is not runtime checkpoint evidence";
+
+    /**
+     * 失败原因写入 checkpoint 前允许保留的最大字符数。
+     */
     private static final int MAX_ERROR_LENGTH = 1000;
 
     /**
@@ -65,8 +87,8 @@ public final class CanvasFlinkJobMain {
             int statementCount = CanvasFlinkSqlJobRunner.run(renderedSql, executor);
             checkpointSink.report(payload(config, STARTUP_STATUS, STARTUP_MESSAGE, nowSupplier.get()));
             return new RunResult(config.pipelineKey(), assetPath, statementCount);
-        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ex) {
+            // SQL 提交失败也要尽力上报，便于平台侧区分未启动和启动失败。
             reportFailure(config, checkpointSink, nowSupplier, ex);
             throw ex;
         }
@@ -90,8 +112,8 @@ public final class CanvasFlinkJobMain {
             }
             if (arg.startsWith("--pipeline-key=")) {
                 values.put("CANVAS_FLINK_JOB_PIPELINE_KEY", arg.substring("--pipeline-key=".length()));
-            // 根据前序判断结果进入后续条件分支。
             } else if (!arg.startsWith("--") && !values.containsKey("CANVAS_FLINK_JOB_PIPELINE_KEY")) {
+                // 兼容只传第一个位置参数的 Kubernetes Job 启动方式。
                 values.put("CANVAS_FLINK_JOB_PIPELINE_KEY", arg);
             }
         }
@@ -112,8 +134,8 @@ public final class CanvasFlinkJobMain {
                                       RuntimeException ex) {
         try {
             checkpointSink.report(payload(config, "FAIL", limit(ex.getMessage()), nowSupplier.get()));
-        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException reportEx) {
+            // 保留原始 SQL 启动失败作为主异常，checkpoint 上报失败只作为附加诊断。
             ex.addSuppressed(reportEx);
         }
     }
@@ -189,11 +211,108 @@ public final class CanvasFlinkJobMain {
      * Flink SQL 作业启动结果。
      *
      * <p>该结果只代表 SQL 已提交给 Flink，不代表流式作业后续 checkpoint 已经成功。
-     *
-     * @param pipelineKey 已启动的管道标识
-     * @param assetPath 实际加载的 SQL asset 路径
-     * @param statementCount 已提交的 SQL 语句数量
      */
-    public record RunResult(String pipelineKey, String assetPath, int statementCount) {
+    public static final class RunResult {
+
+        /**
+         * 已启动的管道标识。
+         */
+        private final String pipelineKey;
+
+        /**
+         * 实际加载的 SQL asset 路径。
+         */
+        private final String assetPath;
+
+        /**
+         * 已提交的 SQL 语句数量。
+         */
+        private final int statementCount;
+
+        /**
+         * 创建 Flink SQL 作业启动结果。
+         *
+         * @param pipelineKey 已启动的管道标识
+         * @param assetPath 实际加载的 SQL asset 路径
+         * @param statementCount 已提交的 SQL 语句数量
+         */
+        public RunResult(String pipelineKey, String assetPath, int statementCount) {
+            this.pipelineKey = pipelineKey;
+            this.assetPath = assetPath;
+            this.statementCount = statementCount;
+        }
+
+        /**
+         * 返回已启动的管道标识。
+         *
+         * @return 已启动的管道标识
+         */
+        public String pipelineKey() {
+            return pipelineKey;
+        }
+
+        /**
+         * 返回实际加载的 SQL asset 路径。
+         *
+         * @return SQL asset 路径
+         */
+        public String assetPath() {
+            return assetPath;
+        }
+
+        /**
+         * 返回已提交的 SQL 语句数量。
+         *
+         * @return SQL 语句数量
+         */
+        public int statementCount() {
+            return statementCount;
+        }
+
+        /**
+         * 按字段值判断两个启动结果是否相同。
+         *
+         * @param o 待比较对象
+         * @return true 表示所有字段相同
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof RunResult runResult)) {
+                return false;
+            }
+            return statementCount == runResult.statementCount
+                    && Objects.equals(pipelineKey, runResult.pipelineKey)
+                    && Objects.equals(assetPath, runResult.assetPath);
+        }
+
+        /**
+         * 基于所有字段生成 hashCode。
+         *
+         * @return 字段组合哈希值
+         */
+        @Override
+        public int hashCode() {
+            int result = Objects.hashCode(pipelineKey);
+            result = 31 * result + Objects.hashCode(assetPath);
+            result = 31 * result + Integer.hashCode(statementCount);
+            return result;
+        }
+
+        /**
+         * 返回与原 record 形式一致的调试字符串。
+         *
+         * @return 字段名和值组成的字符串
+         */
+        @Override
+        public String toString() {
+            return "RunResult["
+                    + "pipelineKey=" + pipelineKey
+                    + ", assetPath=" + assetPath
+                    + ", statementCount=" + statementCount
+                    + ']';
+        }
     }
 }

@@ -8,8 +8,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.domain.ApprovalCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖审批应用服务的任务视图、决策和飞书同步权限。
+ */
 class ApprovalApplicationServiceTest {
 
+    /**
+     * 验证任务和实例查询后可由被分配人通过审批。
+     */
     @Test
     void listsTasksAndInstancesThenApprovesAssignedTask() {
         ApprovalApplicationService service = new ApprovalApplicationService(new ApprovalCatalog());
@@ -39,6 +45,9 @@ class ApprovalApplicationServiceTest {
         assertThat(service.instances(7L, "CANVAS", "canvas-101", "APPROVED")).hasSize(1);
     }
 
+    /**
+     * 验证无效任务输入和未授权决策会被拒绝。
+     */
     @Test
     void rejectsBadTaskInputsAndUnauthorizedDecisions() {
         ApprovalApplicationService service = new ApprovalApplicationService(new ApprovalCatalog());
@@ -54,6 +63,9 @@ class ApprovalApplicationServiceTest {
                 .hasMessage("approval task is not assigned to actor: other");
     }
 
+    /**
+     * 验证飞书审批同步仅允许管理员触发并更新实例快照。
+     */
     @Test
     void adminOnlyLarkSyncUsesLimitAndUpdatesInstanceSnapshot() {
         ApprovalApplicationService service = new ApprovalApplicationService(new ApprovalCatalog());

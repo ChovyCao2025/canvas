@@ -7,8 +7,12 @@ package org.chovy.cache.strategy;
  * <p>集中策略有助于避免脏缓存导致业务链路持续异常。
  */
 public enum DeserializeFailureStrategy {
-    /** 反序列化失败时忽略二级缓存并回源加载。 */
+    /**
+     * 反序列化失败时忽略二级缓存并回源加载。
+     */
     FALLTHROUGH_TO_L3,
-    /** 反序列化失败时向调用方抛出异常。 */
+    /**
+     * 反序列化失败时向调用方抛出异常。
+     */
     THROW
 }

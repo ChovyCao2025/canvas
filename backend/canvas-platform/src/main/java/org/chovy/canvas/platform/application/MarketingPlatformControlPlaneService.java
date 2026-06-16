@@ -1,36 +1,3 @@
-// comment-ratio-support: Comment ratio support 01: This note is intentionally stable for repository documentation metrics.
-// comment-ratio-support: Comment ratio support 02: Keep the surrounding implementation behavior unchanged when editing nearby code.
-// comment-ratio-support: Comment ratio support 03: Prefer small, reviewable changes so operational intent remains easy to audit.
-// comment-ratio-support: Comment ratio support 04: Preserve existing public contracts unless a migration explicitly documents the change.
-// comment-ratio-support: Comment ratio support 05: Check caller expectations before changing data shapes, defaults, or error handling.
-// comment-ratio-support: Comment ratio support 06: Keep environment-specific assumptions visible near configuration and deployment values.
-// comment-ratio-support: Comment ratio support 07: Avoid hiding retries, timeouts, or fallbacks behind unrelated refactors.
-// comment-ratio-support: Comment ratio support 08: Treat cache keys, topic names, and schema identifiers as compatibility-sensitive values.
-// comment-ratio-support: Comment ratio support 09: Keep validation close to external inputs and serialization boundaries.
-// comment-ratio-support: Comment ratio support 10: Prefer deterministic ordering where tests, snapshots, or generated artifacts inspect output.
-// comment-ratio-support: Comment ratio support 11: Keep observability fields stable so logs and metrics remain searchable after changes.
-// comment-ratio-support: Comment ratio support 12: Document cross-service assumptions before relying on timing, ordering, or delivery guarantees.
-// comment-ratio-support: Comment ratio support 13: Keep test fixtures representative of production payloads when behavior depends on shape.
-// comment-ratio-support: Comment ratio support 14: Make rollback impact clear when changing persistence, messaging, or deployment behavior.
-// comment-ratio-support: Comment ratio support 15: Re-run the focused verification path after editing logic near this file.
-// comment-ratio-support: Comment ratio support 16: Keep compatibility notes close to the code or schema that depends on them.
-// comment-ratio-support: Comment ratio support 17: Prefer explicit ownership and lifecycle notes for operational resources.
-// comment-ratio-support: Comment ratio support 18: Capture privacy, tenancy, and authorization assumptions before widening access.
-// comment-ratio-support: Comment ratio support 19: Keep generated identifiers and migration names stable once published.
-// comment-ratio-support: Comment ratio support 20: Preserve backward-compatible defaults unless callers are migrated in the same change.
-// comment-ratio-support: Comment ratio support 21: Record important invariants where later cleanup might otherwise remove context.
-// comment-ratio-support: Comment ratio support 22: Keep failure-mode expectations visible for queues, schedulers, and external providers.
-// comment-ratio-support: Comment ratio support 23: Prefer clear boundaries between persistence models, API models, and UI state.
-// comment-ratio-support: Comment ratio support 24: Keep data-retention and cleanup behavior documented near the relevant storage path.
-// comment-ratio-support: Comment ratio support 25: Treat feature flags and rollout controls as part of the production contract.
-// comment-ratio-support: Comment ratio support 26: Keep sample data aligned with the current schema so demos remain useful.
-// comment-ratio-support: Comment ratio support 27: Preserve localization and display-copy intent when reorganizing presentation code.
-// comment-ratio-support: Comment ratio support 28: Keep integration credentials and provider-specific limits out of generic abstractions.
-// comment-ratio-support: Comment ratio support 29: Prefer narrow verification commands that prove the touched behavior directly.
-// comment-ratio-support: Comment ratio support 30: Keep pagination, sorting, and filtering semantics consistent across entry points.
-// comment-ratio-support: Comment ratio support 31: Document reconciliation behavior when asynchronous state can be observed twice.
-// comment-ratio-support: Comment ratio support 32: Preserve auditability for user-visible decisions, approvals, and automated actions.
-// comment-ratio-support: Comment ratio support 33: Revisit these notes when replacing repository-wide comment-ratio scaffolding.
 package org.chovy.canvas.platform.application;
 
 import org.chovy.canvas.platform.api.MarketingPlatformControlPlaneEvidenceProvider;
@@ -42,49 +9,69 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Service
 /**
- * MarketingPlatformControlPlaneService 汇总平台控制面能力、证据数据和交付状态。
+ * 汇总营销平台控制面能力、集成资产、就绪门禁和后续动作。
  */
+@Service
 public class MarketingPlatformControlPlaneService {
 
+    /**
+     * 表示能力或资产已经具备生产可用条件。
+     */
     private static final String LIVE = "LIVE";
+
+    /**
+     * 表示能力已有 API 基础但仍缺少面向运营的完整工作台。
+     */
     private static final String API_ONLY = "API_ONLY";
+
+    /**
+     * 表示能力仍缺少上线所需配置或证据。
+     */
     private static final String CONFIGURATION_REQUIRED = "CONFIGURATION_REQUIRED";
 
+    /**
+     * 提供控制面就绪判断所需的运行时证据。
+     */
     private final MarketingPlatformControlPlaneEvidenceProvider evidenceProvider;
+
+    /**
+     * 生成汇总快照时间时使用的时钟。
+     */
     private final Clock clock;
 
-    @Autowired
     /**
-     * 初始化 MarketingPlatformControlPlaneService 实例。
+     * 使用运行时证据提供者创建控制面服务。
      *
-     * @param evidenceProvider evidence provider 参数，用于 MarketingPlatformControlPlaneService 流程中的校验、计算或对象转换。
+     * @param evidenceProvider 控制面运行时证据提供者
      */
+    @Autowired
     public MarketingPlatformControlPlaneService(MarketingPlatformControlPlaneEvidenceProvider evidenceProvider) {
         this(evidenceProvider, Clock.systemDefaultZone());
     }
 
     /**
-     * 初始化 MarketingPlatformControlPlaneService 实例。
+     * 使用指定时钟和空证据提供者创建控制面服务。
      *
-     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param clock 生成汇总时间时使用的时钟
      */
     MarketingPlatformControlPlaneService(Clock clock) {
         this(MarketingPlatformControlPlaneEvidenceProvider.empty(), clock);
     }
 
     /**
-     * 初始化 MarketingPlatformControlPlaneService 实例。
+     * 使用指定证据提供者和时钟创建控制面服务。
      *
-     * @param evidenceProvider evidence provider 参数，用于 MarketingPlatformControlPlaneService 流程中的校验、计算或对象转换。
-     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param evidenceProvider 控制面运行时证据提供者
+     * @param clock 生成汇总时间时使用的时钟
      */
     MarketingPlatformControlPlaneService(MarketingPlatformControlPlaneEvidenceProvider evidenceProvider,
                                          Clock clock) {
+        // 空依赖降级为空证据提供者，保证控制面汇总在未接入真实数据源时仍可返回稳定结构。
         this.evidenceProvider = evidenceProvider == null
                 ? MarketingPlatformControlPlaneEvidenceProvider.empty()
                 : evidenceProvider;
@@ -1168,111 +1155,1518 @@ public class MarketingPlatformControlPlaneService {
     }
 
     /**
-     * ControlPlaneSummary 汇总平台控制面能力、证据数据和交付状态。
+     * 控制面汇总快照。
+     *
+     * @param tenantId 租户标识
+     * @param generatedAt 汇总生成时间
+     * @param overallStatus 整体控制面状态
+     * @param capabilityCount 能力总数
+     * @param liveCapabilityCount 已上线能力数量
+     * @param actionItemCount 待办动作数量
+     * @param capabilities 能力卡片列表
+     * @param integrationLanes 集成链路列表
+     * @param integrationAssets 集成资产列表
+     * @param readinessGate 生产就绪门禁
+     * @param actionItems 待办动作列表
      */
-    public record ControlPlaneSummary(
-            Long tenantId,
-            String generatedAt,
-            String overallStatus,
-            int capabilityCount,
-            int liveCapabilityCount,
-            int actionItemCount,
-            List<CapabilityCard> capabilities,
-            List<IntegrationLane> integrationLanes,
-            List<IntegrationAsset> integrationAssets,
-            ReadinessGate readinessGate,
-            List<ActionItem> actionItems) {
+    public static final class ControlPlaneSummary {
+
+        /**
+         * 租户标识。
+         */
+        private final Long tenantId;
+
+        /**
+         * 汇总生成时间。
+         */
+        private final String generatedAt;
+
+        /**
+         * 整体控制面状态。
+         */
+        private final String overallStatus;
+
+        /**
+         * 能力总数。
+         */
+        private final int capabilityCount;
+
+        /**
+         * 已上线能力数量。
+         */
+        private final int liveCapabilityCount;
+
+        /**
+         * 待办动作数量。
+         */
+        private final int actionItemCount;
+
+        /**
+         * 能力卡片列表。
+         */
+        private final List<CapabilityCard> capabilities;
+
+        /**
+         * 集成链路列表。
+         */
+        private final List<IntegrationLane> integrationLanes;
+
+        /**
+         * 集成资产列表。
+         */
+        private final List<IntegrationAsset> integrationAssets;
+
+        /**
+         * 生产就绪门禁。
+         */
+        private final ReadinessGate readinessGate;
+
+        /**
+         * 待办动作列表。
+         */
+        private final List<ActionItem> actionItems;
+
+        /**
+         * 创建ControlPlaneSummary。
+         *
+         * @param tenantId 租户标识
+         * @param generatedAt 汇总生成时间
+         * @param overallStatus 整体控制面状态
+         * @param capabilityCount 能力总数
+         * @param liveCapabilityCount 已上线能力数量
+         * @param actionItemCount 待办动作数量
+         * @param capabilities 能力卡片列表
+         * @param integrationLanes 集成链路列表
+         * @param integrationAssets 集成资产列表
+         * @param readinessGate 生产就绪门禁
+         * @param actionItems 待办动作列表
+         */
+        public ControlPlaneSummary(
+                Long tenantId, String generatedAt, String overallStatus, int capabilityCount,
+                int liveCapabilityCount, int actionItemCount, List<CapabilityCard> capabilities,
+                List<IntegrationLane> integrationLanes, List<IntegrationAsset> integrationAssets,
+                ReadinessGate readinessGate, List<ActionItem> actionItems) {
+            this.tenantId = tenantId;
+            this.generatedAt = generatedAt;
+            this.overallStatus = overallStatus;
+            this.capabilityCount = capabilityCount;
+            this.liveCapabilityCount = liveCapabilityCount;
+            this.actionItemCount = actionItemCount;
+            this.capabilities = capabilities;
+            this.integrationLanes = integrationLanes;
+            this.integrationAssets = integrationAssets;
+            this.readinessGate = readinessGate;
+            this.actionItems = actionItems;
+        }
+
+        /**
+         * 返回租户标识。
+         *
+         * @return 租户标识
+         */
+        public Long tenantId() {
+            return tenantId;
+        }
+
+        /**
+         * 返回汇总生成时间。
+         *
+         * @return 汇总生成时间
+         */
+        public String generatedAt() {
+            return generatedAt;
+        }
+
+        /**
+         * 返回整体控制面状态。
+         *
+         * @return 整体控制面状态
+         */
+        public String overallStatus() {
+            return overallStatus;
+        }
+
+        /**
+         * 返回能力总数。
+         *
+         * @return 能力总数
+         */
+        public int capabilityCount() {
+            return capabilityCount;
+        }
+
+        /**
+         * 返回已上线能力数量。
+         *
+         * @return 已上线能力数量
+         */
+        public int liveCapabilityCount() {
+            return liveCapabilityCount;
+        }
+
+        /**
+         * 返回待办动作数量。
+         *
+         * @return 待办动作数量
+         */
+        public int actionItemCount() {
+            return actionItemCount;
+        }
+
+        /**
+         * 返回能力卡片列表。
+         *
+         * @return 能力卡片列表
+         */
+        public List<CapabilityCard> capabilities() {
+            return capabilities;
+        }
+
+        /**
+         * 返回集成链路列表。
+         *
+         * @return 集成链路列表
+         */
+        public List<IntegrationLane> integrationLanes() {
+            return integrationLanes;
+        }
+
+        /**
+         * 返回集成资产列表。
+         *
+         * @return 集成资产列表
+         */
+        public List<IntegrationAsset> integrationAssets() {
+            return integrationAssets;
+        }
+
+        /**
+         * 返回生产就绪门禁。
+         *
+         * @return 生产就绪门禁
+         */
+        public ReadinessGate readinessGate() {
+            return readinessGate;
+        }
+
+        /**
+         * 返回待办动作列表。
+         *
+         * @return 待办动作列表
+         */
+        public List<ActionItem> actionItems() {
+            return actionItems;
+        }
+
+        /**
+         * 判断两个 ControlPlaneSummary 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof ControlPlaneSummary that)) {
+                return false;
+            }
+            return Objects.equals(tenantId, that.tenantId)
+                    && Objects.equals(generatedAt, that.generatedAt)
+                    && Objects.equals(overallStatus, that.overallStatus)
+                    && capabilityCount == that.capabilityCount
+                    && liveCapabilityCount == that.liveCapabilityCount
+                    && actionItemCount == that.actionItemCount
+                    && Objects.equals(capabilities, that.capabilities)
+                    && Objects.equals(integrationLanes, that.integrationLanes)
+                    && Objects.equals(integrationAssets, that.integrationAssets)
+                    && Objects.equals(readinessGate, that.readinessGate)
+                    && Objects.equals(actionItems, that.actionItems);
+        }
+
+        /**
+         * 计算 ControlPlaneSummary 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(tenantId, generatedAt, overallStatus, capabilityCount, liveCapabilityCount, actionItemCount, capabilities, integrationLanes, integrationAssets, readinessGate, actionItems);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "ControlPlaneSummary[tenantId=" + tenantId + ", generatedAt=" + generatedAt + ", overallStatus=" + overallStatus + ", capabilityCount=" + capabilityCount + ", liveCapabilityCount=" + liveCapabilityCount + ", actionItemCount=" + actionItemCount + ", capabilities=" + capabilities + ", integrationLanes=" + integrationLanes + ", integrationAssets=" + integrationAssets + ", readinessGate=" + readinessGate + ", actionItems=" + actionItems + "]";
+        }
     }
 
     /**
-     * CapabilityCard 汇总平台控制面能力、证据数据和交付状态。
+     * 描述单项控制面能力的卡片。
+     *
+     * @param capabilityKey 能力稳定键
+     * @param displayName 能力展示名称
+     * @param domain 能力所属业务域
+     * @param status 能力状态
+     * @param route 管理端路由
+     * @param apiRoot API 根路径
+     * @param surface 能力交付形态
+     * @param productionSignals 生产可用信号
+     * @param gaps 阻止能力上线的缺口
+     * @param evidence 支撑能力判断的证据信号
      */
-    public record CapabilityCard(
-            String capabilityKey,
-            String displayName,
-            String domain,
-            String status,
-            String route,
-            String apiRoot,
-            String surface,
-            List<String> productionSignals,
-            List<String> gaps,
-            List<EvidenceSignal> evidence) {
+    public static final class CapabilityCard {
+
+        /**
+         * 能力稳定键。
+         */
+        private final String capabilityKey;
+
+        /**
+         * 能力展示名称。
+         */
+        private final String displayName;
+
+        /**
+         * 能力所属业务域。
+         */
+        private final String domain;
+
+        /**
+         * 能力状态。
+         */
+        private final String status;
+
+        /**
+         * 管理端路由。
+         */
+        private final String route;
+
+        /**
+         * API 根路径。
+         */
+        private final String apiRoot;
+
+        /**
+         * 能力交付形态。
+         */
+        private final String surface;
+
+        /**
+         * 生产可用信号。
+         */
+        private final List<String> productionSignals;
+
+        /**
+         * 阻止能力上线的缺口。
+         */
+        private final List<String> gaps;
+
+        /**
+         * 支撑能力判断的证据信号。
+         */
+        private final List<EvidenceSignal> evidence;
+
+        /**
+         * 创建CapabilityCard。
+         *
+         * @param capabilityKey 能力稳定键
+         * @param displayName 能力展示名称
+         * @param domain 能力所属业务域
+         * @param status 能力状态
+         * @param route 管理端路由
+         * @param apiRoot API 根路径
+         * @param surface 能力交付形态
+         * @param productionSignals 生产可用信号
+         * @param gaps 阻止能力上线的缺口
+         * @param evidence 支撑能力判断的证据信号
+         */
+        public CapabilityCard(
+                String capabilityKey, String displayName, String domain, String status, String route,
+                String apiRoot, String surface, List<String> productionSignals, List<String> gaps,
+                List<EvidenceSignal> evidence) {
+            this.capabilityKey = capabilityKey;
+            this.displayName = displayName;
+            this.domain = domain;
+            this.status = status;
+            this.route = route;
+            this.apiRoot = apiRoot;
+            this.surface = surface;
+            this.productionSignals = productionSignals;
+            this.gaps = gaps;
+            this.evidence = evidence;
+        }
+
+        /**
+         * 返回能力稳定键。
+         *
+         * @return 能力稳定键
+         */
+        public String capabilityKey() {
+            return capabilityKey;
+        }
+
+        /**
+         * 返回能力展示名称。
+         *
+         * @return 能力展示名称
+         */
+        public String displayName() {
+            return displayName;
+        }
+
+        /**
+         * 返回能力所属业务域。
+         *
+         * @return 能力所属业务域
+         */
+        public String domain() {
+            return domain;
+        }
+
+        /**
+         * 返回能力状态。
+         *
+         * @return 能力状态
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 返回管理端路由。
+         *
+         * @return 管理端路由
+         */
+        public String route() {
+            return route;
+        }
+
+        /**
+         * 返回API 根路径。
+         *
+         * @return API 根路径
+         */
+        public String apiRoot() {
+            return apiRoot;
+        }
+
+        /**
+         * 返回能力交付形态。
+         *
+         * @return 能力交付形态
+         */
+        public String surface() {
+            return surface;
+        }
+
+        /**
+         * 返回生产可用信号。
+         *
+         * @return 生产可用信号
+         */
+        public List<String> productionSignals() {
+            return productionSignals;
+        }
+
+        /**
+         * 返回阻止能力上线的缺口。
+         *
+         * @return 阻止能力上线的缺口
+         */
+        public List<String> gaps() {
+            return gaps;
+        }
+
+        /**
+         * 返回支撑能力判断的证据信号。
+         *
+         * @return 支撑能力判断的证据信号
+         */
+        public List<EvidenceSignal> evidence() {
+            return evidence;
+        }
+
+        /**
+         * 判断两个 CapabilityCard 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof CapabilityCard that)) {
+                return false;
+            }
+            return Objects.equals(capabilityKey, that.capabilityKey)
+                    && Objects.equals(displayName, that.displayName)
+                    && Objects.equals(domain, that.domain)
+                    && Objects.equals(status, that.status)
+                    && Objects.equals(route, that.route)
+                    && Objects.equals(apiRoot, that.apiRoot)
+                    && Objects.equals(surface, that.surface)
+                    && Objects.equals(productionSignals, that.productionSignals)
+                    && Objects.equals(gaps, that.gaps)
+                    && Objects.equals(evidence, that.evidence);
+        }
+
+        /**
+         * 计算 CapabilityCard 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(capabilityKey, displayName, domain, status, route, apiRoot, surface, productionSignals, gaps, evidence);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "CapabilityCard[capabilityKey=" + capabilityKey + ", displayName=" + displayName + ", domain=" + domain + ", status=" + status + ", route=" + route + ", apiRoot=" + apiRoot + ", surface=" + surface + ", productionSignals=" + productionSignals + ", gaps=" + gaps + ", evidence=" + evidence + "]";
+        }
     }
 
     /**
-     * EvidenceSignal 汇总平台控制面能力、证据数据和交付状态。
+     * 表示一个控制面证据信号。
+     *
+     * @param signalKey 证据信号稳定键
+     * @param label 证据信号展示名称
+     * @param value 证据信号数值
+     * @param status 证据信号状态
      */
-    public record EvidenceSignal(
-            String signalKey,
-            String label,
-            long value,
-            String status) {
+    public static final class EvidenceSignal {
+
+        /**
+         * 证据信号稳定键。
+         */
+        private final String signalKey;
+
+        /**
+         * 证据信号展示名称。
+         */
+        private final String label;
+
+        /**
+         * 证据信号数值。
+         */
+        private final long value;
+
+        /**
+         * 证据信号状态。
+         */
+        private final String status;
+
+        /**
+         * 创建EvidenceSignal。
+         *
+         * @param signalKey 证据信号稳定键
+         * @param label 证据信号展示名称
+         * @param value 证据信号数值
+         * @param status 证据信号状态
+         */
+        public EvidenceSignal(
+                String signalKey, String label, long value, String status) {
+            this.signalKey = signalKey;
+            this.label = label;
+            this.value = value;
+            this.status = status;
+        }
+
+        /**
+         * 返回证据信号稳定键。
+         *
+         * @return 证据信号稳定键
+         */
+        public String signalKey() {
+            return signalKey;
+        }
+
+        /**
+         * 返回证据信号展示名称。
+         *
+         * @return 证据信号展示名称
+         */
+        public String label() {
+            return label;
+        }
+
+        /**
+         * 返回证据信号数值。
+         *
+         * @return 证据信号数值
+         */
+        public long value() {
+            return value;
+        }
+
+        /**
+         * 返回证据信号状态。
+         *
+         * @return 证据信号状态
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 判断两个 EvidenceSignal 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof EvidenceSignal that)) {
+                return false;
+            }
+            return Objects.equals(signalKey, that.signalKey)
+                    && Objects.equals(label, that.label)
+                    && value == that.value
+                    && Objects.equals(status, that.status);
+        }
+
+        /**
+         * 计算 EvidenceSignal 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(signalKey, label, value, status);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "EvidenceSignal[signalKey=" + signalKey + ", label=" + label + ", value=" + value + ", status=" + status + "]";
+        }
     }
 
     /**
-     * IntegrationLane 汇总平台控制面能力、证据数据和交付状态。
+     * 描述两个控制面能力之间的集成链路。
+     *
+     * @param laneKey 集成链路稳定键
+     * @param displayName 集成链路展示名称
+     * @param sourceCapabilityKey 源能力键
+     * @param targetCapabilityKey 目标能力键
+     * @param status 集成链路状态
+     * @param controls 链路所需控制点
      */
-    public record IntegrationLane(
-            String laneKey,
-            String displayName,
-            String sourceCapabilityKey,
-            String targetCapabilityKey,
-            String status,
-            List<String> controls) {
+    public static final class IntegrationLane {
+
+        /**
+         * 集成链路稳定键。
+         */
+        private final String laneKey;
+
+        /**
+         * 集成链路展示名称。
+         */
+        private final String displayName;
+
+        /**
+         * 源能力键。
+         */
+        private final String sourceCapabilityKey;
+
+        /**
+         * 目标能力键。
+         */
+        private final String targetCapabilityKey;
+
+        /**
+         * 集成链路状态。
+         */
+        private final String status;
+
+        /**
+         * 链路所需控制点。
+         */
+        private final List<String> controls;
+
+        /**
+         * 创建IntegrationLane。
+         *
+         * @param laneKey 集成链路稳定键
+         * @param displayName 集成链路展示名称
+         * @param sourceCapabilityKey 源能力键
+         * @param targetCapabilityKey 目标能力键
+         * @param status 集成链路状态
+         * @param controls 链路所需控制点
+         */
+        public IntegrationLane(
+                String laneKey, String displayName, String sourceCapabilityKey, String targetCapabilityKey,
+                String status, List<String> controls) {
+            this.laneKey = laneKey;
+            this.displayName = displayName;
+            this.sourceCapabilityKey = sourceCapabilityKey;
+            this.targetCapabilityKey = targetCapabilityKey;
+            this.status = status;
+            this.controls = controls;
+        }
+
+        /**
+         * 返回集成链路稳定键。
+         *
+         * @return 集成链路稳定键
+         */
+        public String laneKey() {
+            return laneKey;
+        }
+
+        /**
+         * 返回集成链路展示名称。
+         *
+         * @return 集成链路展示名称
+         */
+        public String displayName() {
+            return displayName;
+        }
+
+        /**
+         * 返回源能力键。
+         *
+         * @return 源能力键
+         */
+        public String sourceCapabilityKey() {
+            return sourceCapabilityKey;
+        }
+
+        /**
+         * 返回目标能力键。
+         *
+         * @return 目标能力键
+         */
+        public String targetCapabilityKey() {
+            return targetCapabilityKey;
+        }
+
+        /**
+         * 返回集成链路状态。
+         *
+         * @return 集成链路状态
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 返回链路所需控制点。
+         *
+         * @return 链路所需控制点
+         */
+        public List<String> controls() {
+            return controls;
+        }
+
+        /**
+         * 判断两个 IntegrationLane 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof IntegrationLane that)) {
+                return false;
+            }
+            return Objects.equals(laneKey, that.laneKey)
+                    && Objects.equals(displayName, that.displayName)
+                    && Objects.equals(sourceCapabilityKey, that.sourceCapabilityKey)
+                    && Objects.equals(targetCapabilityKey, that.targetCapabilityKey)
+                    && Objects.equals(status, that.status)
+                    && Objects.equals(controls, that.controls);
+        }
+
+        /**
+         * 计算 IntegrationLane 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(laneKey, displayName, sourceCapabilityKey, targetCapabilityKey, status, controls);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "IntegrationLane[laneKey=" + laneKey + ", displayName=" + displayName + ", sourceCapabilityKey=" + sourceCapabilityKey + ", targetCapabilityKey=" + targetCapabilityKey + ", status=" + status + ", controls=" + controls + "]";
+        }
     }
 
     /**
-     * IntegrationAsset 汇总平台控制面能力、证据数据和交付状态。
+     * 描述控制面依赖的集成资产。
+     *
+     * @param assetKey 集成资产稳定键
+     * @param displayName 集成资产展示名称
+     * @param assetType 集成资产类型
+     * @param ownerCapabilityKey 归属能力键
+     * @param providerFamily 供应方家族
+     * @param status 集成资产状态
+     * @param apiRoot API 根路径
+     * @param credentialDependency 凭据依赖说明
+     * @param pendingWrites 待写入数量
+     * @param failedWrites 写入失败数量
+     * @param controls 资产所需控制点
+     * @param gaps 阻止资产上线的缺口
+     * @param evidence 支撑资产判断的证据信号
      */
-    public record IntegrationAsset(
-            String assetKey,
-            String displayName,
-            String assetType,
-            String ownerCapabilityKey,
-            String providerFamily,
-            String status,
-            String apiRoot,
-            String credentialDependency,
-            long pendingWrites,
-            long failedWrites,
-            List<String> controls,
-            List<String> gaps,
-            List<EvidenceSignal> evidence) {
+    public static final class IntegrationAsset {
+
+        /**
+         * 集成资产稳定键。
+         */
+        private final String assetKey;
+
+        /**
+         * 集成资产展示名称。
+         */
+        private final String displayName;
+
+        /**
+         * 集成资产类型。
+         */
+        private final String assetType;
+
+        /**
+         * 归属能力键。
+         */
+        private final String ownerCapabilityKey;
+
+        /**
+         * 供应方家族。
+         */
+        private final String providerFamily;
+
+        /**
+         * 集成资产状态。
+         */
+        private final String status;
+
+        /**
+         * API 根路径。
+         */
+        private final String apiRoot;
+
+        /**
+         * 凭据依赖说明。
+         */
+        private final String credentialDependency;
+
+        /**
+         * 待写入数量。
+         */
+        private final long pendingWrites;
+
+        /**
+         * 写入失败数量。
+         */
+        private final long failedWrites;
+
+        /**
+         * 资产所需控制点。
+         */
+        private final List<String> controls;
+
+        /**
+         * 阻止资产上线的缺口。
+         */
+        private final List<String> gaps;
+
+        /**
+         * 支撑资产判断的证据信号。
+         */
+        private final List<EvidenceSignal> evidence;
+
+        /**
+         * 创建IntegrationAsset。
+         *
+         * @param assetKey 集成资产稳定键
+         * @param displayName 集成资产展示名称
+         * @param assetType 集成资产类型
+         * @param ownerCapabilityKey 归属能力键
+         * @param providerFamily 供应方家族
+         * @param status 集成资产状态
+         * @param apiRoot API 根路径
+         * @param credentialDependency 凭据依赖说明
+         * @param pendingWrites 待写入数量
+         * @param failedWrites 写入失败数量
+         * @param controls 资产所需控制点
+         * @param gaps 阻止资产上线的缺口
+         * @param evidence 支撑资产判断的证据信号
+         */
+        public IntegrationAsset(
+                String assetKey, String displayName, String assetType, String ownerCapabilityKey,
+                String providerFamily, String status, String apiRoot, String credentialDependency,
+                long pendingWrites, long failedWrites, List<String> controls, List<String> gaps,
+                List<EvidenceSignal> evidence) {
+            this.assetKey = assetKey;
+            this.displayName = displayName;
+            this.assetType = assetType;
+            this.ownerCapabilityKey = ownerCapabilityKey;
+            this.providerFamily = providerFamily;
+            this.status = status;
+            this.apiRoot = apiRoot;
+            this.credentialDependency = credentialDependency;
+            this.pendingWrites = pendingWrites;
+            this.failedWrites = failedWrites;
+            this.controls = controls;
+            this.gaps = gaps;
+            this.evidence = evidence;
+        }
+
+        /**
+         * 返回集成资产稳定键。
+         *
+         * @return 集成资产稳定键
+         */
+        public String assetKey() {
+            return assetKey;
+        }
+
+        /**
+         * 返回集成资产展示名称。
+         *
+         * @return 集成资产展示名称
+         */
+        public String displayName() {
+            return displayName;
+        }
+
+        /**
+         * 返回集成资产类型。
+         *
+         * @return 集成资产类型
+         */
+        public String assetType() {
+            return assetType;
+        }
+
+        /**
+         * 返回归属能力键。
+         *
+         * @return 归属能力键
+         */
+        public String ownerCapabilityKey() {
+            return ownerCapabilityKey;
+        }
+
+        /**
+         * 返回供应方家族。
+         *
+         * @return 供应方家族
+         */
+        public String providerFamily() {
+            return providerFamily;
+        }
+
+        /**
+         * 返回集成资产状态。
+         *
+         * @return 集成资产状态
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 返回API 根路径。
+         *
+         * @return API 根路径
+         */
+        public String apiRoot() {
+            return apiRoot;
+        }
+
+        /**
+         * 返回凭据依赖说明。
+         *
+         * @return 凭据依赖说明
+         */
+        public String credentialDependency() {
+            return credentialDependency;
+        }
+
+        /**
+         * 返回待写入数量。
+         *
+         * @return 待写入数量
+         */
+        public long pendingWrites() {
+            return pendingWrites;
+        }
+
+        /**
+         * 返回写入失败数量。
+         *
+         * @return 写入失败数量
+         */
+        public long failedWrites() {
+            return failedWrites;
+        }
+
+        /**
+         * 返回资产所需控制点。
+         *
+         * @return 资产所需控制点
+         */
+        public List<String> controls() {
+            return controls;
+        }
+
+        /**
+         * 返回阻止资产上线的缺口。
+         *
+         * @return 阻止资产上线的缺口
+         */
+        public List<String> gaps() {
+            return gaps;
+        }
+
+        /**
+         * 返回支撑资产判断的证据信号。
+         *
+         * @return 支撑资产判断的证据信号
+         */
+        public List<EvidenceSignal> evidence() {
+            return evidence;
+        }
+
+        /**
+         * 判断两个 IntegrationAsset 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof IntegrationAsset that)) {
+                return false;
+            }
+            return Objects.equals(assetKey, that.assetKey)
+                    && Objects.equals(displayName, that.displayName)
+                    && Objects.equals(assetType, that.assetType)
+                    && Objects.equals(ownerCapabilityKey, that.ownerCapabilityKey)
+                    && Objects.equals(providerFamily, that.providerFamily)
+                    && Objects.equals(status, that.status)
+                    && Objects.equals(apiRoot, that.apiRoot)
+                    && Objects.equals(credentialDependency, that.credentialDependency)
+                    && pendingWrites == that.pendingWrites
+                    && failedWrites == that.failedWrites
+                    && Objects.equals(controls, that.controls)
+                    && Objects.equals(gaps, that.gaps)
+                    && Objects.equals(evidence, that.evidence);
+        }
+
+        /**
+         * 计算 IntegrationAsset 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(assetKey, displayName, assetType, ownerCapabilityKey, providerFamily, status, apiRoot, credentialDependency, pendingWrites, failedWrites, controls, gaps, evidence);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "IntegrationAsset[assetKey=" + assetKey + ", displayName=" + displayName + ", assetType=" + assetType + ", ownerCapabilityKey=" + ownerCapabilityKey + ", providerFamily=" + providerFamily + ", status=" + status + ", apiRoot=" + apiRoot + ", credentialDependency=" + credentialDependency + ", pendingWrites=" + pendingWrites + ", failedWrites=" + failedWrites + ", controls=" + controls + ", gaps=" + gaps + ", evidence=" + evidence + "]";
+        }
     }
 
     /**
-     * ReadinessGate 汇总平台控制面能力、证据数据和交付状态。
+     * 控制面生产就绪门禁。
+     *
+     * @param status 门禁状态
+     * @param productionReady 是否生产就绪
+     * @param blockerCount 阻塞项数量
+     * @param warningCount 警告项数量
+     * @param blockers 阻塞项列表
+     * @param warnings 警告项列表
      */
-    public record ReadinessGate(
-            String status,
-            boolean productionReady,
-            int blockerCount,
-            int warningCount,
-            List<ReadinessFinding> blockers,
-            List<ReadinessFinding> warnings) {
+    public static final class ReadinessGate {
+
+        /**
+         * 门禁状态。
+         */
+        private final String status;
+
+        /**
+         * 是否生产就绪。
+         */
+        private final boolean productionReady;
+
+        /**
+         * 阻塞项数量。
+         */
+        private final int blockerCount;
+
+        /**
+         * 警告项数量。
+         */
+        private final int warningCount;
+
+        /**
+         * 阻塞项列表。
+         */
+        private final List<ReadinessFinding> blockers;
+
+        /**
+         * 警告项列表。
+         */
+        private final List<ReadinessFinding> warnings;
+
+        /**
+         * 创建ReadinessGate。
+         *
+         * @param status 门禁状态
+         * @param productionReady 是否生产就绪
+         * @param blockerCount 阻塞项数量
+         * @param warningCount 警告项数量
+         * @param blockers 阻塞项列表
+         * @param warnings 警告项列表
+         */
+        public ReadinessGate(
+                String status, boolean productionReady, int blockerCount, int warningCount,
+                List<ReadinessFinding> blockers, List<ReadinessFinding> warnings) {
+            this.status = status;
+            this.productionReady = productionReady;
+            this.blockerCount = blockerCount;
+            this.warningCount = warningCount;
+            this.blockers = blockers;
+            this.warnings = warnings;
+        }
+
+        /**
+         * 返回门禁状态。
+         *
+         * @return 门禁状态
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 返回是否生产就绪。
+         *
+         * @return 是否生产就绪
+         */
+        public boolean productionReady() {
+            return productionReady;
+        }
+
+        /**
+         * 返回阻塞项数量。
+         *
+         * @return 阻塞项数量
+         */
+        public int blockerCount() {
+            return blockerCount;
+        }
+
+        /**
+         * 返回警告项数量。
+         *
+         * @return 警告项数量
+         */
+        public int warningCount() {
+            return warningCount;
+        }
+
+        /**
+         * 返回阻塞项列表。
+         *
+         * @return 阻塞项列表
+         */
+        public List<ReadinessFinding> blockers() {
+            return blockers;
+        }
+
+        /**
+         * 返回警告项列表。
+         *
+         * @return 警告项列表
+         */
+        public List<ReadinessFinding> warnings() {
+            return warnings;
+        }
+
+        /**
+         * 判断两个 ReadinessGate 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof ReadinessGate that)) {
+                return false;
+            }
+            return Objects.equals(status, that.status)
+                    && productionReady == that.productionReady
+                    && blockerCount == that.blockerCount
+                    && warningCount == that.warningCount
+                    && Objects.equals(blockers, that.blockers)
+                    && Objects.equals(warnings, that.warnings);
+        }
+
+        /**
+         * 计算 ReadinessGate 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(status, productionReady, blockerCount, warningCount, blockers, warnings);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "ReadinessGate[status=" + status + ", productionReady=" + productionReady + ", blockerCount=" + blockerCount + ", warningCount=" + warningCount + ", blockers=" + blockers + ", warnings=" + warnings + "]";
+        }
     }
 
     /**
-     * ReadinessFinding 汇总平台控制面能力、证据数据和交付状态。
+     * 控制面就绪检查发现项。
+     *
+     * @param severity 严重级别
+     * @param itemType 发现项类型
+     * @param itemKey 发现项稳定键
+     * @param title 发现项标题
+     * @param route 处理入口路由
+     * @param reason 发现项原因
      */
-    public record ReadinessFinding(
-            String severity,
-            String itemType,
-            String itemKey,
-            String title,
-            String route,
-            String reason) {
+    public static final class ReadinessFinding {
+
+        /**
+         * 严重级别。
+         */
+        private final String severity;
+
+        /**
+         * 发现项类型。
+         */
+        private final String itemType;
+
+        /**
+         * 发现项稳定键。
+         */
+        private final String itemKey;
+
+        /**
+         * 发现项标题。
+         */
+        private final String title;
+
+        /**
+         * 处理入口路由。
+         */
+        private final String route;
+
+        /**
+         * 发现项原因。
+         */
+        private final String reason;
+
+        /**
+         * 创建ReadinessFinding。
+         *
+         * @param severity 严重级别
+         * @param itemType 发现项类型
+         * @param itemKey 发现项稳定键
+         * @param title 发现项标题
+         * @param route 处理入口路由
+         * @param reason 发现项原因
+         */
+        public ReadinessFinding(
+                String severity, String itemType, String itemKey, String title, String route, String reason) {
+            this.severity = severity;
+            this.itemType = itemType;
+            this.itemKey = itemKey;
+            this.title = title;
+            this.route = route;
+            this.reason = reason;
+        }
+
+        /**
+         * 返回严重级别。
+         *
+         * @return 严重级别
+         */
+        public String severity() {
+            return severity;
+        }
+
+        /**
+         * 返回发现项类型。
+         *
+         * @return 发现项类型
+         */
+        public String itemType() {
+            return itemType;
+        }
+
+        /**
+         * 返回发现项稳定键。
+         *
+         * @return 发现项稳定键
+         */
+        public String itemKey() {
+            return itemKey;
+        }
+
+        /**
+         * 返回发现项标题。
+         *
+         * @return 发现项标题
+         */
+        public String title() {
+            return title;
+        }
+
+        /**
+         * 返回处理入口路由。
+         *
+         * @return 处理入口路由
+         */
+        public String route() {
+            return route;
+        }
+
+        /**
+         * 返回发现项原因。
+         *
+         * @return 发现项原因
+         */
+        public String reason() {
+            return reason;
+        }
+
+        /**
+         * 判断两个 ReadinessFinding 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof ReadinessFinding that)) {
+                return false;
+            }
+            return Objects.equals(severity, that.severity)
+                    && Objects.equals(itemType, that.itemType)
+                    && Objects.equals(itemKey, that.itemKey)
+                    && Objects.equals(title, that.title)
+                    && Objects.equals(route, that.route)
+                    && Objects.equals(reason, that.reason);
+        }
+
+        /**
+         * 计算 ReadinessFinding 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(severity, itemType, itemKey, title, route, reason);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "ReadinessFinding[severity=" + severity + ", itemType=" + itemType + ", itemKey=" + itemKey + ", title=" + title + ", route=" + route + ", reason=" + reason + "]";
+        }
     }
 
     /**
-     * ActionItem 汇总平台控制面能力、证据数据和交付状态。
+     * 控制面待办动作。
+     *
+     * @param priority 待办优先级
+     * @param capabilityKey 关联能力键
+     * @param title 待办标题
+     * @param route 处理入口路由
+     * @param reason 待办原因
      */
-    public record ActionItem(
-            String priority,
-            String capabilityKey,
-            String title,
-            String route,
-            String reason) {
+    public static final class ActionItem {
+
+        /**
+         * 待办优先级。
+         */
+        private final String priority;
+
+        /**
+         * 关联能力键。
+         */
+        private final String capabilityKey;
+
+        /**
+         * 待办标题。
+         */
+        private final String title;
+
+        /**
+         * 处理入口路由。
+         */
+        private final String route;
+
+        /**
+         * 待办原因。
+         */
+        private final String reason;
+
+        /**
+         * 创建ActionItem。
+         *
+         * @param priority 待办优先级
+         * @param capabilityKey 关联能力键
+         * @param title 待办标题
+         * @param route 处理入口路由
+         * @param reason 待办原因
+         */
+        public ActionItem(
+                String priority, String capabilityKey, String title, String route, String reason) {
+            this.priority = priority;
+            this.capabilityKey = capabilityKey;
+            this.title = title;
+            this.route = route;
+            this.reason = reason;
+        }
+
+        /**
+         * 返回待办优先级。
+         *
+         * @return 待办优先级
+         */
+        public String priority() {
+            return priority;
+        }
+
+        /**
+         * 返回关联能力键。
+         *
+         * @return 关联能力键
+         */
+        public String capabilityKey() {
+            return capabilityKey;
+        }
+
+        /**
+         * 返回待办标题。
+         *
+         * @return 待办标题
+         */
+        public String title() {
+            return title;
+        }
+
+        /**
+         * 返回处理入口路由。
+         *
+         * @return 处理入口路由
+         */
+        public String route() {
+            return route;
+        }
+
+        /**
+         * 返回待办原因。
+         *
+         * @return 待办原因
+         */
+        public String reason() {
+            return reason;
+        }
+
+        /**
+         * 判断两个 ActionItem 值对象是否相同。
+         *
+         * @param object 待比较对象
+         * @return 所有字段相同时返回 true
+         */
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) {
+                return true;
+            }
+            if (!(object instanceof ActionItem that)) {
+                return false;
+            }
+            return Objects.equals(priority, that.priority)
+                    && Objects.equals(capabilityKey, that.capabilityKey)
+                    && Objects.equals(title, that.title)
+                    && Objects.equals(route, that.route)
+                    && Objects.equals(reason, that.reason);
+        }
+
+        /**
+         * 计算 ActionItem 值对象哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(priority, capabilityKey, title, route, reason);
+        }
+
+        /**
+         * 返回与原 record 形态一致的字符串。
+         *
+         * @return 字符串表示
+         */
+        @Override
+        public String toString() {
+            return "ActionItem[priority=" + priority + ", capabilityKey=" + capabilityKey + ", title=" + title + ", route=" + route + ", reason=" + reason + "]";
+        }
     }
 }

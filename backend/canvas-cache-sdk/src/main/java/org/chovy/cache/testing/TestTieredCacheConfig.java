@@ -33,7 +33,9 @@ public class TestTieredCacheConfig {
     @Primary
     public AnnotationCacheResolver testAnnotationCacheResolver() {
         return new AnnotationCacheResolver(null, new ObjectMapper()) {
-            /** 测试环境中按缓存名称复用的内存缓存实例。 */
+            /**
+             * 测试环境中按缓存名称复用的内存缓存实例。
+             */
             private final Map<String, TieredCache<Object, Object>> caches = new ConcurrentHashMap<>();
 
             /**

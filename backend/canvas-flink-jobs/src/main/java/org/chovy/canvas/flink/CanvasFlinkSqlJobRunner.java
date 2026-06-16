@@ -7,7 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * CanvasFlinkSqlJobRunner 支撑 flink 场景的后端处理。
+ * 负责把渲染后的 Flink SQL 脚本拆分并按顺序提交给执行器。
+ *
+ * <p>拆分逻辑保留 SQL 注释、字符串和 dollar quote 片段，避免把这些上下文中的分号误判成语句结束符。
  */
 public class CanvasFlinkSqlJobRunner {
 
@@ -67,7 +69,6 @@ public class CanvasFlinkSqlJobRunner {
      * @return 去除首尾空白后的语句列表
      */
     static List<String> statements(String sql) {
-        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (sql == null || sql.isBlank()) {
             return List.of();
         }
@@ -77,7 +78,6 @@ public class CanvasFlinkSqlJobRunner {
         boolean inLineComment = false;
         boolean inBlockComment = false;
         String dollarQuoteDelimiter = null;
-        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (int i = 0; i < sql.length(); i++) {
             char c = sql.charAt(i);
             if (dollarQuoteDelimiter != null) {
@@ -130,6 +130,7 @@ public class CanvasFlinkSqlJobRunner {
             if (c == '\'') {
                 current.append(c);
                 if (inSingleQuote && i + 1 < sql.length() && sql.charAt(i + 1) == '\'') {
+                    // SQL 使用两个单引号转义字面量中的单引号，不能切换字符串状态。
                     current.append(sql.charAt(i + 1));
                     i++;
                 } else {
@@ -145,7 +146,6 @@ public class CanvasFlinkSqlJobRunner {
             current.append(c);
         }
         addStatement(statements, current);
-        // 汇总前面计算出的状态和明细，返回给调用方。
         return List.copyOf(statements);
     }
 
@@ -157,7 +157,6 @@ public class CanvasFlinkSqlJobRunner {
      * @return 完整分隔符，当前位置不是合法分隔符时返回 null
      */
     private static String dollarQuoteDelimiter(String sql, int start) {
-        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (sql.charAt(start) != '$') {
             return null;
         }
@@ -165,14 +164,12 @@ public class CanvasFlinkSqlJobRunner {
         if (end < 0) {
             return null;
         }
-        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (int i = start + 1; i < end; i++) {
             char c = sql.charAt(i);
             if (!Character.isLetterOrDigit(c) && c != '_') {
                 return null;
             }
         }
-        // 汇总前面计算出的状态和明细，返回给调用方。
         return sql.substring(start, end + 1);
     }
 

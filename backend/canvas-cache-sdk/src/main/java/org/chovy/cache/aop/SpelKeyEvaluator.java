@@ -14,9 +14,14 @@ import java.lang.reflect.Method;
  * <p>该类集中封装 Spring Expression 解析细节，避免各个切面重复处理参数上下文。
  */
 public class SpelKeyEvaluator {
-    /** SpEL 表达式解析器。 */
+    /**
+     * SpEL 表达式解析器。
+     */
     private final ExpressionParser parser = new SpelExpressionParser();
-    /** 方法参数名发现器，用于暴露真实参数名变量。 */
+
+    /**
+     * 方法参数名发现器，用于暴露真实参数名变量。
+     */
     private final DefaultParameterNameDiscoverer nameDiscoverer = new DefaultParameterNameDiscoverer();
 
     /**

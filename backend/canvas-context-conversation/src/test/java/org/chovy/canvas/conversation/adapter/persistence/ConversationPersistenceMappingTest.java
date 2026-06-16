@@ -13,10 +13,19 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 校验会话上下文持久化映射的单元测试。
+ */
 class ConversationPersistenceMappingTest {
 
+    /**
+     * 固定测试时间，避免序列化断言受系统时钟影响。
+     */
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 6, 6, 11, 0);
 
+    /**
+     * 验证代表性表名和 Mapper 继承关系。
+     */
     @Test
     void mapsRepresentativeConversationTablesAndMappersToConversationContext() {
         assertTable(ConversationSessionDO.class, "conversation_session");
@@ -37,6 +46,9 @@ class ConversationPersistenceMappingTest {
         assertThat(BaseMapper.class).isAssignableFrom(ConversationSlaBreachMapper.class);
     }
 
+    /**
+     * 验证会话、消息和工单在领域对象与行对象之间转换时保留租户和 JSON 状态。
+     */
     @Test
     void convertsSessionMessageAndWorkItemRowsWithoutDroppingTenantOrJsonState() {
         ConversationSession session = new ConversationSession(
@@ -72,6 +84,12 @@ class ConversationPersistenceMappingTest {
                 .containsExactly("sales", "vip");
     }
 
+    /**
+     * 断言行对象绑定到指定表名。
+     *
+     * @param rowType 行对象类型
+     * @param tableName 预期表名
+     */
     private static void assertTable(Class<?> rowType, String tableName) {
         assertThat(rowType.getAnnotation(TableName.class)).isNotNull();
         assertThat(rowType.getAnnotation(TableName.class).value()).isEqualTo(tableName);

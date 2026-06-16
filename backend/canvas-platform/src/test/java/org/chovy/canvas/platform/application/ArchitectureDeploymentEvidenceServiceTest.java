@@ -11,8 +11,14 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+/**
+ * 覆盖架构部署证据服务的登记校验和审批校验。
+ */
 class ArchitectureDeploymentEvidenceServiceTest {
 
+    /**
+     * 验证登记时必须提供证据和回滚信息，并写入待评审状态。
+     */
     @Test
     void registerRequiresProofAndRollbackEvidenceThenStoresPendingReview() {
         ArchitectureDeploymentEvidenceRepository repository = mock(ArchitectureDeploymentEvidenceRepository.class);
@@ -35,6 +41,9 @@ class ArchitectureDeploymentEvidenceServiceTest {
                         && record.decisionStatus().equals("BLOCKED_PENDING_REVIEW")));
     }
 
+    /**
+     * 验证登记缺失必填字段时快速失败。
+     */
     @Test
     void registerRejectsMissingRequiredFields() {
         ArchitectureDeploymentEvidenceService service =
@@ -54,6 +63,9 @@ class ArchitectureDeploymentEvidenceServiceTest {
                 .hasMessageContaining("rollback plan is required");
     }
 
+    /**
+     * 验证审批必须提供评审人和子规格。
+     */
     @Test
     void approveRequiresReviewerAndChildSpec() {
         ArchitectureDeploymentEvidenceRepository repository = mock(ArchitectureDeploymentEvidenceRepository.class);

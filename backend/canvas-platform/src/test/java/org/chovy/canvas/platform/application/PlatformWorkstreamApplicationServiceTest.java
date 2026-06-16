@@ -11,8 +11,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * 覆盖平台工作流应用服务的状态计算和子规格准入。
+ */
 class PlatformWorkstreamApplicationServiceTest {
 
+    /**
+     * 验证缺少必需子规格的工作流会被标记为阻塞。
+     */
     @Test
     void listMarksWorkstreamsWithoutRequiredChildSpecsAsBlocked() {
         PlatformWorkstreamRepository repository = mock(PlatformWorkstreamRepository.class);
@@ -34,6 +40,9 @@ class PlatformWorkstreamApplicationServiceTest {
                 .containsExactly("BLOCKED_CHILD_SPEC_REQUIRED", "READY_FOR_CHILD_EXECUTION");
     }
 
+    /**
+     * 验证子规格准入会标准化工作流键并拒绝缺失路径。
+     */
     @Test
     void requireExecutableChildSpecNormalizesKeyAndRejectsMissingSpecPath() {
         PlatformWorkstreamRepository repository = mock(PlatformWorkstreamRepository.class);
@@ -46,6 +55,9 @@ class PlatformWorkstreamApplicationServiceTest {
                 .hasMessageContaining("channels requires a child spec before implementation");
     }
 
+    /**
+     * 验证未知或非法工作流键会被拒绝。
+     */
     @Test
     void requireExecutableChildSpecRejectsUnknownOrInvalidKeys() {
         PlatformWorkstreamRepository repository = mock(PlatformWorkstreamRepository.class);

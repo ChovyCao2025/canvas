@@ -10,8 +10,14 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证 Flink 作业入口的 SQL 提交和 checkpoint 上报流程。
+ */
 class CanvasFlinkJobMainTest {
 
+    /**
+     * 正常启动时应渲染 SQL、按顺序提交并上报 WARN 启动证据。
+     */
     @Test
     void runSelectsPipelineKeyRendersSqlExecutesStatementsAndReportsPass() {
         List<String> statements = new ArrayList<>();
@@ -48,6 +54,9 @@ class CanvasFlinkJobMainTest {
                 });
     }
 
+    /**
+     * SQL 执行失败时应上报 FAIL checkpoint 并保留原始异常。
+     */
     @Test
     void runReportsFailWhenSqlExecutionFails() {
         List<CanvasFlinkCheckpointReporter.CheckpointPayload> reports = new ArrayList<>();
@@ -70,6 +79,9 @@ class CanvasFlinkJobMainTest {
                 });
     }
 
+    /**
+     * 未注册管道应在提交 SQL 前失败。
+     */
     @Test
     void rejectsUnknownPipelineKeyBeforeSubmittingSql() {
         Map<String, String> env = validEnv();
@@ -87,6 +99,11 @@ class CanvasFlinkJobMainTest {
         assertThat(statements).isEmpty();
     }
 
+    /**
+     * 构造可启动 MySQL CDC 管道的环境变量。
+     *
+     * @return 测试环境变量映射
+     */
     private Map<String, String> validEnv() {
         Map<String, String> env = new LinkedHashMap<>();
         env.put("CANVAS_FLINK_JOB_PIPELINE_KEY", "mysql_cdp_event_log_to_doris_ods");

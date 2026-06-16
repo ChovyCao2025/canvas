@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.domain.AiCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖 AI 应用服务的决策、预测、提示词和供应方流程。
+ */
 class AiApplicationServiceTest {
 
+    /**
+     * 验证决策和预测流程按租户隔离并遵守数量上限。
+     */
     @Test
     void decisionAndPredictionFlowsAreTenantScopedAndLimitBounded() {
         AiApplicationService service = new AiApplicationService(new AiCatalog());
@@ -45,6 +51,9 @@ class AiApplicationServiceTest {
         assertThat(service.topRiskUsers(7L, 500)).hasSize(3);
     }
 
+    /**
+     * 验证提示词模板可渲染、评估、审计，并拒绝缺失名称。
+     */
     @Test
     void promptTemplatesRenderEvaluateAuditAndRejectMissingNames() {
         AiApplicationService service = new AiApplicationService(new AiCatalog());
@@ -76,6 +85,9 @@ class AiApplicationServiceTest {
                 .hasMessage("name is required");
     }
 
+    /**
+     * 验证供应方按租户隔离、可更新禁用，并暴露模型列表。
+     */
     @Test
     void providersAreTenantScopedMutableAndExposeModels() {
         AiApplicationService service = new AiApplicationService(new AiCatalog());

@@ -14,11 +14,23 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 会话领域对象和持久化行对象之间的转换器。
+ */
 public final class ConversationPersistenceConverter {
 
+    /**
+     * 禁止实例化纯静态转换器。
+     */
     private ConversationPersistenceConverter() {
     }
 
+    /**
+     * 将会话领域对象转换为数据库行对象。
+     *
+     * @param session 会话领域对象
+     * @return 会话数据库行
+     */
     public static ConversationSessionDO toSessionRow(ConversationSession session) {
         ConversationSessionDO row = new ConversationSessionDO();
         row.id = session.id();
@@ -39,6 +51,12 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将会话数据库行转换为领域对象。
+     *
+     * @param row 会话数据库行
+     * @return 会话领域对象
+     */
     public static ConversationSession toSession(ConversationSessionDO row) {
         return new ConversationSession(row.id, row.tenantId, row.canvasId, row.versionId,
                 row.executionId, row.userId, row.channel, row.provider, row.status,
@@ -46,6 +64,12 @@ public final class ConversationPersistenceConverter {
                 row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 将消息领域对象转换为数据库行对象。
+     *
+     * @param message 消息领域对象
+     * @return 消息数据库行
+     */
     public static ConversationMessageDO toMessageRow(ConversationMessage message) {
         ConversationMessageDO row = new ConversationMessageDO();
         row.id = message.id();
@@ -63,12 +87,24 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将消息数据库行转换为领域对象。
+     *
+     * @param row 消息数据库行
+     * @return 消息领域对象
+     */
     public static ConversationMessage toMessage(ConversationMessageDO row) {
         return new ConversationMessage(row.id, row.tenantId, row.sessionId, row.direction,
                 row.messageType, row.externalMessageId, row.idempotencyKey, parseMap(row.contentJson),
                 row.textContent, row.intent, Boolean.TRUE.equals(row.processed), row.createdAt);
     }
 
+    /**
+     * 将工单领域对象转换为数据库行对象。
+     *
+     * @param item 工单领域对象
+     * @return 工单数据库行
+     */
     public static ConversationWorkItemDO toWorkItemRow(ConversationWorkItem item) {
         ConversationWorkItemDO row = new ConversationWorkItemDO();
         row.id = item.id();
@@ -100,6 +136,12 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将工单数据库行转换为领域对象。
+     *
+     * @param row 工单数据库行
+     * @return 工单领域对象
+     */
     public static ConversationWorkItem toWorkItem(ConversationWorkItemDO row) {
         return new ConversationWorkItem(row.id, row.tenantId, row.sessionId, row.contactProfileId,
                 row.userId, row.channel, row.provider, row.subject, row.status, row.priority,
@@ -109,6 +151,12 @@ public final class ConversationPersistenceConverter {
                 row.routingReason, row.routedAt, row.slaPolicyKey, row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 将联系人画像领域对象转换为数据库行对象。
+     *
+     * @param profile 联系人画像领域对象
+     * @return 联系人画像数据库行
+     */
     public static ConversationContactProfileDO toContactProfileRow(ConversationContactProfile profile) {
         ConversationContactProfileDO row = new ConversationContactProfileDO();
         row.id = profile.id();
@@ -126,12 +174,24 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将联系人画像数据库行转换为领域对象。
+     *
+     * @param row 联系人画像数据库行
+     * @return 联系人画像领域对象
+     */
     public static ConversationContactProfile toContactProfile(ConversationContactProfileDO row) {
         return new ConversationContactProfile(row.id, row.tenantId, row.userId, row.displayName,
                 row.externalContactId, row.privateDomainSource, row.owner, row.lifecycleStage,
                 parseList(row.tagsJson), parseMap(row.attributesJson), row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 将工单审计领域对象转换为数据库行对象。
+     *
+     * @param audit 工单审计领域对象
+     * @return 工单审计数据库行
+     */
     public static ConversationWorkItemAuditDO toWorkItemAuditRow(ConversationWorkItemAudit audit) {
         ConversationWorkItemAuditDO row = new ConversationWorkItemAuditDO();
         row.id = audit.id();
@@ -146,11 +206,23 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将工单审计数据库行转换为领域对象。
+     *
+     * @param row 工单审计数据库行
+     * @return 工单审计领域对象
+     */
     public static ConversationWorkItemAudit toWorkItemAudit(ConversationWorkItemAuditDO row) {
         return new ConversationWorkItemAudit(row.id, row.tenantId, row.workItemId, row.eventType,
                 row.actor, parseMap(row.oldValueJson), parseMap(row.newValueJson), row.note, row.createdAt);
     }
 
+    /**
+     * 将路由坐席领域对象转换为数据库行对象。
+     *
+     * @param agent 路由坐席领域对象
+     * @return 路由坐席数据库行
+     */
     public static ConversationRoutingAgentDO toRoutingAgentRow(ConversationRoutingAgent agent) {
         ConversationRoutingAgentDO row = new ConversationRoutingAgentDO();
         row.id = agent.id();
@@ -169,12 +241,24 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将路由坐席数据库行转换为领域对象。
+     *
+     * @param row 路由坐席数据库行
+     * @return 路由坐席领域对象
+     */
     public static ConversationRoutingAgent toRoutingAgent(ConversationRoutingAgentDO row) {
         return new ConversationRoutingAgent(row.id, row.tenantId, row.agentKey, row.displayName,
                 row.teamKey, row.status, value(row.maxCapacity, 1), value(row.currentLoad),
                 parseList(row.skillsJson), parseMap(row.metadataJson), row.createdBy, row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 将路由规则领域对象转换为数据库行对象。
+     *
+     * @param rule 路由规则领域对象
+     * @return 路由规则数据库行
+     */
     public static ConversationRoutingRuleDO toRoutingRuleRow(ConversationRoutingRule rule) {
         ConversationRoutingRuleDO row = new ConversationRoutingRuleDO();
         row.id = rule.id();
@@ -194,6 +278,12 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将路由规则数据库行转换为领域对象。
+     *
+     * @param row 路由规则数据库行
+     * @return 路由规则领域对象
+     */
     public static ConversationRoutingRule toRoutingRule(ConversationRoutingRuleDO row) {
         return new ConversationRoutingRule(row.id, row.tenantId, row.ruleKey, row.channel,
                 row.minPriority, parseList(row.requiredSkillsJson), row.targetTeam,
@@ -201,6 +291,12 @@ public final class ConversationPersistenceConverter {
                 parseMap(row.metadataJson), row.createdBy, row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 将 SLA 违约领域对象转换为数据库行对象。
+     *
+     * @param breach SLA 违约领域对象
+     * @return SLA 违约数据库行
+     */
     public static ConversationSlaBreachDO toSlaBreachRow(ConversationSlaBreach breach) {
         ConversationSlaBreachDO row = new ConversationSlaBreachDO();
         row.id = breach.id();
@@ -221,20 +317,45 @@ public final class ConversationPersistenceConverter {
         return row;
     }
 
+    /**
+     * 将 SLA 违约数据库行转换为领域对象。
+     *
+     * @param row SLA 违约数据库行
+     * @return SLA 违约领域对象
+     */
     public static ConversationSlaBreach toSlaBreach(ConversationSlaBreachDO row) {
         return new ConversationSlaBreach(row.id, row.tenantId, row.workItemId, row.breachType,
                 row.severity, row.status, row.escalationTarget, row.reason, row.dueAt, row.breachedAt,
                 row.resolvedBy, row.resolvedAt, parseMap(row.metadataJson), row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 将可空整数转换为 0。
+     *
+     * @param value 可空整数
+     * @return 非空整数
+     */
     private static int value(Integer value) {
         return value == null ? 0 : value;
     }
 
+    /**
+     * 将可空整数转换为给定默认值。
+     *
+     * @param value 可空整数
+     * @param defaultValue 默认值
+     * @return 非空整数
+     */
     private static int value(Integer value, int defaultValue) {
         return value == null ? defaultValue : value;
     }
 
+    /**
+     * 将 Map 序列化为当前模块使用的轻量 JSON 文本。
+     *
+     * @param values 待序列化 Map
+     * @return JSON 对象文本
+     */
     private static String toJson(Map<String, Object> values) {
         if (values == null || values.isEmpty()) {
             return "{}";
@@ -244,6 +365,12 @@ public final class ConversationPersistenceConverter {
         return "{" + String.join(",", parts) + "}";
     }
 
+    /**
+     * 将字符串列表序列化为 JSON 数组文本。
+     *
+     * @param values 待序列化列表
+     * @return JSON 数组文本
+     */
     private static String toJson(List<String> values) {
         if (values == null || values.isEmpty()) {
             return "[]";
@@ -251,6 +378,12 @@ public final class ConversationPersistenceConverter {
         return "[" + String.join(",", values.stream().map(ConversationPersistenceConverter::quote).toList()) + "]";
     }
 
+    /**
+     * 将单个值序列化为 JSON 值文本。
+     *
+     * @param value 待序列化值
+     * @return JSON 值文本
+     */
     private static String toJsonValue(Object value) {
         if (value == null) {
             return "null";
@@ -260,6 +393,7 @@ public final class ConversationPersistenceConverter {
         }
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> normalized = new LinkedHashMap<>();
+            // JSON 对象键统一转成字符串，保持写库格式稳定。
             map.forEach((key, nestedValue) -> {
                 if (key != null) {
                     normalized.put(String.valueOf(key), nestedValue);
@@ -273,6 +407,12 @@ public final class ConversationPersistenceConverter {
         return quote(String.valueOf(value));
     }
 
+    /**
+     * 将轻量 JSON 对象文本解析为 Map。
+     *
+     * @param json JSON 对象文本
+     * @return 解析后的 Map
+     */
     private static Map<String, Object> parseMap(String json) {
         Map<String, Object> values = new LinkedHashMap<>();
         if (json == null || json.isBlank() || "{}".equals(json.trim())) {
@@ -291,6 +431,12 @@ public final class ConversationPersistenceConverter {
         return values;
     }
 
+    /**
+     * 将轻量 JSON 数组文本解析为字符串列表。
+     *
+     * @param json JSON 数组文本
+     * @return 解析后的字符串列表
+     */
     private static List<String> parseList(String json) {
         if (json == null || json.isBlank() || "[]".equals(json.trim())) {
             return List.of();
@@ -302,6 +448,12 @@ public final class ConversationPersistenceConverter {
                 .toList();
     }
 
+    /**
+     * 解析单个 JSON 值文本。
+     *
+     * @param rawValue JSON 值文本
+     * @return 解析后的 Java 值
+     */
     private static Object parseValue(String rawValue) {
         if (rawValue.startsWith("{")) {
             return parseMap(rawValue);
@@ -322,6 +474,14 @@ public final class ConversationPersistenceConverter {
         }
     }
 
+    /**
+     * 在首尾括号匹配时剥离括号。
+     *
+     * @param value 原始文本
+     * @param open 左括号
+     * @param close 右括号
+     * @return 去括号后的文本
+     */
     private static String trimBrackets(String value, char open, char close) {
         String trimmed = value.trim();
         if (trimmed.length() >= 2 && trimmed.charAt(0) == open && trimmed.charAt(trimmed.length() - 1) == close) {
@@ -330,6 +490,12 @@ public final class ConversationPersistenceConverter {
         return trimmed;
     }
 
+    /**
+     * 按顶层逗号切分 JSON 对象或数组正文。
+     *
+     * @param body JSON 对象或数组正文
+     * @return 顶层片段列表
+     */
     private static List<String> splitTopLevel(String body) {
         List<String> parts = new ArrayList<>();
         if (body.isBlank()) {
@@ -360,6 +526,12 @@ public final class ConversationPersistenceConverter {
         return parts;
     }
 
+    /**
+     * 将文本转义并包裹为 JSON 字符串。
+     *
+     * @param value 原始文本
+     * @return JSON 字符串文本
+     */
     private static String quote(String value) {
         if (value == null) {
             return "null";
@@ -367,6 +539,12 @@ public final class ConversationPersistenceConverter {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
+    /**
+     * 去除 JSON 字符串包裹并还原简单转义。
+     *
+     * @param value JSON 字符串文本
+     * @return 还原后的文本
+     */
     private static String unquote(String value) {
         String trimmed = value.trim();
         if (trimmed.length() >= 2 && trimmed.charAt(0) == '"' && trimmed.charAt(trimmed.length() - 1) == '"') {

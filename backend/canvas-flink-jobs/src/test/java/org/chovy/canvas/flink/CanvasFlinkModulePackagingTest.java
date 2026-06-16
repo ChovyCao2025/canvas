@@ -7,8 +7,16 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证 Flink job 模块打包配置包含运行所需的连接器和入口类。
+ */
 class CanvasFlinkModulePackagingTest {
 
+    /**
+     * POM 应把连接器依赖和 main class 配置进可运行 job jar。
+     *
+     * @throws Exception POM 读取失败时抛出
+     */
     @Test
     void pomPackagesConnectorDependenciesIntoRunnableJobJar() throws Exception {
         String pom = Files.readString(Path.of("pom.xml"));
