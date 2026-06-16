@@ -281,6 +281,54 @@ public class CanvasDO {
         this.createdBy = createdBy;
     }
 
+    public Integer getIsExample() {
+        return isExample;
+    }
+
+    public void setIsExample(Integer isExample) {
+        this.isExample = isExample;
+    }
+
+    public String getSourceTemplateKey() {
+        return sourceTemplateKey;
+    }
+
+    public void setSourceTemplateKey(String sourceTemplateKey) {
+        this.sourceTemplateKey = sourceTemplateKey;
+    }
+
+    public String getProjectKey() {
+        return projectKey;
+    }
+
+    public void setProjectKey(String projectKey) {
+        this.projectKey = projectKey;
+    }
+
+    public String getProjectName() {
+        return projectName;
+    }
+
+    public void setProjectName(String projectName) {
+        this.projectName = projectName;
+    }
+
+    public String getFolderKey() {
+        return folderKey;
+    }
+
+    public void setFolderKey(String folderKey) {
+        this.folderKey = folderKey;
+    }
+
+    public String getFolderName() {
+        return folderName;
+    }
+
+    public void setFolderName(String folderName) {
+        this.folderName = folderName;
+    }
+
     /**
      * 获取ValidStart。
      */
@@ -503,5 +551,29 @@ public class CanvasDO {
      */
     public void setPreviousVersionId(Long previousVersionId) {
         this.previousVersionId = previousVersionId;
+    }
+
+    public Integer getEditVersion() {
+        return editVersion;
+    }
+
+    public void setEditVersion(Integer editVersion) {
+        this.editVersion = editVersion;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

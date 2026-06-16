@@ -52,10 +52,7 @@ time unless you change ports; both expose the same local service ports.
 Open a second terminal:
 
 ```bash
-cd backend
-CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
-JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
+bash scripts/start-backend-local.sh
 ```
 
 Backend URLs:
@@ -66,6 +63,14 @@ Backend URLs:
 
 Flyway runs automatically on first startup and seeds the initial local schema
 and default user.
+
+The helper script uses `canvas-boot` directly and prints Flyway validation
+guidance if your local `canvas_db` has checksum drift from older migrations.
+If you want a clean disposable schema for local startup, use:
+
+```bash
+bash scripts/start-backend-local.sh --fresh-db
+```
 
 If Flyway reports duplicate migrations, clean stale build output:
 

@@ -23,10 +23,14 @@ docker compose -f docker-compose.local.yml up -d
 Start the backend:
 
 ```bash
-cd backend
-CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
-JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
+bash scripts/start-backend-local.sh
+```
+
+If your local `canvas_db` has Flyway checksum drift from older migrations, use
+the disposable-schema path instead:
+
+```bash
+bash scripts/start-backend-local.sh --fresh-db
 ```
 
 Start the frontend:

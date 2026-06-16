@@ -7,7 +7,11 @@ import java.util.Map;
 
 import org.chovy.canvas.canvas.application.CanvasCompatibilityApplicationService;
 import org.chovy.canvas.canvas.application.CanvasPublishApplicationService;
+import org.chovy.canvas.canvas.application.CanvasQueryApplicationService;
 import org.chovy.canvas.canvas.application.CanvasVersionApplicationService;
+import org.chovy.canvas.canvas.domain.CanvasListItem;
+import org.chovy.canvas.canvas.domain.CanvasListQuery;
+import org.chovy.canvas.canvas.domain.CanvasPage;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -292,6 +296,36 @@ class CanvasControllerCompatibilityTest {
     }
 
     @Test
+    void listUsesPersistentCanvasQueryWhenAvailable() {
+        RecordingCanvasQueryService queryService = new RecordingCanvasQueryService();
+        queryService.nextPage = CanvasPage.of(2, List.of(
+                new CanvasListItem(21L, 7L, "Persisted Journey", "from database", 0,
+                        null, null, null, "system", 1, null, null, null, null, null,
+                        "2026-06-16T10:00:00", "2026-06-16T10:00:00", null, null, 1,
+                        null, null, null, null, null, null, null, null, null, null)));
+
+        WebTestClient client = WebTestClient.bindToController(new CanvasController(
+                        new RecordingCanvasVersionService(),
+                        new RecordingCanvasPublishService(),
+                        new CanvasCompatibilityApplicationService(),
+                        queryService))
+                .build();
+
+        client.get()
+                .uri("/canvas/list?page=2&size=10&name=Persisted")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data.total").isEqualTo(2)
+                .jsonPath("$.data.list[0].id").isEqualTo(21)
+                .jsonPath("$.data.list[0].tenantId").isEqualTo(7)
+                .jsonPath("$.data.list[0].name").isEqualTo("Persisted Journey")
+                .jsonPath("$.data.list[0].status").isEqualTo(0);
+
+        assertThat(queryService.query).isEqualTo(new CanvasListQuery(2, 10, null, "Persisted", null, null, null, null));
+    }
+
+    @Test
     void governanceAndOperationsRoutesPreserveCompatibilityEnvelopes() {
         CanvasCompatibilityApplicationService compatibilityService = new CanvasCompatibilityApplicationService();
         WebTestClient client = webClient(
@@ -504,6 +538,21 @@ class CanvasControllerCompatibilityTest {
             }
             this.versionId = versionId;
             return nextVersion;
+        }
+    }
+
+    private static final class RecordingCanvasQueryService extends CanvasQueryApplicationService {
+        private CanvasListQuery query;
+        private CanvasPage<CanvasListItem> nextPage = CanvasPage.of(0, List.of());
+
+        private RecordingCanvasQueryService() {
+            super(null, null);
+        }
+
+        @Override
+        public CanvasPage<CanvasListItem> listCanvases(CanvasListQuery query) {
+            this.query = query;
+            return nextPage;
         }
     }
 

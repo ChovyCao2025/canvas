@@ -5,7 +5,9 @@ import java.util.Map;
 
 import org.chovy.canvas.canvas.application.CanvasCompatibilityApplicationService;
 import org.chovy.canvas.canvas.application.CanvasPublishApplicationService;
+import org.chovy.canvas.canvas.application.CanvasQueryApplicationService;
 import org.chovy.canvas.canvas.application.CanvasVersionApplicationService;
+import org.chovy.canvas.canvas.domain.CanvasListQuery;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -29,19 +31,28 @@ public class CanvasController {
     private final CanvasVersionApplicationService versionService;
     private final CanvasPublishApplicationService publishService;
     private final CanvasCompatibilityApplicationService compatibilityService;
+    private final CanvasQueryApplicationService queryService;
 
     public CanvasController(CanvasVersionApplicationService versionService,
                             CanvasPublishApplicationService publishService) {
-        this(versionService, publishService, new CanvasCompatibilityApplicationService());
+        this(versionService, publishService, new CanvasCompatibilityApplicationService(), null);
     }
 
     @Autowired
     public CanvasController(CanvasVersionApplicationService versionService,
                             CanvasPublishApplicationService publishService,
-                            CanvasCompatibilityApplicationService compatibilityService) {
+                            CanvasCompatibilityApplicationService compatibilityService,
+                            CanvasQueryApplicationService queryService) {
         this.versionService = versionService;
         this.publishService = publishService;
         this.compatibilityService = compatibilityService;
+        this.queryService = queryService;
+    }
+
+    public CanvasController(CanvasVersionApplicationService versionService,
+                            CanvasPublishApplicationService publishService,
+                            CanvasCompatibilityApplicationService compatibilityService) {
+        this(versionService, publishService, compatibilityService, null);
     }
 
     @PostMapping("/canvas")
@@ -69,9 +80,20 @@ public class CanvasController {
     }
 
     @GetMapping("/canvas/list")
-    public Mono<CompatibilityEnvelope<CanvasCompatibilityApplicationService.PageView<CanvasCompatibilityApplicationService.CanvasView>>> list(
-            @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
-        return envelope(() -> compatibilityService.list(tenantId(tenantId)));
+    public Mono<CompatibilityEnvelope<Object>> list(
+            @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String projectKey,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String folderKey) {
+        if (queryService != null) {
+            return envelope(() -> (Object) queryService.listCanvases(new CanvasListQuery(
+                    page, size, status, name, tenantId, projectKey, projectId, folderKey)));
+        }
+        return envelope(() -> (Object) compatibilityService.list(tenantId(tenantId)));
     }
 
     @GetMapping("/canvas/templates")

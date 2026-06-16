@@ -17,10 +17,7 @@ a custom engineering project.
 ```bash
 docker compose -f docker-compose.local.yml up -d
 
-cd backend
-CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
-JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-mvn -f canvas-boot/pom.xml -Dmaven.test.skip=true spring-boot:run
+bash scripts/start-backend-local.sh
 
 cd ../frontend
 npm install

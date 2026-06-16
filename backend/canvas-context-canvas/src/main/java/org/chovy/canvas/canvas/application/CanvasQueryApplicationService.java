@@ -3,6 +3,9 @@ package org.chovy.canvas.canvas.application;
 import org.chovy.canvas.canvas.api.PublishedCanvasDefinition;
 import org.chovy.canvas.canvas.api.PublishedCanvasDefinitionProvider;
 import org.chovy.canvas.canvas.domain.Canvas;
+import org.chovy.canvas.canvas.domain.CanvasListItem;
+import org.chovy.canvas.canvas.domain.CanvasListQuery;
+import org.chovy.canvas.canvas.domain.CanvasPage;
 import org.chovy.canvas.canvas.domain.CanvasRepository;
 import org.chovy.canvas.canvas.domain.CanvasStatus;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
@@ -40,6 +43,13 @@ public class CanvasQueryApplicationService implements PublishedCanvasDefinitionP
     public Canvas getCanvas(Long canvasId) {
         return canvasRepository.findById(canvasId)
                 .orElseThrow(() -> new IllegalArgumentException("画布不存在: " + canvasId));
+    }
+
+    /**
+     * 分页查询画布列表。
+     */
+    public CanvasPage<CanvasListItem> listCanvases(CanvasListQuery query) {
+        return canvasRepository.list(query);
     }
 
     /**

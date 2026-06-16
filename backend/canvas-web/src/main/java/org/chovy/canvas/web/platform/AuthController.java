@@ -28,22 +28,22 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public Mono<CompatibilityEnvelope<AuthFacade.LoginView>> login(
+    public Mono<CompatibilityEnvelope<LoginPayload>> login(
             @RequestBody(required = false) Map<String, Object> payload) {
-        return envelope(() -> facade.login(new AuthFacade.LoginCommand(text(payload, "username"),
-                text(payload, "password"))));
+        return envelope(() -> toPayload(facade.login(new AuthFacade.LoginCommand(text(payload, "username"),
+                text(payload, "password")))));
     }
 
     @PostMapping("/logout")
-    public Mono<CompatibilityEnvelope<AuthFacade.LogoutView>> logout(
+    public Mono<CompatibilityEnvelope<LogoutPayload>> logout(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
-        return envelope(() -> facade.logout(authorizationHeader));
+        return envelope(() -> toPayload(facade.logout(authorizationHeader)));
     }
 
     @GetMapping("/me")
-    public Mono<CompatibilityEnvelope<AuthFacade.LoginView>> me(
+    public Mono<CompatibilityEnvelope<LoginPayload>> me(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
-        return envelope(() -> facade.me(authorizationHeader));
+        return envelope(() -> toPayload(facade.me(authorizationHeader)));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -65,6 +65,15 @@ public class AuthController {
         return value == null ? null : String.valueOf(value);
     }
 
+    private static LoginPayload toPayload(AuthFacade.LoginView view) {
+        return new LoginPayload(view.token(), view.userId(), view.tenantId(), view.username(),
+                view.displayName(), view.role());
+    }
+
+    private static LogoutPayload toPayload(AuthFacade.LogoutView view) {
+        return new LogoutPayload(view.revoked(), view.tokenHash());
+    }
+
     private record CompatibilityEnvelope<T>(int code, String message, String errorCode, T data, String traceId) {
         private static <T> CompatibilityEnvelope<T> ok(T data) {
             return new CompatibilityEnvelope<>(0, "success", null, data, null);
@@ -73,5 +82,12 @@ public class AuthController {
         private static CompatibilityEnvelope<Object> badRequest(String message) {
             return new CompatibilityEnvelope<>(400, message, "API_001", null, null);
         }
+    }
+
+    private record LoginPayload(String token, Long userId, Long tenantId, String username,
+                                String displayName, String role) {
+    }
+
+    private record LogoutPayload(boolean revoked, String tokenHash) {
     }
 }
