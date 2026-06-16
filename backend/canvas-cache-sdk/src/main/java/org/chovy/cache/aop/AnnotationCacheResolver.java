@@ -18,11 +18,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>当缓存不存在或类型不匹配时，该类负责给出统一的错误边界。
  */
 public class AnnotationCacheResolver {
-    /** 缓存注册中心，用于查找或注册注解声明的缓存实例。 */
+    /**
+     * 缓存注册中心，用于查找或注册注解声明的缓存实例。
+     */
     private final TieredCacheManager manager;
-    /** 注解缓存值序列化与反序列化使用的 ObjectMapper。 */
+
+    /**
+     * 注解缓存值序列化与反序列化使用的 ObjectMapper。
+     */
     private final ObjectMapper objectMapper;
-    /** 按注解缓存名称缓存已解析的缓存实例。 */
+
+    /**
+     * 按注解缓存名称缓存已解析的缓存实例。
+     */
     private final Map<String, TieredCache<Object, Object>> caches = new ConcurrentHashMap<>();
 
     /**

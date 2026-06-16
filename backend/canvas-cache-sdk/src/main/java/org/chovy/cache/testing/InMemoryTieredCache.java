@@ -20,15 +20,29 @@ import java.util.function.Supplier;
  * <p>该组件只服务测试场景，不应承载生产缓存策略。
  */
 public class InMemoryTieredCache<K, V> implements TieredCache<K, V> {
-    /** 测试缓存实例名称。 */
+    /**
+     * 测试缓存实例名称。
+     */
     private final String name;
-    /** 测试未命中时使用的数据加载函数。 */
+
+    /**
+     * 测试未命中时使用的数据加载函数。
+     */
     private final Function<K, V> loader;
-    /** 内存缓存数据存储。 */
+
+    /**
+     * 内存缓存数据存储。
+     */
     private final ConcurrentHashMap<K, Optional<V>> store = new ConcurrentHashMap<>();
-    /** 内存缓存命中次数。 */
+
+    /**
+     * 内存缓存命中次数。
+     */
     private final LongAdder hits = new LongAdder();
-    /** 内存缓存未命中次数。 */
+
+    /**
+     * 内存缓存未命中次数。
+     */
     private final LongAdder misses = new LongAdder();
 
     /**

@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,113 +52,258 @@ import java.util.concurrent.atomic.LongAdder;
  */
 @Slf4j
 public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
-    /** 表示已缓存空值的 Redis 字符串哨兵。 */
+    /**
+     * 表示已缓存空值的 Redis 字符串哨兵。
+     */
     static final String NULL_SENTINEL = "__NULL__";
 
-    /** 延迟双删使用独立守护线程，避免阻塞写入调用线程。 */
+    /**
+ * 延迟双删使用独立守护线程，避免阻塞写入调用线程。
+ */
     private static final ScheduledExecutorService DELAYED_INVALIDATION_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "tiered-cache-delayed-invalidation");
         thread.setDaemon(true);
         return thread;
     });
 
-    /** 缓存实例名称。 */
+    /**
+ * 缓存实例名称。
+ */
     @Getter private final String name;
-    /** 一级本地缓存最大条目数。 */
+    /**
+     * 一级本地缓存最大条目数。
+     */
     private final int l1MaxSize;
-    /** 二级 Redis 缓存键前缀。 */
+
+    /**
+     * 二级 Redis 缓存键前缀。
+     */
     private final String l2KeyPrefix;
-    /** 二级 Redis 缓存默认过期时间。 */
+
+    /**
+     * 二级 Redis 缓存默认过期时间。
+     */
     private final Duration l2Ttl;
-    /** 二级缓存过期时间抖动比例。 */
+
+    /**
+     * 二级缓存过期时间抖动比例。
+     */
     private final double l2TtlJitter;
-    /** 缓存键结构版本号。 */
+
+    /**
+     * 缓存键结构版本号。
+     */
     private final int keySchemaVersion;
-    /** 空对象占位值过期时间。 */
+
+    /**
+     * 空对象占位值过期时间。
+     */
     private final Duration nullValueTtl;
-    /** 空集合或空结果占位值过期时间。 */
+
+    /**
+     * 空集合或空结果占位值过期时间。
+     */
     private final Duration emptyValueTtl;
-    /** 分布式加载锁过期时间。 */
+
+    /**
+     * 分布式加载锁过期时间。
+     */
     private final Duration lockTtl;
-    /** 缓存过期前提前刷新窗口。 */
+
+    /**
+     * 缓存过期前提前刷新窗口。
+     */
     private final Duration refreshAhead;
-    /** 旧值兜底可用时间。 */
+
+    /**
+     * 旧值兜底可用时间。
+     */
     private final Duration staleTtl;
-    /** 是否启用热点 key 保护。 */
+
+    /**
+     * 是否启用热点 key 保护。
+     */
     private final boolean hotspotProtection;
-    /** 缓存穿透保护策略。 */
+
+    /**
+     * 缓存穿透保护策略。
+     */
     private final PenetrationProtectionStrategy penetration;
-    /** 缓存击穿保护策略。 */
+
+    /**
+     * 缓存击穿保护策略。
+     */
     private final BreakdownProtectionStrategy breakdown;
-    /** 缓存雪崩保护策略。 */
+
+    /**
+     * 缓存雪崩保护策略。
+     */
     private final AvalancheProtectionStrategy avalanche;
-    /** 缓存 key 合法性校验器。 */
+
+    /**
+     * 缓存 key 合法性校验器。
+     */
     private final Predicate<K> keyValidator;
-    /** 用于拦截不存在 key 的布隆过滤器。 */
+
+    /**
+     * 用于拦截不存在 key 的布隆过滤器。
+     */
     private final CacheBloomFilter<K> bloomFilter;
-    /** 数据加载器失败时的处理策略。 */
+
+    /**
+     * 数据加载器失败时的处理策略。
+     */
     private final LoaderFailureStrategy loaderFailure;
-    /** Redis 读取失败时的处理策略。 */
+
+    /**
+     * Redis 读取失败时的处理策略。
+     */
     private final RedisFailureStrategy redisReadFailure;
-    /** Redis 写入失败时的处理策略。 */
+
+    /**
+     * Redis 写入失败时的处理策略。
+     */
     private final RedisFailureStrategy redisWriteFailure;
-    /** Redis 值反序列化失败时的处理策略。 */
+
+    /**
+     * Redis 值反序列化失败时的处理策略。
+     */
     private final DeserializeFailureStrategy deserializeFailure;
-    /** L3 数据加载函数。 */
+
+    /**
+     * L3 数据加载函数。
+     */
     private final Function<K, V> loader;
-    /** 缓存值的 Jackson JavaType。 */
+
+    /**
+     * 缓存值的 Jackson JavaType。
+     */
     private final JavaType valueJavaType;
-    /** 缓存值序列化与反序列化使用的 ObjectMapper。 */
+
+    /**
+     * 缓存值序列化与反序列化使用的 ObjectMapper。
+     */
     private final ObjectMapper objectMapper;
-    /** 同步 Redis 操作模板。 */
+
+    /**
+     * 同步 Redis 操作模板。
+     */
     private final StringRedisTemplate redis;
-    /** 响应式 Redis 操作模板。 */
+
+    /**
+     * 响应式 Redis 操作模板。
+     */
     @SuppressWarnings("unused")
     private final ReactiveStringRedisTemplate reactiveRedis;
-    /** 跨节点本地缓存失效事件发布器。 */
+
+    /**
+     * 跨节点本地缓存失效事件发布器。
+     */
     private final CacheInvalidationPublisher invalidationPublisher;
-    /** 一级 Caffeine 本地缓存。 */
+
+    /**
+     * 一级 Caffeine 本地缓存。
+     */
     final LoadingCache<K, Optional<V>> l1;
-    /** 响应式缓存访问视图。 */
+
+    /**
+     * 响应式缓存访问视图。
+     */
     private final ReactiveTieredCache<K, V> reactiveView;
-    /** 正在执行的本地单飞加载任务。 */
+
+    /**
+     * 正在执行的本地单飞加载任务。
+     */
     private final Map<K, CompletableFuture<Optional<V>>> inFlightLoads = new ConcurrentHashMap<>();
-    /** 本地缓存 key 对应的写入版本号。 */
+
+    /**
+     * 本地缓存 key 对应的写入版本号。
+     */
     private final Map<K, Long> l1Versions = new ConcurrentHashMap<>();
-    /** 可在异常或提前刷新场景中兜底的旧值。 */
+
+    /**
+     * 可在异常或提前刷新场景中兜底的旧值。
+     */
     private final Map<K, StaleValue<V>> staleValues = new ConcurrentHashMap<>();
-    /** 本地记录的一级缓存命中次数。 */
+
+    /**
+     * 本地记录的一级缓存命中次数。
+     */
     private final LongAdder localL1Hits = new LongAdder();
-    /** 本地记录的一级缓存未命中次数。 */
+
+    /**
+     * 本地记录的一级缓存未命中次数。
+     */
     private final LongAdder localL1Misses = new LongAdder();
-    /** 本地记录的二级缓存命中次数。 */
+
+    /**
+     * 本地记录的二级缓存命中次数。
+     */
     private final LongAdder localL2Hits = new LongAdder();
-    /** 本地记录的二级缓存未命中次数。 */
+
+    /**
+     * 本地记录的二级缓存未命中次数。
+     */
     private final LongAdder localL2Misses = new LongAdder();
-    /** 本地记录的三级加载次数。 */
+
+    /**
+     * 本地记录的三级加载次数。
+     */
     private final LongAdder localL3Loads = new LongAdder();
-    /** 本地记录的穿透保护拒绝次数。 */
+
+    /**
+     * 本地记录的穿透保护拒绝次数。
+     */
     private final LongAdder localPenetrationRejects = new LongAdder();
-    /** 本地记录的数据加载失败次数。 */
+
+    /**
+     * 本地记录的数据加载失败次数。
+     */
     private final LongAdder localLoaderFailures = new LongAdder();
 
-    /** Micrometer 一级缓存命中计数器。 */
+    /**
+ * Micrometer 一级缓存命中计数器。
+ */
     private Counter l1Hits;
-    /** Micrometer 二级缓存命中计数器。 */
+
+    /**
+     * Micrometer 二级缓存命中计数器。
+     */
     private Counter l2Hits;
-    /** Micrometer 三级加载命中计数器。 */
+
+    /**
+     * Micrometer 三级加载命中计数器。
+     */
     private Counter l3Hits;
-    /** Micrometer 一级缓存未命中计数器。 */
+
+    /**
+     * Micrometer 一级缓存未命中计数器。
+     */
     private Counter l1Misses;
-    /** Micrometer 二级缓存未命中计数器。 */
+
+    /**
+     * Micrometer 二级缓存未命中计数器。
+     */
     private Counter l2Misses;
-    /** Micrometer 数据加载耗时计时器。 */
+
+    /**
+     * Micrometer 数据加载耗时计时器。
+     */
     private Timer loadTimer;
-    /** Micrometer 穿透保护命中计数器。 */
+
+    /**
+     * Micrometer 穿透保护命中计数器。
+     */
     private Counter penetrationHits;
-    /** Micrometer 热点保护等待计数器。 */
+
+    /**
+     * Micrometer 热点保护等待计数器。
+     */
     private Counter hotspotWaits;
-    /** Micrometer 数据加载失败计数器。 */
+
+    /**
+     * Micrometer 数据加载失败计数器。
+     */
     private Counter loaderFailures;
 
     /**
@@ -744,13 +890,87 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * L2Lookup record.
-     * @param found 是否在二级缓存中读取到原始值.
-     * @param value 二级缓存反序列化后的业务值.
+     * L2 查询结果值对象。
+     *
+     * <p>found 表示 Redis 是否返回过原始值，value 表示反序列化后的业务值，二者用于区分 L2 未命中与空值命中。
      */
-    private record L2Lookup<T>(
-        boolean found,
-        Optional<T> value) {}
+    private static final class L2Lookup<T> {
+        /**
+         * 是否在二级缓存中读取到原始值。
+         */
+        private final boolean found;
+
+        /**
+         * 二级缓存反序列化后的业务值。
+         */
+        private final Optional<T> value;
+
+        /**
+         * 创建 L2 查询结果。
+         *
+         * @param found 是否在二级缓存中读取到原始值
+         * @param value 二级缓存反序列化后的业务值
+         */
+        private L2Lookup(boolean found, Optional<T> value) {
+            this.found = found;
+            this.value = value;
+        }
+
+        /**
+         * 返回是否在二级缓存中读取到原始值。
+         *
+         * @return true 表示 L2 有原始值
+         */
+        private boolean found() {
+            return found;
+        }
+
+        /**
+         * 返回二级缓存反序列化后的业务值。
+         *
+         * @return L2 业务值，可为空值占位
+         */
+        private Optional<T> value() {
+            return value;
+        }
+
+        /**
+         * 按 L2 命中标记和业务值比较查询结果。
+         *
+         * @param o 待比较对象
+         * @return 两个字段都相等时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof L2Lookup<?> l2Lookup)) {
+                return false;
+            }
+            return found == l2Lookup.found && Objects.equals(value, l2Lookup.value);
+        }
+
+        /**
+         * 生成与 L2 查询结果字段匹配的哈希值。
+         *
+         * @return 查询结果哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(found, value);
+        }
+
+        /**
+         * 返回与 record 语义一致的 L2 查询结果字符串。
+         *
+         * @return 查询结果字符串
+         */
+        @Override
+        public String toString() {
+            return "L2Lookup[found=" + found + ", value=" + value + ']';
+        }
+    }
 
     /**
      * 调用 L3 加载器并写回 L2。
@@ -1531,19 +1751,95 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     /**
-     * StaleValue record.
-     * @param value 可用于异常兜底或提前刷新的旧值.
-     * @param createdAt 旧值写入本地兜底区的时间.
+     * 本地旧值兜底值对象。
+     *
+     * <p>用于加载失败或提前刷新时临时保存最近一次成功加载的业务值及其写入时间。
      */
-    private record StaleValue<T>(
-        T value,
-        Instant createdAt) {}
+    private static final class StaleValue<T> {
+        /**
+         * 可用于异常兜底或提前刷新的旧值。
+         */
+        private final T value;
+
+        /**
+         * 旧值写入本地兜底区的时间。
+         */
+        private final Instant createdAt;
+
+        /**
+         * 创建旧值兜底对象。
+         *
+         * @param value 可用于异常兜底或提前刷新的旧值
+         * @param createdAt 旧值写入本地兜底区的时间
+         */
+        private StaleValue(T value, Instant createdAt) {
+            this.value = value;
+            this.createdAt = createdAt;
+        }
+
+        /**
+         * 返回可用于异常兜底或提前刷新的旧值。
+         *
+         * @return 旧值
+         */
+        private T value() {
+            return value;
+        }
+
+        /**
+         * 返回旧值写入本地兜底区的时间。
+         *
+         * @return 旧值写入时间
+         */
+        private Instant createdAt() {
+            return createdAt;
+        }
+
+        /**
+         * 按旧值和写入时间比较兜底对象。
+         *
+         * @param o 待比较对象
+         * @return 两个字段都相等时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof StaleValue<?> that)) {
+                return false;
+            }
+            return Objects.equals(value, that.value) && Objects.equals(createdAt, that.createdAt);
+        }
+
+        /**
+         * 生成与旧值兜底字段匹配的哈希值。
+         *
+         * @return 旧值兜底哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(value, createdAt);
+        }
+
+        /**
+         * 返回与 record 语义一致的旧值兜底字符串。
+         *
+         * @return 旧值兜底字符串
+         */
+        @Override
+        public String toString() {
+            return "StaleValue[value=" + value + ", createdAt=" + createdAt + ']';
+        }
+    }
 
     /**
      * ReactiveTieredCacheView 封装本模块的核心职责、输入输出结构和协作边界。
      */
     private static class ReactiveTieredCacheView<K, V> implements ReactiveTieredCache<K, V> {
-        /** 被包装为响应式接口的同步缓存实现。 */
+        /**
+         * 被包装为响应式接口的同步缓存实现。
+         */
         private final TieredCacheImpl<K, V> delegate;
 
         /**

@@ -26,21 +26,41 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 public class TieredCacheManager {
-    /** 同步 Redis 操作模板。 */
+    /**
+     * 同步 Redis 操作模板。
+     */
     @Getter private final StringRedisTemplate redis;
-    /** 响应式 Redis 操作模板。 */
+    /**
+     * 响应式 Redis 操作模板。
+     */
     @Getter private final ReactiveStringRedisTemplate reactiveRedis;
-    /** 缓存指标注册表。 */
+    /**
+     * 缓存指标注册表。
+     */
     @Getter private final MeterRegistry meterRegistry;
-    /** 响应式 Redis 连接工厂。 */
+    /**
+     * 响应式 Redis 连接工厂。
+     */
     private final ReactiveRedisConnectionFactory reactiveFactory;
-    /** 外部缓存失效事件发布器集合。 */
+
+    /**
+     * 外部缓存失效事件发布器集合。
+     */
     private final List<CacheInvalidationPublisher> externalInvalidationPublishers;
-    /** 按缓存名称索引的已注册缓存实例。 */
+
+    /**
+     * 按缓存名称索引的已注册缓存实例。
+     */
     private final Map<String, TieredCacheImpl<?, ?>> caches = new ConcurrentHashMap<>();
-    /** Redis 缓存失效消息监听容器。 */
+
+    /**
+     * Redis 缓存失效消息监听容器。
+     */
     private ReactiveRedisMessageListenerContainer listenerContainer;
-    /** 缓存失效消息订阅句柄。 */
+
+    /**
+     * 缓存失效消息订阅句柄。
+     */
     private Disposable invalidationSubscription;
 
     /**
