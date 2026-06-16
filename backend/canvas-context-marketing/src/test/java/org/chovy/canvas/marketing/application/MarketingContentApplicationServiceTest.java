@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.MarketingContentFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MarketingContentApplicationService的关键兼容行为。
+ */
 class MarketingContentApplicationServiceTest {
 
+    /**
+     * 验证 content state is tenant scoped deterministic and audited 场景的兼容行为。
+     */
     @Test
     void contentStateIsTenantScopedDeterministicAndAudited() {
         MarketingContentFacade service = new MarketingContentApplicationService();
@@ -70,6 +76,9 @@ class MarketingContentApplicationServiceTest {
                 .contains("publishRelease", "resolveRelease", "rollbackRelease");
     }
 
+    /**
+     * 验证 filters cleanup status and validation follow compatibility rules 场景的兼容行为。
+     */
     @Test
     void filtersCleanupStatusAndValidationFollowCompatibilityRules() {
         MarketingContentFacade service = new MarketingContentApplicationService();

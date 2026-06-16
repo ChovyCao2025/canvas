@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.MarketingFormFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MarketingFormApplicationService的关键兼容行为。
+ */
 class MarketingFormApplicationServiceTest {
 
+    /**
+     * 验证 forms are tenant scoped and seeded deterministically for compatibility 场景的兼容行为。
+     */
     @Test
     void formsAreTenantScopedAndSeededDeterministicallyForCompatibility() {
         MarketingFormFacade service = new MarketingFormApplicationService();
@@ -30,6 +36,9 @@ class MarketingFormApplicationServiceTest {
                 .hasMessageContaining("marketing form not found");
     }
 
+    /**
+     * 验证 create update and status follow legacy management behavior 场景的兼容行为。
+     */
     @Test
     void createUpdateAndStatusFollowLegacyManagementBehavior() {
         MarketingFormFacade service = new MarketingFormApplicationService();
@@ -68,6 +77,9 @@ class MarketingFormApplicationServiceTest {
                 .containsEntry("updatedBy", "status-admin");
     }
 
+    /**
+     * 验证 submissions support tenant form filtering and compatibility limits 场景的兼容行为。
+     */
     @Test
     void submissionsSupportTenantFormFilteringAndCompatibilityLimits() {
         MarketingFormFacade service = new MarketingFormApplicationService();
@@ -85,6 +97,9 @@ class MarketingFormApplicationServiceTest {
         assertThat(service.submissions(7L, null, 500)).hasSize(3);
     }
 
+    /**
+     * 验证 defaults and validation match compatibility rules 场景的兼容行为。
+     */
     @Test
     void defaultsAndValidationMatchCompatibilityRules() {
         MarketingFormFacade service = new MarketingFormApplicationService();

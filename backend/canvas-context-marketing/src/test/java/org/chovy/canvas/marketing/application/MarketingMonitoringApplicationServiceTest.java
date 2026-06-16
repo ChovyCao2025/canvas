@@ -12,12 +12,18 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.MarketingMonitoringFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MarketingMonitoringApplicationService的关键兼容行为。
+ */
 class MarketingMonitoringApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T01:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 sources items alerts and dispatches are tenant scoped and stateful 场景的兼容行为。
+     */
     @Test
     void sourcesItemsAlertsAndDispatchesAreTenantScopedAndStateful() {
         MarketingMonitoringFacade service = new MarketingMonitoringApplicationService(CLOCK);
@@ -49,6 +55,9 @@ class MarketingMonitoringApplicationServiceTest {
         assertThat(otherTenantItems).isEmpty();
     }
 
+    /**
+     * 验证 provider credentials oauth anomalies and webhook return deterministic views 场景的兼容行为。
+     */
     @Test
     void providerCredentialsOauthAnomaliesAndWebhookReturnDeterministicViews() {
         MarketingMonitoringFacade service = new MarketingMonitoringApplicationService(CLOCK);
@@ -84,6 +93,9 @@ class MarketingMonitoringApplicationServiceTest {
         assertThat(service.list(7L, "anomalies", Map.of("ruleId", rule.get("id")), 100)).hasSize(1);
     }
 
+    /**
+     * 验证 clamps list limits defaults tenant and rejects unknown operation 场景的兼容行为。
+     */
     @Test
     void clampsListLimitsDefaultsTenantAndRejectsUnknownOperation() {
         MarketingMonitoringFacade service = new MarketingMonitoringApplicationService(CLOCK);

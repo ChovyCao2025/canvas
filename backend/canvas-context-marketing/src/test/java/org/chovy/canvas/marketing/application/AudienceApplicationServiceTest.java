@@ -12,12 +12,18 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.AudienceFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证AudienceApplicationService的关键兼容行为。
+ */
 class AudienceApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T03:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 audiences are tenant scoped and support preview ready compute and stats 场景的兼容行为。
+     */
     @Test
     void audiencesAreTenantScopedAndSupportPreviewReadyComputeAndStats() {
         AudienceFacade service = new AudienceApplicationService(CLOCK);
@@ -59,6 +65,9 @@ class AudienceApplicationServiceTest {
         assertThat(service.get(8L, 1L)).isEmpty();
     }
 
+    /**
+     * 验证 update delete defaults and validation follow compatibility rules 场景的兼容行为。
+     */
     @Test
     void updateDeleteDefaultsAndValidationFollowCompatibilityRules() {
         AudienceFacade service = new AudienceApplicationService(CLOCK);

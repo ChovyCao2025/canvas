@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.TagImportFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证TagImportApplicationService的关键兼容行为。
+ */
 class TagImportApplicationServiceTest {
 
+    /**
+     * 验证 api push creates tenant scoped batch and counts row validation results 场景的兼容行为。
+     */
     @Test
     void apiPushCreatesTenantScopedBatchAndCountsRowValidationResults() {
         TagImportFacade service = new TagImportApplicationService();
@@ -41,6 +47,9 @@ class TagImportApplicationServiceTest {
         assertThat(service.listBatches(7L)).hasSize(2);
     }
 
+    /**
+     * 验证 excel import and template keep legacy result and download contracts 场景的兼容行为。
+     */
     @Test
     void excelImportAndTemplateKeepLegacyResultAndDownloadContracts() {
         TagImportFacade service = new TagImportApplicationService();
@@ -62,6 +71,9 @@ class TagImportApplicationServiceTest {
                 .containsExactly(7003L, 7002L, 7001L);
     }
 
+    /**
+     * 验证 batch errors are sorted by row no then id and tenant scoped 场景的兼容行为。
+     */
     @Test
     void batchErrorsAreSortedByRowNoThenIdAndTenantScoped() {
         TagImportFacade service = new TagImportApplicationService();
@@ -80,6 +92,9 @@ class TagImportApplicationServiceTest {
         assertThat(service.listErrors(42L, 1L)).isEmpty();
     }
 
+    /**
+     * 执行row业务操作。
+     */
     private static Map<String, Object> row(String idType, String idValue, String tagCode, String tagValue) {
         return Map.of("idType", idType, "idValue", idValue, "tagCode", tagCode, "tagValue", tagValue);
     }

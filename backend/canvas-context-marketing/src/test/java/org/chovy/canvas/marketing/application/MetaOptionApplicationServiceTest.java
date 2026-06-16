@@ -8,8 +8,14 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.MetaOptionFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MetaOptionApplicationService的关键兼容行为。
+ */
 class MetaOptionApplicationServiceTest {
 
+    /**
+     * 验证 exposes legacy meta dropdown data as tenant scoped options 场景的兼容行为。
+     */
     @Test
     void exposesLegacyMetaDropdownDataAsTenantScopedOptions() {
         MetaOptionFacade service = new MetaOptionApplicationService();
@@ -38,6 +44,9 @@ class MetaOptionApplicationServiceTest {
                 .containsExactly("send-coupon", "query-profile");
     }
 
+    /**
+     * 验证 handles unknown categories and unknown experiments without breaking config panels 场景的兼容行为。
+     */
     @Test
     void handlesUnknownCategoriesAndUnknownExperimentsWithoutBreakingConfigPanels() {
         MetaOptionFacade service = new MetaOptionApplicationService();

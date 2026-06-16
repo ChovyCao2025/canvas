@@ -12,12 +12,18 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.GrowthActivityFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证GrowthActivityApplicationService的关键兼容行为。
+ */
 class GrowthActivityApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T02:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 activity resources are tenant scoped stateful and deterministic 场景的兼容行为。
+     */
     @Test
     void activityResourcesAreTenantScopedStatefulAndDeterministic() {
         GrowthActivityFacade service = new GrowthActivityApplicationService(CLOCK);
@@ -59,6 +65,9 @@ class GrowthActivityApplicationServiceTest {
         assertThat(service.list(8L, 1L, "rewardPools", Map.of(), 100)).isEmpty();
     }
 
+    /**
+     * 验证 major state transitions update existing rows by target id 场景的兼容行为。
+     */
     @Test
     void majorStateTransitionsUpdateExistingRowsByTargetId() {
         GrowthActivityFacade service = new GrowthActivityApplicationService(CLOCK);
@@ -94,6 +103,9 @@ class GrowthActivityApplicationServiceTest {
                 .containsEntry("status", "RESET");
     }
 
+    /**
+     * 验证 readiness report limits defaults and validation follow compatibility rules 场景的兼容行为。
+     */
     @Test
     void readinessReportLimitsDefaultsAndValidationFollowCompatibilityRules() {
         GrowthActivityFacade service = new GrowthActivityApplicationService(CLOCK);

@@ -15,17 +15,38 @@ import org.chovy.canvas.marketing.api.MarketingPolicyFacade.PolicyState;
 import org.chovy.canvas.marketing.api.MarketingPolicyFacade.SuppressionCommand;
 import org.chovy.canvas.marketing.api.MarketingPolicyFacade.SuppressionView;
 
+/**
+ * 维护MarketingPolicy相关的内存业务目录。
+ */
 public class MarketingPolicyCatalog {
 
+    /**
+     * 保存ALL_CHANNELS字段值。
+     */
     private static final String ALL_CHANNELS = "ALL";
 
     private final Map<PolicyChannelKey, ConsentView> consents = new LinkedHashMap<>();
     private final Map<SuppressionKey, SuppressionView> suppressions = new LinkedHashMap<>();
     private final Map<PolicyChannelKey, ChannelView> channels = new LinkedHashMap<>();
+
+    /**
+     * 保存consentIds字段值。
+     */
     private long consentIds;
+
+    /**
+     * 保存suppressionIds字段值。
+     */
     private long suppressionIds;
+
+    /**
+     * 保存channelIds字段值。
+     */
     private long channelIds;
 
+    /**
+     * 执行policyState业务操作。
+     */
     public synchronized PolicyState policyState(Long tenantId, String userId, String channel) {
         Long scopedTenantId = normalizeTenant(tenantId);
         String scopedUserId = required(userId, "userId");
@@ -41,6 +62,9 @@ public class MarketingPolicyCatalog {
         return new PolicyState(scopedUserId, scopedChannel, consent, matchingSuppressions, customerChannel);
     }
 
+    /**
+     * 执行upsertConsent业务操作。
+     */
     public synchronized ConsentView upsertConsent(Long tenantId, ConsentCommand command) {
         if (command == null) {
             throw new IllegalArgumentException("consent request is required");
@@ -57,6 +81,9 @@ public class MarketingPolicyCatalog {
         return view;
     }
 
+    /**
+     * 执行upsertSuppression业务操作。
+     */
     public synchronized SuppressionView upsertSuppression(Long tenantId, SuppressionCommand command) {
         if (command == null) {
             throw new IllegalArgumentException("suppression request is required");
@@ -74,6 +101,9 @@ public class MarketingPolicyCatalog {
         return view;
     }
 
+    /**
+     * 执行upsertChannel业务操作。
+     */
     public synchronized ChannelView upsertChannel(Long tenantId, ChannelCommand command) {
         if (command == null) {
             throw new IllegalArgumentException("channel request is required");
@@ -90,18 +120,30 @@ public class MarketingPolicyCatalog {
         return view;
     }
 
+    /**
+     * 规范化tenant输入值。
+     */
     private static Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 规范化channelOrAll输入值。
+     */
     private static String normalizeChannelOrAll(String value) {
         return value == null || value.isBlank() ? ALL_CHANNELS : normalizeRequired(value, "channel");
     }
 
+    /**
+     * 规范化required输入值。
+     */
     private static String normalizeRequired(String value, String field) {
         return required(value, field).toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 校验并返回d必填值。
+     */
     private static String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -109,13 +151,192 @@ public class MarketingPolicyCatalog {
         return value.trim();
     }
 
+    /**
+     * 执行optional业务操作。
+     */
     private static String optional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private record PolicyChannelKey(Long tenantId, String userId, String channel) {
+    /**
+     * 表示PolicyChannelKey使用的稳定匹配键。
+     */
+    private static final class PolicyChannelKey {
+
+        /**
+         * 所属租户标识。
+         */
+        private final Long tenantId;
+
+        /**
+         * 用户标识。
+         */
+        private final String userId;
+
+        /**
+         * 渠道标识。
+         */
+        private final String channel;
+
+        /**
+         * 创建PolicyChannelKey实例。
+         */
+        public PolicyChannelKey(Long tenantId, String userId, String channel) {
+            this.tenantId = tenantId;
+            this.userId = userId;
+            this.channel = channel;
+        }
+
+        /**
+         * 返回所属租户标识。
+         */
+        public Long tenantId() {
+            return tenantId;
+        }
+
+        /**
+         * 返回用户标识。
+         */
+        public String userId() {
+            return userId;
+        }
+
+        /**
+         * 返回渠道标识。
+         */
+        public String channel() {
+            return channel;
+        }
+
+        /**
+         * 比较两个实例的组件值是否一致。
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            PolicyChannelKey that = (PolicyChannelKey) o;
+            return                     Objects.equals(tenantId, that.tenantId) &&
+                    Objects.equals(userId, that.userId) &&
+                    Objects.equals(channel, that.channel);
+        }
+
+        /**
+         * 根据组件值计算哈希值。
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(tenantId, userId, channel);
+        }
+
+        /**
+         * 返回与记录类型一致的组件展示文本。
+         */
+        @Override
+        public String toString() {
+            return "PolicyChannelKey[tenantId=" + tenantId + ", userId=" + userId + ", channel=" + channel + "]";
+        }
     }
 
-    private record SuppressionKey(Long tenantId, String userId, String channel, String reason) {
+    /**
+     * 表示SuppressionKey使用的稳定匹配键。
+     */
+    private static final class SuppressionKey {
+
+        /**
+         * 所属租户标识。
+         */
+        private final Long tenantId;
+
+        /**
+         * 用户标识。
+         */
+        private final String userId;
+
+        /**
+         * 渠道标识。
+         */
+        private final String channel;
+
+        /**
+         * 问题原因。
+         */
+        private final String reason;
+
+        /**
+         * 创建SuppressionKey实例。
+         */
+        public SuppressionKey(Long tenantId, String userId, String channel, String reason) {
+            this.tenantId = tenantId;
+            this.userId = userId;
+            this.channel = channel;
+            this.reason = reason;
+        }
+
+        /**
+         * 返回所属租户标识。
+         */
+        public Long tenantId() {
+            return tenantId;
+        }
+
+        /**
+         * 返回用户标识。
+         */
+        public String userId() {
+            return userId;
+        }
+
+        /**
+         * 返回渠道标识。
+         */
+        public String channel() {
+            return channel;
+        }
+
+        /**
+         * 返回问题原因。
+         */
+        public String reason() {
+            return reason;
+        }
+
+        /**
+         * 比较两个实例的组件值是否一致。
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            SuppressionKey that = (SuppressionKey) o;
+            return                     Objects.equals(tenantId, that.tenantId) &&
+                    Objects.equals(userId, that.userId) &&
+                    Objects.equals(channel, that.channel) &&
+                    Objects.equals(reason, that.reason);
+        }
+
+        /**
+         * 根据组件值计算哈希值。
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(tenantId, userId, channel, reason);
+        }
+
+        /**
+         * 返回与记录类型一致的组件展示文本。
+         */
+        @Override
+        public String toString() {
+            return "SuppressionKey[tenantId=" + tenantId + ", userId=" + userId + ", channel=" + channel + ", reason=" + reason + "]";
+        }
     }
 }

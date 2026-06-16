@@ -7,8 +7,14 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证CampaignDateRange的关键兼容行为。
+ */
 class CampaignDateRangeTest {
 
+    /**
+     * 验证 allows open ended ranges 场景的兼容行为。
+     */
     @Test
     void allowsOpenEndedRanges() {
         CampaignDateRange open = CampaignDateRange.of(null, null);
@@ -20,6 +26,9 @@ class CampaignDateRangeTest {
         assertThat(endOnly.endAt()).isEqualTo(LocalDateTime.parse("2026-06-30T23:59:00"));
     }
 
+    /**
+     * 验证 rejects end before start 场景的兼容行为。
+     */
     @Test
     void rejectsEndBeforeStart() {
         assertThatThrownBy(() -> CampaignDateRange.of(

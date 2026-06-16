@@ -9,16 +9,33 @@ import java.util.Objects;
 
 import org.chovy.canvas.marketing.api.MarketingPreferenceFacade;
 
+/**
+ * 维护MarketingPreference相关的内存业务目录。
+ */
 public class MarketingPreferenceCatalog {
 
+    /**
+     * 保存OPT_IN字段值。
+     */
     private static final String OPT_IN = "OPT_IN";
+
+    /**
+     * 保存OPT_OUT字段值。
+     */
     private static final String OPT_OUT = "OPT_OUT";
 
     private final List<ConsentState> consents = new ArrayList<>();
     private final List<ChannelState> channels = new ArrayList<>();
     private final List<SuppressionState> suppressions = new ArrayList<>();
+
+    /**
+     * 保存nextSuppressionId字段值。
+     */
     private long nextSuppressionId = 1L;
 
+    /**
+     * 执行report业务操作。
+     */
     public synchronized MarketingPreferenceFacade.PreferenceReport report(Long tenantId, String userId) {
         List<MarketingPreferenceFacade.ConsentRow> consentRows = consents.stream()
                 .filter(row -> row.matches(tenantId, userId))
@@ -45,6 +62,9 @@ public class MarketingPreferenceCatalog {
                 summary);
     }
 
+    /**
+     * 更新consent业务对象。
+     */
     public synchronized MarketingPreferenceFacade.ConsentRow updateConsent(
             Long tenantId,
             String userId,
@@ -64,6 +84,9 @@ public class MarketingPreferenceCatalog {
         return toConsentRow(row);
     }
 
+    /**
+     * 更新channel业务对象。
+     */
     public synchronized MarketingPreferenceFacade.ChannelRow updateChannel(
             Long tenantId,
             String userId,
@@ -85,6 +108,9 @@ public class MarketingPreferenceCatalog {
         return toChannelRow(row);
     }
 
+    /**
+     * 执行addSuppression业务操作。
+     */
     public synchronized MarketingPreferenceFacade.SuppressionRow addSuppression(
             Long tenantId,
             String userId,
@@ -103,6 +129,9 @@ public class MarketingPreferenceCatalog {
         return toSuppressionRow(row);
     }
 
+    /**
+     * 执行deactivateSuppression业务操作。
+     */
     public synchronized void deactivateSuppression(Long tenantId, Long suppressionId) {
         suppressions.stream()
                 .filter(row -> Objects.equals(row.tenantId, tenantId))
@@ -114,21 +143,33 @@ public class MarketingPreferenceCatalog {
                 });
     }
 
+    /**
+     * 转换为consentRow对象。
+     */
     private static MarketingPreferenceFacade.ConsentRow toConsentRow(ConsentState row) {
         return new MarketingPreferenceFacade.ConsentRow(row.channel, row.consentStatus, row.source, row.updatedAt);
     }
 
+    /**
+     * 转换为channelRow对象。
+     */
     private static MarketingPreferenceFacade.ChannelRow toChannelRow(ChannelState row) {
         boolean reachable = row.enabled && row.address != null && !row.address.isBlank();
         return new MarketingPreferenceFacade.ChannelRow(row.channel, row.address, row.enabled, row.verified,
                 reachable, row.metadata, row.updatedAt);
     }
 
+    /**
+     * 转换为suppressionRow对象。
+     */
     private static MarketingPreferenceFacade.SuppressionRow toSuppressionRow(SuppressionState row) {
         return new MarketingPreferenceFacade.SuppressionRow(row.id, row.channel, row.reason, row.active,
                 suppressionState(row), row.expiresAt, row.createdAt, row.updatedAt);
     }
 
+    /**
+     * 执行suppressionState业务操作。
+     */
     private static String suppressionState(SuppressionState row) {
         if (!row.active) {
             return "INACTIVE";
@@ -139,6 +180,9 @@ public class MarketingPreferenceCatalog {
         return "ACTIVE";
     }
 
+    /**
+     * 规范化consentStatus输入值。
+     */
     private static String normalizeConsentStatus(String status) {
         String normalized = defaultString(status, OPT_OUT).toUpperCase(Locale.ROOT);
         if ("OPTIN".equals(normalized)) {
@@ -153,73 +197,198 @@ public class MarketingPreferenceCatalog {
         throw new IllegalArgumentException("Unsupported consent status: " + status);
     }
 
+    /**
+     * 规范化输入值。
+     */
     private static String normalize(String channel) {
         return defaultString(channel, "ALL").toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 执行defaultString业务操作。
+     */
     private static String defaultString(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    /**
+     * 提供ConsentState的业务能力。
+     */
     private static final class ConsentState {
+        /**
+         * 保存tenantId字段值。
+         */
         private final Long tenantId;
+
+        /**
+         * 保存userId字段值。
+         */
         private final String userId;
+
+        /**
+         * 保存channel字段值。
+         */
         private final String channel;
+
+        /**
+         * 保存consentStatus字段值。
+         */
         private String consentStatus;
+
+        /**
+         * 保存source字段值。
+         */
         private String source;
+
+        /**
+         * 保存updatedAt字段值。
+         */
         private LocalDateTime updatedAt;
 
+        /**
+         * 创建ConsentState实例。
+         */
         private ConsentState(Long tenantId, String userId, String channel) {
             this.tenantId = tenantId;
             this.userId = userId;
             this.channel = channel;
         }
 
+        /**
+         * 执行matches业务操作。
+         */
         private boolean matches(Long tenantId, String userId) {
             return Objects.equals(this.tenantId, tenantId) && Objects.equals(this.userId, userId);
         }
 
+        /**
+         * 执行matches业务操作。
+         */
         private boolean matches(Long tenantId, String userId, String channel) {
             return matches(tenantId, userId) && Objects.equals(this.channel, channel);
         }
     }
 
+    /**
+     * 提供ChannelState的业务能力。
+     */
     private static final class ChannelState {
+        /**
+         * 保存tenantId字段值。
+         */
         private final Long tenantId;
+
+        /**
+         * 保存userId字段值。
+         */
         private final String userId;
+
+        /**
+         * 保存channel字段值。
+         */
         private final String channel;
+
+        /**
+         * 保存address字段值。
+         */
         private String address;
+
+        /**
+         * 保存enabled字段值。
+         */
         private boolean enabled;
+
+        /**
+         * 保存verified字段值。
+         */
         private boolean verified;
+
+        /**
+         * 保存metadata字段值。
+         */
         private String metadata;
+
+        /**
+         * 保存updatedAt字段值。
+         */
         private LocalDateTime updatedAt;
 
+        /**
+         * 创建ChannelState实例。
+         */
         private ChannelState(Long tenantId, String userId, String channel) {
             this.tenantId = tenantId;
             this.userId = userId;
             this.channel = channel;
         }
 
+        /**
+         * 执行matches业务操作。
+         */
         private boolean matches(Long tenantId, String userId) {
             return Objects.equals(this.tenantId, tenantId) && Objects.equals(this.userId, userId);
         }
 
+        /**
+         * 执行matches业务操作。
+         */
         private boolean matches(Long tenantId, String userId, String channel) {
             return matches(tenantId, userId) && Objects.equals(this.channel, channel);
         }
     }
 
+    /**
+     * 提供SuppressionState的业务能力。
+     */
     private static final class SuppressionState {
+        /**
+         * 保存id字段值。
+         */
         private final Long id;
+
+        /**
+         * 保存tenantId字段值。
+         */
         private final Long tenantId;
+
+        /**
+         * 保存userId字段值。
+         */
         private final String userId;
+
+        /**
+         * 保存channel字段值。
+         */
         private final String channel;
+
+        /**
+         * 保存reason字段值。
+         */
         private final String reason;
+
+        /**
+         * 保存active字段值。
+         */
         private boolean active;
+
+        /**
+         * 保存expiresAt字段值。
+         */
         private final LocalDateTime expiresAt;
+
+        /**
+         * 保存createdAt字段值。
+         */
         private final LocalDateTime createdAt;
+
+        /**
+         * 保存updatedAt字段值。
+         */
         private LocalDateTime updatedAt;
 
+        /**
+         * 创建SuppressionState实例。
+         */
         private SuppressionState(
                 Long id,
                 Long tenantId,
@@ -241,6 +410,9 @@ public class MarketingPreferenceCatalog {
             this.updatedAt = updatedAt;
         }
 
+        /**
+         * 执行matches业务操作。
+         */
         private boolean matches(Long tenantId, String userId) {
             return Objects.equals(this.tenantId, tenantId) && Objects.equals(this.userId, userId);
         }

@@ -12,6 +12,9 @@ import java.util.regex.Pattern;
 
 import org.chovy.canvas.marketing.api.MessageTemplateFacade;
 
+/**
+ * 维护MessageTemplate相关的内存业务目录。
+ */
 public class MessageTemplateCatalog {
 
     private static final Set<String> SUPPORTED_CHANNELS = Set.of("SMS", "EMAIL", "PUSH", "WECHAT", "IN_APP",
@@ -20,6 +23,9 @@ public class MessageTemplateCatalog {
 
     private final Map<Long, Map<String, MessageTemplateFacade.TemplateView>> tenants = new LinkedHashMap<>();
 
+    /**
+     * 创建业务对象。
+     */
     public MessageTemplateFacade.TemplateView create(Long tenantId, String actor,
                                                      MessageTemplateFacade.TemplateDraft draft) {
         Objects.requireNonNull(draft, "template draft is required");
@@ -41,6 +47,9 @@ public class MessageTemplateCatalog {
         return template;
     }
 
+    /**
+     * 执行search业务操作。
+     */
     public List<MessageTemplateFacade.TemplateView> search(Long tenantId, String keyword, String channel) {
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedChannel = normalizeOptionalChannel(channel);
@@ -53,6 +62,9 @@ public class MessageTemplateCatalog {
                 .toList();
     }
 
+    /**
+     * 执行preview业务操作。
+     */
     public MessageTemplateFacade.PreviewView preview(Long tenantId, String templateCode, Map<String, Object> context) {
         String normalizedCode = normalizeTemplateCode(templateCode);
         MessageTemplateFacade.TemplateView template = tenantTemplates(tenantId).get(normalizedCode);
@@ -77,10 +89,16 @@ public class MessageTemplateCatalog {
         return new MessageTemplateFacade.PreviewView(renderedBody.toString(), List.copyOf(missingVariables));
     }
 
+    /**
+     * 执行tenantTemplates业务操作。
+     */
     private Map<String, MessageTemplateFacade.TemplateView> tenantTemplates(Long tenantId) {
         return tenants.computeIfAbsent(tenantId, ignored -> new LinkedHashMap<>());
     }
 
+    /**
+     * 执行extractVariables业务操作。
+     */
     private static List<String> extractVariables(String body) {
         LinkedHashSet<String> variables = new LinkedHashSet<>();
         Matcher matcher = VARIABLE_PATTERN.matcher(body);
@@ -90,6 +108,9 @@ public class MessageTemplateCatalog {
         return List.copyOf(variables);
     }
 
+    /**
+     * 规范化templateCode输入值。
+     */
     private static String normalizeTemplateCode(String templateCode) {
         requireText(templateCode, "template code is required");
         String normalized = templateCode.trim().toLowerCase(Locale.ROOT);
@@ -99,6 +120,9 @@ public class MessageTemplateCatalog {
         return normalized;
     }
 
+    /**
+     * 规范化channel输入值。
+     */
     private static String normalizeChannel(String channel) {
         requireText(channel, "template channel is required");
         String normalized = channel.trim().toUpperCase(Locale.ROOT);
@@ -108,14 +132,23 @@ public class MessageTemplateCatalog {
         return normalized;
     }
 
+    /**
+     * 规范化optionalChannel输入值。
+     */
     private static String normalizeOptionalChannel(String channel) {
         return channel == null || channel.isBlank() ? null : normalizeChannel(channel);
     }
 
+    /**
+     * 规范化keyword输入值。
+     */
     private static String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
     }
 
+    /**
+     * 校验并返回text必填值。
+     */
     private static void requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(message);

@@ -26,12 +26,18 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证MarketingCampaignApplicationService的关键兼容行为。
+ */
 class MarketingCampaignApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-06T02:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 upsert campaign normalizes and inserts tenant scoped record 场景的兼容行为。
+     */
     @Test
     void upsertCampaignNormalizesAndInsertsTenantScopedRecord() {
         FakeRepository repository = new FakeRepository();
@@ -67,6 +73,9 @@ class MarketingCampaignApplicationServiceTest {
         assertThat(saved.updatedBy()).isEqualTo("operator-1");
     }
 
+    /**
+     * 验证 upsert campaign updates existing tenant key and defaults missing values 场景的兼容行为。
+     */
     @Test
     void upsertCampaignUpdatesExistingTenantKeyAndDefaultsMissingValues() {
         FakeRepository repository = new FakeRepository();
@@ -93,6 +102,9 @@ class MarketingCampaignApplicationServiceTest {
         assertThat(repository.campaignsById.get(10L).updatedBy()).isEqualTo("operator-2");
     }
 
+    /**
+     * 验证 rejects invalid dates unsupported status and invalid budget 场景的兼容行为。
+     */
     @Test
     void rejectsInvalidDatesUnsupportedStatusAndInvalidBudget() {
         FakeRepository repository = new FakeRepository();
@@ -144,6 +156,9 @@ class MarketingCampaignApplicationServiceTest {
                 .hasMessageContaining("budgetAmount must be non-negative");
     }
 
+    /**
+     * 验证 list campaigns normalizes status and clamps limit 场景的兼容行为。
+     */
     @Test
     void listCampaignsNormalizesStatusAndClampsLimit() {
         FakeRepository repository = new FakeRepository();
@@ -162,6 +177,9 @@ class MarketingCampaignApplicationServiceTest {
                 .hasMessageContaining("unsupported campaign status");
     }
 
+    /**
+     * 验证 link resource validates campaign ownership and inserts required dependency 场景的兼容行为。
+     */
     @Test
     void linkResourceValidatesCampaignOwnershipAndInsertsRequiredDependency() {
         FakeRepository repository = new FakeRepository();
@@ -189,6 +207,9 @@ class MarketingCampaignApplicationServiceTest {
         assertThat(view.metadata()).containsEntry("stage", "launch");
     }
 
+    /**
+     * 验证 link resource updates existing dependency and rejects foreign campaign 场景的兼容行为。
+     */
     @Test
     void linkResourceUpdatesExistingDependencyAndRejectsForeignCampaign() {
         FakeRepository repository = new FakeRepository();
@@ -229,6 +250,9 @@ class MarketingCampaignApplicationServiceTest {
                 .hasMessageContaining("campaign does not belong to tenant");
     }
 
+    /**
+     * 验证 readiness and unlink enforce tenant ownership 场景的兼容行为。
+     */
     @Test
     void readinessAndUnlinkEnforceTenantOwnership() {
         FakeRepository repository = new FakeRepository();
@@ -251,14 +275,32 @@ class MarketingCampaignApplicationServiceTest {
                 .hasMessageContaining("campaign link does not belong to tenant");
     }
 
+    /**
+     * 定义FakeRepository的数据访问边界。
+     */
     private static final class FakeRepository implements MarketingCampaignRepository {
         private final Map<Long, MarketingCampaign> campaignsById = new LinkedHashMap<>();
         private final Map<Long, MarketingCampaignLink> linksById = new LinkedHashMap<>();
         private final List<Long> deletedLinkIds = new ArrayList<>();
+
+        /**
+         * 保存nextCampaignId字段值。
+         */
         private long nextCampaignId = 100L;
+
+        /**
+         * 下一个资源关联内存标识。
+         */
         private long nextLinkId = 200L;
+
+        /**
+         * 保存lastListLimit字段值。
+         */
         private int lastListLimit;
 
+        /**
+         * 查找byTenantAndKey业务对象。
+         */
         @Override
         public MarketingCampaign findByTenantAndKey(Long tenantId, CampaignKey campaignKey) {
             return campaignsById.values().stream()
@@ -268,12 +310,18 @@ class MarketingCampaignApplicationServiceTest {
                     .orElse(null);
         }
 
+        /**
+         * 查找byId业务对象。
+         */
         @Override
         public MarketingCampaign findById(Long tenantId, Long campaignId) {
             MarketingCampaign campaign = campaignsById.get(campaignId);
             return campaign != null && campaign.tenantId().equals(tenantId) ? campaign : null;
         }
 
+        /**
+         * 执行save业务操作。
+         */
         @Override
         public MarketingCampaign save(MarketingCampaign campaign) {
             Long id = campaign.id() == null ? nextCampaignId++ : campaign.id();
@@ -282,6 +330,9 @@ class MarketingCampaignApplicationServiceTest {
             return saved;
         }
 
+        /**
+         * 查询列表。
+         */
         @Override
         public List<MarketingCampaign> list(Long tenantId, CampaignStatus status, int limit) {
             lastListLimit = limit;
@@ -293,6 +344,9 @@ class MarketingCampaignApplicationServiceTest {
                     .toList();
         }
 
+        /**
+         * 查找link业务对象。
+         */
         @Override
         public MarketingCampaignLink findLink(Long tenantId, Long campaignId, String resourceType, CampaignKey resourceKey) {
             return linksById.values().stream()
@@ -304,6 +358,9 @@ class MarketingCampaignApplicationServiceTest {
                     .orElse(null);
         }
 
+        /**
+         * 执行saveLink业务操作。
+         */
         @Override
         public MarketingCampaignLink saveLink(MarketingCampaignLink link) {
             Long id = link.id() == null ? nextLinkId++ : link.id();
@@ -312,6 +369,9 @@ class MarketingCampaignApplicationServiceTest {
             return saved;
         }
 
+        /**
+         * 查询links列表。
+         */
         @Override
         public List<MarketingCampaignLink> listLinks(Long tenantId, Long campaignId) {
             return linksById.values().stream()
@@ -322,18 +382,27 @@ class MarketingCampaignApplicationServiceTest {
                     .toList();
         }
 
+        /**
+         * 查找linkById业务对象。
+         */
         @Override
         public MarketingCampaignLink findLinkById(Long tenantId, Long linkId) {
             MarketingCampaignLink link = linksById.get(linkId);
             return link != null && link.tenantId().equals(tenantId) ? link : null;
         }
 
+        /**
+         * 删除或停用link业务对象。
+         */
         @Override
         public void deleteLink(Long tenantId, Long linkId) {
             deletedLinkIds.add(linkId);
             linksById.remove(linkId);
         }
 
+        /**
+         * 执行campaign业务操作。
+         */
         private MarketingCampaign campaign(Long id, Long tenantId, String key, CampaignStatus status) {
             return MarketingCampaign.createExisting(
                     id,
@@ -355,10 +424,16 @@ class MarketingCampaignApplicationServiceTest {
                     null);
         }
 
+        /**
+         * 执行link业务操作。
+         */
         private MarketingCampaignLink link(Long id, Long tenantId, Long campaignId, String type, String key) {
             return link(id, tenantId, campaignId, type, key, "PRIMARY");
         }
 
+        /**
+         * 执行link业务操作。
+         */
         private MarketingCampaignLink link(Long id, Long tenantId, Long campaignId, String type, String key, String role) {
             return MarketingCampaignLink.createExisting(
                     id,

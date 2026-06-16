@@ -9,15 +9,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 维护SearchMarketing相关的内存业务目录。
+ */
 public class SearchMarketingCatalog {
 
+    /**
+     * 用于生成确定性业务时间的时钟。
+     */
     private final Clock clock;
     private final Map<Long, TenantState> tenants = new LinkedHashMap<>();
 
+    /**
+     * 创建SearchMarketingCatalog实例。
+     */
     public SearchMarketingCatalog(Clock clock) {
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
+    /**
+     * 查询sources列表。
+     */
     public List<Map<String, Object>> listSources(Long tenantId, String provider, String channel,
                                                  Boolean enabled, int limit) {
         return list(state(tenantId).sources, limit, row -> matches(row.get("provider"), provider)
@@ -25,6 +37,9 @@ public class SearchMarketingCatalog {
                 && (enabled == null || Objects.equals(row.get("enabled"), enabled)));
     }
 
+    /**
+     * 执行upsertSource业务操作。
+     */
     public Map<String, Object> upsertSource(Long tenantId, Map<String, Object> payload, String actor) {
         TenantState state = state(tenantId);
         Map<String, Object> safePayload = safeMap(payload);
@@ -38,11 +53,17 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 查询keywords列表。
+     */
     public List<Map<String, Object>> listKeywords(Long tenantId, String channel, String status, int limit) {
         return list(state(tenantId).keywords, limit, row -> matches(row.get("channel"), channel)
                 && matches(row.get("status"), status));
     }
 
+    /**
+     * 执行upsertKeyword业务操作。
+     */
     public Map<String, Object> upsertKeyword(Long tenantId, Map<String, Object> payload, String actor) {
         TenantState state = state(tenantId);
         Map<String, Object> row = append(state.keywords, state.nextKeywordId++, tenantId, "upsertKeyword",
@@ -52,6 +73,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 查询snapshots列表。
+     */
     public List<Map<String, Object>> listSnapshots(Long tenantId, String channel, Long sourceId, Long keywordId,
                                                    LocalDate startDate, LocalDate endDate, int limit) {
         return list(state(tenantId).snapshots, limit, row -> matches(row.get("channel"), channel)
@@ -60,6 +84,9 @@ public class SearchMarketingCatalog {
                 && dateInRange((LocalDate) row.get("snapshotDate"), startDate, endDate));
     }
 
+    /**
+     * 执行upsertSnapshot业务操作。
+     */
     public Map<String, Object> upsertSnapshot(Long tenantId, Map<String, Object> payload, String actor) {
         TenantState state = state(tenantId);
         Map<String, Object> row = append(state.snapshots, state.nextSnapshotId++, tenantId, "upsertSnapshot",
@@ -73,6 +100,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 查询opportunities列表。
+     */
     public List<Map<String, Object>> listOpportunities(Long tenantId, String channel, Long sourceId,
                                                        String status, String severity, int limit) {
         return list(state(tenantId).opportunities, limit, row -> matches(row.get("channel"), channel)
@@ -81,6 +111,9 @@ public class SearchMarketingCatalog {
                 && matches(row.get("severity"), severity));
     }
 
+    /**
+     * 执行evaluateOpportunities业务操作。
+     */
     public Map<String, Object> evaluateOpportunities(Long tenantId, Map<String, Object> payload, String actor) {
         TenantState state = state(tenantId);
         Map<String, Object> row = append(state.opportunities, state.nextOpportunityId++, tenantId,
@@ -91,6 +124,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 更新opportunityStatus业务对象。
+     */
     public Map<String, Object> updateOpportunityStatus(Long tenantId, Long opportunityId,
                                                        Map<String, Object> payload, String actor) {
         Map<String, Object> safePayload = safeMap(payload);
@@ -103,6 +139,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 创建mutation业务对象。
+     */
     public Map<String, Object> createMutation(Long tenantId, Long opportunityId, Map<String, Object> payload,
                                               String actor) {
         TenantState state = state(tenantId);
@@ -116,6 +155,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 查询mutations列表。
+     */
     public List<Map<String, Object>> listMutations(Long tenantId, Long sourceId, String status,
                                                    String approvalStatus, int limit) {
         return list(state(tenantId).mutations, limit, row -> idMatches(row.get("sourceId"), sourceId)
@@ -123,6 +165,9 @@ public class SearchMarketingCatalog {
                 && matches(row.get("approvalStatus"), approvalStatus));
     }
 
+    /**
+     * 执行approveMutation业务操作。
+     */
     public Map<String, Object> approveMutation(Long tenantId, Long mutationId, Map<String, Object> payload,
                                                String actor) {
         Map<String, Object> row = findOrCreate(state(tenantId).mutations, mutationId, tenantId, "approveMutation",
@@ -133,6 +178,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行executeMutation业务操作。
+     */
     public Map<String, Object> executeMutation(Long tenantId, Long mutationId, Map<String, Object> payload,
                                                String actor) {
         Map<String, Object> row = findOrCreate(state(tenantId).mutations, mutationId, tenantId, "executeMutation",
@@ -143,6 +191,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 查询urlInspections列表。
+     */
     public List<Map<String, Object>> listUrlInspections(Long tenantId, Long sourceId, String indexedState,
                                                         LocalDate startDate, LocalDate endDate, int limit) {
         TenantState state = state(tenantId);
@@ -158,6 +209,9 @@ public class SearchMarketingCatalog {
                 && dateInRange((LocalDate) row.get("inspectionDate"), startDate, endDate));
     }
 
+    /**
+     * 查询syncRuns列表。
+     */
     public List<Map<String, Object>> listSyncRuns(Long tenantId, Long sourceId, String runType, String status,
                                                   int limit) {
         return list(state(tenantId).syncRuns, limit, row -> idMatches(row.get("sourceId"), sourceId)
@@ -165,6 +219,9 @@ public class SearchMarketingCatalog {
                 && matches(row.get("status"), status));
     }
 
+    /**
+     * 执行syncSource业务操作。
+     */
     public Map<String, Object> syncSource(Long tenantId, Long sourceId, Map<String, Object> payload, String actor) {
         TenantState state = state(tenantId);
         Map<String, Object> safePayload = safeMap(payload);
@@ -175,6 +232,9 @@ public class SearchMarketingCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行syncDue业务操作。
+     */
     public Map<String, Object> syncDue(Long tenantId, Map<String, Object> payload, String actor) {
         int limit = limitFrom(payload);
         Map<String, Object> row = base(tenantId, "syncDue", safeMap(payload), actor, "SCHEDULED");
@@ -183,6 +243,9 @@ public class SearchMarketingCatalog {
         return row;
     }
 
+    /**
+     * 查询providerChanges列表。
+     */
     public List<Map<String, Object>> listProviderChanges(Long tenantId, Long sourceId, Long mutationId,
                                                          String provider, String reconciliationStatus, int limit) {
         return list(state(tenantId).providerChanges, limit, row -> idMatches(row.get("sourceId"), sourceId)
@@ -191,6 +254,9 @@ public class SearchMarketingCatalog {
                 && matches(row.get("reconciliationStatus"), reconciliationStatus));
     }
 
+    /**
+     * 执行reconcileMutation业务操作。
+     */
     public Map<String, Object> reconcileMutation(Long tenantId, Long mutationId, String actor) {
         TenantState state = state(tenantId);
         Map<String, Object> mutation = findOrCreate(state.mutations, mutationId, tenantId, "reconcileMutation",
@@ -206,6 +272,9 @@ public class SearchMarketingCatalog {
         return copy(mutation);
     }
 
+    /**
+     * 查询impactWindows列表。
+     */
     public List<Map<String, Object>> listImpactWindows(Long tenantId, Long opportunityId, Long mutationId,
                                                        Long sourceId, String status, String decision, int limit) {
         return list(state(tenantId).impactWindows, limit, row -> idMatches(row.get("opportunityId"), opportunityId)
@@ -215,6 +284,9 @@ public class SearchMarketingCatalog {
                 && matches(row.get("decision"), decision));
     }
 
+    /**
+     * 执行evaluateDueImpactWindows业务操作。
+     */
     public Map<String, Object> evaluateDueImpactWindows(Long tenantId, Map<String, Object> payload, String actor) {
         int limit = limitFrom(payload);
         Map<String, Object> row = base(tenantId, "evaluateDueImpactWindows", safeMap(payload), actor, "EVALUATED");
@@ -223,6 +295,9 @@ public class SearchMarketingCatalog {
         return row;
     }
 
+    /**
+     * 执行readiness业务操作。
+     */
     public Map<String, Object> readiness(Long tenantId) {
         TenantState state = state(tenantId);
         boolean ready = !state.sources.isEmpty();
@@ -233,6 +308,9 @@ public class SearchMarketingCatalog {
         return row;
     }
 
+    /**
+     * 执行summary业务操作。
+     */
     public Map<String, Object> summary(Long tenantId, String channel, Long sourceId, Long keywordId,
                                        LocalDate startDate, LocalDate endDate) {
         List<Map<String, Object>> snapshots = listSnapshots(tenantId, channel, sourceId, keywordId, startDate, endDate,
@@ -248,6 +326,9 @@ public class SearchMarketingCatalog {
         return row;
     }
 
+    /**
+     * 执行appendImpactWindow业务操作。
+     */
     private void appendImpactWindow(TenantState state, Long tenantId, Long mutationId, Long sourceId, String actor) {
         Map<String, Object> row = append(state.impactWindows, state.nextImpactWindowId++, tenantId,
                 "impactWindow", Map.of("mutationId", mutationId), actor, "PENDING");
@@ -256,6 +337,9 @@ public class SearchMarketingCatalog {
         row.put("decision", "KEEP");
     }
 
+    /**
+     * 执行append业务操作。
+     */
     private Map<String, Object> append(List<Map<String, Object>> rows, long id, Long tenantId, String operation,
                                        Map<String, Object> payload, String actor, String status) {
         Map<String, Object> row = base(tenantId, operation, payload, actor, status);
@@ -268,6 +352,9 @@ public class SearchMarketingCatalog {
         return row;
     }
 
+    /**
+     * 查找orCreate业务对象。
+     */
     private Map<String, Object> findOrCreate(List<Map<String, Object>> rows, Long id, Long tenantId, String operation,
                                              Map<String, Object> payload, String actor, String status) {
         Long requiredId = id == null ? 1L : id;
@@ -281,6 +368,9 @@ public class SearchMarketingCatalog {
                 });
     }
 
+    /**
+     * 执行base业务操作。
+     */
     private Map<String, Object> base(Long tenantId, String operation, Map<String, Object> payload, String actor,
                                      String status) {
         Map<String, Object> row = new LinkedHashMap<>();
@@ -293,10 +383,16 @@ public class SearchMarketingCatalog {
         return row;
     }
 
+    /**
+     * 执行state业务操作。
+     */
     private TenantState state(Long tenantId) {
         return tenants.computeIfAbsent(tenantId, ignored -> new TenantState());
     }
 
+    /**
+     * 查询列表。
+     */
     private static List<Map<String, Object>> list(List<Map<String, Object>> rows, int limit,
                                                   java.util.function.Predicate<Map<String, Object>> filter) {
         return rows.stream()
@@ -307,21 +403,33 @@ public class SearchMarketingCatalog {
                 .toList();
     }
 
+    /**
+     * 执行matches业务操作。
+     */
     private static boolean matches(Object rowValue, Object expected) {
         return expected == null || String.valueOf(expected).isBlank()
                 || (rowValue != null && String.valueOf(rowValue).equalsIgnoreCase(String.valueOf(expected)));
     }
 
+    /**
+     * 执行idMatches业务操作。
+     */
     private static boolean idMatches(Object rowValue, Long expected) {
         return expected == null || Objects.equals(toLong(rowValue, null), expected);
     }
 
+    /**
+     * 执行dateInRange业务操作。
+     */
     private static boolean dateInRange(LocalDate value, LocalDate startDate, LocalDate endDate) {
         return value != null
                 && (startDate == null || !value.isBefore(startDate))
                 && (endDate == null || !value.isAfter(endDate));
     }
 
+    /**
+     * 规范化d输入值。
+     */
     private static String normalized(Object value, Object fallback) {
         String text = value == null ? "" : String.valueOf(value).trim();
         if (text.isBlank()) {
@@ -330,12 +438,18 @@ public class SearchMarketingCatalog {
         return text.isBlank() ? null : text.toUpperCase();
     }
 
+    /**
+     * 执行key业务操作。
+     */
     private static String key(Map<String, Object> payload, String key, String fallback) {
         Object value = payload.get(key);
         String text = value == null ? "" : String.valueOf(value).trim();
         return text.isBlank() ? fallback : text;
     }
 
+    /**
+     * 校验并返回dText必填值。
+     */
     private static String requiredText(Object value, String field) {
         String text = value == null ? "" : String.valueOf(value).trim();
         if (text.isBlank()) {
@@ -344,14 +458,23 @@ public class SearchMarketingCatalog {
         return text;
     }
 
+    /**
+     * 执行booleanValue业务操作。
+     */
     private static boolean booleanValue(Object value, boolean fallback) {
         return value == null ? fallback : Boolean.parseBoolean(String.valueOf(value));
     }
 
+    /**
+     * 执行limitFrom业务操作。
+     */
     private static int limitFrom(Map<String, Object> payload) {
         return Math.max(1, Math.min(toLong(safeMap(payload).get("limit"), 50L).intValue(), 100));
     }
 
+    /**
+     * 转换为long对象。
+     */
     private static Long toLong(Object value, Long fallback) {
         if (value instanceof Number number) {
             return number.longValue();
@@ -363,10 +486,16 @@ public class SearchMarketingCatalog {
         }
     }
 
+    /**
+     * 转换为date对象。
+     */
     private static LocalDate toDate(Object value, LocalDate fallback) {
         return value instanceof LocalDate date ? date : value == null ? fallback : LocalDate.parse(String.valueOf(value));
     }
 
+    /**
+     * 执行sum业务操作。
+     */
     private static long sum(List<Map<String, Object>> rows, String field) {
         return rows.stream()
                 .map(row -> toLong(row.get(field), 0L))
@@ -375,14 +504,23 @@ public class SearchMarketingCatalog {
                 .sum();
     }
 
+    /**
+     * 执行safeMap业务操作。
+     */
     private static Map<String, Object> safeMap(Map<String, Object> payload) {
         return payload == null ? Map.of() : new LinkedHashMap<>(payload);
     }
 
+    /**
+     * 执行copy业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> row) {
         return new LinkedHashMap<>(row);
     }
 
+    /**
+     * 提供TenantState的业务能力。
+     */
     private static final class TenantState {
         private final List<Map<String, Object>> sources = new ArrayList<>();
         private final List<Map<String, Object>> keywords = new ArrayList<>();
@@ -393,14 +531,50 @@ public class SearchMarketingCatalog {
         private final List<Map<String, Object>> syncRuns = new ArrayList<>();
         private final List<Map<String, Object>> providerChanges = new ArrayList<>();
         private final List<Map<String, Object>> impactWindows = new ArrayList<>();
+
+        /**
+         * 保存nextSourceId字段值。
+         */
         private long nextSourceId = 1L;
+
+        /**
+         * 保存nextKeywordId字段值。
+         */
         private long nextKeywordId = 1L;
+
+        /**
+         * 保存nextSnapshotId字段值。
+         */
         private long nextSnapshotId = 1L;
+
+        /**
+         * 保存nextOpportunityId字段值。
+         */
         private long nextOpportunityId = 1L;
+
+        /**
+         * 保存nextMutationId字段值。
+         */
         private long nextMutationId = 1L;
+
+        /**
+         * 保存nextUrlInspectionId字段值。
+         */
         private long nextUrlInspectionId = 1L;
+
+        /**
+         * 保存nextSyncRunId字段值。
+         */
         private long nextSyncRunId = 1L;
+
+        /**
+         * 保存nextProviderChangeId字段值。
+         */
         private long nextProviderChangeId = 1L;
+
+        /**
+         * 保存nextImpactWindowId字段值。
+         */
         private long nextImpactWindowId = 1L;
     }
 }

@@ -13,9 +13,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 负责MarketingCampaignPersistenceConverter相关对象之间的字段转换。
+ */
 @Component
 public class MarketingCampaignPersistenceConverter {
 
+    /**
+     * 转换为campaignRow对象。
+     */
     public MarketingCampaignMasterDO toCampaignRow(MarketingCampaign campaign) {
         if (campaign == null) {
             return null;
@@ -41,6 +47,9 @@ public class MarketingCampaignPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为campaign对象。
+     */
     public MarketingCampaign toCampaign(MarketingCampaignMasterDO row) {
         if (row == null) {
             return null;
@@ -65,6 +74,9 @@ public class MarketingCampaignPersistenceConverter {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为linkRow对象。
+     */
     public MarketingCampaignLinkDO toLinkRow(MarketingCampaignLink link) {
         if (link == null) {
             return null;
@@ -89,6 +101,9 @@ public class MarketingCampaignPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为link对象。
+     */
     public MarketingCampaignLink toLink(MarketingCampaignLinkDO row) {
         if (row == null) {
             return null;
@@ -112,8 +127,14 @@ public class MarketingCampaignPersistenceConverter {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 提供SimpleJsonMapCodec的业务能力。
+     */
     private static final class SimpleJsonMapCodec {
 
+        /**
+         * 创建SimpleJsonMapCodec实例。
+         */
         private SimpleJsonMapCodec() {
         }
 
@@ -147,6 +168,9 @@ public class MarketingCampaignPersistenceConverter {
             }
         }
 
+        /**
+         * 执行valueToJson业务操作。
+         */
         private static String valueToJson(Object value) {
             if (value == null) {
                 return "null";
@@ -166,6 +190,9 @@ public class MarketingCampaignPersistenceConverter {
             return quote(String.valueOf(value));
         }
 
+        /**
+         * 执行mapToJson业务操作。
+         */
         private static String mapToJson(Map<?, ?> map) {
             if (map.isEmpty()) {
                 return "{}";
@@ -182,6 +209,9 @@ public class MarketingCampaignPersistenceConverter {
             return builder.append('}').toString();
         }
 
+        /**
+         * 执行iterableToJson业务操作。
+         */
         private static String iterableToJson(Iterable<?> iterable) {
             StringBuilder builder = new StringBuilder("[");
             boolean first = true;
@@ -195,6 +225,9 @@ public class MarketingCampaignPersistenceConverter {
             return builder.append(']').toString();
         }
 
+        /**
+         * 执行arrayToJson业务操作。
+         */
         private static String arrayToJson(Object array) {
             StringBuilder builder = new StringBuilder("[");
             for (int index = 0; index < Array.getLength(array); index++) {
@@ -206,6 +239,9 @@ public class MarketingCampaignPersistenceConverter {
             return builder.append(']').toString();
         }
 
+        /**
+         * 执行quote业务操作。
+         */
         private static String quote(String value) {
             StringBuilder builder = new StringBuilder("\"");
             String safeValue = value == null ? "" : value;
@@ -225,14 +261,30 @@ public class MarketingCampaignPersistenceConverter {
             return builder.append('"').toString();
         }
 
+        /**
+         * 提供Parser的业务能力。
+         */
         private static final class Parser {
+            /**
+             * 保存text字段值。
+             */
             private final String text;
+
+            /**
+             * 保存index字段值。
+             */
             private int index;
 
+            /**
+             * 创建Parser实例。
+             */
             private Parser(String text) {
                 this.text = text.trim();
             }
 
+            /**
+             * 执行parseObject业务操作。
+             */
             private Map<String, Object> parseObject() {
                 LinkedHashMap<String, Object> result = new LinkedHashMap<>();
                 expect('{');
@@ -258,6 +310,9 @@ public class MarketingCampaignPersistenceConverter {
                 throw new IllegalArgumentException("unterminated JSON object");
             }
 
+            /**
+             * 执行ensureComplete业务操作。
+             */
             private void ensureComplete() {
                 skipWhitespace();
                 if (index != text.length()) {
@@ -265,6 +320,9 @@ public class MarketingCampaignPersistenceConverter {
                 }
             }
 
+            /**
+             * 执行parseValue业务操作。
+             */
             private Object parseValue() {
                 skipWhitespace();
                 if (peek('"')) {
@@ -288,6 +346,9 @@ public class MarketingCampaignPersistenceConverter {
                 return parseNumber();
             }
 
+            /**
+             * 执行parseArray业务操作。
+             */
             private List<Object> parseArray() {
                 List<Object> result = new ArrayList<>();
                 expect('[');
@@ -309,6 +370,9 @@ public class MarketingCampaignPersistenceConverter {
                 throw new IllegalArgumentException("unterminated JSON array");
             }
 
+            /**
+             * 执行parseNumber业务操作。
+             */
             private Number parseNumber() {
                 int start = index;
                 if (peek('-')) {
@@ -358,6 +422,9 @@ public class MarketingCampaignPersistenceConverter {
                 return parsed;
             }
 
+            /**
+             * 执行parseString业务操作。
+             */
             private String parseString() {
                 expect('"');
                 StringBuilder builder = new StringBuilder();
@@ -389,6 +456,9 @@ public class MarketingCampaignPersistenceConverter {
                 throw new IllegalArgumentException("unterminated JSON string");
             }
 
+            /**
+             * 执行match业务操作。
+             */
             private boolean match(String token) {
                 if (!text.startsWith(token, index)) {
                     return false;
@@ -397,6 +467,9 @@ public class MarketingCampaignPersistenceConverter {
                 return true;
             }
 
+            /**
+             * 执行expect业务操作。
+             */
             private void expect(char expected) {
                 skipWhitespace();
                 if (!peek(expected)) {
@@ -405,10 +478,16 @@ public class MarketingCampaignPersistenceConverter {
                 index++;
             }
 
+            /**
+             * 执行peek业务操作。
+             */
             private boolean peek(char expected) {
                 return index < text.length() && text.charAt(index) == expected;
             }
 
+            /**
+             * 执行skipWhitespace业务操作。
+             */
             private void skipWhitespace() {
                 while (index < text.length() && Character.isWhitespace(text.charAt(index))) {
                     index++;

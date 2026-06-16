@@ -8,8 +8,14 @@ import java.time.LocalDateTime;
 import org.chovy.canvas.marketing.api.MarketingPreferenceFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MarketingPreferenceApplicationService的关键兼容行为。
+ */
 class MarketingPreferenceApplicationServiceTest {
 
+    /**
+     * 验证 preference lifecycle is tenant scoped and summarized 场景的兼容行为。
+     */
     @Test
     void preferenceLifecycleIsTenantScopedAndSummarized() {
         MarketingPreferenceFacade service = new MarketingPreferenceApplicationService();
@@ -47,6 +53,9 @@ class MarketingPreferenceApplicationServiceTest {
         assertThat(service.report(8L, "user-1").consents()).isEmpty();
     }
 
+    /**
+     * 验证 deactivate suppression only affects visible tenant and validation rejects bad status 场景的兼容行为。
+     */
     @Test
     void deactivateSuppressionOnlyAffectsVisibleTenantAndValidationRejectsBadStatus() {
         MarketingPreferenceFacade service = new MarketingPreferenceApplicationService();

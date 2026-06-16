@@ -12,12 +12,18 @@ import java.util.List;
 import org.chovy.canvas.marketing.api.LoyaltyFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证LoyaltyApplicationService的关键兼容行为。
+ */
 class LoyaltyApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T02:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 earn creates tenant scoped account and is idempotent by transaction key 场景的兼容行为。
+     */
     @Test
     void earnCreatesTenantScopedAccountAndIsIdempotentByTransactionKey() {
         LoyaltyFacade service = new LoyaltyApplicationService(CLOCK);
@@ -44,6 +50,9 @@ class LoyaltyApplicationServiceTest {
                 .containsExactly(8L, 0, "BASIC");
     }
 
+    /**
+     * 验证 redeem records redeemed and failed states against account balance 场景的兼容行为。
+     */
     @Test
     void redeemRecordsRedeemedAndFailedStatesAgainstAccountBalance() {
         LoyaltyFacade service = new LoyaltyApplicationService(CLOCK);
@@ -71,6 +80,9 @@ class LoyaltyApplicationServiceTest {
         assertThat(duplicate.redemptionId()).isEqualTo(failed.redemptionId());
     }
 
+    /**
+     * 验证 benefits follow current tier and validation matches legacy messages 场景的兼容行为。
+     */
     @Test
     void benefitsFollowCurrentTierAndValidationMatchesLegacyMessages() {
         LoyaltyFacade service = new LoyaltyApplicationService(CLOCK);
