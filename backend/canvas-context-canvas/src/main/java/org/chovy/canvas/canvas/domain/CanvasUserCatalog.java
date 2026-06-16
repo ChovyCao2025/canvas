@@ -12,12 +12,29 @@ import org.chovy.canvas.canvas.api.CanvasUserFacade.CanvasUserCommand;
 import org.chovy.canvas.canvas.api.CanvasUserFacade.CanvasUserView;
 import org.chovy.canvas.canvas.api.CanvasUserFacade.ExecutionCommand;
 
+/**
+ * 封装CanvasUserCatalog相关的业务逻辑。
+ */
 public class CanvasUserCatalog {
 
+    /**
+     * 保存内存实现使用的users映射数据。
+     */
     private final Map<CanvasUserKey, CanvasUserView> users = new LinkedHashMap<>();
+
+    /**
+     * 保存测试或内存实现使用的executions列表。
+     */
     private final List<CanvasExecutionView> executions = new ArrayList<>();
+
+    /**
+     * 保存executionIds。
+     */
     private long executionIds;
 
+    /**
+     * 列出Users。
+     */
     public synchronized List<CanvasUserView> listUsers(Long canvasId) {
         Long scopedCanvasId = requireCanvasId(canvasId);
         return users.values().stream()
@@ -26,6 +43,9 @@ public class CanvasUserCatalog {
                 .toList();
     }
 
+    /**
+     * 获取UserInCanvas。
+     */
     public synchronized CanvasUserView getUserInCanvas(Long canvasId, String userId) {
         Long scopedCanvasId = requireCanvasId(canvasId);
         String scopedUserId = requireText(userId, "user id");
@@ -36,6 +56,9 @@ public class CanvasUserCatalog {
         return row;
     }
 
+    /**
+     * 列出Executions。
+     */
     public synchronized List<CanvasExecutionView> listExecutions(Long canvasId, String userId) {
         Long scopedCanvasId = requireCanvasId(canvasId);
         String scopedUserId = requireText(userId, "user id");
@@ -46,6 +69,9 @@ public class CanvasUserCatalog {
                 .toList();
     }
 
+    /**
+     * 处理registerUser。
+     */
     public synchronized void registerUser(Long canvasId, CanvasUserCommand command) {
         Long scopedCanvasId = requireCanvasId(canvasId);
         if (command == null) {
@@ -58,6 +84,9 @@ public class CanvasUserCatalog {
         users.put(new CanvasUserKey(scopedCanvasId, userId), row);
     }
 
+    /**
+     * 处理registerExecution。
+     */
     public synchronized void registerExecution(Long canvasId, String userId, ExecutionCommand command) {
         Long scopedCanvasId = requireCanvasId(canvasId);
         String scopedUserId = requireText(userId, "user id");
@@ -68,6 +97,9 @@ public class CanvasUserCatalog {
                 optional(command.nodeKey()), defaultText(command.status(), "SUCCESS"), command.executedAt()));
     }
 
+    /**
+     * 校验并返回画布标识。
+     */
     private static Long requireCanvasId(Long canvasId) {
         if (canvasId == null) {
             throw new IllegalArgumentException("canvas id is required");
@@ -75,6 +107,9 @@ public class CanvasUserCatalog {
         return canvasId;
     }
 
+    /**
+     * 校验并返回Text。
+     */
     private static String requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -82,14 +117,23 @@ public class CanvasUserCatalog {
         return value.trim();
     }
 
+    /**
+     * 处理optional。
+     */
     private static String optional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /**
+     * 处理defaultText。
+     */
     private static String defaultText(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    /**
+     * 承载CanvasUserKey的数据快照。
+     */
     private record CanvasUserKey(Long canvasId, String userId) {
     }
 }

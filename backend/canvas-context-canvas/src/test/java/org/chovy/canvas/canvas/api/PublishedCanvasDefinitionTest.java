@@ -11,8 +11,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装PublishedCanvasDefinitionTest相关的业务逻辑。
+ */
 class PublishedCanvasDefinitionTest {
 
+    /**
+     * 处理rejects missing required identity and blank graphJSON 内容。
+     */
     @Test
     void rejectsMissingRequiredIdentityAndBlankGraphJson() {
         assertThatThrownBy(() -> definition(null, 1L, "{\"nodes\":[]}"))
@@ -28,6 +34,9 @@ class PublishedCanvasDefinitionTest {
                 .hasMessageContaining("graphJson");
     }
 
+    /**
+     * 处理defensivelyCopiesOptionsNodesAndEdges。
+     */
     @Test
     void defensivelyCopiesOptionsNodesAndEdges() {
         Map<String, Object> options = new HashMap<>();
@@ -72,6 +81,9 @@ class PublishedCanvasDefinitionTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    /**
+     * 处理definition。
+     */
     private static PublishedCanvasDefinition definition(Long tenantId, Long canvasId, String graphJson) {
         return new PublishedCanvasDefinition(
                 tenantId,

@@ -6,9 +6,15 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.CanvasTriggerFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 封装CanvasTriggerApplicationService相关的业务逻辑。
+ */
 @Service
 public class CanvasTriggerApplicationService implements CanvasTriggerFacade {
 
+    /**
+     * 处理triggerBehavior。
+     */
     @Override
     public BehaviorTriggerResult triggerBehavior(BehaviorTriggerCommand command) {
         Map<String, Object> data = new LinkedHashMap<>();

@@ -10,8 +10,14 @@ import org.chovy.canvas.canvas.api.ApiDefinitionFacade.ApiDefinitionView;
 import org.chovy.canvas.canvas.api.ApiDefinitionFacade.PageView;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装ApiDefinitionApplicationServiceTest相关的业务逻辑。
+ */
 class ApiDefinitionApplicationServiceTest {
 
+    /**
+     * 创建sWithLegacyDefaultsAndListsByEnabledDescendingIdWithPaging。
+     */
     @Test
     void createsWithLegacyDefaultsAndListsByEnabledDescendingIdWithPaging() {
         ApiDefinitionFacade service = new ApiDefinitionApplicationService();
@@ -37,6 +43,9 @@ class ApiDefinitionApplicationServiceTest {
                 .returns("enabled-api-2", ApiDefinitionView::apiKey);
     }
 
+    /**
+     * 更新DistinguishesOmittedAndExplicitNullRateLimitThenDeleteRemovesRow。
+     */
     @Test
     void updateDistinguishesOmittedAndExplicitNullRateLimitThenDeleteRemovesRow() {
         ApiDefinitionFacade service = new ApiDefinitionApplicationService();
@@ -76,6 +85,9 @@ class ApiDefinitionApplicationServiceTest {
         assertThat(service.list(new ApiDefinitionListQuery(1, 20, null)).total()).isZero();
     }
 
+    /**
+     * 处理validatesRequiredSafeUrlAndPositiveRateLimit。
+     */
     @Test
     void validatesRequiredSafeUrlAndPositiveRateLimit() {
         ApiDefinitionFacade service = new ApiDefinitionApplicationService();
@@ -91,6 +103,9 @@ class ApiDefinitionApplicationServiceTest {
                 .hasMessageContaining("rateLimitPerSec");
     }
 
+    /**
+     * 创建测试使用的 API 定义命令。
+     */
     private static ApiDefinitionCommand command(String apiKey,
                                                 String url,
                                                 Integer enabled,

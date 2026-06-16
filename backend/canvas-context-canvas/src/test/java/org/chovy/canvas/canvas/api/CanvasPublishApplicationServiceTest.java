@@ -8,8 +8,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasPublishApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasPublishApplicationServiceTest {
 
+    /**
+     * 处理publishBuildsDefinitionAndCallsExecutionPublicationPort。
+     */
     @Test
     void publishBuildsDefinitionAndCallsExecutionPublicationPort() {
         CapturingPublicationPort port = new CapturingPublicationPort();
@@ -25,13 +31,26 @@ class CanvasPublishApplicationServiceTest {
         assertThat(port.published.graphJson()).contains("start");
     }
 
+    /**
+     * 封装ContractCanvasPublishApplicationService相关的业务逻辑。
+     */
     private static final class ContractCanvasPublishApplicationService {
+
+        /**
+         * 保存publicationPort。
+         */
         private final ExecutionPublicationPort publicationPort;
 
+        /**
+         * 创建当前对象实例。
+         */
         private ContractCanvasPublishApplicationService(ExecutionPublicationPort publicationPort) {
             this.publicationPort = publicationPort;
         }
 
+        /**
+         * 处理publish。
+         */
         private Long publish(Long tenantId, Long canvasId, Long versionId, String graphJson) {
             PublishedCanvasDefinition definition = new PublishedCanvasDefinition(
                     tenantId,
@@ -48,14 +67,27 @@ class CanvasPublishApplicationServiceTest {
         }
     }
 
+    /**
+     * 封装CapturingPublicationPort相关的业务逻辑。
+     */
     private static final class CapturingPublicationPort implements ExecutionPublicationPort {
+
+        /**
+         * 保存published。
+         */
         private PublishedCanvasDefinition published;
 
+        /**
+         * 处理publish。
+         */
         @Override
         public void publish(PublishedCanvasDefinition definition) {
             this.published = definition;
         }
 
+        /**
+         * 处理unpublish。
+         */
         @Override
         public void unpublish(Long tenantId, Long canvasId) {
         }

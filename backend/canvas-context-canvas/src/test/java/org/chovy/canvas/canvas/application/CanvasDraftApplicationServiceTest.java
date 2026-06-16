@@ -15,8 +15,14 @@ import org.chovy.canvas.canvas.domain.CanvasVersionRepository;
 import org.chovy.canvas.canvas.domain.VersionStatus;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasDraftApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasDraftApplicationServiceTest {
 
+    /**
+     * 创建DraftStoresCanvasAndInitialDraftVersion。
+     */
     @Test
     void createDraftStoresCanvasAndInitialDraftVersion() {
         InMemoryCanvasRepository canvases = new InMemoryCanvasRepository();
@@ -38,6 +44,9 @@ class CanvasDraftApplicationServiceTest {
                 .containsExactly(1, VersionStatus.DRAFT, "{\"nodes\":[]}");
     }
 
+    /**
+     * 更新PublishedCanvasCreatesNewDraftVersionInsteadOfMutatingExistingDraft。
+     */
     @Test
     void updatePublishedCanvasCreatesNewDraftVersionInsteadOfMutatingExistingDraft() {
         InMemoryCanvasRepository canvases = new InMemoryCanvasRepository();
@@ -59,6 +68,9 @@ class CanvasDraftApplicationServiceTest {
                 .containsExactly(3, "{\"nodes\":[{\"id\":\"start\"}]}", "editor");
     }
 
+    /**
+     * 更新KilledCanvasIsRejected。
+     */
     @Test
     void updateKilledCanvasIsRejected() {
         InMemoryCanvasRepository canvases = new InMemoryCanvasRepository();
@@ -72,10 +84,24 @@ class CanvasDraftApplicationServiceTest {
                 .hasMessageContaining("KILLED");
     }
 
+    /**
+     * 封装InMemoryCanvasRepository相关的业务逻辑。
+     */
     static final class InMemoryCanvasRepository implements CanvasRepository {
+
+        /**
+         * 保存测试或内存实现使用的rows列表。
+         */
         private final List<Canvas> rows = new ArrayList<>();
+
+        /**
+         * 保存next标识。
+         */
         private long nextId = 1L;
 
+        /**
+         * 保存。
+         */
         @Override
         public Canvas save(Canvas canvas) {
             Canvas saved = canvas.id() == null ? canvas.withId(nextId++) : canvas;
@@ -84,16 +110,33 @@ class CanvasDraftApplicationServiceTest {
             return saved;
         }
 
+        /**
+         * 查询by标识。
+         */
         @Override
         public Optional<Canvas> findById(Long canvasId) {
             return rows.stream().filter(row -> row.id().equals(canvasId)).findFirst();
         }
     }
 
+    /**
+     * 封装InMemoryCanvasVersionRepository相关的业务逻辑。
+     */
     static final class InMemoryCanvasVersionRepository implements CanvasVersionRepository {
+
+        /**
+         * 保存测试或内存实现使用的rows列表。
+         */
         private final List<CanvasVersion> rows = new ArrayList<>();
+
+        /**
+         * 保存next标识。
+         */
         private long nextId = 1L;
 
+        /**
+         * 保存。
+         */
         @Override
         public CanvasVersion save(CanvasVersion version) {
             CanvasVersion saved = version.id() == null ? version.withId(nextId++) : version;
@@ -102,6 +145,9 @@ class CanvasDraftApplicationServiceTest {
             return saved;
         }
 
+        /**
+         * 处理latestDraft。
+         */
         @Override
         public Optional<CanvasVersion> latestDraft(Long canvasId) {
             return rows.stream()
@@ -110,16 +156,25 @@ class CanvasDraftApplicationServiceTest {
                     .max(java.util.Comparator.comparing(CanvasVersion::version));
         }
 
+        /**
+         * 查询by标识。
+         */
         @Override
         public Optional<CanvasVersion> findById(Long versionId) {
             return rows.stream().filter(row -> row.id().equals(versionId)).findFirst();
         }
 
+        /**
+         * 查询by canvas标识。
+         */
         @Override
         public List<CanvasVersion> findByCanvasId(Long canvasId) {
             return rows.stream().filter(row -> row.canvasId().equals(canvasId)).toList();
         }
 
+        /**
+         * 处理all。
+         */
         List<CanvasVersion> all() {
             return rows;
         }

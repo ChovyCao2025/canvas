@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.template.TemplateValidationPort;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装TemplateImportServiceTest相关的业务逻辑。
+ */
 class TemplateImportServiceTest {
 
+    /**
+     * 处理missingRequiredPluginBlocksImportBeforeDraftCreation。
+     */
     @Test
     void missingRequiredPluginBlocksImportBeforeDraftCreation() {
         RecordingDraftCreator draftCreator = new RecordingDraftCreator();
@@ -32,6 +38,9 @@ class TemplateImportServiceTest {
         assertThat(draftCreator.calls).isZero();
     }
 
+    /**
+     * 处理enabledTemplateCreatesDraftThroughPublicDraftCreator。
+     */
     @Test
     void enabledTemplateCreatesDraftThroughPublicDraftCreator() {
         RecordingDraftCreator draftCreator = new RecordingDraftCreator();
@@ -55,6 +64,9 @@ class TemplateImportServiceTest {
         assertThat(draftCreator.lastCommand.graphJson()).isEqualTo("{\"nodes\":[]}");
     }
 
+    /**
+     * 处理validationPortBlocksSamplePayloadBeforeDraftCreation。
+     */
     @Test
     void validationPortBlocksSamplePayloadBeforeDraftCreation() {
         RecordingDraftCreator draftCreator = new RecordingDraftCreator();
@@ -83,6 +95,9 @@ class TemplateImportServiceTest {
         assertThat(draftCreator.calls).isZero();
     }
 
+    /**
+     * 处理repeatedImportsCreateExplicitClonesWithoutReusingPreviousDraft。
+     */
     @Test
     void repeatedImportsCreateExplicitClonesWithoutReusingPreviousDraft() {
         RecordingDraftCreator draftCreator = new RecordingDraftCreator();
@@ -111,7 +126,14 @@ class TemplateImportServiceTest {
                 .containsExactly("new-user-welcome", "new-user-welcome");
     }
 
+    /**
+     * 封装BlockingValidationPort相关的业务逻辑。
+     */
     private static final class BlockingValidationPort implements TemplateValidationPort {
+
+        /**
+         * 处理validateTemplate。
+         */
         @Override
         public TemplateValidationResult validateTemplate(TemplateValidationCommand command) {
             return TemplateValidationResult.blocked(List.of(
@@ -119,14 +141,31 @@ class TemplateImportServiceTest {
         }
     }
 
+    /**
+     * 封装CapturingValidationPort相关的业务逻辑。
+     */
     private static final class CapturingValidationPort implements TemplateValidationPort {
+
+        /**
+         * 保存结果。
+         */
         private final TemplateValidationResult result;
+
+        /**
+         * 保存lastCommand。
+         */
         private TemplateValidationCommand lastCommand;
 
+        /**
+         * 创建当前对象实例。
+         */
         private CapturingValidationPort(TemplateValidationResult result) {
             this.result = result;
         }
 
+        /**
+         * 处理validateTemplate。
+         */
         @Override
         public TemplateValidationResult validateTemplate(TemplateValidationCommand command) {
             this.lastCommand = command;
@@ -134,11 +173,29 @@ class TemplateImportServiceTest {
         }
     }
 
+    /**
+     * 封装RecordingDraftCreator相关的业务逻辑。
+     */
     private static final class RecordingDraftCreator implements TemplateImportService.DraftCreator {
+
+        /**
+         * 保存calls。
+         */
         private int calls;
+
+        /**
+         * 保存lastCommand。
+         */
         private TemplateImportService.DraftCreationCommand lastCommand;
+
+        /**
+         * 保存测试或内存实现使用的commands列表。
+         */
         private final List<TemplateImportService.DraftCreationCommand> commands = new ArrayList<>();
 
+        /**
+         * 创建Draft。
+         */
         @Override
         public TemplateImportService.DraftCreationResult createDraft(TemplateImportService.DraftCreationCommand command) {
             this.calls++;

@@ -6,15 +6,27 @@ import org.chovy.canvas.canvas.domain.Canvas;
 import org.chovy.canvas.canvas.domain.CanvasRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * 封装MybatisCanvasRepository相关的业务逻辑。
+ */
 @Repository
 public class MybatisCanvasRepository implements CanvasRepository {
 
+    /**
+     * 保存映射器。
+     */
     private final CanvasMapper mapper;
 
+    /**
+     * 创建当前对象实例。
+     */
     public MybatisCanvasRepository(CanvasMapper mapper) {
         this.mapper = mapper;
     }
 
+    /**
+     * 保存。
+     */
     @Override
     public Canvas save(Canvas canvas) {
         CanvasDO row = CanvasPersistenceMapper.toRow(canvas);
@@ -32,6 +44,9 @@ public class MybatisCanvasRepository implements CanvasRepository {
         return CanvasPersistenceMapper.toDomain(row);
     }
 
+    /**
+     * 查询by标识。
+     */
     @Override
     public Optional<Canvas> findById(Long canvasId) {
         return Optional.ofNullable(CanvasPersistenceMapper.toDomain(mapper.selectById(canvasId)));

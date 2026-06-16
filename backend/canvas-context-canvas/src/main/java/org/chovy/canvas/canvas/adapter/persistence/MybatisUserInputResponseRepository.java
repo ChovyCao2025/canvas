@@ -10,15 +10,27 @@ import org.chovy.canvas.canvas.domain.UserInputResponse;
 import org.chovy.canvas.canvas.domain.UserInputStatus;
 import org.springframework.stereotype.Repository;
 
+/**
+ * 封装MybatisUserInputResponseRepository相关的业务逻辑。
+ */
 @Repository
 public class MybatisUserInputResponseRepository implements UserInputResponseRepository {
 
+    /**
+     * 保存映射器。
+     */
     private final UserInputResponseMapper mapper;
 
+    /**
+     * 创建当前对象实例。
+     */
     public MybatisUserInputResponseRepository(UserInputResponseMapper mapper) {
         this.mapper = mapper;
     }
 
+    /**
+     * 保存。
+     */
     @Override
     public UserInputResponse save(UserInputResponse response) {
         UserInputResponseDO row = UserInputPersistenceMapper.toResponseRow(response);
@@ -36,6 +48,9 @@ public class MybatisUserInputResponseRepository implements UserInputResponseRepo
         return UserInputPersistenceMapper.toResponseDomain(row);
     }
 
+    /**
+     * 处理completePending。
+     */
     @Override
     public Optional<UserInputResponse> completePending(Long responseId, String responseJson, LocalDateTime updatedAt) {
         UserInputResponseDO update = new UserInputResponseDO();
@@ -51,6 +66,9 @@ public class MybatisUserInputResponseRepository implements UserInputResponseRepo
         return findById(responseId);
     }
 
+    /**
+     * 查询ByTenantIdAndIdempotencyKey。
+     */
     @Override
     public Optional<UserInputResponse> findByTenantIdAndIdempotencyKey(Long tenantId, String idempotencyKey) {
         UserInputResponseDO row = mapper.selectOne(new LambdaQueryWrapper<UserInputResponseDO>()
@@ -60,6 +78,9 @@ public class MybatisUserInputResponseRepository implements UserInputResponseRepo
         return Optional.ofNullable(UserInputPersistenceMapper.toResponseDomain(row));
     }
 
+    /**
+     * 查询by标识。
+     */
     @Override
     public Optional<UserInputResponse> findById(Long responseId) {
         return Optional.ofNullable(UserInputPersistenceMapper.toResponseDomain(mapper.selectById(responseId)));

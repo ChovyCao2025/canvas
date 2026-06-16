@@ -9,15 +9,27 @@ import org.chovy.canvas.canvas.domain.CanvasVersionRepository;
 import org.chovy.canvas.canvas.domain.VersionStatus;
 import org.springframework.stereotype.Repository;
 
+/**
+ * 封装MybatisCanvasVersionRepository相关的业务逻辑。
+ */
 @Repository
 public class MybatisCanvasVersionRepository implements CanvasVersionRepository {
 
+    /**
+     * 保存映射器。
+     */
     private final CanvasVersionMapper mapper;
 
+    /**
+     * 创建当前对象实例。
+     */
     public MybatisCanvasVersionRepository(CanvasVersionMapper mapper) {
         this.mapper = mapper;
     }
 
+    /**
+     * 保存。
+     */
     @Override
     public CanvasVersion save(CanvasVersion version) {
         CanvasVersionDO row = CanvasVersionPersistenceMapper.toRow(version);
@@ -35,6 +47,9 @@ public class MybatisCanvasVersionRepository implements CanvasVersionRepository {
         return CanvasVersionPersistenceMapper.toDomain(row);
     }
 
+    /**
+     * 处理latestDraft。
+     */
     @Override
     public Optional<CanvasVersion> latestDraft(Long canvasId) {
         CanvasVersionDO row = mapper.selectOne(new LambdaQueryWrapper<CanvasVersionDO>()
@@ -45,11 +60,17 @@ public class MybatisCanvasVersionRepository implements CanvasVersionRepository {
         return Optional.ofNullable(CanvasVersionPersistenceMapper.toDomain(row));
     }
 
+    /**
+     * 查询by标识。
+     */
     @Override
     public Optional<CanvasVersion> findById(Long versionId) {
         return Optional.ofNullable(CanvasVersionPersistenceMapper.toDomain(mapper.selectById(versionId)));
     }
 
+    /**
+     * 查询by canvas标识。
+     */
     @Override
     public List<CanvasVersion> findByCanvasId(Long canvasId) {
         return mapper.selectList(new LambdaQueryWrapper<CanvasVersionDO>()

@@ -8,18 +8,38 @@ import org.chovy.canvas.canvas.domain.CanvasVersionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 封装CanvasDraftApplicationService相关的业务逻辑。
+ */
 @Service
 public class CanvasDraftApplicationService {
 
+    /**
+     * 保存canvasRepository。
+     */
     private final CanvasRepository canvasRepository;
+
+    /**
+     * 保存versionRepository。
+     */
     private final CanvasVersionRepository versionRepository;
+
+    /**
+     * 保存transitionPolicy。
+     */
     private final CanvasStateTransitionPolicy transitionPolicy;
 
+    /**
+     * 使用画布仓储和版本仓储创建草稿应用服务。
+     */
     public CanvasDraftApplicationService(CanvasRepository canvasRepository,
                                          CanvasVersionRepository versionRepository) {
         this(canvasRepository, versionRepository, new CanvasStateTransitionPolicy());
     }
 
+    /**
+     * 使用画布仓储和版本仓储创建草稿应用服务。
+     */
     public CanvasDraftApplicationService(CanvasRepository canvasRepository,
                                          CanvasVersionRepository versionRepository,
                                          CanvasStateTransitionPolicy transitionPolicy) {
@@ -28,6 +48,9 @@ public class CanvasDraftApplicationService {
         this.transitionPolicy = transitionPolicy;
     }
 
+    /**
+     * 创建Draft。
+     */
     @Transactional(rollbackFor = Exception.class)
     public Canvas createDraft(CreateDraftCommand command) {
         Canvas canvas = canvasRepository.save(Canvas.createDraft(
@@ -48,6 +71,9 @@ public class CanvasDraftApplicationService {
         return canvas;
     }
 
+    /**
+     * 更新Draft。
+     */
     @Transactional(rollbackFor = Exception.class)
     public Canvas updateDraft(Long canvasId, UpdateDraftCommand command) {
         Canvas canvas = requireCanvas(canvasId);
@@ -79,23 +105,59 @@ public class CanvasDraftApplicationService {
         return updated;
     }
 
+    /**
+     * 校验并返回Canvas。
+     */
     private Canvas requireCanvas(Long canvasId) {
         return canvasRepository.findById(canvasId)
                 .orElseThrow(() -> new IllegalArgumentException("画布不存在: " + canvasId));
     }
 
+    /**
+     * 承载CreateDraftCommand的数据快照。
+     */
     public record CreateDraftCommand(
+            /**
+             * 记录租户标识。
+             */
             Long tenantId,
+            /**
+             * 记录名称。
+             */
             String name,
+            /**
+             * 记录描述。
+             */
             String description,
+            /**
+             * 记录graphJSON 内容。
+             */
             String graphJson,
+            /**
+             * 记录操作人。
+             */
             String operator) {
     }
 
+    /**
+     * 承载UpdateDraftCommand的数据快照。
+     */
     public record UpdateDraftCommand(
+            /**
+             * 记录名称。
+             */
             String name,
+            /**
+             * 记录描述。
+             */
             String description,
+            /**
+             * 记录graphJSON 内容。
+             */
             String graphJson,
+            /**
+             * 记录操作人。
+             */
             String operator) {
     }
 }

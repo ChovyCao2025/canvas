@@ -3,6 +3,9 @@ package org.chovy.canvas.canvas.adapter.persistence;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
+/**
+ * 定义CanvasVersionMapper对外提供的能力契约。
+ */
 @Mapper
 public interface CanvasVersionMapper extends BaseMapper<CanvasVersionDO> {
 }

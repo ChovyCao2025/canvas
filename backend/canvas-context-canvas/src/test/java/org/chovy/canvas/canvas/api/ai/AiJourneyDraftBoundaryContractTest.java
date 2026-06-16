@@ -9,8 +9,14 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装AiJourneyDraftBoundaryContractTest相关的业务逻辑。
+ */
 class AiJourneyDraftBoundaryContractTest {
 
+    /**
+     * 处理proposalCarriesDraftOnlyAndDoesNotExposePublishedCanvasMutationFields。
+     */
     @Test
     void proposalCarriesDraftOnlyAndDoesNotExposePublishedCanvasMutationFields() {
         AiJourneyDraftProposal proposal = new AiJourneyDraftProposal(

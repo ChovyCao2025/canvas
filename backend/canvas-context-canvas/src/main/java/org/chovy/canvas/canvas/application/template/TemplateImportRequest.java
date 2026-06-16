@@ -3,14 +3,41 @@ package org.chovy.canvas.canvas.application.template;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 承载TemplateImportRequest的数据快照。
+ */
 public record TemplateImportRequest(
+        /**
+         * 记录租户标识。
+         */
         Long tenantId,
+        /**
+         * 记录templateKey。
+         */
         String templateKey,
+        /**
+         * 记录名称。
+         */
         String name,
+        /**
+         * 记录graphJSON 内容。
+         */
         String graphJson,
+        /**
+         * 记录sample payloadJSON 内容。
+         */
         String samplePayloadJson,
+        /**
+         * 记录requiredPluginKeys。
+         */
         List<String> requiredPluginKeys,
+        /**
+         * 记录pluginEnablement。
+         */
         Map<String, Boolean> pluginEnablement,
+        /**
+         * 记录操作人。
+         */
         String operator) {
 
     public TemplateImportRequest {

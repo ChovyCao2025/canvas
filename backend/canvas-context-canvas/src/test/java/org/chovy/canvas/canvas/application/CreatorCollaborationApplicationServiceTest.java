@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.CreatorCollaborationFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CreatorCollaborationApplicationServiceTest相关的业务逻辑。
+ */
 class CreatorCollaborationApplicationServiceTest {
 
+    /**
+     * 处理creatorCollaborationLifecycleIsTenantScopedAndDeterministic。
+     */
     @Test
     void creatorCollaborationLifecycleIsTenantScopedAndDeterministic() {
         CreatorCollaborationFacade service = new CreatorCollaborationApplicationService();
@@ -91,6 +97,9 @@ class CreatorCollaborationApplicationServiceTest {
         assertThat(service.listMutations(8L, Map.of()).get("records")).asList().isEmpty();
     }
 
+    /**
+     * 处理defaultsAndValidationFollowCompatibilityRules。
+     */
     @Test
     void defaultsAndValidationFollowCompatibilityRules() {
         CreatorCollaborationFacade service = new CreatorCollaborationApplicationService();

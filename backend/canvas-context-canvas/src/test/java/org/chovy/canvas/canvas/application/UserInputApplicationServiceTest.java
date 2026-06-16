@@ -16,12 +16,18 @@ import org.chovy.canvas.canvas.domain.UserInputResponse;
 import org.chovy.canvas.canvas.domain.UserInputStatus;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装UserInputApplicationServiceTest相关的业务逻辑。
+ */
 class UserInputApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-04T02:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 创建PendingIsIdempotentByRuntimeKey。
+     */
     @Test
     void createPendingIsIdempotentByRuntimeKey() {
         InMemoryUserInputFormRepository forms = new InMemoryUserInputFormRepository();
@@ -41,6 +47,9 @@ class UserInputApplicationServiceTest {
         assertThat(forms.rows).isEmpty();
     }
 
+    /**
+     * 创建PendingStoresFormAndResponseOwnedByCanvas。
+     */
     @Test
     void createPendingStoresFormAndResponseOwnedByCanvas() {
         InMemoryUserInputFormRepository forms = new InMemoryUserInputFormRepository();
@@ -61,6 +70,9 @@ class UserInputApplicationServiceTest {
         assertThat(responses.rows.get(0).status()).isEqualTo(UserInputStatus.PENDING);
     }
 
+    /**
+     * 处理submitCompletesPendingResponseAndRequestsExecutionResumeThroughPort。
+     */
     @Test
     void submitCompletesPendingResponseAndRequestsExecutionResumeThroughPort() {
         InMemoryUserInputFormRepository forms = new InMemoryUserInputFormRepository();
@@ -90,6 +102,9 @@ class UserInputApplicationServiceTest {
                 .containsEntry("timeoutNodeId", "timeout-1");
     }
 
+    /**
+     * 处理submitAlreadyCompletedResponseIsDuplicateAndDoesNotRequestResume。
+     */
     @Test
     void submitAlreadyCompletedResponseIsDuplicateAndDoesNotRequestResume() {
         InMemoryUserInputResponseRepository responses = new InMemoryUserInputResponseRepository();
@@ -109,6 +124,9 @@ class UserInputApplicationServiceTest {
         assertThat(resumePort.request).isNull();
     }
 
+    /**
+     * 处理submitLosingPendingRaceIsDuplicateAndDoesNotRequestResume。
+     */
     @Test
     void submitLosingPendingRaceIsDuplicateAndDoesNotRequestResume() {
         RaceLosingUserInputResponseRepository responses = new RaceLosingUserInputResponseRepository();
@@ -130,19 +148,43 @@ class UserInputApplicationServiceTest {
                 .isEqualTo("{\"email\":\"already@example.com\"}");
     }
 
+    /**
+     * 封装CapturingResumePort相关的业务逻辑。
+     */
     private static final class CapturingResumePort implements UserInputResumePort {
+
+        /**
+         * 保存请求。
+         */
         private UserInputResumeRequest request;
 
+        /**
+         * 处理requestResume。
+         */
         @Override
         public void requestResume(UserInputResumeRequest request) {
             this.request = request;
         }
     }
 
+    /**
+     * 封装InMemoryUserInputFormRepository相关的业务逻辑。
+     */
     private static final class InMemoryUserInputFormRepository implements UserInputFormRepository {
+
+        /**
+         * 保存测试或内存实现使用的rows列表。
+         */
         private final List<UserInputForm> rows = new ArrayList<>();
+
+        /**
+         * 保存next标识。
+         */
         private long nextId = 1L;
 
+        /**
+         * 保存。
+         */
         @Override
         public UserInputForm save(UserInputForm form) {
             UserInputForm saved = form.id() == null ? form.withId(nextId++) : form;
@@ -152,10 +194,24 @@ class UserInputApplicationServiceTest {
         }
     }
 
+    /**
+     * 封装InMemoryUserInputResponseRepository相关的业务逻辑。
+     */
     private static class InMemoryUserInputResponseRepository implements UserInputResponseRepository {
+
+        /**
+         * 保存测试或内存实现使用的rows列表。
+         */
         private final List<UserInputResponse> rows = new ArrayList<>();
+
+        /**
+         * 保存next标识。
+         */
         private long nextId = 1L;
 
+        /**
+         * 保存。
+         */
         @Override
         public UserInputResponse save(UserInputResponse response) {
             UserInputResponse saved = response.id() == null ? response.withId(nextId++) : response;
@@ -164,6 +220,9 @@ class UserInputApplicationServiceTest {
             return saved;
         }
 
+        /**
+         * 处理completePending。
+         */
         @Override
         public Optional<UserInputResponse> completePending(Long responseId, String responseJson, LocalDateTime updatedAt) {
             Optional<UserInputResponse> current = findById(responseId);
@@ -173,6 +232,9 @@ class UserInputApplicationServiceTest {
             return Optional.of(save(current.get().complete(responseJson, updatedAt)));
         }
 
+        /**
+         * 查询ByTenantIdAndIdempotencyKey。
+         */
         @Override
         public Optional<UserInputResponse> findByTenantIdAndIdempotencyKey(Long tenantId, String idempotencyKey) {
             return rows.stream()
@@ -181,15 +243,28 @@ class UserInputApplicationServiceTest {
                     .findFirst();
         }
 
+        /**
+         * 查询by标识。
+         */
         @Override
         public Optional<UserInputResponse> findById(Long responseId) {
             return rows.stream().filter(row -> row.id().equals(responseId)).findFirst();
         }
     }
 
+    /**
+     * 封装RaceLosingUserInputResponseRepository相关的业务逻辑。
+     */
     private static final class RaceLosingUserInputResponseRepository extends InMemoryUserInputResponseRepository {
+
+        /**
+         * 保存returnStalePendingOnce。
+         */
         private boolean returnStalePendingOnce = true;
 
+        /**
+         * 查询by标识。
+         */
         @Override
         public Optional<UserInputResponse> findById(Long responseId) {
             Optional<UserInputResponse> current = super.findById(responseId);
@@ -203,6 +278,9 @@ class UserInputApplicationServiceTest {
             return current;
         }
 
+        /**
+         * 处理completePending。
+         */
         @Override
         public Optional<UserInputResponse> completePending(Long responseId, String responseJson, LocalDateTime updatedAt) {
             Optional<UserInputResponse> current = super.findById(responseId);

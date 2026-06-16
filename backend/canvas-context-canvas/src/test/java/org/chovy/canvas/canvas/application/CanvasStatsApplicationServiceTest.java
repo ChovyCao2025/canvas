@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.CanvasStatsFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasStatsApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasStatsApplicationServiceTest {
 
+    /**
+     * 处理returnsDeterministicCompactStatsShapes。
+     */
     @Test
     void returnsDeterministicCompactStatsShapes() {
         CanvasStatsFacade service = new CanvasStatsApplicationService();
@@ -65,6 +71,9 @@ class CanvasStatsApplicationServiceTest {
                 .containsEntry("models", "LAST_TOUCH");
     }
 
+    /**
+     * 处理rejectsInvalidStatsInputBeforeBuildingViews。
+     */
     @Test
     void rejectsInvalidStatsInputBeforeBuildingViews() {
         CanvasStatsFacade service = new CanvasStatsApplicationService();

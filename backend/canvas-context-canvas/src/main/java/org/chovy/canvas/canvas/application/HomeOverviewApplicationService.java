@@ -7,9 +7,15 @@ import java.util.List;
 import org.chovy.canvas.canvas.api.HomeOverviewFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 封装HomeOverviewApplicationService相关的业务逻辑。
+ */
 @Service
 public class HomeOverviewApplicationService implements HomeOverviewFacade {
 
+    /**
+     * 处理overview。
+     */
     @Override
     public HomeOverviewView overview(int days) {
         LocalDate until = LocalDate.now();
@@ -22,6 +28,9 @@ public class HomeOverviewApplicationService implements HomeOverviewFacade {
                 List.of(noRecentExecutionsItem()));
     }
 
+    /**
+     * 处理emptyTrend。
+     */
     private static List<TrendPointView> emptyTrend(LocalDate since, LocalDate until) {
         List<TrendPointView> trend = new ArrayList<>();
         LocalDate cursor = since;
@@ -32,6 +41,9 @@ public class HomeOverviewApplicationService implements HomeOverviewFacade {
         return trend;
     }
 
+    /**
+     * 处理noRecentExecutionsItem。
+     */
     private static AttentionItemView noRecentExecutionsItem() {
         return new AttentionItemView(
                 0L,

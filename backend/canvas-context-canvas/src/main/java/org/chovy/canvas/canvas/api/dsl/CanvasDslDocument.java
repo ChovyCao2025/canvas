@@ -3,10 +3,25 @@ package org.chovy.canvas.canvas.api.dsl;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 承载CanvasDslDocument的数据快照。
+ */
 public record CanvasDslDocument(
+        /**
+         * 记录apiVersion。
+         */
         String apiVersion,
+        /**
+         * 记录kind。
+         */
         String kind,
+        /**
+         * 记录元数据。
+         */
         Metadata metadata,
+        /**
+         * 记录spec。
+         */
         Spec spec) {
 
     public CanvasDslDocument {
@@ -16,6 +31,9 @@ public record CanvasDslDocument(
         spec = spec == null ? new Spec(new Trigger("", ""), List.of(), List.of()) : spec;
     }
 
+    /**
+     * 承载元数据的数据快照。
+     */
     public record Metadata(String name, String title) {
 
         public Metadata {
@@ -24,6 +42,9 @@ public record CanvasDslDocument(
         }
     }
 
+    /**
+     * 承载Spec的数据快照。
+     */
     public record Spec(Trigger trigger, List<Node> nodes, List<Edge> edges) {
 
         public Spec {
@@ -33,6 +54,9 @@ public record CanvasDslDocument(
         }
     }
 
+    /**
+     * 承载Trigger的数据快照。
+     */
     public record Trigger(String type, String event) {
 
         public Trigger {
@@ -41,6 +65,9 @@ public record CanvasDslDocument(
         }
     }
 
+    /**
+     * 承载Node的数据快照。
+     */
     public record Node(String id, String type, Map<String, Object> config) {
 
         public Node {
@@ -50,6 +77,9 @@ public record CanvasDslDocument(
         }
     }
 
+    /**
+     * 承载Edge的数据快照。
+     */
     public record Edge(String from, String to) {
 
         public Edge {
@@ -58,6 +88,9 @@ public record CanvasDslDocument(
         }
     }
 
+    /**
+     * 校验文本不能为空。
+     */
     private static String requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");

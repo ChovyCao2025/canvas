@@ -8,8 +8,14 @@ import org.chovy.canvas.canvas.domain.CanvasRuntimeOptions;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasQueryApplicationServiceTest相关的业务逻辑。
+ */
 class CanvasQueryApplicationServiceTest {
 
+    /**
+     * 获取PublishedIncludesRuntimeOptionsAndParsedGraphDefinition。
+     */
     @Test
     void getPublishedIncludesRuntimeOptionsAndParsedGraphDefinition() {
         CanvasDraftApplicationServiceTest.InMemoryCanvasRepository canvases =

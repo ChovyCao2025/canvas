@@ -7,15 +7,27 @@ import org.chovy.canvas.canvas.application.CanvasProjectFolderRepository;
 import org.chovy.canvas.canvas.application.ProjectFolderMetadata;
 import org.springframework.stereotype.Repository;
 
+/**
+ * 封装MybatisCanvasProjectFolderRepository相关的业务逻辑。
+ */
 @Repository
 public class MybatisCanvasProjectFolderRepository implements CanvasProjectFolderRepository {
 
+    /**
+     * 保存映射器。
+     */
     private final CanvasProjectFolderMapper mapper;
 
+    /**
+     * 创建当前对象实例。
+     */
     public MybatisCanvasProjectFolderRepository(CanvasProjectFolderMapper mapper) {
         this.mapper = mapper;
     }
 
+    /**
+     * 查询by tenant id and canvas标识。
+     */
     @Override
     public Optional<ProjectFolderMetadata> findByTenantIdAndCanvasId(Long tenantId, Long canvasId) {
         CanvasProjectFolderDO row = mapper.selectOne(new LambdaQueryWrapper<CanvasProjectFolderDO>()
@@ -25,6 +37,9 @@ public class MybatisCanvasProjectFolderRepository implements CanvasProjectFolder
         return Optional.ofNullable(toDomain(row));
     }
 
+    /**
+     * 保存。
+     */
     @Override
     public ProjectFolderMetadata save(ProjectFolderMetadata metadata) {
         CanvasProjectFolderDO existing = mapper.selectOne(new LambdaQueryWrapper<CanvasProjectFolderDO>()
@@ -53,6 +68,9 @@ public class MybatisCanvasProjectFolderRepository implements CanvasProjectFolder
         return toDomain(row);
     }
 
+    /**
+     * 转换为Domain。
+     */
     private static ProjectFolderMetadata toDomain(CanvasProjectFolderDO row) {
         if (row == null) {
             return null;

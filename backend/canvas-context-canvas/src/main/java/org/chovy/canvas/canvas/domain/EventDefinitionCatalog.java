@@ -14,25 +14,55 @@ import org.chovy.canvas.canvas.api.EventDefinitionFacade.EventDefinitionListQuer
 import org.chovy.canvas.canvas.api.EventDefinitionFacade.EventDefinitionView;
 import org.chovy.canvas.canvas.api.EventDefinitionFacade.PageView;
 
+/**
+ * 封装EventDefinitionCatalog相关的业务逻辑。
+ */
 public class EventDefinitionCatalog {
 
+    /**
+     * 保存DEFAULT_ATTRIBUTES。
+     */
     private static final String DEFAULT_ATTRIBUTES = "[]";
+
+    /**
+     * 保存DEFAULT_DISCOVERY_MODE。
+     */
     private static final String DEFAULT_DISCOVERY_MODE = "REJECT_UNKNOWN";
 
+    /**
+     * 保存内存场景下生成标识或统计次数的原子计数器。
+     */
     private final AtomicLong ids = new AtomicLong(1);
+
+    /**
+     * 保存内存实现使用的rows映射数据。
+     */
     private final Map<Long, EventRow> rows = new LinkedHashMap<>();
+
+    /**
+     * 保存eventCodeInvalidator。
+     */
     private final Consumer<String> eventCodeInvalidator;
 
+    /**
+     * 创建当前对象实例。
+     */
     public EventDefinitionCatalog() {
         this(eventCode -> {
         });
     }
 
+    /**
+     * 创建当前对象实例。
+     */
     public EventDefinitionCatalog(Consumer<String> eventCodeInvalidator) {
         this.eventCodeInvalidator = eventCodeInvalidator == null ? eventCode -> {
         } : eventCodeInvalidator;
     }
 
+    /**
+     * 列出。
+     */
     public synchronized PageView<EventDefinitionView> list(EventDefinitionListQuery query) {
         int page = query.page() <= 0 ? 1 : query.page();
         int size = query.size() <= 0 ? 20 : query.size();
@@ -46,6 +76,9 @@ public class EventDefinitionCatalog {
         return new PageView<>(filtered.size(), filtered.subList(from, to));
     }
 
+    /**
+     * 创建。
+     */
     public synchronized EventDefinitionView create(EventDefinitionCommand command) {
         EventDefinitionCommand safe = requireCommand(command);
         requireEventCode(safe.eventCode());
@@ -67,6 +100,9 @@ public class EventDefinitionCatalog {
         return view(row);
     }
 
+    /**
+     * 更新。
+     */
     public synchronized EventDefinitionView update(Long id, EventDefinitionCommand command) {
         EventRow row = requireExisting(id);
         EventDefinitionCommand safe = requireCommand(command);
@@ -102,12 +138,18 @@ public class EventDefinitionCatalog {
         return view(row);
     }
 
+    /**
+     * 删除。
+     */
     public synchronized void delete(Long id) {
         EventRow existing = requireExisting(id);
         rows.remove(existing.id);
         invalidateEventCode(existing.eventCode);
     }
 
+    /**
+     * 校验并返回Existing。
+     */
     private EventRow requireExisting(Long id) {
         if (id == null) {
             throw new IllegalArgumentException("event definition not found: " + id);
@@ -119,6 +161,9 @@ public class EventDefinitionCatalog {
         return row;
     }
 
+    /**
+     * 校验并返回命令。
+     */
     private static EventDefinitionCommand requireCommand(EventDefinitionCommand command) {
         if (command == null) {
             return new EventDefinitionCommand(null, null, null, null, null, null, null, null);
@@ -126,22 +171,34 @@ public class EventDefinitionCatalog {
         return command;
     }
 
+    /**
+     * 校验并返回EventCode。
+     */
     private static void requireEventCode(String eventCode) {
         if (eventCode == null || eventCode.isBlank()) {
             throw new IllegalArgumentException("eventCode is required");
         }
     }
 
+    /**
+     * 处理invalidateEventCode。
+     */
     private void invalidateEventCode(String eventCode) {
         if (eventCode != null && !eventCode.isBlank()) {
             eventCodeInvalidator.accept(eventCode);
         }
     }
 
+    /**
+     * 处理defaultString。
+     */
     private static String defaultString(String value, String fallback) {
         return value == null ? fallback : value;
     }
 
+    /**
+     * 处理view。
+     */
     private static EventDefinitionView view(EventRow row) {
         return new EventDefinitionView(
                 row.id,
@@ -157,17 +214,64 @@ public class EventDefinitionCatalog {
                 row.updatedAt);
     }
 
+    /**
+     * 封装EventRow相关的业务逻辑。
+     */
     private static final class EventRow {
+
+        /**
+         * 保存标识。
+         */
         private Long id;
+
+        /**
+         * 保存名称。
+         */
         private String name;
+
+        /**
+         * 保存eventCode。
+         */
         private String eventCode;
+
+        /**
+         * 保存attributes。
+         */
         private String attributes;
+
+        /**
+         * 保存描述。
+         */
         private String description;
+
+        /**
+         * 保存autoDiscover。
+         */
         private Integer autoDiscover;
+
+        /**
+         * 保存discoveryMode。
+         */
         private String discoveryMode;
+
+        /**
+         * 保存启用状态。
+         */
         private Integer enabled;
+
+        /**
+         * 保存创建人。
+         */
         private String createdBy;
+
+        /**
+         * 保存创建时间。
+         */
         private LocalDateTime createdAt;
+
+        /**
+         * 保存更新时间。
+         */
         private LocalDateTime updatedAt;
     }
 }

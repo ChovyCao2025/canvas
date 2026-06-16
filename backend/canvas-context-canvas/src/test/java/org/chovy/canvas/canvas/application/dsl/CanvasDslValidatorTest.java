@@ -8,8 +8,14 @@ import java.util.Map;
 import org.chovy.canvas.canvas.api.dsl.CanvasDslDocument;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装CanvasDslValidatorTest相关的业务逻辑。
+ */
 class CanvasDslValidatorTest {
 
+    /**
+     * 处理rejectsUnsupportedVersionDuplicateNodesAndDanglingEdges。
+     */
     @Test
     void rejectsUnsupportedVersionDuplicateNodesAndDanglingEdges() {
         CanvasDslValidator validator = new CanvasDslValidator();
@@ -30,6 +36,9 @@ class CanvasDslValidatorTest {
                 .containsExactly("UNSUPPORTED_API_VERSION", "DUPLICATE_NODE_ID", "UNKNOWN_EDGE_TARGET");
     }
 
+    /**
+     * 处理acceptsSupportedGoldenPathNodeSet。
+     */
     @Test
     void acceptsSupportedGoldenPathNodeSet() {
         CanvasDslValidator validator = new CanvasDslValidator();
@@ -40,6 +49,9 @@ class CanvasDslValidatorTest {
         assertThat(result.violations()).isEmpty();
     }
 
+    /**
+     * 处理rejectsWrongKindBlankMetadataBlankNodeIdAndCycles。
+     */
     @Test
     void rejectsWrongKindBlankMetadataBlankNodeIdAndCycles() {
         CanvasDslValidator validator = new CanvasDslValidator();
@@ -63,6 +75,9 @@ class CanvasDslValidatorTest {
                 .containsExactly("UNSUPPORTED_KIND", "MISSING_METADATA_NAME", "MISSING_NODE_ID", "GRAPH_CONTAINS_CYCLE");
     }
 
+    /**
+     * 处理goldenPath。
+     */
     static CanvasDslDocument goldenPath() {
         return new CanvasDslDocument(
                 "canvas/v1",

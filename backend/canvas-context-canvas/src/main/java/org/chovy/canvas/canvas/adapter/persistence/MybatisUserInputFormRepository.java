@@ -4,15 +4,27 @@ import org.chovy.canvas.canvas.application.UserInputFormRepository;
 import org.chovy.canvas.canvas.domain.UserInputForm;
 import org.springframework.stereotype.Repository;
 
+/**
+ * 封装MybatisUserInputFormRepository相关的业务逻辑。
+ */
 @Repository
 public class MybatisUserInputFormRepository implements UserInputFormRepository {
 
+    /**
+     * 保存映射器。
+     */
     private final UserInputFormMapper mapper;
 
+    /**
+     * 创建当前对象实例。
+     */
     public MybatisUserInputFormRepository(UserInputFormMapper mapper) {
         this.mapper = mapper;
     }
 
+    /**
+     * 保存。
+     */
     @Override
     public UserInputForm save(UserInputForm form) {
         UserInputFormDO row = UserInputPersistenceMapper.toFormRow(form);

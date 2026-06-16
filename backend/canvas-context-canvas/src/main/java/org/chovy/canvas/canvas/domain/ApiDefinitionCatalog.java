@@ -15,11 +15,24 @@ import org.chovy.canvas.canvas.api.ApiDefinitionFacade.ApiDefinitionListQuery;
 import org.chovy.canvas.canvas.api.ApiDefinitionFacade.ApiDefinitionView;
 import org.chovy.canvas.canvas.api.ApiDefinitionFacade.PageView;
 
+/**
+ * 封装ApiDefinitionCatalog相关的业务逻辑。
+ */
 public class ApiDefinitionCatalog {
 
+    /**
+     * 保存内存场景下生成标识或统计次数的原子计数器。
+     */
     private final AtomicLong ids = new AtomicLong(1);
+
+    /**
+     * 保存内存实现使用的rows映射数据。
+     */
     private final Map<Long, ApiRow> rows = new LinkedHashMap<>();
 
+    /**
+     * 列出。
+     */
     public synchronized PageView<ApiDefinitionView> list(ApiDefinitionListQuery query) {
         int page = query.page() <= 0 ? 1 : query.page();
         int size = query.size() <= 0 ? 20 : query.size();
@@ -33,6 +46,9 @@ public class ApiDefinitionCatalog {
         return new PageView<>(filtered.size(), filtered.subList(from, to));
     }
 
+    /**
+     * 创建。
+     */
     public synchronized ApiDefinitionView create(ApiDefinitionCommand command) {
         ApiDefinitionCommand safe = requireCommand(command);
         validateRateLimit(safe.rateLimitPerSec());
@@ -51,6 +67,9 @@ public class ApiDefinitionCatalog {
         return view(row);
     }
 
+    /**
+     * 更新。
+     */
     public synchronized ApiDefinitionView update(Long id, ApiDefinitionCommand command) {
         if (id == null) {
             throw new IllegalArgumentException("id is required");
@@ -89,10 +108,16 @@ public class ApiDefinitionCatalog {
         return view(row);
     }
 
+    /**
+     * 删除。
+     */
     public synchronized void delete(Long id) {
         rows.remove(id);
     }
 
+    /**
+     * 校验并返回命令。
+     */
     private static ApiDefinitionCommand requireCommand(ApiDefinitionCommand command) {
         if (command == null) {
             return new ApiDefinitionCommand(null, null, null, null, null, null, null, null, false);
@@ -100,12 +125,18 @@ public class ApiDefinitionCatalog {
         return command;
     }
 
+    /**
+     * 处理validateRateLimit。
+     */
     private static void validateRateLimit(Integer rateLimitPerSec) {
         if (rateLimitPerSec != null && rateLimitPerSec <= 0) {
             throw new IllegalArgumentException("rateLimitPerSec 必须大于 0");
         }
     }
 
+    /**
+     * 处理validateOutboundUrl。
+     */
     private static void validateOutboundUrl(String url, boolean required) {
         if (url == null) {
             if (required) {
@@ -138,6 +169,9 @@ public class ApiDefinitionCatalog {
         }
     }
 
+    /**
+     * 判断BlockedHost。
+     */
     private static boolean isBlockedHost(String host) {
         String normalized = host.toLowerCase();
         if ("localhost".equals(normalized) || normalized.endsWith(".localhost")
@@ -160,6 +194,9 @@ public class ApiDefinitionCatalog {
         return normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
     }
 
+    /**
+     * 处理view。
+     */
     private static ApiDefinitionView view(ApiRow row) {
         return new ApiDefinitionView(
                 row.id,
@@ -173,15 +210,54 @@ public class ApiDefinitionCatalog {
                 row.rateLimitPerSec);
     }
 
+    /**
+     * 封装ApiRow相关的业务逻辑。
+     */
     private static final class ApiRow {
+
+        /**
+         * 保存标识。
+         */
         private Long id;
+
+        /**
+         * 保存apiKey。
+         */
         private String apiKey;
+
+        /**
+         * 保存url。
+         */
         private String url;
+
+        /**
+         * 保存启用状态。
+         */
         private Integer enabled;
+
+        /**
+         * 保存includeContextPayload。
+         */
         private Integer includeContextPayload;
+
+        /**
+         * 保存receiptEnabled。
+         */
         private Integer receiptEnabled;
+
+        /**
+         * 保存receiptExpireMinutes。
+         */
         private Integer receiptExpireMinutes;
+
+        /**
+         * 保存receiptStatuses。
+         */
         private String receiptStatuses;
+
+        /**
+         * 保存rateLimitPerSec。
+         */
         private Integer rateLimitPerSec;
     }
 }

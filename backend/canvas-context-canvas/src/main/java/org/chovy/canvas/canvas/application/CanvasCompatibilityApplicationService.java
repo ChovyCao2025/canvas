@@ -10,15 +10,40 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.chovy.canvas.canvas.api.CanvasCompatibilityFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 封装CanvasCompatibilityApplicationService相关的业务逻辑。
+ */
 @Service
 public class CanvasCompatibilityApplicationService implements CanvasCompatibilityFacade {
 
+    /**
+     * 保存内存场景下生成标识或统计次数的原子计数器。
+     */
     private final AtomicLong nextCanvasId = new AtomicLong(1000L);
+
+    /**
+     * 保存内存场景下生成标识或统计次数的原子计数器。
+     */
     private final AtomicLong nextTemplateId = new AtomicLong(5000L);
+
+    /**
+     * 保存内存实现使用的canvases by tenant映射数据。
+     */
     private final Map<Long, LinkedHashMap<Long, MutableCanvas>> canvasesByTenant = new LinkedHashMap<>();
+
+    /**
+     * 保存内存实现使用的templates by tenant映射数据。
+     */
     private final Map<Long, LinkedHashMap<Long, MutableTemplate>> templatesByTenant = new LinkedHashMap<>();
+
+    /**
+     * 保存内存实现使用的reviews映射数据。
+     */
     private final Map<String, ReviewView> reviews = new LinkedHashMap<>();
 
+    /**
+     * 创建。
+     */
     @Override
     public synchronized CanvasView create(Long tenantId, String operator, Map<String, ?> request) {
         Long normalizedTenantId = tenantIdOrDefault(tenantId);
@@ -44,6 +69,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas.toView();
     }
 
+    /**
+     * 创建Canvas。
+     */
     public synchronized Map<String, Object> createCanvas(Long tenantId, Map<String, ?> request, String operator) {
         if (nextCanvasId.get() == 1000L) {
             nextCanvasId.incrementAndGet();
@@ -51,11 +79,17 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return toMap(create(tenantId, operator, request));
     }
 
+    /**
+     * 获取。
+     */
     @Override
     public synchronized CanvasView get(Long tenantId, Long canvasId) {
         return requireCanvas(tenantIdOrDefault(tenantId), canvasId).toView();
     }
 
+    /**
+     * 更新。
+     */
     @Override
     public synchronized CanvasView update(Long tenantId, String operator, Long canvasId, Map<String, ?> request) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -63,6 +97,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas.toView();
     }
 
+    /**
+     * 更新兼容接口中的画布基础信息。
+     */
     public synchronized Map<String, Object> updateCanvas(Long tenantId,
                                                          Long canvasId,
                                                          Map<String, ?> request,
@@ -70,10 +107,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return toMap(update(tenantId, operator, canvasId, request));
     }
 
+    /**
+     * 获取Canvas。
+     */
     public synchronized Map<String, Object> getCanvas(Long tenantId, Long canvasId) {
         return toMap(get(tenantId, canvasId));
     }
 
+    /**
+     * 列出Canvases。
+     */
     public synchronized List<Map<String, Object>> listCanvases(Long tenantId) {
         return tenantCanvases(tenantIdOrDefault(tenantId)).values().stream()
                 .map(MutableCanvas::toView)
@@ -82,6 +125,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 .toList();
     }
 
+    /**
+     * 列出。
+     */
     @Override
     public synchronized PageView<CanvasView> list(Long tenantId) {
         List<CanvasView> list = tenantCanvases(tenantIdOrDefault(tenantId)).values().stream()
@@ -90,6 +136,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new PageView<>(list.size(), list);
     }
 
+    /**
+     * 处理submitReview。
+     */
     @Override
     public synchronized ReviewView submitReview(Long tenantId, String operator, Long canvasId, Map<String, ?> request) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -103,6 +152,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return review;
     }
 
+    /**
+     * 提交画布审核并记录审核信息。
+     */
     public synchronized Map<String, Object> submitReview(Long tenantId,
                                                          Long canvasId,
                                                          Map<String, ?> request,
@@ -116,6 +168,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 "reason", review.reason());
     }
 
+    /**
+     * 处理approvalStatusView。
+     */
     @Override
     public synchronized ApprovalStatusView approvalStatusView(Long tenantId, Long canvasId) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -124,11 +179,17 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new ApprovalStatusView(canvas.id, status, review == null ? null : review.reviewId());
     }
 
+    /**
+     * 处理approvalStatus。
+     */
     public synchronized Map<String, Object> approvalStatus(Long tenantId, Long canvasId) {
         ApprovalStatusView status = approvalStatusView(tenantId, canvasId);
         return mapOf("canvasId", status.canvasId(), "status", status.status(), "reviewId", status.reviewId());
     }
 
+    /**
+     * 处理prePublishChecksView。
+     */
     @Override
     public synchronized PrePublishCheckView prePublishChecksView(Long tenantId, Long canvasId) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -138,6 +199,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 new CheckItemView("CANVAS_STATUS", true, "Canvas can be checked")));
     }
 
+    /**
+     * 处理prePublishChecks。
+     */
     public synchronized Map<String, Object> prePublishChecks(Long tenantId, Long canvasId) {
         PrePublishCheckView checks = prePublishChecksView(tenantId, canvasId);
         return mapOf(
@@ -146,6 +210,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 "items", checks.items());
     }
 
+    /**
+     * 处理revert。
+     */
     @Override
     public synchronized OperationView revert(Long tenantId, String operator, Long canvasId, Long versionId) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -156,12 +223,18 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new OperationView(canvas.id, "REVERTED", versionId, canvas.updatedBy);
     }
 
+    /**
+     * 处理revert。
+     */
     public synchronized Map<String, Object> revert(Long tenantId, Long canvasId, Long versionId, String operator) {
         revert(tenantId, operator, canvasId, versionId);
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
         return toMap(canvas.toView());
     }
 
+    /**
+     * 处理startCanary。
+     */
     @Override
     public synchronized CanvasView startCanary(Long tenantId, String operator, Long canvasId, int percent) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -175,10 +248,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas.toView();
     }
 
+    /**
+     * 处理startCanary。
+     */
     public synchronized Map<String, Object> startCanary(Long tenantId, Long canvasId, int percent, String operator) {
         return toMap(startCanary(tenantId, operator, canvasId, percent));
     }
 
+    /**
+     * 处理promoteCanary。
+     */
     @Override
     public synchronized CanvasView promoteCanary(Long tenantId, String operator, Long canvasId) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -189,10 +268,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas.toView();
     }
 
+    /**
+     * 处理promoteCanary。
+     */
     public synchronized Map<String, Object> promoteCanary(Long tenantId, Long canvasId, String operator) {
         return toMap(promoteCanary(tenantId, operator, canvasId));
     }
 
+    /**
+     * 处理rollbackCanary。
+     */
     @Override
     public synchronized CanvasView rollbackCanary(Long tenantId, String operator, Long canvasId) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -203,10 +288,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas.toView();
     }
 
+    /**
+     * 处理rollbackCanary。
+     */
     public synchronized Map<String, Object> rollbackCanary(Long tenantId, Long canvasId, String operator) {
         return toMap(rollbackCanary(tenantId, operator, canvasId));
     }
 
+    /**
+     * 处理rollback。
+     */
     @Override
     public synchronized CanvasView rollback(Long tenantId, String operator, Long canvasId) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -216,10 +307,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas.toView();
     }
 
+    /**
+     * 处理rollback。
+     */
     public synchronized Map<String, Object> rollback(Long tenantId, Long canvasId, String operator) {
         return toMap(rollback(tenantId, operator, canvasId));
     }
 
+    /**
+     * 处理cloneCanvas。
+     */
     @Override
     public synchronized CanvasView cloneCanvas(Long tenantId, String operator, Long canvasId) {
         MutableCanvas source = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -242,10 +339,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return clone.toView();
     }
 
+    /**
+     * 处理cloneCanvas。
+     */
     public synchronized Map<String, Object> cloneCanvas(Long tenantId, Long canvasId, String operator) {
         return toMap(cloneCanvas(tenantId, operator, canvasId));
     }
 
+    /**
+     * 处理diff。
+     */
     @Override
     public synchronized DiffView diff(Long tenantId, Long canvasId, Long leftVersionId, Long rightVersionId) {
         requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -256,6 +359,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 String.valueOf(rightVersionId))));
     }
 
+    /**
+     * 比较两个版本之间的配置差异。
+     */
     public synchronized Map<String, Object> diffVersions(Long tenantId,
                                                          Long canvasId,
                                                          Long leftVersionId,
@@ -264,6 +370,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return mapOf("canvasId", canvasId, "changed", diff.changed(), "changes", diff.changes());
     }
 
+    /**
+     * 处理safeUpdate。
+     */
     @Override
     public synchronized CanvasView safeUpdate(Long tenantId, String operator, Long canvasId, Map<String, ?> request) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -275,6 +384,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas.toView();
     }
 
+    /**
+     * 在安全校验通过后更新画布。
+     */
     public synchronized Map<String, Object> safeUpdateCanvas(Long tenantId,
                                                              Long canvasId,
                                                              Map<String, ?> request,
@@ -289,6 +401,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         }
     }
 
+    /**
+     * 处理previewMessage。
+     */
     @Override
     public synchronized MessagePreviewView previewMessage(Long tenantId, Long canvasId, Map<String, ?> request) {
         requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -296,6 +411,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new MessagePreviewView(canvasId, nodeId, stringValue(request, "userId", ""), "Preview for " + nodeId);
     }
 
+    /**
+     * 处理messagePreview。
+     */
     public synchronized Map<String, Object> messagePreview(Long tenantId, Long canvasId, Map<String, ?> request) {
         MessagePreviewView preview = previewMessage(tenantId, canvasId, request);
         return mapOf(
@@ -306,6 +424,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 "rendered", true);
     }
 
+    /**
+     * 处理exportCanvasView。
+     */
     @Override
     public synchronized CanvasExportView exportCanvasView(Long tenantId, Long canvasId, Long versionId) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
@@ -314,11 +435,17 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new CanvasExportView(canvas.id, versionId, packageJson);
     }
 
+    /**
+     * 处理exportCanvas。
+     */
     public synchronized Map<String, Object> exportCanvas(Long tenantId, Long canvasId, Long versionId) {
         CanvasExportView export = exportCanvasView(tenantId, canvasId, versionId);
         return mapOf("canvasId", export.canvasId(), "versionId", export.versionId(), "packageJson", export.packageJson());
     }
 
+    /**
+     * 处理importCanvas。
+     */
     @Override
     public synchronized CanvasImportView importCanvas(Long tenantId, Map<String, ?> request) {
         String operator = stringValue(request, "operator", "operator-1");
@@ -329,6 +456,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new CanvasImportView(created, stringValue(request, "packageJson", "{}"));
     }
 
+    /**
+     * 处理importCanvas。
+     */
     public synchronized Map<String, Object> importCanvas(Long tenantId, Map<String, ?> request, String operator) {
         CanvasView created = create(tenantIdOrDefault(tenantId), operator, request);
         return mapOf(
@@ -340,6 +470,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 "imported", true);
     }
 
+    /**
+     * 列出Templates。
+     */
     public synchronized List<TemplateView> listTemplates(Long tenantId, String category) {
         return tenantTemplates(tenantIdOrDefault(tenantId)).values().stream()
                 .filter(template -> template.enabled)
@@ -349,6 +482,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 .toList();
     }
 
+    /**
+     * 保存AsTemplate。
+     */
     public synchronized TemplateView saveAsTemplate(Long tenantId, Long canvasId, Map<String, ?> request) {
         MutableCanvas canvas = requireCanvas(tenantIdOrDefault(tenantId), canvasId);
         Long templateId = nextTemplateId.getAndIncrement();
@@ -367,6 +503,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return template.toView();
     }
 
+    /**
+     * 根据模板创建新的画布视图。
+     */
     public synchronized CanvasView createFromTemplate(Long tenantId,
                                                       Long templateId,
                                                       Map<String, ?> request,
@@ -384,6 +523,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas;
     }
 
+    /**
+     * 处理pendingReviews。
+     */
     public synchronized List<PendingReviewView> pendingReviews(Long tenantId) {
         Long normalizedTenantId = tenantIdOrDefault(tenantId);
         return reviews.values().stream()
@@ -398,12 +540,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 .toList();
     }
 
+    /**
+     * 批量执行画布操作并汇总结果。
+     */
     public synchronized BatchOperationView batchOperation(Long tenantId,
                                                           String operator,
                                                           String operation,
                                                           Map<String, ?> request) {
         Long normalizedTenantId = tenantIdOrDefault(tenantId);
         String normalizedOperation = normalizeOperation(operation);
+        // 先固定操作类型，再逐项执行，确保批量结果中的状态口径一致。
         List<BatchItemView> results = resolveBatchCanvasIds(normalizedTenantId, request).stream()
                 .map(canvasId -> runBatchItem(normalizedTenantId, operatorOrDefault(operator), normalizedOperation,
                         canvasId, request))
@@ -411,6 +557,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new BatchOperationView(normalizedOperation, results);
     }
 
+    /**
+     * 执行单个批量操作项。
+     */
     private BatchItemView runBatchItem(Long tenantId,
                                        String operator,
                                        String operation,
@@ -430,6 +579,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         }
     }
 
+    /**
+     * 处理pauseBatchItem。
+     */
     private BatchItemView pauseBatchItem(MutableCanvas canvas, String operator) {
         if ("PAUSED".equals(canvas.status)) {
             return new BatchItemView(canvas.id, null, "SKIPPED", "ALREADY_PAUSED");
@@ -443,6 +595,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new BatchItemView(canvas.id, null, "SUCCESS", "PAUSED");
     }
 
+    /**
+     * 处理resumeBatchItem。
+     */
     private BatchItemView resumeBatchItem(MutableCanvas canvas, String operator) {
         if ("PUBLISHED".equals(canvas.status)) {
             return new BatchItemView(canvas.id, null, "SKIPPED", "ALREADY_PUBLISHED");
@@ -456,6 +611,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new BatchItemView(canvas.id, null, "SUCCESS", "RESUMED");
     }
 
+    /**
+     * 处理archiveBatchItem。
+     */
     private BatchItemView archiveBatchItem(MutableCanvas canvas, String operator) {
         if ("ARCHIVED".equals(canvas.status)) {
             return new BatchItemView(canvas.id, null, "SKIPPED", "ALREADY_ARCHIVED");
@@ -466,6 +624,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new BatchItemView(canvas.id, null, "SUCCESS", "ARCHIVED");
     }
 
+    /**
+     * 处理cloneBatchItem。
+     */
     private BatchItemView cloneBatchItem(MutableCanvas canvas, String operator, Map<String, ?> request) {
         CanvasView clone = cloneCanvas(canvas.tenantId, operator, canvas.id);
         MutableCanvas mutableClone = requireCanvas(canvas.tenantId, clone.id());
@@ -473,6 +634,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return new BatchItemView(canvas.id, mutableClone.id, "SUCCESS", "CLONED");
     }
 
+    /**
+     * 校验并返回Canvas。
+     */
     private MutableCanvas requireCanvas(Long tenantId, Long canvasId) {
         MutableCanvas canvas = tenantCanvases(tenantId).get(canvasId);
         if (canvas == null) {
@@ -481,14 +645,23 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvas;
     }
 
+    /**
+     * 处理tenantCanvases。
+     */
     private LinkedHashMap<Long, MutableCanvas> tenantCanvases(Long tenantId) {
         return canvasesByTenant.computeIfAbsent(tenantId, ignored -> new LinkedHashMap<>());
     }
 
+    /**
+     * 处理tenantTemplates。
+     */
     private LinkedHashMap<Long, MutableTemplate> tenantTemplates(Long tenantId) {
         return templatesByTenant.computeIfAbsent(tenantId, ignored -> new LinkedHashMap<>());
     }
 
+    /**
+     * 处理resolveBatchCanvasIds。
+     */
     private List<Long> resolveBatchCanvasIds(Long tenantId, Map<String, ?> request) {
         List<Long> explicitCanvasIds = longListValue(request, "canvasIds");
         if (!explicitCanvasIds.isEmpty()) {
@@ -513,6 +686,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return canvasIds;
     }
 
+    /**
+     * 处理longListValue。
+     */
     private static List<Long> longListValue(Map<String, ?> request, String key) {
         if (request == null) {
             return List.of();
@@ -532,6 +708,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return ids;
     }
 
+    /**
+     * 处理mapValue。
+     */
     private static Map<String, ?> mapValue(Map<String, ?> request, String key) {
         if (request == null) {
             return Map.of();
@@ -545,6 +724,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return Map.of();
     }
 
+    /**
+     * 规范化Operation。
+     */
     private static String normalizeOperation(String operation) {
         if (operation == null || operation.isBlank()) {
             throw new IllegalArgumentException("operation is required");
@@ -556,6 +738,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return normalized;
     }
 
+    /**
+     * 处理applyBatchCloneReplacements。
+     */
     private static void applyBatchCloneReplacements(MutableCanvas clone, Map<String, ?> replacements) {
         String name = stringValue(replacements, "name", clone.name);
         String description = stringValue(replacements, "description", clone.description);
@@ -563,6 +748,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         clone.description = replaceTokens(description, replacements);
     }
 
+    /**
+     * 处理replaceTokens。
+     */
     private static String replaceTokens(String input, Map<String, ?> replacements) {
         if (input == null || replacements == null || replacements.isEmpty()) {
             return input;
@@ -577,18 +765,30 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return result;
     }
 
+    /**
+     * 处理tenantIdOrDefault。
+     */
     private static Long tenantIdOrDefault(Long tenantId) {
         return tenantId == null ? 7L : tenantId;
     }
 
+    /**
+     * 处理operatorOrDefault。
+     */
     private static String operatorOrDefault(String operator) {
         return operator == null || operator.isBlank() ? "operator-1" : operator;
     }
 
+    /**
+     * 处理reviewKey。
+     */
     private static String reviewKey(Long tenantId, Long canvasId) {
         return tenantId + ":" + canvasId;
     }
 
+    /**
+     * 处理stringValue。
+     */
     private static String stringValue(Map<String, ?> request, String key, String defaultValue) {
         if (request == null) {
             return defaultValue;
@@ -597,6 +797,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return value == null ? defaultValue : String.valueOf(value);
     }
 
+    /**
+     * 处理intValue。
+     */
     private static Integer intValue(Map<String, ?> request, String key, Integer defaultValue) {
         if (request == null) {
             return defaultValue;
@@ -608,10 +811,16 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return value == null ? defaultValue : Integer.parseInt(String.valueOf(value));
     }
 
+    /**
+     * 处理escapeJSON 内容。
+     */
     private static String escapeJson(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
+    /**
+     * 转换为Map。
+     */
     private static Map<String, Object> toMap(CanvasView canvas) {
         return mapOf(
                 "id", canvas.id(),
@@ -630,6 +839,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                 "imported", canvas.imported());
     }
 
+    /**
+     * 处理mapOf。
+     */
     private static Map<String, Object> mapOf(Object... pairs) {
         LinkedHashMap<String, Object> map = new LinkedHashMap<>();
         for (int i = 0; i < pairs.length; i += 2) {
@@ -641,23 +853,89 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         return map;
     }
 
+    /**
+     * 封装MutableCanvas相关的业务逻辑。
+     */
     private static final class MutableCanvas {
+
+        /**
+         * 保存标识。
+         */
         private final Long id;
+
+        /**
+         * 保存租户标识。
+         */
         private final Long tenantId;
+
+        /**
+         * 保存创建人。
+         */
         private final String createdBy;
+
+        /**
+         * 保存名称。
+         */
         private String name;
+
+        /**
+         * 保存描述。
+         */
         private String description;
+
+        /**
+         * 保存graphJSON 内容。
+         */
         private String graphJson;
+
+        /**
+         * 保存状态。
+         */
         private String status;
+
+        /**
+         * 保存更新人。
+         */
         private String updatedBy;
+
+        /**
+         * 保存editVersion。
+         */
         private int editVersion;
+
+        /**
+         * 保存canaryPercent。
+         */
         private int canaryPercent;
+
+        /**
+         * 保存canaryStatus。
+         */
         private String canaryStatus;
+
+        /**
+         * 保存source canvas标识。
+         */
         private Long sourceCanvasId;
+
+        /**
+         * 保存imported。
+         */
         private boolean imported;
+
+        /**
+         * 保存active version标识。
+         */
         private Long activeVersionId = 1L;
+
+        /**
+         * 保存内存实现使用的versions映射数据。
+         */
         private final Map<Long, String> versions = new LinkedHashMap<>();
 
+        /**
+         * 创建可变画布内存行。
+         */
         private MutableCanvas(Long id,
                               Long tenantId,
                               String name,
@@ -685,6 +963,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
             this.imported = imported;
         }
 
+        /**
+         * 更新。
+         */
         private void update(Map<String, ?> request, String operator) {
             this.name = stringValue(request, "name", name);
             this.description = stringValue(request, "description", description);
@@ -695,6 +976,9 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
             this.versions.put(activeVersionId, graphJson);
         }
 
+        /**
+         * 转换为View。
+         */
         private CanvasView toView() {
             return new CanvasView(
                     id,
@@ -714,18 +998,64 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
         }
     }
 
+    /**
+     * 封装MutableTemplate相关的业务逻辑。
+     */
     private static final class MutableTemplate {
+
+        /**
+         * 保存标识。
+         */
         private final Long id;
+
+        /**
+         * 保存租户标识。
+         */
         private final Long tenantId;
+
+        /**
+         * 保存名称。
+         */
         private final String name;
+
+        /**
+         * 保存描述。
+         */
         private final String description;
+
+        /**
+         * 保存category。
+         */
         private final String category;
+
+        /**
+         * 保存graphJSON 内容。
+         */
         private final String graphJson;
+
+        /**
+         * 保存official。
+         */
         private final boolean official;
+
+        /**
+         * 保存启用状态。
+         */
         private final boolean enabled;
+
+        /**
+         * 保存创建人。
+         */
         private final String createdBy;
+
+        /**
+         * 保存useCount。
+         */
         private int useCount;
 
+        /**
+         * 创建可变模板内存行。
+         */
         private MutableTemplate(Long id,
                                 Long tenantId,
                                 String name,
@@ -748,90 +1078,235 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
             this.createdBy = createdBy;
         }
 
+        /**
+         * 转换为View。
+         */
         private TemplateView toView() {
             return new TemplateView(id, tenantId, name, description, category, graphJson, official, enabled,
                     useCount, createdBy);
         }
     }
 
+    /**
+     * 承载CanvasView的数据快照。
+     */
     public record CanvasView(
+            /**
+             * 记录标识。
+             */
             Long id,
+            /**
+             * 记录租户标识。
+             */
             Long tenantId,
+            /**
+             * 记录名称。
+             */
             String name,
+            /**
+             * 记录描述。
+             */
             String description,
+            /**
+             * 记录graphJSON 内容。
+             */
             String graphJson,
+            /**
+             * 记录状态。
+             */
             String status,
+            /**
+             * 记录创建人。
+             */
             String createdBy,
+            /**
+             * 记录更新人。
+             */
             String updatedBy,
+            /**
+             * 记录editVersion。
+             */
             Integer editVersion,
+            /**
+             * 记录canaryPercent。
+             */
             Integer canaryPercent,
+            /**
+             * 记录canaryStatus。
+             */
             String canaryStatus,
+            /**
+             * 记录source canvas标识。
+             */
             Long sourceCanvasId,
+            /**
+             * 记录active version标识。
+             */
             Long activeVersionId,
+            /**
+             * 记录imported。
+             */
             Boolean imported) {
     }
 
+    /**
+     * 承载PageView的数据快照。
+     */
     public record PageView<T>(int total, List<T> list) {
     }
 
+    /**
+     * 承载TemplateView的数据快照。
+     */
     public record TemplateView(
+            /**
+             * 记录标识。
+             */
             Long id,
+            /**
+             * 记录租户标识。
+             */
             Long tenantId,
+            /**
+             * 记录名称。
+             */
             String name,
+            /**
+             * 记录描述。
+             */
             String description,
+            /**
+             * 记录category。
+             */
             String category,
+            /**
+             * 记录graphJSON 内容。
+             */
             String graphJson,
+            /**
+             * 记录official。
+             */
             Boolean official,
+            /**
+             * 记录启用状态。
+             */
             Boolean enabled,
+            /**
+             * 记录useCount。
+             */
             Integer useCount,
+            /**
+             * 记录创建人。
+             */
             String createdBy) {
     }
 
+    /**
+     * 承载ReviewView的数据快照。
+     */
     public record ReviewView(String reviewId, Long canvasId, String status, String operator, String reason) {
     }
 
+    /**
+     * 承载PendingReviewView的数据快照。
+     */
     public record PendingReviewView(String reviewId, Long canvasId, String status, String operator, String reason) {
     }
 
+    /**
+     * 承载ApprovalStatusView的数据快照。
+     */
     public record ApprovalStatusView(Long canvasId, String status, String reviewId) {
     }
 
+    /**
+     * 承载PrePublishCheckView的数据快照。
+     */
     public record PrePublishCheckView(boolean passed, List<CheckItemView> items) {
     }
 
+    /**
+     * 承载CheckItemView的数据快照。
+     */
     public record CheckItemView(String code, boolean passed, String message) {
     }
 
+    /**
+     * 承载OperationView的数据快照。
+     */
     public record OperationView(Long canvasId, String status, Long versionId, String operator) {
     }
 
+    /**
+     * 承载DiffView的数据快照。
+     */
     public record DiffView(boolean changed, List<DiffItemView> changes) {
     }
 
+    /**
+     * 承载DiffItemView的数据快照。
+     */
     public record DiffItemView(String code, String path, String before, String after) {
     }
 
+    /**
+     * 承载MessagePreviewView的数据快照。
+     */
     public record MessagePreviewView(Long canvasId, String nodeId, String userId, String previewText) {
     }
 
+    /**
+     * 承载CanvasExportView的数据快照。
+     */
     public record CanvasExportView(Long canvasId, Long versionId, String packageJson) {
     }
 
+    /**
+     * 承载CanvasImportView的数据快照。
+     */
     public record CanvasImportView(CanvasView created, String packageJson) {
     }
 
+    /**
+     * 承载BatchItemView的数据快照。
+     */
     public record BatchItemView(Long canvasId, Long targetCanvasId, String status, String message) {
+
+        /**
+         * 处理new canvas标识。
+         */
         public Long newCanvasId() {
             return targetCanvasId;
         }
     }
 
+    /**
+     * 承载BatchOperationView的数据快照。
+     */
     public record BatchOperationView(String operation,
+                                     /**
+                                      * 记录totalCount。
+                                      */
                                      int totalCount,
+                                     /**
+                                      * 记录successCount。
+                                      */
                                      int successCount,
+                                     /**
+                                      * 记录skippedCount。
+                                      */
                                      int skippedCount,
+                                     /**
+                                      * 记录failedCount。
+                                      */
                                      int failedCount,
+                                     /**
+                                      * 记录items。
+                                      */
                                      List<BatchItemView> items,
+                                     /**
+                                      * 记录countsByStatus。
+                                      */
                                      Map<String, Integer> countsByStatus) {
 
         private BatchOperationView(String operation, List<BatchItemView> items) {
@@ -839,14 +1314,23 @@ public class CanvasCompatibilityApplicationService implements CanvasCompatibilit
                     items, countsByStatus(items));
         }
 
+        /**
+         * 保存测试或内存实现使用的results列表。
+         */
         public List<BatchItemView> results() {
             return items;
         }
 
+        /**
+         * 统计指定状态的批量操作结果数量。
+         */
         private static int count(List<BatchItemView> items, String status) {
             return (int) items.stream().filter(item -> status.equals(item.status())).count();
         }
 
+        /**
+         * 保存内存实现使用的counts by status映射数据。
+         */
         private static Map<String, Integer> countsByStatus(List<BatchItemView> items) {
             LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
             counts.put("SUCCESS", count(items, "SUCCESS"));

@@ -7,19 +7,34 @@ import java.util.Set;
 
 import org.chovy.canvas.canvas.api.CanvasPreferenceFacade.PreferenceView;
 
+/**
+ * 封装CanvasPreferenceCatalog相关的业务逻辑。
+ */
 public class CanvasPreferenceCatalog {
 
+    /**
+     * 保存EDITOR_KEY。
+     */
     private static final String EDITOR_KEY = "canvas-editor";
     private static final Set<String> ALLOWED_EDITOR_KEYS = Set.of(
             "theme", "sidebarCollapsed", "notificationLevel", "recentNodeTypes", "editorLayout", "listDefaults");
 
+    /**
+     * 保存内存实现使用的preferences映射数据。
+     */
     private final Map<Key, Map<String, Object>> preferences = new LinkedHashMap<>();
 
+    /**
+     * 获取EditorPreference。
+     */
     public synchronized PreferenceView getEditorPreference(Long tenantId, String userId) {
         Map<String, Object> stored = preferences.get(new Key(tenantId, userId, EDITOR_KEY));
         return new PreferenceView(EDITOR_KEY, stored == null ? defaultEditorPreferences() : stored);
     }
 
+    /**
+     * 新增或更新编辑器偏好配置。
+     */
     public synchronized PreferenceView upsertEditorPreference(Long tenantId,
                                                               String userId,
                                                               Map<String, Object> patch) {
@@ -35,6 +50,9 @@ public class CanvasPreferenceCatalog {
         return new PreferenceView(EDITOR_KEY, merged);
     }
 
+    /**
+     * 处理defaultEditorPreferences。
+     */
     private static Map<String, Object> defaultEditorPreferences() {
         Map<String, Object> defaults = new LinkedHashMap<>();
         defaults.put("theme", "system");
@@ -46,6 +64,9 @@ public class CanvasPreferenceCatalog {
         return defaults;
     }
 
+    /**
+     * 承载键的数据快照。
+     */
     private record Key(Long tenantId, String userId, String preferenceKey) {
     }
 }

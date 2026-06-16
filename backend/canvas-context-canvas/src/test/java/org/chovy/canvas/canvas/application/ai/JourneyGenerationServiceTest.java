@@ -10,12 +10,24 @@ import java.util.List;
 import org.chovy.canvas.canvas.api.ai.AiJourneyDraftProposal;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 封装JourneyGenerationServiceTest相关的业务逻辑。
+ */
 class JourneyGenerationServiceTest {
 
+    /**
+     * 提供测试使用的固定时钟。
+     */
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-06-11T08:00:00Z"), ZoneOffset.UTC);
 
+    /**
+     * 提供使用固定时钟创建的旅程生成服务。
+     */
     private final JourneyGenerationService service = JourneyGenerationService.mock(CLOCK);
 
+    /**
+     * 处理mockProviderGeneratesValidCanvasDslDraftProposalWithoutPublishFields。
+     */
     @Test
     void mockProviderGeneratesValidCanvasDslDraftProposalWithoutPublishFields() {
         AiJourneyDraftProposal proposal = service.generateDraft(new JourneyGenerationService.GenerationRequest(
@@ -45,6 +57,9 @@ class JourneyGenerationServiceTest {
                 .containsExactly("exec-42");
     }
 
+    /**
+     * 处理mockProviderUsesDemoSafeFallbackWhenPromptIsBlank。
+     */
     @Test
     void mockProviderUsesDemoSafeFallbackWhenPromptIsBlank() {
         AiJourneyDraftProposal proposal = service.generateDraft(new JourneyGenerationService.GenerationRequest(

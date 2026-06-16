@@ -9,9 +9,15 @@ import java.util.Set;
 import org.chovy.canvas.canvas.api.dsl.CanvasDslDocument;
 import org.springframework.stereotype.Component;
 
+/**
+ * 封装CanvasDslMapper相关的业务逻辑。
+ */
 @Component
 public class CanvasDslMapper implements CanvasDslMappingService {
 
+    /**
+     * 转换为graphJSON 内容。
+     */
     @Override
     public MappingResult toGraphJson(CanvasDslDocument document) {
         Map<String, Object> graph = new LinkedHashMap<>();
@@ -50,6 +56,9 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         return new MappingResult(document.metadata().name(), DslJsonSupport.toJson(graph));
     }
 
+    /**
+     * 处理from graphJSON 内容。
+     */
     @Override
     public CanvasDslDocument fromGraphJson(String graphJson) {
         Map<String, Object> graph = DslJsonSupport.parseObject(graphJson);
@@ -91,6 +100,9 @@ public class CanvasDslMapper implements CanvasDslMappingService {
                         edges));
     }
 
+    /**
+     * 处理inspectUnsupportedExportSemantics。
+     */
     @Override
     public List<CanvasDslValidationResult.Violation> inspectUnsupportedExportSemantics(String graphJson) {
         Map<String, Object> graph = DslJsonSupport.parseObject(graphJson);
@@ -106,6 +118,9 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         return violations;
     }
 
+    /**
+     * 处理diff。
+     */
     @Override
     public DiffResult diff(CanvasDslDocument source, CanvasDslDocument target) {
         List<DiffChange> changes = new ArrayList<>();
@@ -155,6 +170,9 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         return new DiffResult(!changes.isEmpty(), changes);
     }
 
+    /**
+     * 处理nodes by标识。
+     */
     private static Map<String, CanvasDslDocument.Node> nodesById(CanvasDslDocument document) {
         Map<String, CanvasDslDocument.Node> nodes = new LinkedHashMap<>();
         for (CanvasDslDocument.Node node : document.spec().nodes()) {
@@ -163,6 +181,9 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         return nodes;
     }
 
+    /**
+     * 处理edgeKeys。
+     */
     private static Set<String> edgeKeys(CanvasDslDocument document) {
         Set<String> edges = new java.util.LinkedHashSet<>();
         for (CanvasDslDocument.Edge edge : document.spec().edges()) {
@@ -171,6 +192,9 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         return edges;
     }
 
+    /**
+     * 处理objectValue。
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> objectValue(Object value) {
         if (value == null) {
@@ -182,6 +206,9 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         throw new IllegalArgumentException("Expected JSON object");
     }
 
+    /**
+     * 列出Value。
+     */
     @SuppressWarnings("unchecked")
     private static List<Object> listValue(Object value) {
         if (value == null) {
@@ -193,14 +220,23 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         throw new IllegalArgumentException("Expected JSON array");
     }
 
+    /**
+     * 处理stringValue。
+     */
     private static String stringValue(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 
+    /**
+     * 处理hasText。
+     */
     private static boolean hasText(Object value) {
         return value != null && !String.valueOf(value).isBlank();
     }
 
+    /**
+     * 处理hasMeaningfulValue。
+     */
     private static boolean hasMeaningfulValue(Object value) {
         if (value == null) {
             return false;
@@ -217,10 +253,16 @@ public class CanvasDslMapper implements CanvasDslMappingService {
         return true;
     }
 
+    /**
+     * 处理firstText。
+     */
     private static String firstText(Map<String, Object> values, String... keys) {
         return firstTextOrDefault(values, "", keys);
     }
 
+    /**
+     * 处理firstTextOrDefault。
+     */
     private static String firstTextOrDefault(Map<String, Object> values, String defaultValue, String... keys) {
         for (String key : keys) {
             String value = stringValue(values.get(key));
