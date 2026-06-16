@@ -14,13 +14,30 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 编排 AudienceSnapshot 的应用服务流程。
+ */
 @Service
 public class AudienceSnapshotApplicationService implements AudienceSnapshotFacade {
 
+    /**
+     * 仓储依赖。
+     */
     private final AudienceSnapshotRepository repository;
+
+    /**
+     * 时间源。
+     */
     private final Clock clock;
+
+    /**
+     * max Snapshot Users。
+     */
     private final int maxSnapshotUsers;
 
+    /**
+     * 创建当前组件实例。
+     */
     @Autowired
     public AudienceSnapshotApplicationService(AudienceSnapshotRepository repository,
                                               @Value("${canvas.audience.snapshot.max-users:100000}") int maxSnapshotUsers) {
@@ -33,6 +50,9 @@ public class AudienceSnapshotApplicationService implements AudienceSnapshotFacad
         this.maxSnapshotUsers = maxSnapshotUsers <= 0 ? 100000 : maxSnapshotUsers;
     }
 
+    /**
+     * 执行 lockSnapshot 对应的 CDP 业务操作。
+     */
     @Override
     public AudienceSnapshotView lockSnapshot(AudienceSnapshotLockCommand command) {
         if (command == null) {
@@ -60,22 +80,34 @@ public class AudienceSnapshotApplicationService implements AudienceSnapshotFacad
         return toView(saved);
     }
 
+    /**
+     * 返回默认的Mode For Audience。
+     */
     @Override
     public String defaultModeForAudience(Long audienceId) {
         return AudienceSnapshotMode.normalize(repository.defaultSnapshotMode(audienceId)).name();
     }
 
+    /**
+     * 执行 users 对应的 CDP 业务操作。
+     */
     @Override
     public List<String> users(Long snapshotId) {
         AudienceSnapshot snapshot = requiredSnapshot(snapshotId);
         return snapshot.userIds() == null ? List.of() : snapshot.userIds();
     }
 
+    /**
+     * 执行 contains 对应的 CDP 业务操作。
+     */
     @Override
     public boolean contains(Long snapshotId, String userId) {
         return users(snapshotId).contains(userId);
     }
 
+    /**
+     * 读取并校验必填的d Snapshot。
+     */
     private AudienceSnapshot requiredSnapshot(Long snapshotId) {
         if (snapshotId == null || snapshotId <= 0) {
             throw new IllegalArgumentException("snapshotId is required");
@@ -87,6 +119,9 @@ public class AudienceSnapshotApplicationService implements AudienceSnapshotFacad
         return snapshot;
     }
 
+    /**
+     * 转换为View。
+     */
     private AudienceSnapshotView toView(AudienceSnapshot snapshot) {
         return new AudienceSnapshotView(
                 snapshot.id(),

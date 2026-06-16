@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseDataPathProbeFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseDataPathProbeApplicationService 的核心行为。
+ */
 class CdpWarehouseDataPathProbeApplicationServiceTest {
 
+    /**
+     * 执行 runDefaultsDirectSinkBoundsVerifyInputsAndStoresTenantScopedRecentRuns 对应的 CDP 业务操作。
+     */
     @Test
     void runDefaultsDirectSinkBoundsVerifyInputsAndStoresTenantScopedRecentRuns() {
         CdpWarehouseDataPathProbeFacade service = new CdpWarehouseDataPathProbeApplicationService();
@@ -38,6 +44,9 @@ class CdpWarehouseDataPathProbeApplicationServiceTest {
         assertThat(service.recent(8L, 20)).isEmpty();
     }
 
+    /**
+     * 执行 mysqlCdcAliasesAndReservedEventCodeAreValidated 对应的 CDP 业务操作。
+     */
     @Test
     void mysqlCdcAliasesAndReservedEventCodeAreValidated() {
         CdpWarehouseDataPathProbeFacade service = new CdpWarehouseDataPathProbeApplicationService();

@@ -7,11 +7,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 维护 CdpWarehouseAvailability 的内存目录和查询视图。
+ */
 public class CdpWarehouseAvailabilityCatalog {
 
     private final Map<Long, List<Map<String, Object>>> assetsByTenant = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, Map<String, Object>>> contractsByTenant = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 recordAsset 对应的 CDP 业务操作。
+     */
     public Map<String, Object> recordAsset(Long tenantId, Map<String, Object> payload, String actor) {
         String assetKey = required(payload, "assetKey");
         Map<String, Object> asset = ordered();
@@ -30,6 +36,9 @@ public class CdpWarehouseAvailabilityCatalog {
         return copy(asset);
     }
 
+    /**
+     * 查询Assets列表。
+     */
     public List<Map<String, Object>> listAssets(
             Long tenantId,
             String assetType,
@@ -46,6 +55,9 @@ public class CdpWarehouseAvailabilityCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 upsertContract 对应的 CDP 业务操作。
+     */
     public Map<String, Object> upsertContract(Long tenantId, Map<String, Object> payload, String actor) {
         String contractKey = required(payload, "contractKey");
         Map<String, Object> contract = ordered();
@@ -62,6 +74,9 @@ public class CdpWarehouseAvailabilityCatalog {
         return copy(contract);
     }
 
+    /**
+     * 查询Contracts列表。
+     */
     public List<Map<String, Object>> listContracts(Long tenantId, String consumerType, String status) {
         return contractsByTenant.getOrDefault(tenantId, Map.of()).values().stream()
                 .filter(contract -> matches(contract.get("consumerType"), consumerType))
@@ -70,6 +85,9 @@ public class CdpWarehouseAvailabilityCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 contract 对应的 CDP 业务操作。
+     */
     public Map<String, Object> contract(Long tenantId, String contractKey) {
         if (contractKey == null || contractKey.isBlank()) {
             throw new IllegalArgumentException("contractKey is required");
@@ -81,14 +99,23 @@ public class CdpWarehouseAvailabilityCatalog {
         return copy(contract);
     }
 
+    /**
+     * 执行 assets 对应的 CDP 业务操作。
+     */
     public List<Map<String, Object>> assets(Long tenantId) {
         return listAssets(tenantId, null, null, null, 200);
     }
 
+    /**
+     * 执行 matches 对应的 CDP 业务操作。
+     */
     private static boolean matches(Object actual, String expected) {
         return expected == null || expected.isBlank() || expected.equalsIgnoreCase(String.valueOf(actual));
     }
 
+    /**
+     * 读取并校验必填的d。
+     */
     private static String required(Map<String, Object> payload, String key) {
         Object value = payload.get(key);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -97,10 +124,16 @@ public class CdpWarehouseAvailabilityCatalog {
         return String.valueOf(value).trim();
     }
 
+    /**
+     * 执行 stringOrDefault 对应的 CDP 业务操作。
+     */
     private static String stringOrDefault(Object value, String defaultValue) {
         return value == null || String.valueOf(value).isBlank() ? defaultValue : String.valueOf(value).trim();
     }
 
+    /**
+     * 执行 integerOrDefault 对应的 CDP 业务操作。
+     */
     private static Integer integerOrDefault(Object value, Integer defaultValue) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -111,10 +144,16 @@ public class CdpWarehouseAvailabilityCatalog {
         return Integer.parseInt(String.valueOf(value));
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }
 
+    /**
+     * 执行 copy 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }

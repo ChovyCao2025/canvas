@@ -10,8 +10,14 @@ import org.chovy.canvas.cdp.api.CdpIdentityTypeFacade;
 import org.chovy.canvas.cdp.domain.CdpIdentityTypeCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpIdentityTypeApplicationService 的核心行为。
+ */
 class CdpIdentityTypeApplicationServiceTest {
 
+    /**
+     * 创建List And Update Preserve Legacy Identity Type Behavior。
+     */
     @Test
     void createListAndUpdatePreserveLegacyIdentityTypeBehavior() {
         CdpIdentityTypeFacade service = new CdpIdentityTypeApplicationService();
@@ -68,6 +74,9 @@ class CdpIdentityTypeApplicationServiceTest {
                 .containsEntry("priority", 5);
     }
 
+    /**
+     * 执行 validationAndDeleteGuardsMatchLegacyContract 对应的 CDP 业务操作。
+     */
     @Test
     void validationAndDeleteGuardsMatchLegacyContract() {
         CdpIdentityTypeCatalog catalog = new CdpIdentityTypeCatalog();

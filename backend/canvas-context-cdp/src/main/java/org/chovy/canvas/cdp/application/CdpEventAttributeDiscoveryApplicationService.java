@@ -5,9 +5,15 @@ import java.util.List;
 import org.chovy.canvas.cdp.api.CdpEventAttributeDiscoveryFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 编排 CdpEventAttributeDiscovery 的应用服务流程。
+ */
 @Service
 public class CdpEventAttributeDiscoveryApplicationService implements CdpEventAttributeDiscoveryFacade {
 
+    /**
+     * 查询Discovered列表。
+     */
     @Override
     public List<DiscoveredAttributeView> listDiscovered(String status) {
         List<DiscoveredAttributeView> rows = List.of(

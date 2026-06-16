@@ -19,13 +19,30 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * 编排 CdpTag 的应用服务流程。
+ */
 @Service
 public class CdpTagApplicationService implements CdpTagFacade {
 
+    /**
+     * tag Repository。
+     */
     private final CdpTagRepository tagRepository;
+
+    /**
+     * profile Lookup。
+     */
     private final CustomerProfileLookupApplicationService profileLookup;
+
+    /**
+     * 时间源。
+     */
     private final Clock clock;
 
+    /**
+     * 创建当前组件实例。
+     */
     @Autowired
     public CdpTagApplicationService(CdpTagRepository tagRepository, CustomerProfileRepository profileRepository) {
         this(tagRepository, profileRepository, Clock.systemDefaultZone());
@@ -39,6 +56,9 @@ public class CdpTagApplicationService implements CdpTagFacade {
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
+    /**
+     * 设置tag。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CdpUserTagView setTag(Long tenantId, String userId, CdpTagWriteCommand command) {
@@ -61,6 +81,7 @@ public class CdpTagApplicationService implements CdpTagFacade {
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime expiresAt = command.expiresAt();
         if (expiresAt == null && definition.defaultTtlDays() != null) {
+            // 未显式传入过期时间时使用标签定义上的默认 TTL，保证人工和系统写入规则一致。
             expiresAt = now.plusDays(definition.defaultTtlDays());
         }
         boolean reserved = tagRepository.saveHistory(new CdpUserTagHistory(
@@ -77,6 +98,7 @@ public class CdpTagApplicationService implements CdpTagFacade {
                 command.operator(),
                 now));
         if (!reserved) {
+            // 历史表承担幂等占位；重复请求直接返回现有当前标签，避免覆盖首次写入结果。
             return toTagView(existing == null
                     ? tagRepository.findCurrentTag(scopedTenantId, normalizedUserId, tagCode)
                     : existing);
@@ -100,6 +122,9 @@ public class CdpTagApplicationService implements CdpTagFacade {
         return toTagView(saved);
     }
 
+    /**
+     * 执行 removeTag 对应的 CDP 业务操作。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeTag(Long tenantId, String userId, String tagCode, String reason, String operator) {
@@ -127,6 +152,9 @@ public class CdpTagApplicationService implements CdpTagFacade {
                 now));
     }
 
+    /**
+     * 查询Current Tags列表。
+     */
     @Override
     public List<CdpUserTagView> listCurrentTags(Long tenantId, String userId) {
         Long scopedTenantId = safeTenantId(tenantId);
@@ -136,6 +164,9 @@ public class CdpTagApplicationService implements CdpTagFacade {
                 .toList();
     }
 
+    /**
+     * 查询History列表。
+     */
     @Override
     public List<CdpUserTagHistoryView> listHistory(Long tenantId, String userId) {
         Long scopedTenantId = safeTenantId(tenantId);
@@ -145,6 +176,9 @@ public class CdpTagApplicationService implements CdpTagFacade {
                 .toList();
     }
 
+    /**
+     * 转换为Tag View。
+     */
     private CdpUserTagView toTagView(CdpUserTag tag) {
         if (tag == null) {
             return null;
@@ -163,6 +197,9 @@ public class CdpTagApplicationService implements CdpTagFacade {
                 tag.updatedAt());
     }
 
+    /**
+     * 转换为History View。
+     */
     private CdpUserTagHistoryView toHistoryView(CdpUserTagHistory history) {
         return new CdpUserTagHistoryView(
                 history.tenantId(),
@@ -178,16 +215,25 @@ public class CdpTagApplicationService implements CdpTagFacade {
                 history.operatedAt());
     }
 
+    /**
+     * 归一化Source Type。
+     */
     private static String normalizeSourceType(String sourceType) {
         return sourceType == null || sourceType.isBlank()
                 ? "MANUAL"
                 : sourceType.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 返回安全的Tenant Id。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 读取并校验必填的Text。
+     */
     private static String requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");

@@ -11,9 +11,19 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.chovy.canvas.cdp.api.CdpWarehouseEnterpriseOlapEvidenceFacade.EvidenceCommand;
 
+/**
+ * 维护 CdpWarehouseEnterpriseOlapEvidence 的内存目录和查询视图。
+ */
 public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
 
+    /**
+     * 执行 of 对应的 CDP 业务操作。
+     */
     private static final Set<String> OPERATOR_KEYS = Set.of("backup_restore", "ingestion_replay", "runbook_drill");
+
+    /**
+     * 执行 of 对应的 CDP 业务操作。
+     */
     private static final List<String> PROOF_ORDER = List.of(
             "doris_metrics",
             "workload_isolation",
@@ -21,19 +31,39 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
             "backup_restore",
             "compaction_health",
             "ingestion_replay",
+            /**
+             * "runbook drill")。
+             */
             "runbook_drill");
+
+    /**
+     * 执行 of 对应的 CDP 业务操作。
+     */
     private static final List<String> AUTOMATED_KEYS = List.of(
             "doris_metrics",
             "workload_isolation",
             "query_slo",
             "compaction_health",
+            /**
+             * "ingestion replay")。
+             */
             "ingestion_replay");
 
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong evidenceIds = new AtomicLong(1);
+
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong collectionIds = new AtomicLong(1);
     private final List<Map<String, Object>> evidence = new ArrayList<>();
     private final List<Map<String, Object>> collections = new ArrayList<>();
 
+    /**
+     * 执行 record 对应的 CDP 业务操作。
+     */
     public synchronized Map<String, Object> record(Long tenantId, EvidenceCommand command, String actor) {
         if (command == null || isBlank(command.evidenceKey())) {
             throw new IllegalArgumentException("evidenceKey is required");
@@ -51,6 +81,9 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 latest 对应的 CDP 业务操作。
+     */
     public synchronized Map<String, Object> latest(Long tenantId) {
         Map<String, Map<String, Object>> latest = latestRows(tenantId);
         List<Map<String, Object>> ordered = PROOF_ORDER.stream()
@@ -65,6 +98,9 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
         return result;
     }
 
+    /**
+     * 执行 proof 对应的 CDP 业务操作。
+     */
     public synchronized List<Map<String, Object>> proof(Long tenantId) {
         List<Map<String, Object>> rows = rows(latest(tenantId).get("evidence"));
         return rows.stream()
@@ -78,6 +114,9 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 collect 对应的 CDP 业务操作。
+     */
     public synchronized Map<String, Object> collect(Long tenantId, String triggerType, String actor) {
         List<Map<String, Object>> collected = new ArrayList<>();
         for (String key : AUTOMATED_KEYS) {
@@ -106,6 +145,9 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
         return copy(run);
     }
 
+    /**
+     * 执行 collections 对应的 CDP 业务操作。
+     */
     public synchronized List<Map<String, Object>> collections(Long tenantId, Integer limit) {
         int boundedLimit = Math.max(1, Math.min(limit == null || limit <= 0 ? 20 : limit, 100));
         return collections.stream()
@@ -116,6 +158,9 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 latestRows 对应的 CDP 业务操作。
+     */
     private Map<String, Map<String, Object>> latestRows(Long tenantId) {
         Map<String, Map<String, Object>> latest = new LinkedHashMap<>();
         for (int i = evidence.size() - 1; i >= 0; i--) {
@@ -127,6 +172,9 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
         return latest;
     }
 
+    /**
+     * 执行 evidenceRow 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> evidenceRow(Long id, Long tenantId, String key, String source, String status,
             String reason, String measuredAt, String expiresAt, String evidenceJson, String actor) {
         Map<String, Object> row = ordered();
@@ -143,11 +191,17 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
         return row;
     }
 
+    /**
+     * 执行 missingEvidence 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> missingEvidence(Long tenantId, String key) {
         return evidenceRow(null, tenantId, key, "warehouse", "FAIL", key + " evidence is missing",
                 "2026-06-15T02:40:00", "2026-06-15T02:55:00", "{}", "system");
     }
 
+    /**
+     * 执行 worstStatus 对应的 CDP 业务操作。
+     */
     private static String worstStatus(List<Map<String, Object>> rows) {
         if (rows.stream().map(row -> row.get("status")).anyMatch("FAIL"::equals)) {
             return "FAIL";
@@ -158,36 +212,60 @@ public class CdpWarehouseEnterpriseOlapEvidenceCatalog {
         return "PASS";
     }
 
+    /**
+     * 执行 rows 对应的 CDP 业务操作。
+     */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> rows(Object value) {
         return value instanceof List<?> list ? (List<Map<String, Object>>) list : List.of();
     }
 
+    /**
+     * 执行 copy 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> value) {
         return new LinkedHashMap<>(value);
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }
 
+    /**
+     * 归一化Status。
+     */
     private static String normalizeStatus(String status) {
         String value = defaultString(status, "FAIL").toUpperCase(Locale.ROOT);
         return "PASS".equals(value) || "WARN".equals(value) || "FAIL".equals(value) ? value : "FAIL";
     }
 
+    /**
+     * 归一化Key。
+     */
     private static String normalizeKey(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 返回默认的Reason。
+     */
     private static String defaultReason(String reason, String key, String status) {
         return defaultString(reason, key + " " + normalizeStatus(status).toLowerCase(Locale.ROOT));
     }
 
+    /**
+     * 返回默认的String。
+     */
     private static String defaultString(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
+    /**
+     * 判断blank。
+     */
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

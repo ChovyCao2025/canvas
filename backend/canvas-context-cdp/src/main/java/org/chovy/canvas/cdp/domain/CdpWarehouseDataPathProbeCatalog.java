@@ -12,26 +12,90 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.chovy.canvas.cdp.api.CdpWarehouseDataPathProbeFacade.RunCommand;
 
+/**
+ * 维护 CdpWarehouseDataPathProbe 的内存目录和查询视图。
+ */
 public class CdpWarehouseDataPathProbeCatalog {
 
+    /**
+     * DEFAULT LIMIT。
+     */
     private static final int DEFAULT_LIMIT = 20;
+
+    /**
+     * MAX LIMIT。
+     */
     private static final int MAX_LIMIT = 100;
+
+    /**
+     * DEFAULT VERIFY ATTEMPTS。
+     */
     private static final int DEFAULT_VERIFY_ATTEMPTS = 3;
+
+    /**
+     * MAX VERIFY ATTEMPTS。
+     */
     private static final int MAX_VERIFY_ATTEMPTS = 10;
+
+    /**
+     * DEFAULT VERIFY DELAY MS。
+     */
     private static final int DEFAULT_VERIFY_DELAY_MS = 100;
+
+    /**
+     * MAX VERIFY DELAY MS。
+     */
     private static final int MAX_VERIFY_DELAY_MS = 5_000;
+
+    /**
+     * DEFAULT PROBE KEY。
+     */
     private static final String DEFAULT_PROBE_KEY = "synthetic-ods";
+
+    /**
+     * DEFAULT EVENT CODE。
+     */
     private static final String DEFAULT_EVENT_CODE = "__warehouse_probe__";
+
+    /**
+     * DEFAULT SOURCE MODE。
+     */
     private static final String DEFAULT_SOURCE_MODE = "DIRECT_SINK";
+
+    /**
+     * SOURCE MYSQL CDC。
+     */
     private static final String SOURCE_MYSQL_CDC = "MYSQL_CDC";
+
+    /**
+     * STATUS PASS。
+     */
     private static final String STATUS_PASS = "PASS";
+
+    /**
+     * STATUS FAIL。
+     */
     private static final String STATUS_FAIL = "FAIL";
+
+    /**
+     * STATUS WARN。
+     */
     private static final String STATUS_WARN = "WARN";
+
+    /**
+     * STATUS SKIPPED。
+     */
     private static final String STATUS_SKIPPED = "SKIPPED";
 
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong ids = new AtomicLong(3000L);
     private final Map<Long, Map<String, Object>> runs = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 run 对应的 CDP 业务操作。
+     */
     public Map<String, Object> run(Long tenantId, RunCommand command) {
         RunCommand normalized = normalize(command);
         boolean mysqlCdc = SOURCE_MYSQL_CDC.equals(normalized.sourceMode());
@@ -67,6 +131,9 @@ public class CdpWarehouseDataPathProbeCatalog {
         return view;
     }
 
+    /**
+     * 执行 recent 对应的 CDP 业务操作。
+     */
     public List<Map<String, Object>> recent(Long tenantId, int limit) {
         return runs.values().stream()
                 .filter(run -> run.get("tenantId").equals(tenantId))
@@ -78,6 +145,9 @@ public class CdpWarehouseDataPathProbeCatalog {
                 .toList();
     }
 
+    /**
+     * 归一化normalize。
+     */
     private static RunCommand normalize(RunCommand command) {
         RunCommand safe = command == null
                 ? new RunCommand(null, null, true, DEFAULT_VERIFY_ATTEMPTS, DEFAULT_VERIFY_DELAY_MS, null)
@@ -95,6 +165,9 @@ public class CdpWarehouseDataPathProbeCatalog {
                 sourceMode(safe.sourceMode()));
     }
 
+    /**
+     * 执行 boundLimit 对应的 CDP 业务操作。
+     */
     private static int boundLimit(int limit) {
         if (limit <= 0) {
             return DEFAULT_LIMIT;
@@ -102,10 +175,16 @@ public class CdpWarehouseDataPathProbeCatalog {
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 返回默认的String。
+     */
     private static String defaultString(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    /**
+     * 执行 sourceMode 对应的 CDP 业务操作。
+     */
     private static String sourceMode(String value) {
         String normalized = defaultString(value, DEFAULT_SOURCE_MODE)
                 .toUpperCase(Locale.ROOT)
@@ -119,16 +198,25 @@ public class CdpWarehouseDataPathProbeCatalog {
         throw new IllegalArgumentException("sourceMode must be DIRECT_SINK or MYSQL_CDC");
     }
 
+    /**
+     * 执行 boundedAttempts 对应的 CDP 业务操作。
+     */
     private static int boundedAttempts(int value) {
         int attempts = value <= 0 ? DEFAULT_VERIFY_ATTEMPTS : value;
         return Math.min(attempts, MAX_VERIFY_ATTEMPTS);
     }
 
+    /**
+     * 执行 boundedDelayMs 对应的 CDP 业务操作。
+     */
     private static int boundedDelayMs(int value) {
         int delay = value < 0 ? DEFAULT_VERIFY_DELAY_MS : value;
         return Math.min(delay, MAX_VERIFY_DELAY_MS);
     }
 
+    /**
+     * 执行 worstStatus 对应的 CDP 业务操作。
+     */
     private static String worstStatus(String sourceStatus, String sinkStatus, String odsStatus) {
         if (STATUS_FAIL.equals(sourceStatus) || STATUS_FAIL.equals(sinkStatus) || STATUS_FAIL.equals(odsStatus)) {
             return STATUS_FAIL;
@@ -139,6 +227,9 @@ public class CdpWarehouseDataPathProbeCatalog {
         return STATUS_PASS;
     }
 
+    /**
+     * 执行 evidenceJson 对应的 CDP 业务操作。
+     */
     private static String evidenceJson(boolean mysqlCdc, String sourceStatus, String sinkStatus, String odsStatus) {
         String writeStep = mysqlCdc ? "source_mysql_write" : "sink_write";
         return "[{\"step\":\"" + writeStep + "\",\"status\":\""
@@ -146,6 +237,9 @@ public class CdpWarehouseDataPathProbeCatalog {
                 + "\"},{\"step\":\"ods_read\",\"status\":\"" + odsStatus + "\"}]";
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }

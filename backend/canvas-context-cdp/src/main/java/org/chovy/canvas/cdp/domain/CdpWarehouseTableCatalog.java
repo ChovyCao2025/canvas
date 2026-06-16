@@ -9,15 +9,27 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 维护 CdpWarehouseTable 的内存目录和查询视图。
+ */
 public class CdpWarehouseTableCatalog {
 
+    /**
+     * 时间源。
+     */
     private final Clock clock;
     private final Map<Long, TenantTables> tenants = new LinkedHashMap<>();
 
+    /**
+     * 创建当前组件实例。
+     */
     public CdpWarehouseTableCatalog(Clock clock) {
         this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
+    /**
+     * 查询Contracts列表。
+     */
     public Map<String, Object> listContracts(Long tenantId, String layer, String lifecycleStatus) {
         List<Map<String, Object>> records = tables(tenantId).contracts.stream()
                 .filter(item -> matches(item, "layer", upper(layer)))
@@ -31,6 +43,9 @@ public class CdpWarehouseTableCatalog {
         return page;
     }
 
+    /**
+     * 执行 upsertContract 对应的 CDP 业务操作。
+     */
     public Map<String, Object> upsertContract(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "tableKey");
         TenantTables tenant = tables(tenantId);
@@ -52,6 +67,9 @@ public class CdpWarehouseTableCatalog {
         return copy(contract);
     }
 
+    /**
+     * 执行 inspectContract 对应的 CDP 业务操作。
+     */
     public Map<String, Object> inspectContract(Long tenantId, String tableKey, String actor, boolean live) {
         TenantTables tenant = tables(tenantId);
         Map<String, Object> contract = findOptional(tenant.contracts, tableKey);
@@ -72,6 +90,9 @@ public class CdpWarehouseTableCatalog {
         return copy(report);
     }
 
+    /**
+     * 执行 inspectAll 对应的 CDP 业务操作。
+     */
     public Map<String, Object> inspectAll(Long tenantId, String actor, boolean live) {
         TenantTables tenant = tables(tenantId);
         int issueCount = tenant.contracts.stream().mapToInt(CdpWarehouseTableCatalog::issueCount).sum();
@@ -87,6 +108,9 @@ public class CdpWarehouseTableCatalog {
         return summary;
     }
 
+    /**
+     * 执行 planRemediation 对应的 CDP 业务操作。
+     */
     public Map<String, Object> planRemediation(Long tenantId, String tableKey, boolean live, String actor) {
         Map<String, Object> contract = find(tables(tenantId).contracts, tableKey);
         Map<String, Object> plan = new LinkedHashMap<>();
@@ -100,6 +124,9 @@ public class CdpWarehouseTableCatalog {
         return plan;
     }
 
+    /**
+     * 执行 planAllRemediation 对应的 CDP 业务操作。
+     */
     public Map<String, Object> planAllRemediation(Long tenantId, boolean live, String actor) {
         TenantTables tenant = tables(tenantId);
         int actionCount = tenant.contracts.stream().mapToInt(CdpWarehouseTableCatalog::issueCount).sum();
@@ -114,6 +141,9 @@ public class CdpWarehouseTableCatalog {
         return summary;
     }
 
+    /**
+     * 执行 scanIncidents 对应的 CDP 业务操作。
+     */
     public Map<String, Object> scanIncidents(Long tenantId, boolean live, String actor) {
         TenantTables tenant = tables(tenantId);
         int incidentCount = tenant.contracts.stream().mapToInt(CdpWarehouseTableCatalog::issueCount).sum();
@@ -129,14 +159,23 @@ public class CdpWarehouseTableCatalog {
         return copy(scan);
     }
 
+    /**
+     * 执行 tables 对应的 CDP 业务操作。
+     */
     private TenantTables tables(Long tenantId) {
         return tenants.computeIfAbsent(tenantId, ignored -> new TenantTables());
     }
 
+    /**
+     * 执行 now 对应的 CDP 业务操作。
+     */
     private String now() {
         return Instant.now(clock).toString();
     }
 
+    /**
+     * 执行 remediationActions 对应的 CDP 业务操作。
+     */
     private static List<Map<String, Object>> remediationActions(Map<String, Object> contract) {
         if (issueCount(contract) == 0) {
             return List.of();
@@ -146,15 +185,24 @@ public class CdpWarehouseTableCatalog {
                 "message", "expectedPropertiesJson is not configured"));
     }
 
+    /**
+     * 判断sue Count。
+     */
     private static int issueCount(Map<String, Object> contract) {
         Object expectedProperties = contract.get("expectedPropertiesJson");
         return expectedProperties == null || String.valueOf(expectedProperties).isBlank() ? 1 : 0;
     }
 
+    /**
+     * 执行 matches 对应的 CDP 业务操作。
+     */
     private static boolean matches(Map<String, Object> item, String field, Object expected) {
         return expected == null || String.valueOf(expected).isBlank() || Objects.equals(item.get(field), expected);
     }
 
+    /**
+     * 查找find。
+     */
     private static Map<String, Object> find(List<Map<String, Object>> contracts, String tableKey) {
         Map<String, Object> match = findOptional(contracts, tableKey);
         if (match == null) {
@@ -163,6 +211,9 @@ public class CdpWarehouseTableCatalog {
         return match;
     }
 
+    /**
+     * 返回默认的Contract。
+     */
     private static Map<String, Object> defaultContract(Long tenantId, String tableKey) {
         Map<String, Object> contract = new LinkedHashMap<>();
         contract.put("tenantId", tenantId);
@@ -172,6 +223,9 @@ public class CdpWarehouseTableCatalog {
         return contract;
     }
 
+    /**
+     * 查找Optional。
+     */
     private static Map<String, Object> findOptional(List<Map<String, Object>> contracts, String tableKey) {
         return contracts.stream()
                 .filter(contract -> Objects.equals(contract.get("tableKey"), tableKey))
@@ -179,6 +233,9 @@ public class CdpWarehouseTableCatalog {
                 .orElse(null);
     }
 
+    /**
+     * 读取并校验必填的d。
+     */
     private static void required(Map<String, Object> payload, String key) {
         Object value = payload.get(key);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -186,18 +243,30 @@ public class CdpWarehouseTableCatalog {
         }
     }
 
+    /**
+     * 执行 value 对应的 CDP 业务操作。
+     */
     private static String value(Object value, String fallback) {
         return value == null || String.valueOf(value).isBlank() ? fallback : String.valueOf(value);
     }
 
+    /**
+     * 执行 upper 对应的 CDP 业务操作。
+     */
     private static String upper(String value) {
         return value == null || value.isBlank() ? value : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 执行 copy 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }
 
+    /**
+     * 表示 TenantTables 的业务数据或处理组件。
+     */
     private static final class TenantTables {
         private final List<Map<String, Object>> contracts = new ArrayList<>();
         private final List<Map<String, Object>> inspections = new ArrayList<>();

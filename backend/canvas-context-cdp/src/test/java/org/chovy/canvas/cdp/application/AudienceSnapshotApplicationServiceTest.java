@@ -18,12 +18,24 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * 验证 AudienceSnapshotApplicationService 的核心行为。
+ */
 class AudienceSnapshotApplicationServiceTest {
 
+    /**
+     * 执行 fixed 对应的 CDP 业务操作。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-06T02:00:00Z"),
+            /**
+             * 执行 of 对应的 CDP 业务操作。
+             */
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 执行 lockSnapshotFiltersBlankUsersDeduplicatesAndPersistsStaticSnapshot 对应的 CDP 业务操作。
+     */
     @Test
     void lockSnapshotFiltersBlankUsersDeduplicatesAndPersistsStaticSnapshot() {
         FakeAudienceRepository repository = new FakeAudienceRepository();
@@ -46,6 +58,9 @@ class AudienceSnapshotApplicationServiceTest {
         assertThat(repository.snapshots.get(500L).createdAt()).isEqualTo(LocalDateTime.parse("2026-06-06T10:00:00"));
     }
 
+    /**
+     * 执行 lockSnapshotEnforcesConfiguredMaximum 对应的 CDP 业务操作。
+     */
     @Test
     void lockSnapshotEnforcesConfiguredMaximum() {
         FakeAudienceRepository repository = new FakeAudienceRepository();
@@ -62,6 +77,9 @@ class AudienceSnapshotApplicationServiceTest {
                 .hasMessageContaining("AUDIENCE_SNAPSHOT_LIMIT");
     }
 
+    /**
+     * 返回默认的Mode Normalizes Missing And Unknown Values To Static Locked。
+     */
     @Test
     void defaultModeNormalizesMissingAndUnknownValuesToStaticLocked() {
         FakeAudienceRepository repository = new FakeAudienceRepository();
@@ -73,16 +91,25 @@ class AudienceSnapshotApplicationServiceTest {
         assertThat(AudienceSnapshotMode.normalize("invalid")).isEqualTo(AudienceSnapshotMode.STATIC_LOCKED);
     }
 
+    /**
+     * 定义 FakeAudience 的持久化访问契约。
+     */
     private static final class FakeAudienceRepository implements AudienceSnapshotRepository {
         private final Map<Long, List<String>> resolvedUsers = new LinkedHashMap<>();
         private final Map<Long, AudienceSnapshot> snapshots = new LinkedHashMap<>();
         private final Map<Long, String> defaultModes = new LinkedHashMap<>();
 
+        /**
+         * 执行 resolveUsers 对应的 CDP 业务操作。
+         */
         @Override
         public List<String> resolveUsers(Long audienceId) {
             return resolvedUsers.getOrDefault(audienceId, List.of());
         }
 
+        /**
+         * 保存save。
+         */
         @Override
         public AudienceSnapshot save(AudienceSnapshot snapshot) {
             AudienceSnapshot saved = snapshot.withId(500L);
@@ -90,11 +117,17 @@ class AudienceSnapshotApplicationServiceTest {
             return saved;
         }
 
+        /**
+         * 查找Snapshot。
+         */
         @Override
         public AudienceSnapshot findSnapshot(Long snapshotId) {
             return snapshots.get(snapshotId);
         }
 
+        /**
+         * 返回默认的Snapshot Mode。
+         */
         @Override
         public String defaultSnapshotMode(Long audienceId) {
             return defaultModes.get(audienceId);

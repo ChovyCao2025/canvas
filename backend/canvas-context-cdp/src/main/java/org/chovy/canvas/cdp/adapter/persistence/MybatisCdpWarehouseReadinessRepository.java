@@ -9,17 +9,45 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 定义 MybatisCdpWarehouseReadiness 的持久化访问契约。
+ */
 @Repository
 public class MybatisCdpWarehouseReadinessRepository implements CdpWarehouseReadinessRepository {
 
+    /**
+     * RECENT LIMIT。
+     */
     private static final int RECENT_LIMIT = 20;
 
+    /**
+     * sync Run Mapper。
+     */
     private final CdpWarehouseSyncRunMapper syncRunMapper;
+
+    /**
+     * watermark Mapper。
+     */
     private final CdpWarehouseWatermarkMapper watermarkMapper;
+
+    /**
+     * incident Mapper。
+     */
     private final CdpWarehouseIncidentMapper incidentMapper;
+
+    /**
+     * materialization Run Mapper。
+     */
     private final AudienceMaterializationRunMapper materializationRunMapper;
+
+    /**
+     * 持久化转换器。
+     */
     private final CdpPersistenceConverter converter;
 
+    /**
+     * 创建当前组件实例。
+     */
     public MybatisCdpWarehouseReadinessRepository(CdpWarehouseSyncRunMapper syncRunMapper,
                                                   CdpWarehouseWatermarkMapper watermarkMapper,
                                                   CdpWarehouseIncidentMapper incidentMapper,
@@ -32,6 +60,9 @@ public class MybatisCdpWarehouseReadinessRepository implements CdpWarehouseReadi
         this.converter = converter;
     }
 
+    /**
+     * 执行 evidence 对应的 CDP 业务操作。
+     */
     @Override
     public CdpWarehouseReadinessEvidence evidence(Long tenantId) {
         Long scopedTenantId = tenantId == null ? 0L : tenantId;

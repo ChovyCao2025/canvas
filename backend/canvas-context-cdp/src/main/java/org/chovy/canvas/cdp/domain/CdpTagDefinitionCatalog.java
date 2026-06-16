@@ -9,13 +9,26 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * 维护 CdpTagDefinition 的内存目录和查询视图。
+ */
 public class CdpTagDefinitionCatalog {
 
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong definitionIds = new AtomicLong();
+
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong valueIds = new AtomicLong();
     private final Map<Long, Map<Long, Map<String, Object>>> definitionsByTenant = new ConcurrentHashMap<>();
     private final Map<Long, Map<Long, Map<String, Object>>> valuesByTenant = new ConcurrentHashMap<>();
 
+    /**
+     * 查询Definitions列表。
+     */
     public Map<String, Object> listDefinitions(Long tenantId, Integer page, Integer size, String tagType,
             Integer enabled) {
         List<Map<String, Object>> matched = definitionsByTenant.getOrDefault(tenantId, Map.of()).values().stream()
@@ -27,6 +40,9 @@ public class CdpTagDefinitionCatalog {
         return page(tenantId, page, size, matched);
     }
 
+    /**
+     * 创建Definition。
+     */
     public Map<String, Object> createDefinition(Long tenantId, Map<String, Object> payload, String actor,
             LocalDateTime now) {
         String tagCode = required(payload, "tagCode");
@@ -39,6 +55,9 @@ public class CdpTagDefinitionCatalog {
         return copy(row);
     }
 
+    /**
+     * 更新Definition。
+     */
     public Map<String, Object> updateDefinition(Long tenantId, Long id, Map<String, Object> payload, String actor,
             LocalDateTime now) {
         Map<String, Object> existing = definitionsByTenant.getOrDefault(tenantId, Map.of()).get(id);
@@ -64,6 +83,9 @@ public class CdpTagDefinitionCatalog {
         return copy(row);
     }
 
+    /**
+     * 删除Definition。
+     */
     public Map<String, Object> deleteDefinition(Long tenantId, Long id, String actor, LocalDateTime now) {
         definitionsByTenant.getOrDefault(tenantId, Map.of()).remove(id);
         Map<String, Object> row = ordered();
@@ -75,6 +97,9 @@ public class CdpTagDefinitionCatalog {
         return row;
     }
 
+    /**
+     * 查询Values列表。
+     */
     public Map<String, Object> listValues(Long tenantId, String tagCode, Integer enabled) {
         List<Map<String, Object>> matched = valuesByTenant.getOrDefault(tenantId, Map.of()).values().stream()
                 .filter(row -> tagCode.equals(row.get("tagCode")))
@@ -90,6 +115,9 @@ public class CdpTagDefinitionCatalog {
         return result;
     }
 
+    /**
+     * 创建Value。
+     */
     public Map<String, Object> createValue(Long tenantId, String tagCode, Map<String, Object> payload, String actor,
             LocalDateTime now) {
         String valueCode = required(payload, "valueCode");
@@ -101,6 +129,9 @@ public class CdpTagDefinitionCatalog {
         return copy(row);
     }
 
+    /**
+     * 更新Value。
+     */
     public Map<String, Object> updateValue(Long tenantId, Long id, Map<String, Object> payload, String actor,
             LocalDateTime now) {
         Map<String, Object> existing = valuesByTenant.getOrDefault(tenantId, Map.of()).get(id);
@@ -124,6 +155,9 @@ public class CdpTagDefinitionCatalog {
         return copy(row);
     }
 
+    /**
+     * 删除Value。
+     */
     public Map<String, Object> deleteValue(Long tenantId, Long id, String actor, LocalDateTime now) {
         valuesByTenant.getOrDefault(tenantId, Map.of()).remove(id);
         Map<String, Object> row = ordered();
@@ -135,6 +169,9 @@ public class CdpTagDefinitionCatalog {
         return row;
     }
 
+    /**
+     * 执行 definitionBase 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> definitionBase(Long tenantId, Long id, String tagCode,
             Map<String, Object> payload, String actor, LocalDateTime now) {
         Map<String, Object> row = ordered();
@@ -149,6 +186,9 @@ public class CdpTagDefinitionCatalog {
         return row;
     }
 
+    /**
+     * 执行 valueBase 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> valueBase(Long tenantId, Long id, String tagCode, String valueCode,
             Map<String, Object> payload, String actor, LocalDateTime now) {
         Map<String, Object> row = ordered();
@@ -163,6 +203,9 @@ public class CdpTagDefinitionCatalog {
         return row;
     }
 
+    /**
+     * 执行 page 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> page(Long tenantId, Integer page, Integer size, List<Map<String, Object>> rows) {
         int from = Math.min((page - 1) * size, rows.size());
         int to = Math.min(from + size, rows.size());
@@ -175,14 +218,23 @@ public class CdpTagDefinitionCatalog {
         return result;
     }
 
+    /**
+     * 执行 matches 对应的 CDP 业务操作。
+     */
     private static boolean matches(Object actual, String expected) {
         return expected == null || expected.isBlank() || expected.equalsIgnoreCase(String.valueOf(actual));
     }
 
+    /**
+     * 执行 matchesEnabled 对应的 CDP 业务操作。
+     */
     private static boolean matchesEnabled(Object actual, Integer expected) {
         return expected == null || (expected == 1) == Boolean.TRUE.equals(actual);
     }
 
+    /**
+     * 读取并校验必填的d。
+     */
     private static String required(Map<String, Object> payload, String key) {
         Object value = payload.get(key);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -191,10 +243,16 @@ public class CdpTagDefinitionCatalog {
         return String.valueOf(value).trim();
     }
 
+    /**
+     * 执行 stringOrDefault 对应的 CDP 业务操作。
+     */
     private static String stringOrDefault(Object value, String defaultValue) {
         return value == null || String.valueOf(value).isBlank() ? defaultValue : String.valueOf(value).trim();
     }
 
+    /**
+     * 执行 booleanOrDefault 对应的 CDP 业务操作。
+     */
     private static boolean booleanOrDefault(Object value, boolean defaultValue) {
         if (value instanceof Boolean bool) {
             return bool;
@@ -208,10 +266,16 @@ public class CdpTagDefinitionCatalog {
         return Boolean.parseBoolean(String.valueOf(value));
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }
 
+    /**
+     * 执行 copy 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }

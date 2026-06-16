@@ -6,8 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.chovy.canvas.cdp.api.CdpWriteKeyFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWriteKeyApplicationService 的核心行为。
+ */
 class CdpWriteKeyApplicationServiceTest {
 
+    /**
+     * 创建s Raw Key Once And Lists Only Tenant Rows Without Secret。
+     */
     @Test
     void createsRawKeyOnceAndListsOnlyTenantRowsWithoutSecret() {
         CdpWriteKeyFacade service = new CdpWriteKeyApplicationService();
@@ -34,6 +40,9 @@ class CdpWriteKeyApplicationServiceTest {
                 .returns("browser ingestion", CdpWriteKeyFacade.KeyRow::description);
     }
 
+    /**
+     * 执行 disableIsTenantScopedAndIdempotentlyMarksKeyDisabled 对应的 CDP 业务操作。
+     */
     @Test
     void disableIsTenantScopedAndIdempotentlyMarksKeyDisabled() {
         CdpWriteKeyFacade service = new CdpWriteKeyApplicationService();
@@ -51,6 +60,9 @@ class CdpWriteKeyApplicationServiceTest {
                 .hasMessageContaining("write key is not found");
     }
 
+    /**
+     * 执行 validationUsesCompatibilityMessagesAndDefaultsQuotas 对应的 CDP 业务操作。
+     */
     @Test
     void validationUsesCompatibilityMessagesAndDefaultsQuotas() {
         CdpWriteKeyFacade service = new CdpWriteKeyApplicationService();

@@ -12,12 +12,24 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpTagDefinitionFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpTagDefinitionApplicationService 的核心行为。
+ */
 class CdpTagDefinitionApplicationServiceTest {
 
+    /**
+     * 执行 fixed 对应的 CDP 业务操作。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T04:00:00Z"),
+            /**
+             * 执行 of 对应的 CDP 业务操作。
+             */
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 执行 managesTagDefinitionsAndValuesWithinTenant 对应的 CDP 业务操作。
+     */
     @Test
     void managesTagDefinitionsAndValuesWithinTenant() {
         CdpTagDefinitionFacade service = new CdpTagDefinitionApplicationService(CLOCK);
@@ -77,6 +89,9 @@ class CdpTagDefinitionApplicationServiceTest {
         assertThat(service.list(8L, 1, 20, null, null)).containsEntry("total", 0L);
     }
 
+    /**
+     * 执行 validationDefaultsAndPaginationAreStable 对应的 CDP 业务操作。
+     */
     @Test
     void validationDefaultsAndPaginationAreStable() {
         CdpTagDefinitionFacade service = new CdpTagDefinitionApplicationService(CLOCK);

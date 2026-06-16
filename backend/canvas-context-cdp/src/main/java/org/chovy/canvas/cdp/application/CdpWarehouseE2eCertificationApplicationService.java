@@ -9,11 +9,20 @@ import org.chovy.canvas.cdp.api.CdpWarehouseE2eCertificationFacade;
 import org.chovy.canvas.cdp.domain.CdpWarehouseE2eCertificationCatalog;
 import org.springframework.stereotype.Service;
 
+/**
+ * 编排 CdpWarehouseE2eCertification 的应用服务流程。
+ */
 @Service
 public class CdpWarehouseE2eCertificationApplicationService implements CdpWarehouseE2eCertificationFacade {
 
+    /**
+     * 领域目录组件。
+     */
     private final CdpWarehouseE2eCertificationCatalog catalog;
 
+    /**
+     * 创建当前组件实例。
+     */
     public CdpWarehouseE2eCertificationApplicationService() {
         this(new CdpWarehouseE2eCertificationCatalog());
     }
@@ -22,6 +31,9 @@ public class CdpWarehouseE2eCertificationApplicationService implements CdpWareho
         this.catalog = catalog;
     }
 
+    /**
+     * 执行 certify 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> certify(Long tenantId, String from, String to, String mode, List<String> contractKeys,
             boolean requirePhysical, boolean requireRealtime, boolean requireDataPathProof) {
@@ -29,6 +41,9 @@ public class CdpWarehouseE2eCertificationApplicationService implements CdpWareho
                 safeContractKeys(contractKeys), requirePhysical, requireRealtime, requireDataPathProof);
     }
 
+    /**
+     * 执行 gate 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> gate(Long tenantId, String mode, List<String> contractKeys, boolean requirePhysical,
             boolean requireRealtime, boolean requireDataPathProof, Long maxAgeMinutes) {
@@ -56,6 +71,9 @@ public class CdpWarehouseE2eCertificationApplicationService implements CdpWareho
         return decision;
     }
 
+    /**
+     * 执行 run 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> run(Long tenantId, String from, String to, String mode, List<String> contractKeys,
             boolean requirePhysical, boolean requireRealtime, boolean requireDataPathProof, String requestedBy) {
@@ -64,28 +82,46 @@ public class CdpWarehouseE2eCertificationApplicationService implements CdpWareho
                 defaultString(requestedBy, "system"));
     }
 
+    /**
+     * 执行 recent 对应的 CDP 业务操作。
+     */
     @Override
     public List<Map<String, Object>> recent(Long tenantId, Integer limit) {
         return catalog.recent(tenantIdOrDefault(tenantId), limit);
     }
 
+    /**
+     * 返回get。
+     */
     @Override
     public Map<String, Object> get(Long tenantId, Long id) {
         return catalog.get(tenantIdOrDefault(tenantId), id);
     }
 
+    /**
+     * 执行 tenantIdOrDefault 对应的 CDP 业务操作。
+     */
     private static Long tenantIdOrDefault(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 归一化Mode。
+     */
     private static String normalizeMode(String mode) {
         return defaultString(mode, "HYBRID").toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 返回默认的String。
+     */
     private static String defaultString(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
+    /**
+     * 返回安全的Contract Keys。
+     */
     private static List<String> safeContractKeys(List<String> contractKeys) {
         if (contractKeys == null) {
             return List.of();
@@ -97,6 +133,9 @@ public class CdpWarehouseE2eCertificationApplicationService implements CdpWareho
                 .toList();
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }

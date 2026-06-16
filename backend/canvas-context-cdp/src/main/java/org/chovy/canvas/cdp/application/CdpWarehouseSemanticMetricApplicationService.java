@@ -5,9 +5,15 @@ import java.util.List;
 import org.chovy.canvas.cdp.api.CdpWarehouseSemanticMetricFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 编排 CdpWarehouseSemanticMetric 的应用服务流程。
+ */
 @Service
 public class CdpWarehouseSemanticMetricApplicationService implements CdpWarehouseSemanticMetricFacade {
 
+    /**
+     * 查询Metrics列表。
+     */
     @Override
     public List<SemanticMetricView> listMetrics(Long tenantId, String datasetKey) {
         Long scopedTenantId = tenantId == null ? 0L : tenantId;

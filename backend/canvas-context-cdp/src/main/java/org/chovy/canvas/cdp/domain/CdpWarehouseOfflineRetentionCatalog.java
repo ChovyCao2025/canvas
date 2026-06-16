@@ -12,15 +12,44 @@ import org.chovy.canvas.cdp.api.CdpWarehouseOfflineRetentionFacade.RetentionPlan
 import org.chovy.canvas.cdp.api.CdpWarehouseOfflineRetentionFacade.RetentionTargetPlanView;
 import org.chovy.canvas.cdp.api.CdpWarehouseOfflineRetentionFacade.RetentionTargetResultView;
 
+/**
+ * 维护 CdpWarehouseOfflineRetention 的内存目录和查询视图。
+ */
 public class CdpWarehouseOfflineRetentionCatalog {
 
+    /**
+     * MAX BACKFILL LIMIT。
+     */
     private static final int MAX_BACKFILL_LIMIT = 5000;
+
+    /**
+     * MAX RETENTION DAYS。
+     */
     private static final int MAX_RETENTION_DAYS = 3650;
+
+    /**
+     * DEFAULT OPERATOR。
+     */
     private static final String DEFAULT_OPERATOR = "warehouse-retention";
+
+    /**
+     * STATUS READY。
+     */
     private static final String STATUS_READY = "READY";
+
+    /**
+     * STATUS WAITING。
+     */
     private static final String STATUS_WAITING = "WAITING_FOR_BACKFILL";
+
+    /**
+     * STATUS SUCCESS。
+     */
     private static final String STATUS_SUCCESS = "SUCCESS";
 
+    /**
+     * 执行 offlineCyclePlan 对应的 CDP 业务操作。
+     */
     public OfflineCyclePlanView offlineCyclePlan(Long tenantId, LocalDateTime now, int backfillLimit,
                                                  int aggregationWindowMinutes) {
         requireBackfillLimit(backfillLimit);
@@ -37,6 +66,9 @@ public class CdpWarehouseOfflineRetentionCatalog {
                         "will run after backfill succeeds", null, null, windowStart, windowEnd)));
     }
 
+    /**
+     * 执行 runOfflineCycle 对应的 CDP 业务操作。
+     */
     public OfflineCycleResultView runOfflineCycle(Long tenantId, LocalDateTime now, int backfillLimit,
                                                   int aggregationWindowMinutes, String operator) {
         OfflineCyclePlanView plan = offlineCyclePlan(tenantId, now, backfillLimit, aggregationWindowMinutes);
@@ -51,6 +83,9 @@ public class CdpWarehouseOfflineRetentionCatalog {
                         plan.steps().get(1).windowStart(), plan.steps().get(1).windowEnd(), STATUS_SUCCESS)));
     }
 
+    /**
+     * 执行 retentionPlan 对应的 CDP 业务操作。
+     */
     public RetentionPlanView retentionPlan(Long tenantId, LocalDateTime now, int syncRunRetentionDays,
                                            int realtimeRetryRetentionDays, int resolvedIncidentRetentionDays) {
         LocalDateTime effectiveNow = now == null ? LocalDateTime.now() : now;
@@ -64,6 +99,9 @@ public class CdpWarehouseOfflineRetentionCatalog {
                 syncRuns.eligibleRows() + retries.eligibleRows() + incidents.eligibleRows());
     }
 
+    /**
+     * 执行 runRetention 对应的 CDP 业务操作。
+     */
     public RetentionCleanupResultView runRetention(Long tenantId, LocalDateTime now, int syncRunRetentionDays,
                                                    int realtimeRetryRetentionDays, int resolvedIncidentRetentionDays,
                                                    String operator) {
@@ -77,23 +115,35 @@ public class CdpWarehouseOfflineRetentionCatalog {
                 (long) syncRuns.deletedRows() + retries.deletedRows() + incidents.deletedRows());
     }
 
+    /**
+     * 执行 targetPlan 对应的 CDP 业务操作。
+     */
     private static RetentionTargetPlanView targetPlan(String targetKey, int days, LocalDateTime now, long eligibleRows,
                                                       String rule) {
         requireRetentionDays(days, targetKey);
         return new RetentionTargetPlanView(targetKey, days, now.minusDays(days), eligibleRows, rule);
     }
 
+    /**
+     * 执行 targetResult 对应的 CDP 业务操作。
+     */
     private static RetentionTargetResultView targetResult(RetentionTargetPlanView plan) {
         return new RetentionTargetResultView(plan.targetKey(), plan.retentionDays(), plan.cutoff(),
                 plan.eligibleRows(), Math.toIntExact(plan.eligibleRows()));
     }
 
+    /**
+     * 读取并校验必填的Backfill Limit。
+     */
     private static void requireBackfillLimit(int limit) {
         if (limit <= 0 || limit > MAX_BACKFILL_LIMIT) {
             throw new IllegalArgumentException("backfillLimit must be between 1 and " + MAX_BACKFILL_LIMIT);
         }
     }
 
+    /**
+     * 读取并校验必填的Retention Days。
+     */
     private static void requireRetentionDays(int days, String targetKey) {
         if (days <= 0 || days > MAX_RETENTION_DAYS) {
             String name = switch (targetKey) {
@@ -105,6 +155,9 @@ public class CdpWarehouseOfflineRetentionCatalog {
         }
     }
 
+    /**
+     * 归一化Operator。
+     */
     private static String normalizeOperator(String operator, String fallback) {
         return operator == null || operator.isBlank() ? fallback : operator.trim();
     }

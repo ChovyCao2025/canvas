@@ -6,13 +6,30 @@ import org.chovy.canvas.cdp.domain.CustomerProfileRepository;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 
+/**
+ * 定义 MybatisCustomerProfile 的持久化访问契约。
+ */
 @Repository
 public class MybatisCustomerProfileRepository implements CustomerProfileRepository {
 
+    /**
+     * profile Mapper。
+     */
     private final CdpUserProfileMapper profileMapper;
+
+    /**
+     * identity Mapper。
+     */
     private final CdpUserIdentityMapper identityMapper;
+
+    /**
+     * 持久化转换器。
+     */
     private final CdpPersistenceConverter converter;
 
+    /**
+     * 创建当前组件实例。
+     */
     public MybatisCustomerProfileRepository(CdpUserProfileMapper profileMapper,
                                             CdpUserIdentityMapper identityMapper,
                                             CdpPersistenceConverter converter) {
@@ -21,6 +38,9 @@ public class MybatisCustomerProfileRepository implements CustomerProfileReposito
         this.converter = converter;
     }
 
+    /**
+     * 查找Profile。
+     */
     @Override
     public CustomerProfile findProfile(Long tenantId, String userId) {
         CdpUserProfileDO row = profileMapper.selectOne(new LambdaQueryWrapper<CdpUserProfileDO>()
@@ -30,6 +50,9 @@ public class MybatisCustomerProfileRepository implements CustomerProfileReposito
         return converter.toProfile(row);
     }
 
+    /**
+     * 保存Profile。
+     */
     @Override
     public CustomerProfile saveProfile(CustomerProfile profile) {
         CdpUserProfileDO row = converter.toProfileRow(profile);
@@ -41,6 +64,9 @@ public class MybatisCustomerProfileRepository implements CustomerProfileReposito
         return converter.toProfile(row);
     }
 
+    /**
+     * 查找User Id By Identity。
+     */
     @Override
     public String findUserIdByIdentity(Long tenantId, String identityType, String identityValue) {
         CdpUserIdentityDO row = identityMapper.selectOne(new LambdaQueryWrapper<CdpUserIdentityDO>()
@@ -51,6 +77,9 @@ public class MybatisCustomerProfileRepository implements CustomerProfileReposito
         return row == null ? null : row.getUserId();
     }
 
+    /**
+     * 保存Identity。
+     */
     @Override
     public void saveIdentity(Long tenantId, String userId, String identityType, String identityValue,
                              String sourceType, String sourceRefId, boolean verified) {

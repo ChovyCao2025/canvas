@@ -12,19 +12,43 @@ import java.util.regex.Pattern;
 
 import org.chovy.canvas.cdp.api.CdpWarehouseMetricChangeReviewFacade.MetricChangeCommand;
 
+/**
+ * 维护 CdpWarehouseMetricChangeReview 的内存目录和查询视图。
+ */
 public class CdpWarehouseMetricChangeReviewCatalog {
 
+    /**
+     * PENDING REVIEW。
+     */
     private static final String PENDING_REVIEW = "PENDING_REVIEW";
+
+    /**
+     * APPROVED。
+     */
     private static final String APPROVED = "APPROVED";
+
+    /**
+     * REJECTED。
+     */
     private static final String REJECTED = "REJECTED";
+
+    /**
+     * APPLIED。
+     */
     private static final String APPLIED = "APPLIED";
     private static final Pattern SAFE_EXPRESSION = Pattern.compile("[A-Za-z0-9_\\s().,+\\-*/<>=]+");
 
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong ids = new AtomicLong(1);
     private final List<Map<String, Object>> reviews = new ArrayList<>();
     private final Map<String, Map<String, Object>> metricContracts = new LinkedHashMap<>();
     private final Map<String, Set<String>> datasetDimensions = new LinkedHashMap<>();
 
+    /**
+     * 创建当前组件实例。
+     */
     public CdpWarehouseMetricChangeReviewCatalog() {
         datasetDimensions.put("dwd_user_profile", Set.of("country", "channel"));
         metricContracts.put(key(0L, "dwd_user_profile", "profile_completeness"),
@@ -35,6 +59,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
                         List.of("country")));
     }
 
+    /**
+     * 查询list列表。
+     */
     public synchronized List<Map<String, Object>> list(Long tenantId, String datasetKey, String metricKey,
             String status) {
         String datasetFilter = trimToNull(datasetKey);
@@ -49,6 +76,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
                 .toList();
     }
 
+    /**
+     * 创建create。
+     */
     public synchronized Map<String, Object> create(Long tenantId, String requestedBy, MetricChangeCommand command) {
         if (command == null) {
             throw new IllegalArgumentException("metric change command is required");
@@ -90,6 +120,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 approve 对应的 CDP 业务操作。
+     */
     public synchronized Map<String, Object> approve(Long tenantId, String reviewer, Long reviewId, String note) {
         Map<String, Object> row = review(tenantId, reviewId);
         requireStatus(row, PENDING_REVIEW, "only pending metric changes can be approved");
@@ -101,6 +134,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 reject 对应的 CDP 业务操作。
+     */
     public synchronized Map<String, Object> reject(Long tenantId, String reviewer, Long reviewId, String note) {
         Map<String, Object> row = review(tenantId, reviewId);
         requireStatus(row, PENDING_REVIEW, "only pending metric changes can be rejected");
@@ -112,6 +148,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 apply 对应的 CDP 业务操作。
+     */
     public synchronized Map<String, Object> apply(Long tenantId, Long reviewId) {
         Map<String, Object> row = review(tenantId, reviewId);
         requireStatus(row, APPROVED, "only APPROVED metric changes can be applied");
@@ -125,6 +164,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return copy(row);
     }
 
+    /**
+     * 执行 rejectOpenReview 对应的 CDP 业务操作。
+     */
     private void rejectOpenReview(Long tenantId, String datasetKey, String metricKey) {
         boolean exists = reviews.stream()
                 .anyMatch(row -> tenantId.equals(row.get("tenantId"))
@@ -136,6 +178,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         }
     }
 
+    /**
+     * 执行 review 对应的 CDP 业务操作。
+     */
     private Map<String, Object> review(Long tenantId, Long reviewId) {
         if (reviewId == null) {
             throw new IllegalArgumentException("reviewId is required");
@@ -146,12 +191,18 @@ public class CdpWarehouseMetricChangeReviewCatalog {
                 .orElseThrow(() -> new IllegalArgumentException("metric change review not found: " + reviewId));
     }
 
+    /**
+     * 读取并校验必填的Status。
+     */
     private static void requireStatus(Map<String, Object> row, String expectedStatus, String message) {
         if (!expectedStatus.equals(row.get("status"))) {
             throw new IllegalStateException(message);
         }
     }
 
+    /**
+     * 执行 allowedDimensions 对应的 CDP 业务操作。
+     */
     private List<String> allowedDimensions(String datasetKey, List<String> dimensions) {
         Set<String> allowed = datasetDimensions.get(datasetKey);
         if (allowed == null) {
@@ -168,6 +219,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return List.copyOf(normalized);
     }
 
+    /**
+     * 校验Expression。
+     */
     private static String validateExpression(String value) {
         String expression = required(value, "proposedExpression");
         if (!SAFE_EXPRESSION.matcher(expression).matches()
@@ -179,6 +233,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return expression;
     }
 
+    /**
+     * 读取并校验必填的d。
+     */
     private static String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -186,14 +243,23 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return value.trim();
     }
 
+    /**
+     * 执行 trimToNull 对应的 CDP 业务操作。
+     */
     private static String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /**
+     * 执行 key 对应的 CDP 业务操作。
+     */
     private static String key(Long tenantId, String datasetKey, String metricKey) {
         return tenantId + ":" + datasetKey + ":" + metricKey;
     }
 
+    /**
+     * 执行 metricSnapshot 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> metricSnapshot(
             String metricKey,
             String expression,
@@ -207,6 +273,9 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return value;
     }
 
+    /**
+     * 执行 impact 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> impact() {
         Map<String, Object> value = ordered();
         value.put("fieldDependencyCount", 0);
@@ -223,10 +292,16 @@ public class CdpWarehouseMetricChangeReviewCatalog {
         return value;
     }
 
+    /**
+     * 执行 copy 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> value) {
         return new LinkedHashMap<>(value);
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }

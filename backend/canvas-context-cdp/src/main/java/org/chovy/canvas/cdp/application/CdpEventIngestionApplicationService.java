@@ -28,19 +28,60 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * 编排 CdpEventIngestion 的应用服务流程。
+ */
 @Service
 public class CdpEventIngestionApplicationService implements CdpEventIngestionFacade {
 
+    /**
+     * event Repository。
+     */
     private final CdpEventRepository eventRepository;
+
+    /**
+     * event Definition Repository。
+     */
     private final CdpEventDefinitionRepository eventDefinitionRepository;
+
+    /**
+     * profile Lookup。
+     */
     private final CustomerProfileLookupApplicationService profileLookup;
+
+    /**
+     * discovery Port。
+     */
     private final CdpEventAttributeDiscoveryPort discoveryPort;
+
+    /**
+     * publisher。
+     */
     private final CdpAcceptedEventPublisher publisher;
+
+    /**
+     * warehouse Sink。
+     */
     private final CdpWarehouseEventSinkPort warehouseSink;
+
+    /**
+     * privacy Tombstone Port。
+     */
     private final CdpPrivacyTombstonePort privacyTombstonePort;
+
+    /**
+     * 时间源。
+     */
     private final Clock clock;
+
+    /**
+     * max Batch Size。
+     */
     private final int maxBatchSize;
 
+    /**
+     * 创建当前组件实例。
+     */
     @Autowired
     public CdpEventIngestionApplicationService(CdpEventRepository eventRepository,
                                                CdpEventDefinitionRepository eventDefinitionRepository,
@@ -74,6 +115,9 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
         this.maxBatchSize = maxBatchSize <= 0 ? 100 : maxBatchSize;
     }
 
+    /**
+     * 执行 ingestBatch 对应的 CDP 业务操作。
+     */
     @Override
     public CdpIngestionResult ingestBatch(CdpWriteKeyView writeKey, CdpBatchTrackCommand command) {
         List<CdpTrackEventCommand> batch = command == null || command.batch() == null
@@ -100,6 +144,9 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
         return new CdpIngestionResult(accepted, errors.size(), errors);
     }
 
+    /**
+     * 执行 ingestOne 对应的 CDP 业务操作。
+     */
     private boolean ingestOne(CdpWriteKeyView writeKey, CdpTrackEventCommand event, OffsetDateTime batchSentAt) {
         if (writeKey == null) {
             throw new IllegalArgumentException("writeKey is required");
@@ -115,6 +162,7 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
         }
         String eventCode = requireText(event.event(), "event");
         String idempotencyKey = blankToNull(event.idempotencyKey());
+        // 先按 messageId 和幂等键去重，避免重复事件继续写入日志、用户档案和仓库镜像。
         if (eventRepository.existsByMessageId(tenantId, messageId)
                 || eventRepository.existsByIdempotencyKey(tenantId, idempotencyKey)) {
             return false;
@@ -125,6 +173,7 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
         }
         String userId = blankToNull(event.userId());
         if (userId != null) {
+            // 用户维度事件写入前先执行隐私墓碑校验，确保已屏蔽身份不会重新进入 CDP。
             privacyTombstonePort.enforceNotBlocked(tenantId, "USER_ID", userId, "CDP_EVENT_INGESTION");
             profileLookup.ensureUser(tenantId, userId, "CDP_EVENT", eventCode);
         }
@@ -137,6 +186,7 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
             discoveryPort.discover(tenantId, eventCode, safeMap(event.properties()));
         }
         try {
+            // 事件已被接受后再发布领域通知；通知失败不回滚主写入。
             publisher.publishAccepted(row);
         } catch (RuntimeException ignored) {
             // Internal publish failures must not reject already accepted CDP events.
@@ -149,6 +199,9 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
         return true;
     }
 
+    /**
+     * 转换为Event Log。
+     */
     private CdpEventLog toEventLog(CdpWriteKeyView writeKey,
                                    Long tenantId,
                                    CdpTrackEventCommand event,
@@ -183,6 +236,9 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
                 null);
     }
 
+    /**
+     * 执行 readContextString 对应的 CDP 业务操作。
+     */
     @SuppressWarnings("unchecked")
     private String readContextString(Map<String, Object> context, String directKey, String snakeKey, String nestedKey) {
         if (context == null) {
@@ -201,6 +257,9 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
         return value == null || String.valueOf(value).isBlank() ? null : String.valueOf(value).trim();
     }
 
+    /**
+     * 执行 readPlatform 对应的 CDP 业务操作。
+     */
     private String readPlatform(CdpWriteKeyView writeKey, Map<String, Object> context) {
         Object platform = context == null ? null : context.get("platform");
         return platform == null || String.valueOf(platform).isBlank()
@@ -208,22 +267,37 @@ public class CdpEventIngestionApplicationService implements CdpEventIngestionFac
                 : String.valueOf(platform);
     }
 
+    /**
+     * 转换为Local。
+     */
     private LocalDateTime toLocal(OffsetDateTime value) {
         return LocalDateTime.ofInstant(value.toInstant(), ZoneOffset.UTC);
     }
 
+    /**
+     * 返回安全的Map。
+     */
     private static Map<String, Object> safeMap(Map<String, Object> value) {
         return value == null ? Map.of() : value;
     }
 
+    /**
+     * 返回安全的Tenant Id。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 执行 blankToNull 对应的 CDP 业务操作。
+     */
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /**
+     * 读取并校验必填的Text。
+     */
     private static String requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");

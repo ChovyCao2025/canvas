@@ -12,12 +12,24 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseTableFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseTableApplicationService 的核心行为。
+ */
 class CdpWarehouseTableApplicationServiceTest {
 
+    /**
+     * 执行 fixed 对应的 CDP 业务操作。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T04:00:00Z"),
+            /**
+             * 执行 of 对应的 CDP 业务操作。
+             */
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 执行 managesContractsInspectionsRemediationAndIncidentScanWithinTenant 对应的 CDP 业务操作。
+     */
     @Test
     void managesContractsInspectionsRemediationAndIncidentScanWithinTenant() {
         CdpWarehouseTableFacade service = new CdpWarehouseTableApplicationService(CLOCK);
@@ -64,6 +76,9 @@ class CdpWarehouseTableApplicationServiceTest {
         assertThat(service.listContracts(8L, null, null)).containsEntry("total", 0L);
     }
 
+    /**
+     * 执行 validationIsTenantScopedAndDefaultsAreStable 对应的 CDP 业务操作。
+     */
     @Test
     void validationIsTenantScopedAndDefaultsAreStable() {
         CdpWarehouseTableFacade service = new CdpWarehouseTableApplicationService(CLOCK);

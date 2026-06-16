@@ -6,10 +6,19 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehousePrivacyApplicationService 的核心行为。
+ */
 class CdpWarehousePrivacyApplicationServiceTest {
 
+    /**
+     * 执行 CdpWarehousePrivacyApplicationService 对应的 CDP 业务操作。
+     */
     private final CdpWarehousePrivacyApplicationService service = new CdpWarehousePrivacyApplicationService();
 
+    /**
+     * 执行 managesErasureRequestsTombstonesAndDecisionsWithDeterministicCompatibilityPayloads 对应的 CDP 业务操作。
+     */
     @Test
     void managesErasureRequestsTombstonesAndDecisionsWithDeterministicCompatibilityPayloads() {
         Map<String, Object> erasure = service.createErasureRequest(

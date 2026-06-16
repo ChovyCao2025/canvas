@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.RealtimeAudienceFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 RealtimeAudienceApplicationService 的核心行为。
+ */
 class RealtimeAudienceApplicationServiceTest {
 
+    /**
+     * 执行 processEventAddsMatchingUsersAndCanRemoveNonMatchingUsers 对应的 CDP 业务操作。
+     */
     @Test
     void processEventAddsMatchingUsersAndCanRemoveNonMatchingUsers() {
         RealtimeAudienceFacade service = new RealtimeAudienceApplicationService();
@@ -34,6 +40,9 @@ class RealtimeAudienceApplicationServiceTest {
                 .returns(1, RealtimeAudienceFacade.EventResult::memberCount);
     }
 
+    /**
+     * 执行 snapshotsCaptureCurrentMembersAndRespectLimit 对应的 CDP 业务操作。
+     */
     @Test
     void snapshotsCaptureCurrentMembersAndRespectLimit() {
         RealtimeAudienceFacade service = new RealtimeAudienceApplicationService();
@@ -54,6 +63,9 @@ class RealtimeAudienceApplicationServiceTest {
                 .returns(2L, RealtimeAudienceFacade.SnapshotRow::snapshotId);
     }
 
+    /**
+     * 执行 overlapMergeAndExcludeOperateOnAudienceSets 对应的 CDP 业务操作。
+     */
     @Test
     void overlapMergeAndExcludeOperateOnAudienceSets() {
         RealtimeAudienceFacade service = new RealtimeAudienceApplicationService();
@@ -76,6 +88,9 @@ class RealtimeAudienceApplicationServiceTest {
         assertThat(exclude.memberIds()).containsExactly("user-2");
     }
 
+    /**
+     * 执行 validationUsesCompatibilityMessages 对应的 CDP 业务操作。
+     */
     @Test
     void validationUsesCompatibilityMessages() {
         RealtimeAudienceFacade service = new RealtimeAudienceApplicationService();

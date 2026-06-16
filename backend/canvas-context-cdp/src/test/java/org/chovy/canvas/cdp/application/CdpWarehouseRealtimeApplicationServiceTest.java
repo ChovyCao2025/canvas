@@ -8,8 +8,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseRealtimeApplicationService 的核心行为。
+ */
 class CdpWarehouseRealtimeApplicationServiceTest {
 
+    /**
+     * 执行 managesRealtimeSchemasPipelinesJobsAndProbeTargetsPerTenant 对应的 CDP 业务操作。
+     */
     @Test
     void managesRealtimeSchemasPipelinesJobsAndProbeTargetsPerTenant() {
         CdpWarehouseRealtimeApplicationService service = new CdpWarehouseRealtimeApplicationService();
@@ -78,6 +84,9 @@ class CdpWarehouseRealtimeApplicationServiceTest {
         assertThat(service.listProbeTargets(42L, true, 10)).hasSize(1);
     }
 
+    /**
+     * 校验s Required Keys And Defaults Actor。
+     */
     @Test
     void validatesRequiredKeysAndDefaultsActor() {
         CdpWarehouseRealtimeApplicationService service = new CdpWarehouseRealtimeApplicationService();

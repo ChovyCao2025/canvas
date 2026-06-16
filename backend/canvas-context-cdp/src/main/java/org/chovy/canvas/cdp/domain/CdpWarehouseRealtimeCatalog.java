@@ -7,10 +7,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 维护 CdpWarehouseRealtime 的内存目录和查询视图。
+ */
 public class CdpWarehouseRealtimeCatalog {
 
     private final Map<Long, TenantRealtime> tenants = new LinkedHashMap<>();
 
+    /**
+     * 执行 realtimeStatus 对应的 CDP 业务操作。
+     */
     public Map<String, Object> realtimeStatus(Long tenantId) {
         TenantRealtime realtime = realtime(tenantId);
         return Map.of(
@@ -23,6 +29,9 @@ public class CdpWarehouseRealtimeCatalog {
                 "status", hasFailedCheckpoint(realtime) ? "WARN" : "PASS");
     }
 
+    /**
+     * 执行 registerSchema 对应的 CDP 业务操作。
+     */
     public Map<String, Object> registerSchema(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "pipelineKey");
         TenantRealtime realtime = realtime(tenantId);
@@ -37,6 +46,9 @@ public class CdpWarehouseRealtimeCatalog {
         return copy(schema);
     }
 
+    /**
+     * 查询Schemas列表。
+     */
     public List<Map<String, Object>> listSchemas(Long tenantId, String pipelineKey, String schemaRole, int limit) {
         return realtime(tenantId).schemas.stream()
                 .filter(item -> matches(item, "pipelineKey", pipelineKey))
@@ -46,6 +58,9 @@ public class CdpWarehouseRealtimeCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 latestSchema 对应的 CDP 业务操作。
+     */
     public Map<String, Object> latestSchema(Long tenantId, String pipelineKey, String schemaRole) {
         List<Map<String, Object>> matches = listSchemas(tenantId, pipelineKey, schemaRole, 100);
         if (matches.isEmpty()) {
@@ -54,6 +69,9 @@ public class CdpWarehouseRealtimeCatalog {
         return matches.get(matches.size() - 1);
     }
 
+    /**
+     * 查询Pipeline Contracts列表。
+     */
     public List<Map<String, Object>> listPipelineContracts(Long tenantId, String lifecycleStatus) {
         return realtime(tenantId).pipelines.stream()
                 .filter(item -> matches(item, "lifecycleStatus", upper(lifecycleStatus)))
@@ -61,6 +79,9 @@ public class CdpWarehouseRealtimeCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 upsertPipelineContract 对应的 CDP 业务操作。
+     */
     public Map<String, Object> upsertPipelineContract(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "pipelineKey");
         TenantRealtime realtime = realtime(tenantId);
@@ -80,6 +101,9 @@ public class CdpWarehouseRealtimeCatalog {
         return copy(pipeline);
     }
 
+    /**
+     * 执行 reportCheckpoint 对应的 CDP 业务操作。
+     */
     public Map<String, Object> reportCheckpoint(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "pipelineKey");
         TenantRealtime realtime = realtime(tenantId);
@@ -92,6 +116,9 @@ public class CdpWarehouseRealtimeCatalog {
         return copy(checkpoint);
     }
 
+    /**
+     * 执行 pipelineStatus 对应的 CDP 业务操作。
+     */
     public Map<String, Object> pipelineStatus(Long tenantId, int recentLimit) {
         TenantRealtime realtime = realtime(tenantId);
         return Map.of(
@@ -102,6 +129,9 @@ public class CdpWarehouseRealtimeCatalog {
                 "pipelines", copies(realtime.pipelines, recentLimit));
     }
 
+    /**
+     * 执行 scanJobIncidents 对应的 CDP 业务操作。
+     */
     public Map<String, Object> scanJobIncidents(Long tenantId, String pipelineKey, long maxHeartbeatAgeSeconds,
                                                 int limit) {
         TenantRealtime realtime = realtime(tenantId);
@@ -117,6 +147,9 @@ public class CdpWarehouseRealtimeCatalog {
         return incident;
     }
 
+    /**
+     * 执行 heartbeat 对应的 CDP 业务操作。
+     */
     public Map<String, Object> heartbeat(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "jobKey");
         TenantRealtime realtime = realtime(tenantId);
@@ -136,6 +169,9 @@ public class CdpWarehouseRealtimeCatalog {
         return copy(job);
     }
 
+    /**
+     * 执行 jobStatus 对应的 CDP 业务操作。
+     */
     public Map<String, Object> jobStatus(Long tenantId, String pipelineKey, long maxHeartbeatAgeSeconds, int limit) {
         List<Map<String, Object>> jobs = realtime(tenantId).jobs.stream()
                 .filter(item -> matches(item, "pipelineKey", pipelineKey))
@@ -150,6 +186,9 @@ public class CdpWarehouseRealtimeCatalog {
                 "jobs", jobs);
     }
 
+    /**
+     * 执行 requestAction 对应的 CDP 业务操作。
+     */
     public Map<String, Object> requestAction(Long tenantId, Map<String, Object> payload, String actor) {
         required(payload, "jobKey");
         TenantRealtime realtime = realtime(tenantId);
@@ -163,6 +202,9 @@ public class CdpWarehouseRealtimeCatalog {
         return copy(action);
     }
 
+    /**
+     * 执行 pendingActions 对应的 CDP 业务操作。
+     */
     public List<Map<String, Object>> pendingActions(Long tenantId, String pipelineKey, String jobKey, int limit) {
         return realtime(tenantId).actions.stream()
                 .filter(item -> matches(item, "pipelineKey", pipelineKey))
@@ -173,12 +215,18 @@ public class CdpWarehouseRealtimeCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 acknowledgeAction 对应的 CDP 业务操作。
+     */
     public Map<String, Object> acknowledgeAction(Long tenantId, Long actionId) {
         Map<String, Object> action = find(realtime(tenantId).actions, "actionId", actionId, "action not found");
         action.put("status", "ACKNOWLEDGED");
         return copy(action);
     }
 
+    /**
+     * 执行 completeAction 对应的 CDP 业务操作。
+     */
     public Map<String, Object> completeAction(Long tenantId, Long actionId, String status, String resultMessage) {
         Map<String, Object> action = find(realtime(tenantId).actions, "actionId", actionId, "action not found");
         action.put("status", upper(value(status, "COMPLETED")));
@@ -186,6 +234,9 @@ public class CdpWarehouseRealtimeCatalog {
         return copy(action);
     }
 
+    /**
+     * 执行 scanPipelineIncidents 对应的 CDP 业务操作。
+     */
     public Map<String, Object> scanPipelineIncidents(Long tenantId, int recentLimit) {
         TenantRealtime realtime = realtime(tenantId);
         Map<String, Object> scan = Map.of(
@@ -198,6 +249,9 @@ public class CdpWarehouseRealtimeCatalog {
         return scan;
     }
 
+    /**
+     * 执行 upsertProbeTarget 对应的 CDP 业务操作。
+     */
     public Map<String, Object> upsertProbeTarget(Long tenantId, Map<String, Object> payload, String actor) {
         TenantRealtime realtime = realtime(tenantId);
         Map<String, Object> target = record(payload);
@@ -209,6 +263,9 @@ public class CdpWarehouseRealtimeCatalog {
         return copy(target);
     }
 
+    /**
+     * 查询Probe Targets列表。
+     */
     public List<Map<String, Object>> listProbeTargets(Long tenantId, boolean includeDisabled, int limit) {
         return realtime(tenantId).probeTargets.stream()
                 .filter(item -> includeDisabled || Boolean.TRUE.equals(item.get("enabled")))
@@ -217,12 +274,18 @@ public class CdpWarehouseRealtimeCatalog {
                 .toList();
     }
 
+    /**
+     * 设置probe Target Enabled。
+     */
     public Map<String, Object> setProbeTargetEnabled(Long tenantId, Long targetId, boolean enabled) {
         Map<String, Object> target = find(realtime(tenantId).probeTargets, "targetId", targetId, "target not found");
         target.put("enabled", enabled);
         return copy(target);
     }
 
+    /**
+     * 执行 scanProbeTargets 对应的 CDP 业务操作。
+     */
     public Map<String, Object> scanProbeTargets(Long tenantId, Long targetId, int limit) {
         long scanned = realtime(tenantId).probeTargets.stream()
                 .filter(item -> targetId == null || Objects.equals(item.get("targetId"), targetId))
@@ -231,30 +294,51 @@ public class CdpWarehouseRealtimeCatalog {
         return Map.of("tenantId", tenantId, "targetId", targetId, "scannedCount", scanned, "incidentCount", 0);
     }
 
+    /**
+     * 执行 realtime 对应的 CDP 业务操作。
+     */
     private TenantRealtime realtime(Long tenantId) {
         return tenants.computeIfAbsent(tenantId, ignored -> new TenantRealtime());
     }
 
+    /**
+     * 执行 hasFailedCheckpoint 对应的 CDP 业务操作。
+     */
     private static boolean hasFailedCheckpoint(TenantRealtime realtime) {
         return realtime.checkpoints.stream().anyMatch(item -> "FAILED".equals(item.get("status")));
     }
 
+    /**
+     * 执行 record 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> record(Map<String, Object> payload) {
         return new LinkedHashMap<>(payload);
     }
 
+    /**
+     * 执行 copy 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }
 
+    /**
+     * 执行 copies 对应的 CDP 业务操作。
+     */
     private static List<Map<String, Object>> copies(List<Map<String, Object>> source, int limit) {
         return source.stream().limit(limit).map(CdpWarehouseRealtimeCatalog::copy).toList();
     }
 
+    /**
+     * 执行 matches 对应的 CDP 业务操作。
+     */
     private static boolean matches(Map<String, Object> item, String field, Object expected) {
         return expected == null || String.valueOf(expected).isBlank() || Objects.equals(item.get(field), expected);
     }
 
+    /**
+     * 查找find。
+     */
     private static Map<String, Object> find(List<Map<String, Object>> rows, String key, Object value, String message) {
         Map<String, Object> match = findOptional(rows, key, value);
         if (match == null) {
@@ -263,10 +347,16 @@ public class CdpWarehouseRealtimeCatalog {
         return match;
     }
 
+    /**
+     * 查找Optional。
+     */
     private static Map<String, Object> findOptional(List<Map<String, Object>> rows, String key, Object value) {
         return rows.stream().filter(row -> Objects.equals(row.get(key), value)).findFirst().orElse(null);
     }
 
+    /**
+     * 读取并校验必填的d。
+     */
     private static void required(Map<String, Object> payload, String key) {
         Object value = payload.get(key);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -274,14 +364,23 @@ public class CdpWarehouseRealtimeCatalog {
         }
     }
 
+    /**
+     * 执行 value 对应的 CDP 业务操作。
+     */
     private static String value(Object value, String fallback) {
         return value == null || String.valueOf(value).isBlank() ? fallback : String.valueOf(value);
     }
 
+    /**
+     * 执行 upper 对应的 CDP 业务操作。
+     */
     private static String upper(String value) {
         return value == null || value.isBlank() ? value : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 表示 TenantRealtime 的业务数据或处理组件。
+     */
     private static final class TenantRealtime {
         private final List<Map<String, Object>> schemas = new ArrayList<>();
         private final List<Map<String, Object>> pipelines = new ArrayList<>();

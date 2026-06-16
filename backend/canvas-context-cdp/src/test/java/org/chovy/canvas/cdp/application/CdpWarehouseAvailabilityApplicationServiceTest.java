@@ -7,8 +7,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseAvailabilityApplicationService 的核心行为。
+ */
 class CdpWarehouseAvailabilityApplicationServiceTest {
 
+    /**
+     * 执行 recordsAssetsContractsAndEvaluatesAvailabilityDeterministically 对应的 CDP 业务操作。
+     */
     @Test
     void recordsAssetsContractsAndEvaluatesAvailabilityDeterministically() {
         CdpWarehouseAvailabilityApplicationService service = new CdpWarehouseAvailabilityApplicationService();
@@ -42,6 +48,9 @@ class CdpWarehouseAvailabilityApplicationServiceTest {
         assertThat(service.listContracts(9L, "bi", "ACTIVE")).hasSize(1);
     }
 
+    /**
+     * 执行 rejectsMissingRequiredCompatibilityKeys 对应的 CDP 业务操作。
+     */
     @Test
     void rejectsMissingRequiredCompatibilityKeys() {
         CdpWarehouseAvailabilityApplicationService service = new CdpWarehouseAvailabilityApplicationService();
@@ -57,6 +66,9 @@ class CdpWarehouseAvailabilityApplicationServiceTest {
                 .hasMessage("contractKey not found");
     }
 
+    /**
+     * 执行 scanResultsUseTenantAndActorInputs 对应的 CDP 业务操作。
+     */
     @Test
     void scanResultsUseTenantAndActorInputs() {
         CdpWarehouseAvailabilityApplicationService service = new CdpWarehouseAvailabilityApplicationService();

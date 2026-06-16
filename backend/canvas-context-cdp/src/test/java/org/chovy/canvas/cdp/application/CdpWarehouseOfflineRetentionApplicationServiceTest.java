@@ -8,8 +8,14 @@ import java.time.LocalDateTime;
 import org.chovy.canvas.cdp.api.CdpWarehouseOfflineRetentionFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseOfflineRetentionApplicationService 的核心行为。
+ */
 class CdpWarehouseOfflineRetentionApplicationServiceTest {
 
+    /**
+     * 执行 offlineCyclePlanAndRunNormalizeLimitsWindowsAndOperator 对应的 CDP 业务操作。
+     */
     @Test
     void offlineCyclePlanAndRunNormalizeLimitsWindowsAndOperator() {
         CdpWarehouseOfflineRetentionFacade service = new CdpWarehouseOfflineRetentionApplicationService();
@@ -44,6 +50,9 @@ class CdpWarehouseOfflineRetentionApplicationServiceTest {
                 .hasMessage("aggregationWindowMinutes must be positive");
     }
 
+    /**
+     * 执行 retentionPlanAndRunComputeCutoffsEligibleRowsAndOperatorDefaults 对应的 CDP 业务操作。
+     */
     @Test
     void retentionPlanAndRunComputeCutoffsEligibleRowsAndOperatorDefaults() {
         CdpWarehouseOfflineRetentionFacade service = new CdpWarehouseOfflineRetentionApplicationService();

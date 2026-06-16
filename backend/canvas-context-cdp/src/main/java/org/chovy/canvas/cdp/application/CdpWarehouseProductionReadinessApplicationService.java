@@ -8,9 +8,15 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseProductionReadinessFacade;
 import org.springframework.stereotype.Service;
 
+/**
+ * 编排 CdpWarehouseProductionReadiness 的应用服务流程。
+ */
 @Service
 public class CdpWarehouseProductionReadinessApplicationService implements CdpWarehouseProductionReadinessFacade {
 
+    /**
+     * 执行 proof 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> proof(
             Long tenantId,
@@ -45,6 +51,9 @@ public class CdpWarehouseProductionReadinessApplicationService implements CdpWar
         return proof;
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }

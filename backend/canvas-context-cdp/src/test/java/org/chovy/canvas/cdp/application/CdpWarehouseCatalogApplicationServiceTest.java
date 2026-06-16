@@ -12,8 +12,14 @@ import org.chovy.canvas.cdp.api.CdpWarehouseCatalogFacade.Direction;
 import org.chovy.canvas.cdp.api.CdpWarehouseCatalogFacade.LineageCommand;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseCatalogApplicationService 的核心行为。
+ */
 class CdpWarehouseCatalogApplicationServiceTest {
 
+    /**
+     * 返回默认的s Null Tenant To Zero And Keeps Datasets Tenant Scoped。
+     */
     @Test
     void defaultsNullTenantToZeroAndKeepsDatasetsTenantScoped() {
         CdpWarehouseCatalogFacade service = new CdpWarehouseCatalogApplicationService();
@@ -30,6 +36,9 @@ class CdpWarehouseCatalogApplicationServiceTest {
         assertThat(service.listDatasets(7L, null, null)).isEmpty();
     }
 
+    /**
+     * 执行 filtersDatasetsAndUpsertReplacesExistingDatasetFields 对应的 CDP 业务操作。
+     */
     @Test
     void filtersDatasetsAndUpsertReplacesExistingDatasetFields() {
         CdpWarehouseCatalogFacade service = new CdpWarehouseCatalogApplicationService();
@@ -64,6 +73,9 @@ class CdpWarehouseCatalogApplicationServiceTest {
                 .containsEntry("schemaJson", "{\"fields\":[]}");
     }
 
+    /**
+     * 执行 buildsDirectAndTransitiveLineageGraphsWithDirectionAndDepth 对应的 CDP 业务操作。
+     */
     @Test
     void buildsDirectAndTransitiveLineageGraphsWithDirectionAndDepth() {
         CdpWarehouseCatalogFacade service = new CdpWarehouseCatalogApplicationService();
@@ -94,6 +106,9 @@ class CdpWarehouseCatalogApplicationServiceTest {
                 .containsEntry("truncated", false);
     }
 
+    /**
+     * 校验s Required Dataset Lineage And Depth Fields。
+     */
     @Test
     void validatesRequiredDatasetLineageAndDepthFields() {
         CdpWarehouseCatalogFacade service = new CdpWarehouseCatalogApplicationService();
@@ -109,6 +124,9 @@ class CdpWarehouseCatalogApplicationServiceTest {
                 .hasMessageContaining("maxDepth must be positive");
     }
 
+    /**
+     * 执行 dataset 对应的 CDP 业务操作。
+     */
     private static DatasetCommand dataset(String datasetKey, String layer, String status, String displayName) {
         return new DatasetCommand(
                 datasetKey,
@@ -125,6 +143,9 @@ class CdpWarehouseCatalogApplicationServiceTest {
                 "{\"type\":\"struct\"}");
     }
 
+    /**
+     * 执行 lineage 对应的 CDP 业务操作。
+     */
     private static LineageCommand lineage(String upstream, String downstream, String transformRef, Boolean active) {
         return new LineageCommand(upstream, downstream, "sql", transformRef, "hard", "lineage", active);
     }

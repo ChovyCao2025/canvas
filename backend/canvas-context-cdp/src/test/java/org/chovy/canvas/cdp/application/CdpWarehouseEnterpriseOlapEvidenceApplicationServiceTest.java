@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseEnterpriseOlapEvidenceFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseEnterpriseOlapEvidenceApplicationService 的核心行为。
+ */
 class CdpWarehouseEnterpriseOlapEvidenceApplicationServiceTest {
 
+    /**
+     * 执行 recordsLatestProofAndCollectionRunsPerTenantWithDefaultTenant 对应的 CDP 业务操作。
+     */
     @Test
     void recordsLatestProofAndCollectionRunsPerTenantWithDefaultTenant() {
         CdpWarehouseEnterpriseOlapEvidenceFacade service =
@@ -52,6 +58,9 @@ class CdpWarehouseEnterpriseOlapEvidenceApplicationServiceTest {
                 .containsExactly(thirdRun.get("id"), secondRun.get("id"));
     }
 
+    /**
+     * 校验s Evidence Key And Defaults Collection Limit。
+     */
     @Test
     void validatesEvidenceKeyAndDefaultsCollectionLimit() {
         CdpWarehouseEnterpriseOlapEvidenceFacade service =
@@ -64,6 +73,9 @@ class CdpWarehouseEnterpriseOlapEvidenceApplicationServiceTest {
         assertThat(service.collections(0L, 0)).hasSize(1);
     }
 
+    /**
+     * 执行 command 对应的 CDP 业务操作。
+     */
     private static CdpWarehouseEnterpriseOlapEvidenceFacade.EvidenceCommand command(String key, String status) {
         return new CdpWarehouseEnterpriseOlapEvidenceFacade.EvidenceCommand(
                 key,

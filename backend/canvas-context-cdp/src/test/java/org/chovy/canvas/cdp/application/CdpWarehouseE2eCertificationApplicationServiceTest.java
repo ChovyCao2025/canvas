@@ -8,8 +8,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseE2eCertificationApplicationService 的核心行为。
+ */
 class CdpWarehouseE2eCertificationApplicationServiceTest {
 
+    /**
+     * 执行 certifiesWarehouseEvidenceAndCreatesQueryableRuns 对应的 CDP 业务操作。
+     */
     @Test
     void certifiesWarehouseEvidenceAndCreatesQueryableRuns() {
         CdpWarehouseE2eCertificationApplicationService service = new CdpWarehouseE2eCertificationApplicationService();
@@ -48,6 +54,9 @@ class CdpWarehouseE2eCertificationApplicationServiceTest {
         assertThat(service.get(9L, (Long) run.get("id"))).containsEntry("id", run.get("id"));
     }
 
+    /**
+     * 返回默认的s Inputs And Rejects Missing Runs。
+     */
     @Test
     void defaultsInputsAndRejectsMissingRuns() {
         CdpWarehouseE2eCertificationApplicationService service = new CdpWarehouseE2eCertificationApplicationService();

@@ -13,13 +13,22 @@ import org.chovy.canvas.cdp.domain.CdpWriteKeyCatalog;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 编排 CdpWriteKey 的应用服务流程。
+ */
 @Service
 public class CdpWriteKeyApplicationService implements CdpWriteKeyFacade, CdpWriteKeyAuthenticationFacade {
 
+    /**
+     * 执行 CdpWriteKeyCatalog 对应的 CDP 业务操作。
+     */
     private final CdpWriteKeyCatalog catalog = new CdpWriteKeyCatalog();
     private final Map<String, CdpWriteKeyView> activeKeys = new ConcurrentHashMap<>();
     private final Map<Long, String> rawKeysById = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 authenticate 对应的 CDP 业务操作。
+     */
     @Override
     public CdpWriteKeyView authenticate(String authorizationHeader) {
         CdpWriteKeyView key = activeKeys.get(extractBasicWriteKey(authorizationHeader));
@@ -29,11 +38,17 @@ public class CdpWriteKeyApplicationService implements CdpWriteKeyFacade, CdpWrit
         return key;
     }
 
+    /**
+     * 查询list列表。
+     */
     @Override
     public List<KeyRow> list(Long tenantId) {
         return catalog.list(safeTenantId(tenantId));
     }
 
+    /**
+     * 创建create。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CreateResult create(Long tenantId, CreateCommand command, String actor) {
@@ -45,6 +60,9 @@ public class CdpWriteKeyApplicationService implements CdpWriteKeyFacade, CdpWrit
         return result;
     }
 
+    /**
+     * 执行 disable 对应的 CDP 业务操作。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void disable(Long tenantId, Long id) {
@@ -55,10 +73,16 @@ public class CdpWriteKeyApplicationService implements CdpWriteKeyFacade, CdpWrit
         }
     }
 
+    /**
+     * 返回安全的Tenant Id。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 执行 extractBasicWriteKey 对应的 CDP 业务操作。
+     */
     private static String extractBasicWriteKey(String authorizationHeader) {
         if (authorizationHeader == null || !authorizationHeader.startsWith("Basic ")) {
             throw new IllegalArgumentException("CDP write key is required");

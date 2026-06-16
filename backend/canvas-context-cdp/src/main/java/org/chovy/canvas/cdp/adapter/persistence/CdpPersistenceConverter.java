@@ -19,9 +19,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 表示 CdpPersistenceConverter 的业务数据或处理组件。
+ */
 @Component
 public class CdpPersistenceConverter {
 
+    /**
+     * 转换为Profile Row。
+     */
     public CdpUserProfileDO toProfileRow(CustomerProfile profile) {
         if (profile == null) {
             return null;
@@ -43,6 +49,9 @@ public class CdpPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为Profile。
+     */
     public CustomerProfile toProfile(CdpUserProfileDO row) {
         if (row == null) {
             return null;
@@ -63,6 +72,9 @@ public class CdpPersistenceConverter {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为Identity Row。
+     */
     public CdpUserIdentityDO toIdentityRow(Long tenantId, String userId, String identityType, String identityValue,
                                            String sourceType, String sourceRefId, boolean verified) {
         CdpUserIdentityDO row = new CdpUserIdentityDO();
@@ -76,6 +88,9 @@ public class CdpPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为Tag Definition。
+     */
     public CdpTagDefinition toTagDefinition(TagDefinitionDO row) {
         if (row == null) {
             return null;
@@ -89,6 +104,9 @@ public class CdpPersistenceConverter {
                 row.getDefaultTtlDays());
     }
 
+    /**
+     * 转换为User Tag Row。
+     */
     public CdpUserTagDO toUserTagRow(CdpUserTag tag) {
         if (tag == null) {
             return null;
@@ -111,6 +129,9 @@ public class CdpPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为User Tag。
+     */
     public CdpUserTag toUserTag(CdpUserTagDO row) {
         if (row == null) {
             return null;
@@ -132,6 +153,9 @@ public class CdpPersistenceConverter {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 转换为User Tag History Row。
+     */
     public CdpUserTagHistoryDO toUserTagHistoryRow(CdpUserTagHistory history) {
         if (history == null) {
             return null;
@@ -152,6 +176,9 @@ public class CdpPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为User Tag History。
+     */
     public CdpUserTagHistory toUserTagHistory(CdpUserTagHistoryDO row) {
         if (row == null) {
             return null;
@@ -171,6 +198,9 @@ public class CdpPersistenceConverter {
                 row.getOperatedAt());
     }
 
+    /**
+     * 转换为Event Row。
+     */
     public CdpEventLogDO toEventRow(CdpEventLog eventLog) {
         if (eventLog == null) {
             return null;
@@ -199,6 +229,9 @@ public class CdpPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为Event。
+     */
     public CdpEventLog toEvent(CdpEventLogDO row) {
         if (row == null) {
             return null;
@@ -226,6 +259,9 @@ public class CdpPersistenceConverter {
                 row.getCreatedAt());
     }
 
+    /**
+     * 转换为Audience Snapshot Row。
+     */
     public AudienceSnapshotDO toAudienceSnapshotRow(AudienceSnapshot snapshot) {
         if (snapshot == null) {
             return null;
@@ -244,6 +280,9 @@ public class CdpPersistenceConverter {
         return row;
     }
 
+    /**
+     * 转换为Audience Snapshot。
+     */
     public AudienceSnapshot toAudienceSnapshot(AudienceSnapshotDO row) {
         if (row == null) {
             return null;
@@ -260,10 +299,16 @@ public class CdpPersistenceConverter {
                 row.getCreatedAt());
     }
 
+    /**
+     * 转换为Incident。
+     */
     public WarehouseIncident toIncident(CdpWarehouseIncidentDO row) {
         return row == null ? null : new WarehouseIncident(row.getSeverity(), row.getStatus());
     }
 
+    /**
+     * 转换为Sync Run。
+     */
     public WarehouseSyncRun toSyncRun(CdpWarehouseSyncRunDO row) {
         return row == null ? null : new WarehouseSyncRun(
                 row.getStatus(),
@@ -273,10 +318,16 @@ public class CdpPersistenceConverter {
                 row.getWindowStart());
     }
 
+    /**
+     * 转换为Watermark。
+     */
     public WarehouseWatermark toWatermark(CdpWarehouseWatermarkDO row) {
         return row == null ? null : new WarehouseWatermark(row.getWatermarkTime(), row.getUpdatedAt());
     }
 
+    /**
+     * 转换为Materialization Run。
+     */
     public WarehouseMaterializationRun toMaterializationRun(AudienceMaterializationRunDO row) {
         return row == null ? null : new WarehouseMaterializationRun(
                 row.getStatus(),
@@ -284,15 +335,27 @@ public class CdpPersistenceConverter {
                 row.getStartedAt());
     }
 
+    /**
+     * 表示 SimpleJsonCodec 的业务数据或处理组件。
+     */
     private static final class SimpleJsonCodec {
 
+        /**
+         * 创建当前组件实例。
+         */
         private SimpleJsonCodec() {
         }
 
+        /**
+         * 转换为Json Object。
+         */
         static String toJsonObject(Map<String, Object> value) {
             return value == null || value.isEmpty() ? "{}" : mapToJson(value);
         }
 
+        /**
+         * 转换为Json Array。
+         */
         static String toJsonArray(List<String> value) {
             if (value == null || value.isEmpty()) {
                 return "[]";
@@ -307,6 +370,9 @@ public class CdpPersistenceConverter {
             return builder.append(']').toString();
         }
 
+        /**
+         * 执行 fromJsonObject 对应的 CDP 业务操作。
+         */
         static Map<String, Object> fromJsonObject(String value) {
             if (value == null || value.isBlank()) {
                 return Map.of();
@@ -321,6 +387,9 @@ public class CdpPersistenceConverter {
             }
         }
 
+        /**
+         * 执行 fromJsonStringArray 对应的 CDP 业务操作。
+         */
         static List<String> fromJsonStringArray(String value) {
             if (value == null || value.isBlank()) {
                 return List.of();
@@ -335,6 +404,9 @@ public class CdpPersistenceConverter {
             }
         }
 
+        /**
+         * 执行 valueToJson 对应的 CDP 业务操作。
+         */
         private static String valueToJson(Object value) {
             if (value == null) {
                 return "null";
@@ -351,6 +423,9 @@ public class CdpPersistenceConverter {
             return quote(String.valueOf(value));
         }
 
+        /**
+         * 执行 mapToJson 对应的 CDP 业务操作。
+         */
         private static String mapToJson(Map<?, ?> map) {
             if (map == null || map.isEmpty()) {
                 return "{}";
@@ -367,6 +442,9 @@ public class CdpPersistenceConverter {
             return builder.append('}').toString();
         }
 
+        /**
+         * 执行 iterableToJson 对应的 CDP 业务操作。
+         */
         private static String iterableToJson(Iterable<?> iterable) {
             StringBuilder builder = new StringBuilder("[");
             boolean first = true;
@@ -380,6 +458,9 @@ public class CdpPersistenceConverter {
             return builder.append(']').toString();
         }
 
+        /**
+         * 执行 quote 对应的 CDP 业务操作。
+         */
         private static String quote(String value) {
             StringBuilder builder = new StringBuilder("\"");
             String safeValue = value == null ? "" : value;
@@ -399,14 +480,30 @@ public class CdpPersistenceConverter {
             return builder.append('"').toString();
         }
 
+        /**
+         * 表示 Parser 的业务数据或处理组件。
+         */
         private static final class Parser {
+            /**
+             * text。
+             */
             private final String text;
+
+            /**
+             * index。
+             */
             private int index;
 
+            /**
+             * 创建当前组件实例。
+             */
             private Parser(String text) {
                 this.text = text.trim();
             }
 
+            /**
+             * 执行 parseObject 对应的 CDP 业务操作。
+             */
             private Map<String, Object> parseObject() {
                 LinkedHashMap<String, Object> result = new LinkedHashMap<>();
                 expect('{');
@@ -431,6 +528,9 @@ public class CdpPersistenceConverter {
                 throw new IllegalArgumentException("unterminated object");
             }
 
+            /**
+             * 执行 parseArray 对应的 CDP 业务操作。
+             */
             private List<Object> parseArray() {
                 ArrayList<Object> result = new ArrayList<>();
                 expect('[');
@@ -452,6 +552,9 @@ public class CdpPersistenceConverter {
                 throw new IllegalArgumentException("unterminated array");
             }
 
+            /**
+             * 执行 parseValue 对应的 CDP 业务操作。
+             */
             private Object parseValue() {
                 skipWhitespace();
                 if (peek('"')) {
@@ -475,6 +578,9 @@ public class CdpPersistenceConverter {
                 return parseNumber();
             }
 
+            /**
+             * 执行 parseString 对应的 CDP 业务操作。
+             */
             private String parseString() {
                 expect('"');
                 StringBuilder builder = new StringBuilder();
@@ -505,6 +611,9 @@ public class CdpPersistenceConverter {
                 throw new IllegalArgumentException("unterminated string");
             }
 
+            /**
+             * 执行 parseNumber 对应的 CDP 业务操作。
+             */
             private Object parseNumber() {
                 int start = index;
                 while (index < text.length()) {
@@ -534,6 +643,9 @@ public class CdpPersistenceConverter {
                 }
             }
 
+            /**
+             * 执行 match 对应的 CDP 业务操作。
+             */
             private boolean match(String value) {
                 if (text.startsWith(value, index)) {
                     index += value.length();
@@ -542,10 +654,16 @@ public class CdpPersistenceConverter {
                 return false;
             }
 
+            /**
+             * 执行 peek 对应的 CDP 业务操作。
+             */
             private boolean peek(char expected) {
                 return index < text.length() && text.charAt(index) == expected;
             }
 
+            /**
+             * 执行 expect 对应的 CDP 业务操作。
+             */
             private void expect(char expected) {
                 skipWhitespace();
                 if (!peek(expected)) {
@@ -554,12 +672,18 @@ public class CdpPersistenceConverter {
                 index++;
             }
 
+            /**
+             * 执行 skipWhitespace 对应的 CDP 业务操作。
+             */
             private void skipWhitespace() {
                 while (index < text.length() && Character.isWhitespace(text.charAt(index))) {
                     index++;
                 }
             }
 
+            /**
+             * 执行 ensureComplete 对应的 CDP 业务操作。
+             */
             private void ensureComplete() {
                 skipWhitespace();
                 if (index != text.length()) {

@@ -8,11 +8,20 @@ import org.chovy.canvas.cdp.api.CdpWarehouseAvailabilityFacade;
 import org.chovy.canvas.cdp.domain.CdpWarehouseAvailabilityCatalog;
 import org.springframework.stereotype.Service;
 
+/**
+ * 编排 CdpWarehouseAvailability 的应用服务流程。
+ */
 @Service
 public class CdpWarehouseAvailabilityApplicationService implements CdpWarehouseAvailabilityFacade {
 
+    /**
+     * 领域目录组件。
+     */
     private final CdpWarehouseAvailabilityCatalog catalog;
 
+    /**
+     * 创建当前组件实例。
+     */
     public CdpWarehouseAvailabilityApplicationService() {
         this(new CdpWarehouseAvailabilityCatalog());
     }
@@ -21,6 +30,9 @@ public class CdpWarehouseAvailabilityApplicationService implements CdpWarehouseA
         this.catalog = catalog;
     }
 
+    /**
+     * 执行 availability 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> availability(Long tenantId, String from, String to, String mode) {
         Long scopedTenantId = tenantIdOrDefault(tenantId);
@@ -39,11 +51,17 @@ public class CdpWarehouseAvailabilityApplicationService implements CdpWarehouseA
         return result;
     }
 
+    /**
+     * 执行 recordAssetAvailability 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> recordAssetAvailability(Long tenantId, Map<String, Object> payload, String actor) {
         return catalog.recordAsset(tenantIdOrDefault(tenantId), safePayload(payload), actor);
     }
 
+    /**
+     * 查询Asset Availability列表。
+     */
     @Override
     public List<Map<String, Object>> listAssetAvailability(
             Long tenantId,
@@ -54,16 +72,25 @@ public class CdpWarehouseAvailabilityApplicationService implements CdpWarehouseA
         return catalog.listAssets(tenantIdOrDefault(tenantId), assetType, assetKey, mode, limit);
     }
 
+    /**
+     * 执行 upsertContract 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> upsertContract(Long tenantId, Map<String, Object> payload, String actor) {
         return catalog.upsertContract(tenantIdOrDefault(tenantId), safePayload(payload), actor);
     }
 
+    /**
+     * 查询Contracts列表。
+     */
     @Override
     public List<Map<String, Object>> listContracts(Long tenantId, String consumerType, String status) {
         return catalog.listContracts(tenantIdOrDefault(tenantId), consumerType, status);
     }
 
+    /**
+     * 执行 evaluateContract 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> evaluateContract(Long tenantId, String contractKey, String from, String to) {
         Long scopedTenantId = tenantIdOrDefault(tenantId);
@@ -82,6 +109,9 @@ public class CdpWarehouseAvailabilityApplicationService implements CdpWarehouseA
         return result;
     }
 
+    /**
+     * 执行 scanWarehouseIncidents 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> scanWarehouseIncidents(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> result = ordered();
@@ -93,6 +123,9 @@ public class CdpWarehouseAvailabilityApplicationService implements CdpWarehouseA
         return result;
     }
 
+    /**
+     * 执行 scanConsumerIncidents 对应的 CDP 业务操作。
+     */
     @Override
     public Map<String, Object> scanConsumerIncidents(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> body = safePayload(payload);
@@ -106,18 +139,30 @@ public class CdpWarehouseAvailabilityApplicationService implements CdpWarehouseA
         return result;
     }
 
+    /**
+     * 执行 tenantIdOrDefault 对应的 CDP 业务操作。
+     */
     private static Long tenantIdOrDefault(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 返回安全的Payload。
+     */
     private static Map<String, Object> safePayload(Map<String, Object> payload) {
         return payload == null ? Map.of() : payload;
     }
 
+    /**
+     * 返回默认的String。
+     */
     private static String defaultString(Object value, String defaultValue) {
         return value == null || String.valueOf(value).isBlank() ? defaultValue : String.valueOf(value).trim();
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }

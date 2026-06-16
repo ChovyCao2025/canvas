@@ -12,12 +12,24 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpComputedProfileFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpComputedProfileApplicationService 的核心行为。
+ */
 class CdpComputedProfileApplicationServiceTest {
 
+    /**
+     * 执行 fixed 对应的 CDP 业务操作。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T04:00:00Z"),
+            /**
+             * 执行 of 对应的 CDP 业务操作。
+             */
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 执行 managesComputedProfileLifecycleRunsAndChangesWithinTenant 对应的 CDP 业务操作。
+     */
     @Test
     void managesComputedProfileLifecycleRunsAndChangesWithinTenant() {
         CdpComputedProfileFacade service = new CdpComputedProfileApplicationService(CLOCK);
@@ -60,6 +72,9 @@ class CdpComputedProfileApplicationServiceTest {
         assertThat(service.list(8L)).containsEntry("total", 0L);
     }
 
+    /**
+     * 执行 validationDefaultsAndLimitsAreStable 对应的 CDP 业务操作。
+     */
     @Test
     void validationDefaultsAndLimitsAreStable() {
         CdpComputedProfileFacade service = new CdpComputedProfileApplicationService(CLOCK);

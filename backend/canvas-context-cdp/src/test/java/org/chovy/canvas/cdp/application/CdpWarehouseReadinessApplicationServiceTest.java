@@ -19,12 +19,24 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证 CdpWarehouseReadinessApplicationService 的核心行为。
+ */
 class CdpWarehouseReadinessApplicationServiceTest {
 
+    /**
+     * 执行 fixed 对应的 CDP 业务操作。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-06T02:00:00Z"),
+            /**
+             * 执行 of 对应的 CDP 业务操作。
+             */
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 执行 allHealthyEvidenceProducesPassAcrossRequiredSections 对应的 CDP 业务操作。
+     */
     @Test
     void allHealthyEvidenceProducesPassAcrossRequiredSections() {
         CdpWarehouseReadinessApplicationService service = new CdpWarehouseReadinessApplicationService(
@@ -42,6 +54,9 @@ class CdpWarehouseReadinessApplicationServiceTest {
                 .containsExactly("PASS", "PASS", "PASS", "PASS", "PASS");
     }
 
+    /**
+     * 执行 criticalIncidentFailsOverallReadiness 对应的 CDP 业务操作。
+     */
     @Test
     void criticalIncidentFailsOverallReadiness() {
         CdpWarehouseReadinessApplicationService service = new CdpWarehouseReadinessApplicationService(
@@ -56,6 +71,9 @@ class CdpWarehouseReadinessApplicationServiceTest {
                 .satisfies(section -> assertThat(section.reason()).contains("critical open warehouse incident"));
     }
 
+    /**
+     * 执行 missingEvidenceWarnsInsteadOfPassing 对应的 CDP 业务操作。
+     */
     @Test
     void missingEvidenceWarnsInsteadOfPassing() {
         CdpWarehouseReadinessRepository repository = tenantId -> new CdpWarehouseReadinessEvidence(
@@ -76,6 +94,9 @@ class CdpWarehouseReadinessApplicationServiceTest {
                 .contains("WARN");
     }
 
+    /**
+     * 执行 healthyEvidence 对应的 CDP 业务操作。
+     */
     private static CdpWarehouseReadinessEvidence healthyEvidence(Long tenantId) {
         LocalDateTime recent = LocalDateTime.parse("2026-06-06T09:55:00");
         return new CdpWarehouseReadinessEvidence(

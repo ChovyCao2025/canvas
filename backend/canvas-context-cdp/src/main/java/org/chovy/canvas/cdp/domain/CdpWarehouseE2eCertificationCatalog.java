@@ -7,15 +7,35 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * 维护 CdpWarehouseE2eCertification 的内存目录和查询视图。
+ */
 public class CdpWarehouseE2eCertificationCatalog {
 
+    /**
+     * GENERATED AT。
+     */
     private static final String GENERATED_AT = "2026-06-15T01:30:00";
+
+    /**
+     * DEFAULT WINDOW START。
+     */
     private static final String DEFAULT_WINDOW_START = "2026-06-15T00:30:00";
+
+    /**
+     * DEFAULT WINDOW END。
+     */
     private static final String DEFAULT_WINDOW_END = "2026-06-15T01:30:00";
 
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong runIds = new AtomicLong(100L);
     private final Map<Long, List<Map<String, Object>>> runsByTenant = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 certification 对应的 CDP 业务操作。
+     */
     public Map<String, Object> certification(Long tenantId, String from, String to, String mode,
             List<String> contractKeys, boolean requirePhysical, boolean requireRealtime,
             boolean requireDataPathProof) {
@@ -39,6 +59,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return copy(certification);
     }
 
+    /**
+     * 创建Run。
+     */
     public Map<String, Object> createRun(Long tenantId, String from, String to, String mode, List<String> contractKeys,
             boolean requirePhysical, boolean requireRealtime, boolean requireDataPathProof, String requestedBy) {
         Map<String, Object> certification = certification(tenantId, from, to, mode, contractKeys, requirePhysical,
@@ -71,6 +94,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return copy(run);
     }
 
+    /**
+     * 执行 recent 对应的 CDP 业务操作。
+     */
     public List<Map<String, Object>> recent(Long tenantId, Integer limit) {
         int safeLimit = limit == null || limit < 1 ? 20 : Math.min(limit, 100);
         List<Map<String, Object>> runs = runsByTenant.getOrDefault(tenantId, List.of());
@@ -81,6 +107,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return result;
     }
 
+    /**
+     * 返回get。
+     */
     public Map<String, Object> get(Long tenantId, Long id) {
         return runsByTenant.getOrDefault(tenantId, List.of()).stream()
                 .filter(run -> id != null && id.equals(run.get("id")))
@@ -89,6 +118,9 @@ public class CdpWarehouseE2eCertificationCatalog {
                 .orElseThrow(() -> new IllegalArgumentException("certification run not found: " + id));
     }
 
+    /**
+     * 执行 latestMatchingRun 对应的 CDP 业务操作。
+     */
     public Map<String, Object> latestMatchingRun(Long tenantId, String mode, boolean requirePhysical,
             boolean requireRealtime, boolean requireDataPathProof) {
         return recent(tenantId, 100).stream()
@@ -101,6 +133,9 @@ public class CdpWarehouseE2eCertificationCatalog {
                 .orElse(null);
     }
 
+    /**
+     * 执行 evidence 对应的 CDP 业务操作。
+     */
     private static List<Map<String, Object>> evidence(boolean requirePhysical, boolean requireRealtime,
             boolean requireDataPathProof) {
         List<Map<String, Object>> evidence = new ArrayList<>();
@@ -118,6 +153,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return evidence;
     }
 
+    /**
+     * 执行 productionReadiness 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> productionReadiness(String mode, List<String> contractKeys) {
         Map<String, Object> proof = ordered();
         proof.put("status", "PASS");
@@ -129,6 +167,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return proof;
     }
 
+    /**
+     * 执行 liveTableInspection 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> liveTableInspection(boolean required) {
         Map<String, Object> inspection = ordered();
         inspection.put("status", required ? "PASS" : "WARN");
@@ -138,6 +179,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return inspection;
     }
 
+    /**
+     * 执行 realtimePipelineStatus 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> realtimePipelineStatus(boolean required) {
         Map<String, Object> status = ordered();
         status.put("status", required ? "PASS" : "WARN");
@@ -146,6 +190,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return status;
     }
 
+    /**
+     * 执行 realtimeJobStatus 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> realtimeJobStatus(boolean required) {
         Map<String, Object> status = ordered();
         status.put("status", required ? "PASS" : "WARN");
@@ -154,6 +201,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return status;
     }
 
+    /**
+     * 执行 dataPathProof 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> dataPathProof(boolean required) {
         Map<String, Object> proof = ordered();
         proof.put("status", required ? "PASS" : "WARN");
@@ -164,6 +214,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return proof;
     }
 
+    /**
+     * 执行 evidenceItem 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> evidenceItem(String key, String status, String reason) {
         Map<String, Object> item = ordered();
         item.put("key", key);
@@ -172,6 +225,9 @@ public class CdpWarehouseE2eCertificationCatalog {
         return item;
     }
 
+    /**
+     * 执行 evidenceJson 对应的 CDP 业务操作。
+     */
     private static String evidenceJson() {
         return "[{\"key\":\"production_readiness\",\"status\":\"PASS\"},"
                 + "{\"key\":\"doris_jdbc_connectivity\",\"status\":\"PASS\"},"
@@ -181,20 +237,32 @@ public class CdpWarehouseE2eCertificationCatalog {
                 + "{\"key\":\"data_path_proof\",\"status\":\"PASS\"}]";
     }
 
+    /**
+     * 执行 stringListJson 对应的 CDP 业务操作。
+     */
     private static String stringListJson(List<String> values) {
         return values.stream()
                 .map(value -> "\"" + value + "\"")
                 .reduce("[", (json, value) -> "[".equals(json) ? json + value : json + "," + value) + "]";
     }
 
+    /**
+     * 返回默认的String。
+     */
     private static String defaultString(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }
 
+    /**
+     * 执行 copy 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }

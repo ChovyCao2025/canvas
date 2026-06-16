@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseSloPolicyFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseSloPolicyApplicationService 的核心行为。
+ */
 class CdpWarehouseSloPolicyApplicationServiceTest {
 
+    /**
+     * 执行 upsertAppliesDefaultsNormalizesFieldsAndEffectivePrefersTenantOverride 对应的 CDP 业务操作。
+     */
     @Test
     void upsertAppliesDefaultsNormalizesFieldsAndEffectivePrefersTenantOverride() {
         CdpWarehouseSloPolicyFacade service = new CdpWarehouseSloPolicyApplicationService();
@@ -48,6 +54,9 @@ class CdpWarehouseSloPolicyApplicationServiceTest {
                 .containsEntry("displayName", "Global readiness");
     }
 
+    /**
+     * 查询Filters Status Deduplicates Tenant Override And Rejects Invalid Thresholds列表。
+     */
     @Test
     void listFiltersStatusDeduplicatesTenantOverrideAndRejectsInvalidThresholds() {
         CdpWarehouseSloPolicyFacade service = new CdpWarehouseSloPolicyApplicationService();

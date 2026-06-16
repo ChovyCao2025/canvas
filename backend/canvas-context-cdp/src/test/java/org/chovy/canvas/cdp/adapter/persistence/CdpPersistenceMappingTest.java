@@ -16,10 +16,19 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证 CdpPersistenceMapping 的核心行为。
+ */
 class CdpPersistenceMappingTest {
 
+    /**
+     * 执行 CdpPersistenceConverter 对应的 CDP 业务操作。
+     */
     private final CdpPersistenceConverter converter = new CdpPersistenceConverter();
 
+    /**
+     * 执行 cdpDoClassesOwnLegacyTablesInsideCdpPersistenceAdapter 对应的 CDP 业务操作。
+     */
     @Test
     void cdpDoClassesOwnLegacyTablesInsideCdpPersistenceAdapter() {
         assertThat(CdpUserProfileDO.class.getAnnotation(TableName.class).value()).isEqualTo("cdp_user_profile");
@@ -44,6 +53,9 @@ class CdpPersistenceMappingTest {
         assertThat(BaseMapper.class).isAssignableFrom(CdpWarehouseIncidentMapper.class);
     }
 
+    /**
+     * 执行 converterRoundTripsProfileTagEventAndAudienceSnapshotRows 对应的 CDP 业务操作。
+     */
     @Test
     void converterRoundTripsProfileTagEventAndAudienceSnapshotRows() {
         CustomerProfile profile = new CustomerProfile(

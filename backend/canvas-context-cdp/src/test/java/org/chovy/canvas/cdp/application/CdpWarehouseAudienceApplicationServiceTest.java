@@ -10,8 +10,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseAudienceApplicationService 的核心行为。
+ */
 class CdpWarehouseAudienceApplicationServiceTest {
 
+    /**
+     * 执行 materializationOperationsCreateFilterableRunsWithDeterministicFields 对应的 CDP 业务操作。
+     */
     @Test
     void materializationOperationsCreateFilterableRunsWithDeterministicFields() {
         CdpWarehouseAudienceApplicationService service = service();
@@ -37,6 +43,9 @@ class CdpWarehouseAudienceApplicationServiceTest {
                 .containsExactly("MATERIALIZE", "MATERIALIZE_GATED");
     }
 
+    /**
+     * 校验s Contract And Rollback Inputs Without Ceremonial Coverage。
+     */
     @Test
     void validatesContractAndRollbackInputsWithoutCeremonialCoverage() {
         CdpWarehouseAudienceApplicationService service = service();
@@ -52,6 +61,9 @@ class CdpWarehouseAudienceApplicationServiceTest {
                 .hasMessage("audienceId is required");
     }
 
+    /**
+     * 执行 refreshDueCreatesBoundedRunsAndUsesDefaultActor 对应的 CDP 业务操作。
+     */
     @Test
     void refreshDueCreatesBoundedRunsAndUsesDefaultActor() {
         CdpWarehouseAudienceApplicationService service = service();
@@ -72,6 +84,9 @@ class CdpWarehouseAudienceApplicationServiceTest {
                 .containsExactly("REFRESH_DUE_GATED", "REFRESH_DUE_GATED");
     }
 
+    /**
+     * 执行 service 对应的 CDP 业务操作。
+     */
     private static CdpWarehouseAudienceApplicationService service() {
         return new CdpWarehouseAudienceApplicationService(
                 Clock.fixed(Instant.parse("2026-06-14T00:00:00Z"), ZoneOffset.UTC));

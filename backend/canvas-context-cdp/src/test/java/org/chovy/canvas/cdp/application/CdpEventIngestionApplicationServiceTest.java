@@ -28,12 +28,24 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证 CdpEventIngestionApplicationService 的核心行为。
+ */
 class CdpEventIngestionApplicationServiceTest {
 
+    /**
+     * 执行 fixed 对应的 CDP 业务操作。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-06T02:00:00Z"),
+            /**
+             * 执行 of 对应的 CDP 业务操作。
+             */
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 执行 oversizedBatchIsRejectedBeforeAnyEventMutation 对应的 CDP 业务操作。
+     */
     @Test
     void oversizedBatchIsRejectedBeforeAnyEventMutation() {
         FakeEvents events = new FakeEvents();
@@ -50,6 +62,9 @@ class CdpEventIngestionApplicationServiceTest {
         assertThat(events.saved).isEmpty();
     }
 
+    /**
+     * 执行 acceptedTrackEventEnsuresUserDiscoversAttributesPublishesAndMirrorsWarehouse 对应的 CDP 业务操作。
+     */
     @Test
     void acceptedTrackEventEnsuresUserDiscoversAttributesPublishesAndMirrorsWarehouse() {
         FakeEvents events = new FakeEvents();
@@ -93,6 +108,9 @@ class CdpEventIngestionApplicationServiceTest {
         assertThat(events.mirrored).containsExactly("msg-1");
     }
 
+    /**
+     * 执行 duplicateMessageAndUnknownEventAreNotPersisted 对应的 CDP 业务操作。
+     */
     @Test
     void duplicateMessageAndUnknownEventAreNotPersisted() {
         FakeEvents events = new FakeEvents();
@@ -116,6 +134,9 @@ class CdpEventIngestionApplicationServiceTest {
         assertThat(events.mirrored).isEmpty();
     }
 
+    /**
+     * 执行 service 对应的 CDP 业务操作。
+     */
     private static CdpEventIngestionApplicationService service(FakeEvents events,
                                                               FakeProfiles profiles,
                                                               int maxBatchSize) {
@@ -131,14 +152,23 @@ class CdpEventIngestionApplicationServiceTest {
                 maxBatchSize);
     }
 
+    /**
+     * 执行 key 对应的 CDP 业务操作。
+     */
     private static CdpWriteKeyView key() {
         return new CdpWriteKeyView(7L, 42L, "ck_test", "WEB", 100, null);
     }
 
+    /**
+     * 执行 validEvent 对应的 CDP 业务操作。
+     */
     private static CdpTrackEventCommand validEvent(String messageId) {
         return validEvent(messageId, "OrderComplete");
     }
 
+    /**
+     * 执行 validEvent 对应的 CDP 业务操作。
+     */
     private static CdpTrackEventCommand validEvent(String messageId, String eventCode) {
         return new CdpTrackEventCommand(
                 messageId,
@@ -153,6 +183,9 @@ class CdpEventIngestionApplicationServiceTest {
                 null);
     }
 
+    /**
+     * 表示 FakeEvents 的业务数据或处理组件。
+     */
     private static final class FakeEvents implements CdpEventRepository, CdpEventDefinitionRepository,
             CdpEventAttributeDiscoveryPort, CdpAcceptedEventPublisher, CdpWarehouseEventSinkPort {
         private final List<String> duplicateMessages = new ArrayList<>();
@@ -200,30 +233,48 @@ class CdpEventIngestionApplicationServiceTest {
         }
     }
 
+    /**
+     * 表示 FakeProfiles 的业务数据或处理组件。
+     */
     private static final class FakeProfiles implements CustomerProfileRepository {
         private final Map<String, CustomerProfile> profiles = new LinkedHashMap<>();
 
+        /**
+         * 查找Profile。
+         */
         @Override
         public CustomerProfile findProfile(Long tenantId, String userId) {
             return profiles.get(key(tenantId, userId));
         }
 
+        /**
+         * 保存Profile。
+         */
         @Override
         public CustomerProfile saveProfile(CustomerProfile profile) {
             profiles.put(key(profile.tenantId(), profile.userId()), profile);
             return profile;
         }
 
+        /**
+         * 查找User Id By Identity。
+         */
         @Override
         public String findUserIdByIdentity(Long tenantId, String identityType, String identityValue) {
             return null;
         }
 
+        /**
+         * 保存Identity。
+         */
         @Override
         public void saveIdentity(Long tenantId, String userId, String identityType, String identityValue,
                                  String sourceType, String sourceRefId, boolean verified) {
         }
 
+        /**
+         * 执行 key 对应的 CDP 业务操作。
+         */
         private static String key(Long tenantId, String userId) {
             return tenantId + ":" + userId;
         }

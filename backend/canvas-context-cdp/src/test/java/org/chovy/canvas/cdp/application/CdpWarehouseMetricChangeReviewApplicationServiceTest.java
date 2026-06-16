@@ -10,8 +10,14 @@ import org.chovy.canvas.cdp.api.CdpWarehouseMetricChangeReviewFacade;
 import org.chovy.canvas.cdp.api.CdpWarehouseMetricChangeReviewFacade.MetricChangeCommand;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseMetricChangeReviewApplicationService 的核心行为。
+ */
 class CdpWarehouseMetricChangeReviewApplicationServiceTest {
 
+    /**
+     * 创建s Approves And Applies Metric Change With Tenant And User Defaults。
+     */
     @Test
     void createsApprovesAndAppliesMetricChangeWithTenantAndUserDefaults() {
         CdpWarehouseMetricChangeReviewFacade service = new CdpWarehouseMetricChangeReviewApplicationService();
@@ -49,6 +55,9 @@ class CdpWarehouseMetricChangeReviewApplicationServiceTest {
         assertThat(applied.get("appliedAt")).isNotNull();
     }
 
+    /**
+     * 执行 normalizesFiltersAndPreventsDuplicateOpenReviews 对应的 CDP 业务操作。
+     */
     @Test
     void normalizesFiltersAndPreventsDuplicateOpenReviews() {
         CdpWarehouseMetricChangeReviewFacade service = new CdpWarehouseMetricChangeReviewApplicationService();
@@ -78,6 +87,9 @@ class CdpWarehouseMetricChangeReviewApplicationServiceTest {
                 .hasMessageContaining("open metric change review already exists");
     }
 
+    /**
+     * 校验s Required Fields And Status Transitions。
+     */
     @Test
     void validatesRequiredFieldsAndStatusTransitions() {
         CdpWarehouseMetricChangeReviewFacade service = new CdpWarehouseMetricChangeReviewApplicationService();
@@ -105,6 +117,9 @@ class CdpWarehouseMetricChangeReviewApplicationServiceTest {
                 .hasMessageContaining("APPROVED");
     }
 
+    /**
+     * 执行 command 对应的 CDP 业务操作。
+     */
     private static MetricChangeCommand command(
             String datasetKey,
             String metricKey,

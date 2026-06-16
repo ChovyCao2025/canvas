@@ -8,19 +8,55 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * 维护 CdpWarehouseQuality 的内存目录和查询视图。
+ */
 public class CdpWarehouseQualityCatalog {
 
+    /**
+     * DEFAULT LIMIT。
+     */
     private static final int DEFAULT_LIMIT = 20;
+
+    /**
+     * MAX LIMIT。
+     */
     private static final int MAX_LIMIT = 100;
+
+    /**
+     * CHECK ODS COUNT。
+     */
     private static final String CHECK_ODS_COUNT = "ODS_COUNT";
+
+    /**
+     * CHECK AGGREGATE LAG。
+     */
     private static final String CHECK_AGGREGATE_LAG = "AGGREGATE_LAG";
+
+    /**
+     * STATUS PASS。
+     */
     private static final String STATUS_PASS = "PASS";
+
+    /**
+     * STATUS WARN。
+     */
     private static final String STATUS_WARN = "WARN";
+
+    /**
+     * DEFAULT OPERATOR。
+     */
     private static final String DEFAULT_OPERATOR = "operator";
 
+    /**
+     * 执行 AtomicLong 对应的 CDP 业务操作。
+     */
     private final AtomicLong ids = new AtomicLong(1000L);
     private final Map<Long, QualityCheck> checks = new ConcurrentHashMap<>();
 
+    /**
+     * 执行 recentChecks 对应的 CDP 业务操作。
+     */
     public List<Map<String, Object>> recentChecks(Long tenantId, int limit) {
         return checks.values().stream()
                 .filter(check -> check.tenantId().equals(tenantId))
@@ -31,6 +67,9 @@ public class CdpWarehouseQualityCatalog {
                 .toList();
     }
 
+    /**
+     * 执行 reconcileOds 对应的 CDP 业务操作。
+     */
     public Map<String, Object> reconcileOds(Long tenantId, LocalDateTime from, LocalDateTime to, Long tolerance,
                                             String operator) {
         validateWindow(from, to);
@@ -57,6 +96,9 @@ public class CdpWarehouseQualityCatalog {
         return toView(check);
     }
 
+    /**
+     * 执行 checkAggregateLag 对应的 CDP 业务操作。
+     */
     public Map<String, Object> checkAggregateLag(Long tenantId, LocalDateTime now, Long maxLagMinutes,
                                                  String operator) {
         LocalDateTime effectiveNow = now == null ? LocalDateTime.now() : now;
@@ -81,6 +123,9 @@ public class CdpWarehouseQualityCatalog {
         return toView(check);
     }
 
+    /**
+     * 转换为View。
+     */
     private static Map<String, Object> toView(QualityCheck check) {
         Map<String, Object> view = ordered();
         view.put("id", check.id());
@@ -99,6 +144,9 @@ public class CdpWarehouseQualityCatalog {
         return view;
     }
 
+    /**
+     * 校验Window。
+     */
     private static void validateWindow(LocalDateTime from, LocalDateTime to) {
         if (from == null || to == null) {
             throw new IllegalArgumentException("from and to are required");
@@ -108,6 +156,9 @@ public class CdpWarehouseQualityCatalog {
         }
     }
 
+    /**
+     * 执行 boundLimit 对应的 CDP 业务操作。
+     */
     private static int boundLimit(int limit) {
         if (limit <= 0) {
             return DEFAULT_LIMIT;
@@ -115,27 +166,254 @@ public class CdpWarehouseQualityCatalog {
         return Math.min(limit, MAX_LIMIT);
     }
 
+    /**
+     * 归一化Operator。
+     */
     private static String normalizeOperator(String operator) {
         return operator == null || operator.isBlank() ? DEFAULT_OPERATOR : operator.trim();
     }
 
+    /**
+     * 执行 ordered 对应的 CDP 业务操作。
+     */
     private static Map<String, Object> ordered() {
         return new LinkedHashMap<>();
     }
 
-    private record QualityCheck(
-            Long id,
-            Long tenantId,
-            String checkType,
-            String status,
-            Long sourceCount,
-            Long warehouseCount,
-            Long diffCount,
-            LocalDateTime windowStart,
-            LocalDateTime windowEnd,
-            Long thresholdValue,
-            String details,
-            LocalDateTime checkedAt,
-            String createdBy) {
+    /**
+     * 表示 QualityCheck 的业务数据或处理组件。
+     */
+    private static final class QualityCheck {
+
+        /**
+         * 唯一标识。
+         */
+        private final Long id;
+
+        /**
+         * 租户标识。
+         */
+        private final Long tenantId;
+
+        /**
+         * check Type。
+         */
+        private final String checkType;
+
+        /**
+         * 状态。
+         */
+        private final String status;
+
+        /**
+         * source Count。
+         */
+        private final Long sourceCount;
+
+        /**
+         * warehouse Count。
+         */
+        private final Long warehouseCount;
+
+        /**
+         * diff Count。
+         */
+        private final Long diffCount;
+
+        /**
+         * window Start。
+         */
+        private final LocalDateTime windowStart;
+
+        /**
+         * window End。
+         */
+        private final LocalDateTime windowEnd;
+
+        /**
+         * threshold Value。
+         */
+        private final Long thresholdValue;
+
+        /**
+         * details。
+         */
+        private final String details;
+
+        /**
+         * checked At。
+         */
+        private final LocalDateTime checkedAt;
+
+        /**
+         * 创建人。
+         */
+        private final String createdBy;
+
+        /**
+         * 使用记录字段创建 QualityCheck。
+         */
+        private QualityCheck(
+                Long id,
+                Long tenantId,
+                String checkType,
+                String status,
+                Long sourceCount,
+                Long warehouseCount,
+                Long diffCount,
+                LocalDateTime windowStart,
+                LocalDateTime windowEnd,
+                Long thresholdValue,
+                String details,
+                LocalDateTime checkedAt,
+                String createdBy) {
+            this.id = id;
+            this.tenantId = tenantId;
+            this.checkType = checkType;
+            this.status = status;
+            this.sourceCount = sourceCount;
+            this.warehouseCount = warehouseCount;
+            this.diffCount = diffCount;
+            this.windowStart = windowStart;
+            this.windowEnd = windowEnd;
+            this.thresholdValue = thresholdValue;
+            this.details = details;
+            this.checkedAt = checkedAt;
+            this.createdBy = createdBy;
+        }
+
+        /**
+         * 返回唯一标识。
+         */
+        public Long id() {
+            return id;
+        }
+
+        /**
+         * 返回租户标识。
+         */
+        public Long tenantId() {
+            return tenantId;
+        }
+
+        /**
+         * 返回check Type。
+         */
+        public String checkType() {
+            return checkType;
+        }
+
+        /**
+         * 返回状态。
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 返回source Count。
+         */
+        public Long sourceCount() {
+            return sourceCount;
+        }
+
+        /**
+         * 返回warehouse Count。
+         */
+        public Long warehouseCount() {
+            return warehouseCount;
+        }
+
+        /**
+         * 返回diff Count。
+         */
+        public Long diffCount() {
+            return diffCount;
+        }
+
+        /**
+         * 返回window Start。
+         */
+        public LocalDateTime windowStart() {
+            return windowStart;
+        }
+
+        /**
+         * 返回window End。
+         */
+        public LocalDateTime windowEnd() {
+            return windowEnd;
+        }
+
+        /**
+         * 返回threshold Value。
+         */
+        public Long thresholdValue() {
+            return thresholdValue;
+        }
+
+        /**
+         * 返回details。
+         */
+        public String details() {
+            return details;
+        }
+
+        /**
+         * 返回checked At。
+         */
+        public LocalDateTime checkedAt() {
+            return checkedAt;
+        }
+
+        /**
+         * 返回创建人。
+         */
+        public String createdBy() {
+            return createdBy;
+        }
+
+        /**
+         * 按所有字段比较 QualityCheck。
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            QualityCheck that = (QualityCheck) o;
+            return java.util.Objects.equals(id, that.id)
+                    && java.util.Objects.equals(tenantId, that.tenantId)
+                    && java.util.Objects.equals(checkType, that.checkType)
+                    && java.util.Objects.equals(status, that.status)
+                    && java.util.Objects.equals(sourceCount, that.sourceCount)
+                    && java.util.Objects.equals(warehouseCount, that.warehouseCount)
+                    && java.util.Objects.equals(diffCount, that.diffCount)
+                    && java.util.Objects.equals(windowStart, that.windowStart)
+                    && java.util.Objects.equals(windowEnd, that.windowEnd)
+                    && java.util.Objects.equals(thresholdValue, that.thresholdValue)
+                    && java.util.Objects.equals(details, that.details)
+                    && java.util.Objects.equals(checkedAt, that.checkedAt)
+                    && java.util.Objects.equals(createdBy, that.createdBy);
+        }
+
+        /**
+         * 根据所有字段计算 QualityCheck 的哈希值。
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(id, tenantId, checkType, status, sourceCount, warehouseCount, diffCount, windowStart, windowEnd, thresholdValue, details, checkedAt, createdBy);
+        }
+
+        /**
+         * 返回与记录结构一致的调试字符串。
+         */
+        @Override
+        public String toString() {
+            return "QualityCheck[" + "id=" + id + ", tenantId=" + tenantId + ", checkType=" + checkType + ", status=" + status + ", sourceCount=" + sourceCount + ", warehouseCount=" + warehouseCount + ", diffCount=" + diffCount + ", windowStart=" + windowStart + ", windowEnd=" + windowEnd + ", thresholdValue=" + thresholdValue + ", details=" + details + ", checkedAt=" + checkedAt + ", createdBy=" + createdBy + "]";
+        }
     }
 }

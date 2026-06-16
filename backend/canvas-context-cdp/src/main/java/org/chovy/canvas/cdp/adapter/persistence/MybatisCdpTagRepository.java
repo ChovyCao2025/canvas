@@ -10,14 +10,35 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 定义 MybatisCdpTag 的持久化访问契约。
+ */
 @Repository
 public class MybatisCdpTagRepository implements CdpTagRepository {
 
+    /**
+     * definition Mapper。
+     */
     private final TagDefinitionMapper definitionMapper;
+
+    /**
+     * tag Mapper。
+     */
     private final CdpUserTagMapper tagMapper;
+
+    /**
+     * history Mapper。
+     */
     private final CdpUserTagHistoryMapper historyMapper;
+
+    /**
+     * 持久化转换器。
+     */
     private final CdpPersistenceConverter converter;
 
+    /**
+     * 创建当前组件实例。
+     */
     public MybatisCdpTagRepository(TagDefinitionMapper definitionMapper,
                                    CdpUserTagMapper tagMapper,
                                    CdpUserTagHistoryMapper historyMapper,
@@ -28,6 +49,9 @@ public class MybatisCdpTagRepository implements CdpTagRepository {
         this.converter = converter;
     }
 
+    /**
+     * 查找Enabled Definition。
+     */
     @Override
     public CdpTagDefinition findEnabledDefinition(String tagCode) {
         TagDefinitionDO row = definitionMapper.selectOne(new LambdaQueryWrapper<TagDefinitionDO>()
@@ -37,6 +61,9 @@ public class MybatisCdpTagRepository implements CdpTagRepository {
         return converter.toTagDefinition(row);
     }
 
+    /**
+     * 查找Current Tag。
+     */
     @Override
     public CdpUserTag findCurrentTag(Long tenantId, String userId, String tagCode) {
         CdpUserTagDO row = tagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
@@ -47,6 +74,9 @@ public class MybatisCdpTagRepository implements CdpTagRepository {
         return converter.toUserTag(row);
     }
 
+    /**
+     * 保存History。
+     */
     @Override
     public boolean saveHistory(CdpUserTagHistory row) {
         try {
@@ -60,6 +90,9 @@ public class MybatisCdpTagRepository implements CdpTagRepository {
         }
     }
 
+    /**
+     * 保存Current Tag。
+     */
     @Override
     public CdpUserTag saveCurrentTag(CdpUserTag tag) {
         CdpUserTagDO row = converter.toUserTagRow(tag);
@@ -71,6 +104,9 @@ public class MybatisCdpTagRepository implements CdpTagRepository {
         return converter.toUserTag(row);
     }
 
+    /**
+     * 查询Current Tags列表。
+     */
     @Override
     public List<CdpUserTag> listCurrentTags(Long tenantId, String userId) {
         return tagMapper.selectList(new LambdaQueryWrapper<CdpUserTagDO>()
@@ -83,6 +119,9 @@ public class MybatisCdpTagRepository implements CdpTagRepository {
                 .toList();
     }
 
+    /**
+     * 查询History列表。
+     */
     @Override
     public List<CdpUserTagHistory> listHistory(Long tenantId, String userId) {
         return historyMapper.selectList(new LambdaQueryWrapper<CdpUserTagHistoryDO>()

@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseFieldGovernanceFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseFieldGovernanceApplicationService 的核心行为。
+ */
 class CdpWarehouseFieldGovernanceApplicationServiceTest {
 
+    /**
+     * 执行 upsertListAndEvaluateApplyTenantOverrideAndNormalizePolicyFields 对应的 CDP 业务操作。
+     */
     @Test
     void upsertListAndEvaluateApplyTenantOverrideAndNormalizePolicyFields() {
         CdpWarehouseFieldGovernanceFacade service = new CdpWarehouseFieldGovernanceApplicationService();
@@ -67,6 +73,9 @@ class CdpWarehouseFieldGovernanceApplicationServiceTest {
                 .containsEntry("reason", "allowed");
     }
 
+    /**
+     * 执行 rejectsMissingRequiredFieldsAndDeniesDisallowedUsage 对应的 CDP 业务操作。
+     */
     @Test
     void rejectsMissingRequiredFieldsAndDeniesDisallowedUsage() {
         CdpWarehouseFieldGovernanceFacade service = new CdpWarehouseFieldGovernanceApplicationService();

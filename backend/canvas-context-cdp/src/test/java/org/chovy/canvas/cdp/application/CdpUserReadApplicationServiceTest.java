@@ -9,8 +9,14 @@ import org.chovy.canvas.cdp.api.CdpUserReadFacade;
 import org.chovy.canvas.cdp.api.CdpUserReadFacade.CdpUserRowView;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpUserReadApplicationService 的核心行为。
+ */
 class CdpUserReadApplicationServiceTest {
 
+    /**
+     * 查询Filters By Keyword And Keeps Legacy Row Shape列表。
+     */
     @Test
     void listFiltersByKeywordAndKeepsLegacyRowShape() {
         CdpUserReadFacade service = new CdpUserReadApplicationService();
@@ -28,6 +34,9 @@ class CdpUserReadApplicationServiceTest {
                 .containsExactly("vip");
     }
 
+    /**
+     * 执行 detailAndInsightUseTenantScopedProfileAndRejectUnknownUser 对应的 CDP 业务操作。
+     */
     @Test
     void detailAndInsightUseTenantScopedProfileAndRejectUnknownUser() {
         CdpUserReadFacade service = new CdpUserReadApplicationService();

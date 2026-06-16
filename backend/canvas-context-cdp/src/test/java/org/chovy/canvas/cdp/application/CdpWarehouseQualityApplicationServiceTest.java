@@ -10,8 +10,14 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseQualityFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseQualityApplicationService 的核心行为。
+ */
 class CdpWarehouseQualityApplicationServiceTest {
 
+    /**
+     * 执行 reconcileOdsValidatesWindowNormalizesToleranceAndStoresTenantScopedChecks 对应的 CDP 业务操作。
+     */
     @Test
     void reconcileOdsValidatesWindowNormalizesToleranceAndStoresTenantScopedChecks() {
         CdpWarehouseQualityFacade service = new CdpWarehouseQualityApplicationService();
@@ -40,6 +46,9 @@ class CdpWarehouseQualityApplicationServiceTest {
                 .hasMessage("from must be before to");
     }
 
+    /**
+     * 执行 aggregateLagUsesDefaultOperatorAndRecentChecksAreBoundedAndNewestFirst 对应的 CDP 业务操作。
+     */
     @Test
     void aggregateLagUsesDefaultOperatorAndRecentChecksAreBoundedAndNewestFirst() {
         CdpWarehouseQualityFacade service = new CdpWarehouseQualityApplicationService();

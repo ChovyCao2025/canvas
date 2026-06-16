@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.cdp.api.CdpWarehouseIncidentFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证 CdpWarehouseIncidentApplicationService 的核心行为。
+ */
 class CdpWarehouseIncidentApplicationServiceTest {
 
+    /**
+     * 查询Normalizes Status Bounds Limit Sorts And Isolates Tenant列表。
+     */
     @Test
     void listNormalizesStatusBoundsLimitSortsAndIsolatesTenant() {
         CdpWarehouseIncidentFacade service = new CdpWarehouseIncidentApplicationService();
@@ -32,6 +38,9 @@ class CdpWarehouseIncidentApplicationServiceTest {
                 .satisfies(row -> assertThat(row).containsEntry("tenantId", 0L));
     }
 
+    /**
+     * 执行 ackAndResolveRespectLifecycleTenantAndOperatorDefaults 对应的 CDP 业务操作。
+     */
     @Test
     void ackAndResolveRespectLifecycleTenantAndOperatorDefaults() {
         CdpWarehouseIncidentFacade service = new CdpWarehouseIncidentApplicationService();
