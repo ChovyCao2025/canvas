@@ -10,11 +10,18 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+/**
+ * 定义 RiskStrategyCompilerTest 的风控模块职责和数据契约。
+ */
 class RiskStrategyCompilerTest {
 
     private final JacksonRiskRuleJsonCodec jsonCodec = new JacksonRiskRuleJsonCodec();
     private final RiskStrategyCompiler compiler = new RiskStrategyCompiler(jsonCodec);
 
+
+    /**
+     * 执行 compilesStrategyIntoStableOrderedSnapshot 相关的风控处理逻辑。
+     */
     @Test
     void compilesStrategyIntoStableOrderedSnapshot() {
         RiskStrategySnapshot snapshot = snapshot(List.of(
@@ -34,6 +41,9 @@ class RiskStrategyCompilerTest {
                 .containsExactly("a-rule", "b-rule", "r2");
     }
 
+    /**
+     * 执行 recordsOnlyDeclaredRequiredFeatures 相关的风控处理逻辑。
+     */
     @Test
     void recordsOnlyDeclaredRequiredFeatures() {
         RiskCompiledStrategy compiled = compiler.compile(snapshot(List.of(
@@ -53,6 +63,9 @@ class RiskStrategyCompilerTest {
         assertThat(compiled.requiredFeatures()).containsExactly("risk.score");
     }
 
+    /**
+     * 执行 compiledHashIsStableForCanonicalEquivalentSnapshots 相关的风控处理逻辑。
+     */
     @Test
     void compiledHashIsStableForCanonicalEquivalentSnapshots() {
         RiskStrategySnapshot left = snapshot(List.of(group("g", 1, true,
@@ -65,6 +78,9 @@ class RiskStrategyCompilerTest {
         assertThat(compiler.compile(left).compiledHash()).isEqualTo(compiler.compile(right).compiledHash());
     }
 
+    /**
+     * 执行 rejectsUnknownActionWithJsonPath 相关的风控处理逻辑。
+     */
     @Test
     void rejectsUnknownActionWithJsonPath() {
         RiskStrategySnapshot snapshot = snapshot(List.of(group("g", 1, true,
@@ -78,6 +94,9 @@ class RiskStrategyCompilerTest {
                 });
     }
 
+    /**
+     * 执行 rejectsCompileLimits 相关的风控处理逻辑。
+     */
     @Test
     void rejectsCompileLimits() {
         RiskStrategyCompiler limited = new RiskStrategyCompiler(jsonCodec,
@@ -109,6 +128,9 @@ class RiskStrategyCompilerTest {
                 .satisfies(error -> assertThat(error.code()).isEqualTo(RiskStrategyCompileErrorCode.FEATURE_LIMIT_EXCEEDED));
     }
 
+    /**
+     * 执行 rejectsSafeExpressionUntilGovernedCompilerExists 相关的风控处理逻辑。
+     */
     @Test
     void rejectsSafeExpressionUntilGovernedCompilerExists() {
         RiskStrategySnapshot snapshot = snapshot(List.of(group("g", 1, true,
@@ -121,6 +143,9 @@ class RiskStrategyCompilerTest {
                 .satisfies(error -> assertThat(error.code()).isEqualTo(RiskStrategyCompileErrorCode.SAFE_EXPRESSION_LIMIT_EXCEEDED));
     }
 
+    /**
+     * 执行 cacheReturnsSameCompiledSnapshotUntilInvalidated 相关的风控处理逻辑。
+     */
     @Test
     void cacheReturnsSameCompiledSnapshotUntilInvalidated() {
         RiskStrategyRuntimeCache cache = new RiskStrategyRuntimeCache(compiler);
@@ -135,6 +160,9 @@ class RiskStrategyCompilerTest {
         assertThat(cache.getOrCompile(snapshot)).isNotSameAs(first);
     }
 
+    /**
+     * 执行 cacheInvalidationRemovesOneStrategyVersionOnly 相关的风控处理逻辑。
+     */
     @Test
     void cacheInvalidationRemovesOneStrategyVersionOnly() {
         RiskStrategyRuntimeCache cache = new RiskStrategyRuntimeCache(compiler);
@@ -152,10 +180,16 @@ class RiskStrategyCompilerTest {
         assertThat(cache.getOrCompile(version12)).isNotSameAs(compiled12);
     }
 
+    /**
+     * 执行 snapshot 相关的风控处理逻辑。
+     */
     private RiskStrategySnapshot snapshot(List<RiskStrategyRuleGroupDefinition> groups) {
         return snapshot(12, groups);
     }
 
+    /**
+     * 执行 snapshot 相关的风控处理逻辑。
+     */
     private RiskStrategySnapshot snapshot(int version, List<RiskStrategyRuleGroupDefinition> groups) {
         return new RiskStrategySnapshot(
                 7L,
@@ -170,16 +204,25 @@ class RiskStrategyCompilerTest {
                 Map.of());
     }
 
+    /**
+     * 执行 group 相关的风控处理逻辑。
+     */
     private RiskStrategyRuleGroupDefinition group(String groupKey, int executionOrder, boolean enabled,
                                                   List<RiskStrategyRuleDefinition> rules) {
         return new RiskStrategyRuleGroupDefinition(groupKey, "HARD_RULE", executionOrder, "ANY_MATCHED", enabled, rules);
     }
 
+    /**
+     * 执行 rule 相关的风控处理逻辑。
+     */
     private RiskStrategyRuleDefinition rule(String ruleKey, int priority, String action, String dslJson) {
         return new RiskStrategyRuleDefinition(ruleKey, priority, RiskRuntimeMode.ENFORCE, dslJson, action,
                 10, ruleKey, List.of());
     }
 
+    /**
+     * 执行 featureRule 相关的风控处理逻辑。
+     */
     private String featureRule(String featureKey) {
         return """
                 {"logic":"AND","conditions":[{"left":{"type":"FEATURE","key":"%s"},"op":">=","right":{"type":"LITERAL","value":85}}],"groups":[]}

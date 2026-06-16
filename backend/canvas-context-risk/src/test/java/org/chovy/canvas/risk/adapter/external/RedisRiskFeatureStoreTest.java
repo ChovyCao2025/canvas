@@ -14,8 +14,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * 定义 RedisRiskFeatureStoreTest 的风控模块职责和数据契约。
+ */
 class RedisRiskFeatureStoreTest {
 
+    /**
+     * 执行 setStoresFeatureValueWithTenantPrefixAndTtl 相关的风控处理逻辑。
+     */
     @Test
     void setStoresFeatureValueWithTenantPrefixAndTtl() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
@@ -32,6 +38,9 @@ class RedisRiskFeatureStoreTest {
                 eq(Duration.ofMinutes(30)));
     }
 
+    /**
+     * 执行 getParsesNumberBooleanAndStringValues 相关的风控处理逻辑。
+     */
     @Test
     void getParsesNumberBooleanAndStringValues() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
@@ -51,6 +60,9 @@ class RedisRiskFeatureStoreTest {
         assertThat(store.get(7L, "user.segment", "hash-user-1")).contains("vip");
     }
 
+    /**
+     * 执行 missingValueReturnsEmpty 相关的风控处理逻辑。
+     */
     @Test
     void missingValueReturnsEmpty() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
@@ -64,6 +76,9 @@ class RedisRiskFeatureStoreTest {
         assertThat(value).isEmpty();
     }
 
+    /**
+     * 执行 corruptValueIsDeletedAndTreatedAsMissing 相关的风控处理逻辑。
+     */
     @Test
     void corruptValueIsDeletedAndTreatedAsMissing() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);

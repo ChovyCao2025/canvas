@@ -10,15 +10,24 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
+/**
+ * 定义 RiskDecisionApplicationService 的风控模块职责和数据契约。
+ */
 @Service
 public class RiskDecisionApplicationService implements RiskDecisionFacade {
 
+    /**
+     * 保存 decisionService 对应的风控状态或配置。
+     */
     private final RiskDecisionService decisionService;
 
     public RiskDecisionApplicationService(RiskDecisionService decisionService) {
         this.decisionService = decisionService;
     }
 
+    /**
+     * 执行 evaluate 相关的风控处理逻辑。
+     */
     @Override
     public RiskDecisionView evaluate(RiskDecisionCommand command) {
         Objects.requireNonNull(command, "command");

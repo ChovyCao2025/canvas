@@ -26,9 +26,21 @@ import java.util.Set;
  */
 public class RiskStrategyCompiler {
 
+    /**
+     * 保存 limits 对应的风控状态或配置。
+     */
     private final RiskStrategyCompileLimits limits;
+
+    /**
+     * 保存 parser 对应的风控状态或配置。
+     */
     private final RiskRuleParser parser;
+
+    /**
+     * 保存 jsonCodec 对应的风控状态或配置。
+     */
     private final RiskRuleJsonCodec jsonCodec;
+
 
     /**
      * 使用默认编译限制构造编译器。
@@ -318,7 +330,104 @@ public class RiskStrategyCompiler {
      * @param group 规则组定义
      * @param rules 规则组内带原始位置的规则列表
      */
-    private record IndexedGroup(int index, RiskStrategyRuleGroupDefinition group, List<IndexedRule> rules) {
+    private static final class IndexedGroup {
+
+        /**
+         * IndexedGroup 的 index 字段。
+         */
+        private final int index;
+
+
+        /**
+         * IndexedGroup 的 group 字段。
+         */
+        private final RiskStrategyRuleGroupDefinition group;
+
+
+        /**
+         * IndexedGroup 的 rules 字段。
+         */
+        private final List<IndexedRule> rules;
+
+
+        /**
+         * 创建 IndexedGroup。
+         *
+         * @param index IndexedGroup 的 index 字段
+         * @param group IndexedGroup 的 group 字段
+         * @param rules IndexedGroup 的 rules 字段
+         */
+        public IndexedGroup(int index, RiskStrategyRuleGroupDefinition group, List<IndexedRule> rules) {
+            this.index = index;
+            this.group = group;
+            this.rules = rules;
+        }
+
+        /**
+         * 返回 IndexedGroup 的 index 字段。
+         *
+         * @return index 字段值
+         */
+        public int index() {
+            return index;
+        }
+
+        /**
+         * 返回 IndexedGroup 的 group 字段。
+         *
+         * @return group 字段值
+         */
+        public RiskStrategyRuleGroupDefinition group() {
+            return group;
+        }
+
+        /**
+         * 返回 IndexedGroup 的 rules 字段。
+         *
+         * @return rules 字段值
+         */
+        public List<IndexedRule> rules() {
+            return rules;
+        }
+
+        /**
+         * 比较当前 IndexedGroup 与其他对象是否相等。
+         *
+         * @param o 待比较对象
+         * @return 相等时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof IndexedGroup other)) {
+                return false;
+            }
+            return index == other.index
+                    && Objects.equals(group, other.group)
+                    && Objects.equals(rules, other.rules);
+        }
+
+        /**
+         * 计算 IndexedGroup 的哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(index, group, rules);
+        }
+
+        /**
+         * 返回 IndexedGroup 的调试字符串。
+         *
+         * @return 调试字符串
+         */
+        @Override
+        public String toString() {
+            return "IndexedGroup[index=" + index + ", group=" + group + ", rules=" + rules + "]";
+        }
     }
 
     /**
@@ -327,6 +436,85 @@ public class RiskStrategyCompiler {
      * @param index 规则在规则组中的原始位置
      * @param rule 规则定义
      */
-    private record IndexedRule(int index, RiskStrategyRuleDefinition rule) {
+    private static final class IndexedRule {
+
+        /**
+         * IndexedRule 的 index 字段。
+         */
+        private final int index;
+
+
+        /**
+         * IndexedRule 的 rule 字段。
+         */
+        private final RiskStrategyRuleDefinition rule;
+
+
+        /**
+         * 创建 IndexedRule。
+         *
+         * @param index IndexedRule 的 index 字段
+         * @param rule IndexedRule 的 rule 字段
+         */
+        public IndexedRule(int index, RiskStrategyRuleDefinition rule) {
+            this.index = index;
+            this.rule = rule;
+        }
+
+        /**
+         * 返回 IndexedRule 的 index 字段。
+         *
+         * @return index 字段值
+         */
+        public int index() {
+            return index;
+        }
+
+        /**
+         * 返回 IndexedRule 的 rule 字段。
+         *
+         * @return rule 字段值
+         */
+        public RiskStrategyRuleDefinition rule() {
+            return rule;
+        }
+
+        /**
+         * 比较当前 IndexedRule 与其他对象是否相等。
+         *
+         * @param o 待比较对象
+         * @return 相等时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof IndexedRule other)) {
+                return false;
+            }
+            return index == other.index
+                    && Objects.equals(rule, other.rule);
+        }
+
+        /**
+         * 计算 IndexedRule 的哈希值。
+         *
+         * @return 哈希值
+         */
+        @Override
+        public int hashCode() {
+            return Objects.hash(index, rule);
+        }
+
+        /**
+         * 返回 IndexedRule 的调试字符串。
+         *
+         * @return 调试字符串
+         */
+        @Override
+        public String toString() {
+            return "IndexedRule[index=" + index + ", rule=" + rule + "]";
+        }
     }
 }

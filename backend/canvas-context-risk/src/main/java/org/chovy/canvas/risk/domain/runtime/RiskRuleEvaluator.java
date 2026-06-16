@@ -213,9 +213,13 @@ public class RiskRuleEvaluator {
      * EvaluationContext 承载对应领域的业务规则、流程编排和结果转换。
      */
     private static final class EvaluationContext {
+        /**
+         * 保存 resolver 对应的风控状态或配置。
+         */
         private final RiskFeatureResolver resolver;
         private final List<RiskRuleEvidence> evidence = new ArrayList<>();
         private final List<String> missingFeatures = new ArrayList<>();
+
 
         /**
          * 构造评估上下文，未提供解析器时按所有操作数缺失处理。
