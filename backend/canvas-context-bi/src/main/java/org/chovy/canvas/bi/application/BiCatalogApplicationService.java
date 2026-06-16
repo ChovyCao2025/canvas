@@ -177,33 +177,124 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
+/**
+ * BiCatalogApplicationService 应用服务。
+ */
 @Service
 public class BiCatalogApplicationService implements BiCatalogFacade {
-
+    /**
+     * workspaceRepository 字段值。
+     */
     private final BiWorkspaceRepository workspaceRepository;
+
+    /**
+     * datasetRepository 字段值。
+     */
     private final BiDatasetRepository datasetRepository;
+
+    /**
+     * chartRepository 字段值。
+     */
     private final BiChartRepository chartRepository;
+
+    /**
+     * dashboardRepository 字段值。
+     */
     private final BiDashboardRepository dashboardRepository;
+
+    /**
+     * permissionRepository 字段值。
+     */
     private final BiPermissionRepository permissionRepository;
+
+    /**
+     * readinessPolicy 字段值。
+     */
     private final BiDashboardReadinessPolicy readinessPolicy;
+
+    /**
+     * permissionPolicy 字段值。
+     */
     private final BiPermissionPolicy permissionPolicy;
+
+    /**
+     * queryDatasetCatalog 字段值。
+     */
     private final BiQueryDatasetCatalog queryDatasetCatalog;
+
+    /**
+     * dashboardPresetCatalog 字段值。
+     */
     private final BiDashboardPresetCatalog dashboardPresetCatalog;
+
+    /**
+     * dashboardResourceOperationsCatalog 字段值。
+     */
     private final BiDashboardResourceOperationsCatalog dashboardResourceOperationsCatalog;
+
+    /**
+     * quickEngineCapacityCatalog 字段值。
+     */
     private final BiQuickEngineCapacityCatalog quickEngineCapacityCatalog;
+
+    /**
+     * resourceFavoriteCatalog 字段值。
+     */
     private final BiResourceFavoriteCatalog resourceFavoriteCatalog;
+
+    /**
+     * aiAssistantCatalog 字段值。
+     */
     private final BiAiAssistantCatalog aiAssistantCatalog;
+
+    /**
+     * resourceOperationsCatalog 字段值。
+     */
     private final BiResourceOperationsCatalog resourceOperationsCatalog;
+
+    /**
+     * presentationResourceCatalog 字段值。
+     */
     private final BiPresentationResourceCatalog presentationResourceCatalog;
+
+    /**
+     * chartLifecycleCatalog 字段值。
+     */
     private final BiChartLifecycleCatalog chartLifecycleCatalog;
+
+    /**
+     * permissionAdministrationCatalog 字段值。
+     */
     private final BiPermissionAdministrationCatalog permissionAdministrationCatalog;
+
+    /**
+     * subscriptionDeliveryCatalog 字段值。
+     */
     private final BiSubscriptionDeliveryCatalog subscriptionDeliveryCatalog;
+
+    /**
+     * queryOperationsCatalog 字段值。
+     */
     private final BiQueryOperationsCatalog queryOperationsCatalog;
+
+    /**
+     * datasourceOperationsCatalog 字段值。
+     */
     private final BiDatasourceOperationsCatalog datasourceOperationsCatalog;
+
+    /**
+     * selfServiceExportCatalog 字段值。
+     */
     private final BiSelfServiceExportCatalog selfServiceExportCatalog;
+
+    /**
+     * clock 字段值。
+     */
     private final Clock clock;
 
+    /**
+     * 执行 Bi Catalog Application Service 相关处理。
+     */
     @Autowired
     public BiCatalogApplicationService(BiWorkspaceRepository workspaceRepository,
                                        BiDatasetRepository datasetRepository,
@@ -243,7 +334,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         this.selfServiceExportCatalog = new BiSelfServiceExportCatalog();
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiWorkspaceView upsertWorkspace(Long tenantId, BiWorkspaceCommand command, String actor) {
@@ -264,7 +357,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 now);
         return toWorkspaceView(workspaceRepository.saveWorkspace(workspace));
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDatasetView upsertDataset(Long tenantId, BiDatasetCommand command, String actor) {
@@ -295,14 +390,18 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 now);
         return toDatasetView(datasetRepository.saveDataset(dataset));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiDatasetView> listDatasetResources(Long tenantId) {
         return datasetRepository.listAvailableDatasets(safeTenantId(tenantId)).stream()
                 .map(this::toDatasetView)
                 .toList();
     }
-
+    /**
+     * 获取 Dataset Resource。
+     */
     @Override
     public BiDatasetView getDatasetResource(Long tenantId, String datasetKey) {
         BiDataset dataset = datasetRepository.findAvailableDatasetByKeyWithTenantFallback(
@@ -313,7 +412,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return toDatasetView(dataset);
     }
-
+    /**
+     * 发布业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDatasetView publishDatasetResource(Long tenantId, String datasetKey, String actor) {
@@ -338,7 +439,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 LocalDateTime.now(clock));
         return toDatasetView(datasetRepository.saveDataset(published));
     }
-
+    /**
+     * 归档业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDatasetView archiveDatasetResource(Long tenantId, String datasetKey, String actor) {
@@ -368,7 +471,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 LocalDateTime.now(clock));
         return toDatasetView(datasetRepository.saveDataset(archived));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceVersionView> listDatasetResourceVersions(Long tenantId, String datasetKey, int limit) {
         BiDataset dataset = requireAvailableDataset(safeTenantId(tenantId), datasetKey);
@@ -382,7 +487,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 dataset.createdBy(),
                 dataset.updatedAt())).stream().limit(boundedLimit).toList();
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDatasetView restoreDatasetResourceVersion(Long tenantId, String datasetKey, Integer version, String actor) {
@@ -407,7 +514,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 LocalDateTime.now(clock));
         return toDatasetView(datasetRepository.saveDataset(restored));
     }
-
+    /**
+     * 执行 dataset Acceleration Policy 相关处理。
+     */
     @Override
     public Map<String, Object> datasetAccelerationPolicy(Long tenantId, String datasetKey) {
         BiDataset dataset = requireAvailableDataset(safeTenantId(tenantId), datasetKey);
@@ -417,7 +526,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 "enabled", Boolean.TRUE,
                 "mode", "INCREMENTAL");
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     public Map<String, Object> upsertDatasetAccelerationPolicy(
             Long tenantId,
@@ -434,7 +545,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 "policy", policy,
                 "updatedBy", defaultActor(actor));
     }
-
+    /**
+     * 执行 refresh Dataset Acceleration 相关处理。
+     */
     @Override
     public Map<String, Object> refreshDatasetAcceleration(Long tenantId, String datasetKey, String actor) {
         BiDataset dataset = requireAvailableDataset(safeTenantId(tenantId), datasetKey);
@@ -444,7 +557,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 "status", "QUEUED",
                 "triggeredBy", defaultActor(actor));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<Map<String, Object>> listDatasetAccelerationRuns(Long tenantId, String datasetKey, int limit) {
         BiDataset dataset = requireAvailableDataset(safeTenantId(tenantId), datasetKey);
@@ -457,7 +572,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 "status", "SUCCEEDED",
                 "runType", "FULL"));
     }
-
+    /**
+     * 执行 dataset Acceleration Capacity 相关处理。
+     */
     @Override
     public Map<String, Object> datasetAccelerationCapacity(Long tenantId, String datasetKey, int limit) {
         BiDataset dataset = requireAvailableDataset(safeTenantId(tenantId), datasetKey);
@@ -467,7 +584,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 "limit", Math.max(0, limit),
                 "tables", List.of());
     }
-
+    /**
+     * 执行 cleanup Dataset Acceleration 相关处理。
+     */
     @Override
     public Map<String, Object> cleanupDatasetAcceleration(
             Long tenantId,
@@ -482,42 +601,56 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 "cleanedTables", 0,
                 "cleanedBy", defaultActor(actor));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiQueryDatasetView> listQueryDatasets(Long tenantId) {
         return queryDatasetCatalog.datasets(safeTenantId(tenantId)).stream()
                 .map(this::toQueryDatasetView)
                 .toList();
     }
-
+    /**
+     * 获取 Query Dataset。
+     */
     @Override
     public BiQueryDatasetView getQueryDataset(Long tenantId, String datasetKey) {
         return toQueryDatasetView(queryDatasetCatalog.dataset(safeTenantId(tenantId), datasetKey));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiDashboardPresetView> listDashboardPresets(Long tenantId) {
         return dashboardPresetCatalog.presets(safeTenantId(tenantId)).stream()
                 .map(this::toDashboardPresetView)
                 .toList();
     }
-
+    /**
+     * 获取 Dashboard Preset。
+     */
     @Override
     public BiDashboardPresetView getDashboardPreset(Long tenantId, String dashboardKey) {
         return toDashboardPresetView(dashboardPresetCatalog.preset(safeTenantId(tenantId), dashboardKey));
     }
-
+    /**
+     * 执行 quick Engine Capacity 相关处理。
+     */
     @Override
     public BiQuickEngineCapacitySummaryView quickEngineCapacity(Long tenantId, Integer limit) {
         return quickEngineCapacityCatalog.summary(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 执行 quick Engine Queue 相关处理。
+     */
     @Override
     public BiQuickEngineQueueSnapshotView quickEngineQueue(Long tenantId, String poolKey, String status,
                                                            Integer limit) {
         return quickEngineCapacityCatalog.queueSnapshot(safeTenantId(tenantId), poolKey, status, limit);
     }
-
+    /**
+     * 执行 favorite Resource 相关处理。
+     */
     @Override
     public BiResourceFavoriteView favoriteResource(Long tenantId, BiResourceFavoriteCommand command, String actor) {
         return resourceFavoriteCatalog.favorite(
@@ -526,22 +659,30 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 command,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceFavoriteView> listFavoriteResources(Long tenantId, String actor, String resourceType) {
         return resourceFavoriteCatalog.list(safeTenantId(tenantId), defaultActor(actor), resourceType);
     }
-
+    /**
+     * 执行 unfavorite Resource 相关处理。
+     */
     @Override
     public void unfavoriteResource(Long tenantId, String actor, String resourceType, String resourceKey) {
         resourceFavoriteCatalog.remove(safeTenantId(tenantId), defaultActor(actor), resourceType, resourceKey);
     }
-
+    /**
+     * 执行 ai Assistant 相关处理。
+     */
     @Override
     public BiAiResponseView aiAssistant(Long tenantId, String operation, BiAiRequestCommand command, String actor) {
         return aiAssistantCatalog.answer(safeTenantId(tenantId), operation, command, defaultActor(actor));
     }
-
+    /**
+     * 执行 add Resource Comment 相关处理。
+     */
     @Override
     public BiResourceCommentView addResourceComment(Long tenantId, BiResourceCommentCommand command, String actor) {
         return resourceOperationsCatalog.addComment(
@@ -550,17 +691,23 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceCommentView> listResourceComments(Long tenantId, String resourceType, String resourceKey) {
         return resourceOperationsCatalog.listComments(safeTenantId(tenantId), resourceType, resourceKey);
     }
-
+    /**
+     * 删除业务数据。
+     */
     @Override
     public void deleteResourceComment(Long tenantId, String actor, Long commentId) {
         resourceOperationsCatalog.deleteComment(safeTenantId(tenantId), commentId, LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 acquire Resource Lock 相关处理。
+     */
     @Override
     public BiResourceLockView acquireResourceLock(Long tenantId, BiResourceLockCommand command, String actor) {
         return resourceOperationsCatalog.acquireLock(
@@ -569,17 +716,23 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 current Resource Lock 相关处理。
+     */
     @Override
     public BiResourceLockView currentResourceLock(Long tenantId, String resourceType, String resourceKey) {
         return resourceOperationsCatalog.currentLock(safeTenantId(tenantId), resourceType, resourceKey);
     }
-
+    /**
+     * 执行 release Resource Lock 相关处理。
+     */
     @Override
     public void releaseResourceLock(Long tenantId, String actor, BiResourceLockCommand command) {
         resourceOperationsCatalog.releaseLock(safeTenantId(tenantId), command);
     }
-
+    /**
+     * 执行 update Resource Location 相关处理。
+     */
     @Override
     public BiResourceLocationView updateResourceLocation(
             Long tenantId,
@@ -591,7 +744,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 move Resource 相关处理。
+     */
     @Override
     public BiResourceLocationView moveResource(Long tenantId, BiResourceMoveCommand command, String actor) {
         return resourceOperationsCatalog.move(
@@ -600,12 +755,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceLocationView> listResourceLocations(Long tenantId, String resourceType) {
         return resourceOperationsCatalog.listLocations(safeTenantId(tenantId), resourceType);
     }
-
+    /**
+     * 执行 transfer Resource 相关处理。
+     */
     @Override
     public BiResourceOwnershipView transferResource(Long tenantId, BiResourceTransferCommand command, String actor) {
         return resourceOperationsCatalog.transfer(
@@ -614,12 +773,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceOwnershipView> listResourceOwnerships(Long tenantId, String resourceType) {
         return resourceOperationsCatalog.listOwnerships(safeTenantId(tenantId), resourceType);
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiPublishApprovalView> listPublishApprovals(
             Long tenantId,
@@ -628,7 +791,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             String status) {
         return resourceOperationsCatalog.listApprovals(safeTenantId(tenantId), resourceType, resourceKey, status);
     }
-
+    /**
+     * 执行 request Publish Approval 相关处理。
+     */
     @Override
     public BiPublishApprovalView requestPublishApproval(
             Long tenantId,
@@ -640,7 +805,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 review Publish Approval 相关处理。
+     */
     @Override
     public BiPublishApprovalView reviewPublishApproval(
             Long tenantId,
@@ -652,7 +819,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 update Quick Engine Capacity Alert Policy 相关处理。
+     */
     @Override
     public BiQuickEngineCapacityAlertPolicyView updateQuickEngineCapacityAlertPolicy(
             Long tenantId,
@@ -664,7 +833,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 update Quick Engine Tenant Pool Policy 相关处理。
+     */
     @Override
     public BiQuickEngineTenantPoolPolicyView updateQuickEngineTenantPoolPolicy(
             Long tenantId,
@@ -676,7 +847,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiChartView upsertChart(Long tenantId, BiChartCommand command, String actor) {
@@ -715,14 +888,18 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         chartLifecycleCatalog.appendVersion(saved, defaultActor(actor), now);
         return toChartView(saved);
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiChartView> listChartResources(Long tenantId) {
         return chartRepository.listAvailableCharts(safeTenantId(tenantId)).stream()
                 .map(this::toChartView)
                 .toList();
     }
-
+    /**
+     * 获取 Chart Resource。
+     */
     @Override
     public BiChartView getChartResource(Long tenantId, String chartKey) {
         BiChart chart = chartRepository.findAvailableChartByKey(
@@ -733,7 +910,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return toChartView(chart);
     }
-
+    /**
+     * 执行 chart Reference Impact 相关处理。
+     */
     @Override
     public BiChartReferenceImpactView chartReferenceImpact(Long tenantId, String chartKey) {
         Long scopedTenantId = safeTenantId(tenantId);
@@ -765,7 +944,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 List.of(),
                 List.of());
     }
-
+    /**
+     * 发布业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiChartView publishChartResource(Long tenantId, String chartKey, String actor) {
@@ -792,7 +973,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         chartLifecycleCatalog.appendVersion(saved, defaultActor(actor), now);
         return toChartView(saved);
     }
-
+    /**
+     * 归档业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void archiveChartResource(Long tenantId, String chartKey, String actor) {
@@ -820,12 +1003,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 existing.createdAt(),
                 LocalDateTime.now(clock)));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceVersionView> listChartResourceVersions(Long tenantId, String chartKey) {
         return chartLifecycleCatalog.listVersions(safeTenantId(tenantId), chartKey);
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiChartView restoreChartResourceVersion(Long tenantId, String chartKey, Integer version, String actor) {
@@ -853,7 +1040,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         chartLifecycleCatalog.appendVersion(saved, defaultActor(actor), now);
         return toChartView(saved);
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDashboardView upsertDashboard(Long tenantId, BiDashboardCommand command, String actor) {
@@ -885,14 +1074,18 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 now);
         return toDashboardView(dashboardRepository.saveDashboard(dashboard));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiDashboardView> listDashboardResources(Long tenantId) {
         return dashboardRepository.listAvailableDashboards(safeTenantId(tenantId)).stream()
                 .map(this::toDashboardView)
                 .toList();
     }
-
+    /**
+     * 获取 Dashboard Resource。
+     */
     @Override
     public BiDashboardView getDashboardResource(Long tenantId, String dashboardKey) {
         BiDashboard dashboard = dashboardRepository.findAvailableDashboardByKey(
@@ -903,7 +1096,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return toDashboardView(dashboard);
     }
-
+    /**
+     * 执行 clone Dashboard Resource 相关处理。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDashboardView cloneDashboardResource(
@@ -943,7 +1138,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         dashboardResourceOperationsCatalog.appendVersion(view, actor, now);
         return view;
     }
-
+    /**
+     * 执行 export Dashboard Resource 相关处理。
+     */
     @Override
     public BiDashboardExportPackageView exportDashboardResource(Long tenantId, String actor, String dashboardKey) {
         return dashboardResourceOperationsCatalog.exportPackage(
@@ -951,7 +1148,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 export Dashboard Resource File 相关处理。
+     */
     @Override
     public BiDashboardResourceOperationsCatalog.DashboardPackageFile exportDashboardResourceFile(
             Long tenantId,
@@ -959,7 +1158,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             String dashboardKey) {
         return dashboardResourceOperationsCatalog.exportFile(exportDashboardResource(tenantId, actor, dashboardKey));
     }
-
+    /**
+     * 执行 import Dashboard Resource 相关处理。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDashboardView importDashboardResource(Long tenantId, String actor, BiDashboardImportCommand command) {
@@ -996,7 +1197,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         dashboardResourceOperationsCatalog.appendVersion(view, actor, now);
         return view;
     }
-
+    /**
+     * 发布业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDashboardView publishDashboardResource(Long tenantId, String dashboardKey, String actor) {
@@ -1022,7 +1225,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         dashboardResourceOperationsCatalog.appendVersion(view, actor, now);
         return view;
     }
-
+    /**
+     * 归档业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDashboardView archiveDashboardResource(Long tenantId, String dashboardKey, String actor) {
@@ -1048,12 +1253,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         dashboardResourceOperationsCatalog.appendVersion(view, actor, now);
         return view;
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceVersionView> listDashboardResourceVersions(Long tenantId, String dashboardKey, int limit) {
         return dashboardResourceOperationsCatalog.listVersions(safeTenantId(tenantId), dashboardKey, limit);
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiDashboardView restoreDashboardResourceVersion(
@@ -1084,7 +1293,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         dashboardResourceOperationsCatalog.appendVersion(view, actor, now);
         return view;
     }
-
+    /**
+     * 获取 Dashboard Runtime State。
+     */
     @Override
     public BiDashboardRuntimeStateView getDashboardRuntimeState(Long tenantId, String actor, String dashboardKey) {
         return dashboardResourceOperationsCatalog.getRuntimeState(
@@ -1093,7 +1304,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 dashboardKey,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 save Dashboard Runtime State 相关处理。
+     */
     @Override
     public BiDashboardRuntimeStateView saveDashboardRuntimeState(
             Long tenantId,
@@ -1108,7 +1321,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 command,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 dashboard Read Model 相关处理。
+     */
     @Override
     public BiDashboardReadModelView dashboardReadModel(Long tenantId, Long workspaceId, String dashboardKey) {
         Long scopedTenantId = safeTenantId(tenantId);
@@ -1139,7 +1354,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 datasets.stream().map(this::toDatasetView).toList(),
                 toReadinessView(readiness));
     }
-
+    /**
+     * 执行 grant Permission 相关处理。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiPermissionGrantView grantPermission(Long tenantId, BiPermissionGrantCommand command, String actor) {
@@ -1161,7 +1378,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 now));
         return toPermissionGrantView(saved);
     }
-
+    /**
+     * 执行 effective Access 相关处理。
+     */
     @Override
     public BiPermissionDecisionView effectiveAccess(BiAccessRequest request) {
         BiAccessDecision decision = permissionPolicy.evaluate(request, permissionRepository.listResourceGrants(
@@ -1177,7 +1396,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 decision.reason(),
                 decision.signature());
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourcePermissionView> listResourcePermissions(
             Long tenantId,
@@ -1190,7 +1411,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 resourceKey,
                 resourceId);
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public BiResourcePermissionView upsertResourcePermission(
@@ -1228,14 +1451,18 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return view;
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     public BiResourcePermissionView upsertResourcePermission(
             Long tenantId,
             String actor,
             BiResourcePermissionCommand command) {
         return upsertResourcePermission(tenantId, command, actor);
     }
-
+    /**
+     * 删除业务数据。
+     */
     @Override
     public void deleteResourcePermission(Long tenantId, String actor, Long id) {
         BiResourcePermissionView removed = permissionAdministrationCatalog.deleteResourcePermission(
@@ -1254,12 +1481,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                     removed.actionKey());
         }
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiRowPermissionView> listRowPermissions(Long tenantId, String datasetKey) {
         return permissionAdministrationCatalog.listRowPermissions(safeTenantId(tenantId), datasetKey);
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     public BiRowPermissionView upsertRowPermission(Long tenantId, BiRowPermissionCommand command, String actor) {
         return permissionAdministrationCatalog.upsertRowPermission(
@@ -1268,11 +1499,15 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     public BiRowPermissionView upsertRowPermission(Long tenantId, String actor, BiRowPermissionCommand command) {
         return upsertRowPermission(tenantId, command, actor);
     }
-
+    /**
+     * 删除业务数据。
+     */
     @Override
     public void deleteRowPermission(Long tenantId, String actor, Long id) {
         permissionAdministrationCatalog.deleteRowPermission(
@@ -1281,12 +1516,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 id,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiColumnPermissionView> listColumnPermissions(Long tenantId, String datasetKey) {
         return permissionAdministrationCatalog.listColumnPermissions(safeTenantId(tenantId), datasetKey);
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     public BiColumnPermissionView upsertColumnPermission(
             Long tenantId,
@@ -1298,14 +1537,18 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     public BiColumnPermissionView upsertColumnPermission(
             Long tenantId,
             String actor,
             BiColumnPermissionCommand command) {
         return upsertColumnPermission(tenantId, command, actor);
     }
-
+    /**
+     * 删除业务数据。
+     */
     @Override
     public void deleteColumnPermission(Long tenantId, String actor, Long id) {
         permissionAdministrationCatalog.deleteColumnPermission(
@@ -1314,12 +1557,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 id,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 permission Audit 相关处理。
+     */
     @Override
     public List<BiPermissionAuditEntryView> permissionAudit(Long tenantId, int limit) {
         return permissionAdministrationCatalog.audit(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiPermissionRequestView> listPermissionRequests(
             Long tenantId,
@@ -1332,7 +1579,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 resourceKey,
                 status);
     }
-
+    /**
+     * 执行 request Permission 相关处理。
+     */
     @Override
     public BiPermissionRequestView requestPermission(
             Long tenantId,
@@ -1344,11 +1593,15 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 request Permission 相关处理。
+     */
     public BiPermissionRequestView requestPermission(Long tenantId, String actor, BiPermissionRequestCommand command) {
         return requestPermission(tenantId, command, actor);
     }
-
+    /**
+     * 执行 review Permission Request 相关处理。
+     */
     @Override
     public BiPermissionRequestView reviewPermissionRequest(
             Long tenantId,
@@ -1384,19 +1637,25 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return view;
     }
-
+    /**
+     * 执行 review Permission Request 相关处理。
+     */
     public BiPermissionRequestView reviewPermissionRequest(
             Long tenantId,
             String actor,
             BiPermissionRequestReviewCommand command) {
         return reviewPermissionRequest(tenantId, command, actor);
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiSubscriptionView> listSubscriptions(Long tenantId, int limit) {
         return subscriptionDeliveryCatalog.listSubscriptions(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     public BiSubscriptionView upsertSubscription(Long tenantId, BiSubscriptionCommand command, String actor) {
         return subscriptionDeliveryCatalog.upsertSubscription(
@@ -1405,12 +1664,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 删除业务数据。
+     */
     @Override
     public void deleteSubscription(Long tenantId, Long id) {
         subscriptionDeliveryCatalog.deleteSubscription(safeTenantId(tenantId), id);
     }
-
+    /**
+     * 执行 run Subscription Delivery 相关处理。
+     */
     @Override
     public BiDeliveryRunResult runSubscriptionDelivery(Long tenantId, Long id, String actor) {
         return subscriptionDeliveryCatalog.runSubscription(
@@ -1419,12 +1682,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiAlertRuleView> listAlertRules(Long tenantId, int limit) {
         return subscriptionDeliveryCatalog.listAlerts(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 创建或更新业务数据。
+     */
     @Override
     public BiAlertRuleView upsertAlertRule(Long tenantId, BiAlertRuleCommand command, String actor) {
         return subscriptionDeliveryCatalog.upsertAlert(
@@ -1433,12 +1700,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 删除业务数据。
+     */
     @Override
     public void deleteAlertRule(Long tenantId, Long id) {
         subscriptionDeliveryCatalog.deleteAlert(safeTenantId(tenantId), id);
     }
-
+    /**
+     * 执行 run Alert Delivery 相关处理。
+     */
     @Override
     public BiDeliveryRunResult runAlertDelivery(Long tenantId, Long id, String actor) {
         return subscriptionDeliveryCatalog.runAlert(
@@ -1447,12 +1718,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiDeliveryLogView> listDeliveryLogs(Long tenantId, String jobType, Long jobId, int limit) {
         return subscriptionDeliveryCatalog.listLogs(safeTenantId(tenantId), jobType, jobId, limit);
     }
-
+    /**
+     * 执行 audit Delivery Logs 相关处理。
+     */
     @Override
     public BiDeliveryAuditSummary auditDeliveryLogs(
             Long tenantId,
@@ -1463,7 +1738,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             int limit) {
         return subscriptionDeliveryCatalog.audit(safeTenantId(tenantId), jobType, status, channel, jobId, limit);
     }
-
+    /**
+     * 执行 retry Delivery Logs 相关处理。
+     */
     @Override
     public BiDeliveryRetryResult retryDeliveryLogs(Long tenantId, String actor, int limit) {
         return subscriptionDeliveryCatalog.retry(
@@ -1472,7 +1749,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 limit,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiDeliveryAttachmentView> listDeliveryAttachments(
             Long tenantId,
@@ -1483,7 +1762,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         return subscriptionDeliveryCatalog.listAttachments(safeTenantId(tenantId), jobType, jobId, deliveryLogId,
                 limit);
     }
-
+    /**
+     * 执行 download Delivery Attachment 相关处理。
+     */
     @Override
     public BiDeliveryAttachmentDownload downloadDeliveryAttachment(Long tenantId, Long id, String actor) {
         return subscriptionDeliveryCatalog.download(
@@ -1492,12 +1773,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 cleanup Delivery Attachments 相关处理。
+     */
     @Override
     public BiDeliveryAttachmentCleanupResult cleanupDeliveryAttachments(Long tenantId, int limit) {
         return subscriptionDeliveryCatalog.cleanup(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 执行 run Delivery Scheduler 相关处理。
+     */
     @Override
     public BiDeliverySchedulerResult runDeliveryScheduler(Long tenantId, String actor) {
         return subscriptionDeliveryCatalog.runScheduler(
@@ -1505,7 +1790,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 preview Self Service Export 相关处理。
+     */
     @Override
     public Map<String, Object> previewSelfServiceExport(
             Long tenantId,
@@ -1514,7 +1801,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             BiSelfServicePreviewCommand command) {
         return selfServiceExportCatalog.preview(safeTenantId(tenantId), defaultActor(actor), defaultRole(role), command);
     }
-
+    /**
+     * 执行 create Self Service Export 相关处理。
+     */
     @Override
     public BiSelfServiceExportJobView createSelfServiceExport(
             Long tenantId,
@@ -1528,12 +1817,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 command,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiSelfServiceExportJobView> listSelfServiceExports(Long tenantId, int limit) {
         return selfServiceExportCatalog.list(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 执行 review Self Service Export 相关处理。
+     */
     @Override
     public BiSelfServiceExportJobView reviewSelfServiceExport(
             Long tenantId,
@@ -1549,17 +1842,23 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 command,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 获取 Self Service Export Detail。
+     */
     @Override
     public BiSelfServiceExportJobDetailView getSelfServiceExportDetail(Long tenantId, Long id) {
         return selfServiceExportCatalog.detail(safeTenantId(tenantId), id);
     }
-
+    /**
+     * 执行 download Self Service Export 相关处理。
+     */
     @Override
     public BiSelfServiceExportDownload downloadSelfServiceExport(Long tenantId, String actor, Long id) {
         return selfServiceExportCatalog.download(safeTenantId(tenantId), defaultActor(actor), id);
     }
-
+    /**
+     * 执行 cancel Self Service Export 相关处理。
+     */
     @Override
     public BiSelfServiceExportJobView cancelSelfServiceExport(Long tenantId, String actor, Long id) {
         return selfServiceExportCatalog.cancel(
@@ -1568,12 +1867,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 id,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 cleanup Self Service Exports 相关处理。
+     */
     @Override
     public BiSelfServiceExportCleanupResult cleanupSelfServiceExports(Long tenantId, int limit) {
         return selfServiceExportCatalog.cleanup(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 执行 retry Self Service Exports 相关处理。
+     */
     @Override
     public BiSelfServiceExportRetryResult retrySelfServiceExports(
             Long tenantId,
@@ -1587,7 +1890,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 limit,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 run Self Service Export Queue 相关处理。
+     */
     @Override
     public BiSelfServiceExportQueueResult runSelfServiceExportQueue(
             Long tenantId,
@@ -1601,17 +1906,23 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 limit,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiPortalResourceView> listPortalResources(Long tenantId) {
         return presentationResourceCatalog.listPortals(safeTenantId(tenantId));
     }
-
+    /**
+     * 获取 Portal Resource。
+     */
     @Override
     public BiPortalResourceView getPortalResource(Long tenantId, String portalKey) {
         return presentationResourceCatalog.getPortal(safeTenantId(tenantId), portalKey);
     }
-
+    /**
+     * 执行 save Portal Draft 相关处理。
+     */
     @Override
     public BiPortalResourceView savePortalDraft(
             Long tenantId,
@@ -1625,7 +1936,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 发布业务资源。
+     */
     @Override
     public BiPortalResourceView publishPortalResource(Long tenantId, String portalKey, String actor) {
         return presentationResourceCatalog.publishPortal(
@@ -1634,7 +1947,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 归档业务资源。
+     */
     @Override
     public void archivePortalResource(Long tenantId, String portalKey, String actor) {
         presentationResourceCatalog.archivePortal(
@@ -1643,12 +1958,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceVersionView> listPortalResourceVersions(Long tenantId, String portalKey) {
         return presentationResourceCatalog.listPortalVersions(safeTenantId(tenantId), portalKey);
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     @Override
     public BiPortalResourceView restorePortalResourceVersion(
             Long tenantId,
@@ -1662,17 +1981,23 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiBigScreenResourceView> listBigScreenResources(Long tenantId) {
         return presentationResourceCatalog.listBigScreens(safeTenantId(tenantId));
     }
-
+    /**
+     * 获取 Big Screen Resource。
+     */
     @Override
     public BiBigScreenResourceView getBigScreenResource(Long tenantId, String screenKey) {
         return presentationResourceCatalog.getBigScreen(safeTenantId(tenantId), screenKey);
     }
-
+    /**
+     * 执行 save Big Screen Draft 相关处理。
+     */
     @Override
     public BiBigScreenResourceView saveBigScreenDraft(
             Long tenantId,
@@ -1686,7 +2011,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 发布业务资源。
+     */
     @Override
     public BiBigScreenResourceView publishBigScreenResource(Long tenantId, String screenKey, String actor) {
         return presentationResourceCatalog.publishBigScreen(
@@ -1695,7 +2022,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 归档业务资源。
+     */
     @Override
     public void archiveBigScreenResource(Long tenantId, String screenKey, String actor) {
         presentationResourceCatalog.archiveBigScreen(
@@ -1704,12 +2033,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceVersionView> listBigScreenResourceVersions(Long tenantId, String screenKey) {
         return presentationResourceCatalog.listBigScreenVersions(safeTenantId(tenantId), screenKey);
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     @Override
     public BiBigScreenResourceView restoreBigScreenResourceVersion(
             Long tenantId,
@@ -1723,17 +2056,23 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiSpreadsheetResourceView> listSpreadsheetResources(Long tenantId) {
         return presentationResourceCatalog.listSpreadsheets(safeTenantId(tenantId));
     }
-
+    /**
+     * 获取 Spreadsheet Resource。
+     */
     @Override
     public BiSpreadsheetResourceView getSpreadsheetResource(Long tenantId, String spreadsheetKey) {
         return presentationResourceCatalog.getSpreadsheet(safeTenantId(tenantId), spreadsheetKey);
     }
-
+    /**
+     * 执行 save Spreadsheet Draft 相关处理。
+     */
     @Override
     public BiSpreadsheetResourceView saveSpreadsheetDraft(
             Long tenantId,
@@ -1747,7 +2086,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 发布业务资源。
+     */
     @Override
     public BiSpreadsheetResourceView publishSpreadsheetResource(Long tenantId, String spreadsheetKey, String actor) {
         return presentationResourceCatalog.publishSpreadsheet(
@@ -1756,7 +2097,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 归档业务资源。
+     */
     @Override
     public void archiveSpreadsheetResource(Long tenantId, String spreadsheetKey, String actor) {
         presentationResourceCatalog.archiveSpreadsheet(
@@ -1765,12 +2108,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiResourceVersionView> listSpreadsheetResourceVersions(Long tenantId, String spreadsheetKey) {
         return presentationResourceCatalog.listSpreadsheetVersions(safeTenantId(tenantId), spreadsheetKey);
     }
-
+    /**
+     * 恢复指定版本的业务资源。
+     */
     @Override
     public BiSpreadsheetResourceView restoreSpreadsheetResourceVersion(
             Long tenantId,
@@ -1784,34 +2131,46 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 compile Query 相关处理。
+     */
     @Override
     public BiQueryCompileResult compileQuery(Long tenantId, BiQueryCommand command, String actor) {
         return queryOperationsCatalog.compile(safeTenantId(tenantId), command);
     }
-
+    /**
+     * 执行 execute Query 相关处理。
+     */
     @Override
     public BiQueryResultView executeQuery(Long tenantId, BiQueryCommand command, String actor) {
         return queryOperationsCatalog.execute(safeTenantId(tenantId), command, defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 explain Query 相关处理。
+     */
     @Override
     public BiQueryExplainResult explainQuery(Long tenantId, BiQueryCommand command, String actor) {
         return queryOperationsCatalog.explain(safeTenantId(tenantId), command);
     }
-
+    /**
+     * 执行 cancel Query 相关处理。
+     */
     @Override
     public BiQueryCancelResult cancelQuery(Long tenantId, String sqlHash, String actor) {
         return queryOperationsCatalog.cancel(safeTenantId(tenantId), sqlHash);
     }
-
+    /**
+     * 执行 execute Gated Query 相关处理。
+     */
     @Override
     public BiQueryGateResult executeGatedQuery(Long tenantId, BiQueryGateCommand command, String actor) {
         return queryOperationsCatalog.executeGated(safeTenantId(tenantId), command, defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 execute Contract Gated Query 相关处理。
+     */
     @Override
     public BiQueryGateResult executeContractGatedQuery(
             Long tenantId,
@@ -1820,27 +2179,37 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         return queryOperationsCatalog.executeContractGated(safeTenantId(tenantId), command, defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiQueryHistoryItemView> listQueryHistory(Long tenantId, int limit) {
         return queryOperationsCatalog.listHistory(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 执行 query History Detail 相关处理。
+     */
     @Override
     public BiQueryHistoryDetailView queryHistoryDetail(Long tenantId, Long historyId) {
         return queryOperationsCatalog.historyDetail(safeTenantId(tenantId), historyId);
     }
-
+    /**
+     * 执行 query Governance Summary 相关处理。
+     */
     @Override
     public BiQueryGovernanceSummaryView queryGovernanceSummary(Long tenantId, int limit) {
         return queryOperationsCatalog.governanceSummary(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 执行 query Governance Policy 相关处理。
+     */
     @Override
     public BiQueryGovernancePolicyView queryGovernancePolicy(Long tenantId) {
         return queryOperationsCatalog.governancePolicy(safeTenantId(tenantId));
     }
-
+    /**
+     * 执行 update Query Governance Policy 相关处理。
+     */
     @Override
     public BiQueryGovernancePolicyView updateQueryGovernancePolicy(
             Long tenantId,
@@ -1849,17 +2218,23 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         return queryOperationsCatalog.updateGovernancePolicy(safeTenantId(tenantId), command, defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 query Governance Audit 相关处理。
+     */
     @Override
     public List<BiQueryGovernanceAuditEntryView> queryGovernanceAudit(Long tenantId, int limit) {
         return queryOperationsCatalog.governanceAudit(safeTenantId(tenantId), limit);
     }
-
+    /**
+     * 执行 query Cache Policy 相关处理。
+     */
     @Override
     public BiQueryCachePolicyView queryCachePolicy(Long tenantId) {
         return queryOperationsCatalog.cachePolicy(safeTenantId(tenantId));
     }
-
+    /**
+     * 执行 update Query Cache Policy 相关处理。
+     */
     @Override
     public BiQueryCachePolicyView updateQueryCachePolicy(
             Long tenantId,
@@ -1867,44 +2242,60 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             String actor) {
         return queryOperationsCatalog.updateCachePolicy(safeTenantId(tenantId), command);
     }
-
+    /**
+     * 执行 invalidate Query Cache 相关处理。
+     */
     @Override
     public BiQueryCacheInvalidationResult invalidateQueryCache(
             Long tenantId,
             BiQueryCacheInvalidationCommand command) {
         return queryOperationsCatalog.invalidate(command);
     }
-
+    /**
+     * 执行 query Cache Stats 相关处理。
+     */
     @Override
     public BiQueryCacheStatsView queryCacheStats(Long tenantId) {
         return queryOperationsCatalog.cacheStats(safeTenantId(tenantId));
     }
-
+    /**
+     * 执行 datasource Health 相关处理。
+     */
     @Override
     public List<BiDatasourceHealthView> datasourceHealth() {
         return queryOperationsCatalog.datasourceHealth();
     }
-
+    /**
+     * 执行 datasource Health History 相关处理。
+     */
     @Override
     public List<BiDatasourceHealthSnapshotView> datasourceHealthHistory(int limit) {
         return queryOperationsCatalog.datasourceHealthHistory(limit);
     }
-
+    /**
+     * 执行 datasource Health Slo 相关处理。
+     */
     @Override
     public BiDatasourceHealthSloView datasourceHealthSlo(int limit) {
         return queryOperationsCatalog.datasourceHealthSlo(limit);
     }
-
+    /**
+     * 执行 datasource Connectors 相关处理。
+     */
     @Override
     public List<BiDatasourceConnectorView> datasourceConnectors() {
         return datasourceOperationsCatalog.connectors();
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiDatasourceOnboardingView> listDatasources(Long tenantId) {
         return datasourceOperationsCatalog.list(safeTenantId(tenantId));
     }
-
+    /**
+     * 执行 create Datasource 相关处理。
+     */
     @Override
     public BiDatasourceOnboardingView createDatasource(
             Long tenantId,
@@ -1912,7 +2303,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             String actor) {
         return datasourceOperationsCatalog.create(safeTenantId(tenantId), command, defaultActor(actor));
     }
-
+    /**
+     * 执行 update Datasource 相关处理。
+     */
     @Override
     public BiDatasourceOnboardingView updateDatasource(
             Long tenantId,
@@ -1921,7 +2314,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             String actor) {
         return datasourceOperationsCatalog.update(safeTenantId(tenantId), id, command, defaultActor(actor));
     }
-
+    /**
+     * 执行 upload Datasource File 相关处理。
+     */
     @Override
     public BiDatasourceOnboardingView uploadDatasourceFile(
             Long tenantId,
@@ -1944,7 +2339,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 headerRow,
                 encoding);
     }
-
+    /**
+     * 执行 materialize Datasource File 相关处理。
+     */
     @Override
     public BiDatasourceFileMaterializationResult materializeDatasourceFile(
             Long tenantId,
@@ -1978,12 +2375,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 maxRows,
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 test Datasource Connection 相关处理。
+     */
     @Override
     public BiDatasourceConnectionTestResult testDatasourceConnection(Long tenantId, Long id) {
         return datasourceOperationsCatalog.testConnection(safeTenantId(tenantId), id);
     }
-
+    /**
+     * 执行 rotate Datasource Credential 相关处理。
+     */
     @Override
     public BiDatasourceCredentialRotationView rotateDatasourceCredential(
             Long tenantId,
@@ -1992,12 +2393,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             String actor) {
         return datasourceOperationsCatalog.rotateCredential(safeTenantId(tenantId), id, defaultActor(actor));
     }
-
+    /**
+     * 执行 preview Datasource Schema 相关处理。
+     */
     @Override
     public BiDatasourceSchemaPreviewView previewDatasourceSchema(Long tenantId, Long id, int limit) {
         return datasourceOperationsCatalog.previewSchema(safeTenantId(tenantId), id, limit);
     }
-
+    /**
+     * 执行 preview Datasource Api 相关处理。
+     */
     @Override
     public BiDatasourceApiPreviewView previewDatasourceApi(
             Long tenantId,
@@ -2005,7 +2410,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             BiDatasourceApiPreviewCommand command) {
         return datasourceOperationsCatalog.previewApi(safeTenantId(tenantId), id, command);
     }
-
+    /**
+     * 执行 sync Datasource Schema 相关处理。
+     */
     @Override
     public BiDatasourceSchemaSnapshotView syncDatasourceSchema(
             Long tenantId,
@@ -2016,43 +2423,59 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         return datasourceOperationsCatalog.syncSchema(safeTenantId(tenantId), id, limit, defaultActor(actor),
                 LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 latest Datasource Schema Snapshot 相关处理。
+     */
     @Override
     public BiDatasourceSchemaSnapshotView latestDatasourceSchemaSnapshot(Long tenantId, Long id) {
         return datasourceOperationsCatalog.latestSnapshot(safeTenantId(tenantId), id);
     }
-
+    /**
+     * 查询列表数据。
+     */
     @Override
     public List<BiDatasourceSchemaSnapshotView> listDatasourceSchemaSnapshots(Long tenantId, Long id, int limit) {
         return datasourceOperationsCatalog.listSnapshots(safeTenantId(tenantId), id, limit);
     }
-
+    /**
+     * 执行 create Embed Ticket 相关处理。
+     */
     @Override
     public BiEmbedTicketView createEmbedTicket(Long tenantId, BiEmbedTicketCommand command, String actor) {
         return queryOperationsCatalog.createEmbedTicket(safeTenantId(tenantId), command, defaultActor(actor),
                 Instant.now(clock));
     }
-
+    /**
+     * 执行 verify Embed Ticket 相关处理。
+     */
     @Override
     public BiEmbedTicketPayloadView verifyEmbedTicket(BiEmbedTicketVerifyCommand command, String origin) {
         return queryOperationsCatalog.verifyEmbedTicket(command, origin, Instant.now(clock));
     }
-
+    /**
+     * 执行 execute Embed Query 相关处理。
+     */
     @Override
     public BiQueryResultView executeEmbedQuery(BiEmbedQueryCommand command, String origin) {
         return queryOperationsCatalog.executeEmbedQuery(command, origin, LocalDateTime.now(clock));
     }
-
+    /**
+     * 执行 cleanup Embed Tickets 相关处理。
+     */
     @Override
     public BiEmbedTicketCleanupResult cleanupEmbedTickets(Long tenantId, int limit) {
         return queryOperationsCatalog.cleanupEmbedTickets(safeTenantId(tenantId), limit, Instant.now(clock));
     }
-
+    /**
+     * 执行 embed Dashboard Resource 相关处理。
+     */
     @Override
     public BiDashboardView embedDashboardResource(Long tenantId, String resourceKey, String ticket, String origin) {
         return getDashboardResource(safeTenantId(tenantId), resourceKey);
     }
-
+    /**
+     * 执行 embed Dashboard Runtime State 相关处理。
+     */
     @Override
     public BiDashboardRuntimeStateView embedDashboardRuntimeState(
             Long tenantId,
@@ -2062,12 +2485,16 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
             String origin) {
         return getDashboardRuntimeState(safeTenantId(tenantId), actor, resourceKey);
     }
-
+    /**
+     * 执行 embed Portal Resource 相关处理。
+     */
     @Override
     public BiPortalResourceView embedPortalResource(Long tenantId, String resourceKey, String ticket, String origin) {
         return getPortalResource(safeTenantId(tenantId), resourceKey);
     }
-
+    /**
+     * 执行 require Workspace 相关处理。
+     */
     private BiWorkspace requireWorkspace(Long tenantId, Long workspaceId) {
         BiWorkspace workspace = workspaceRepository.findWorkspace(tenantId, requiredId(workspaceId, "workspaceId"));
         if (workspace == null) {
@@ -2075,7 +2502,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return workspace;
     }
-
+    /**
+     * 执行 require Available Chart 相关处理。
+     */
     private BiChart requireAvailableChart(Long tenantId, String chartKey) {
         BiChart chart = chartRepository.findAvailableChartByKey(
                 tenantId,
@@ -2085,7 +2514,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return chart;
     }
-
+    /**
+     * 执行 require Available Dashboard 相关处理。
+     */
     private BiDashboard requireAvailableDashboard(Long tenantId, String dashboardKey) {
         BiDashboard dashboard = dashboardRepository.findAvailableDashboardByKey(
                 tenantId,
@@ -2095,7 +2526,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return dashboard;
     }
-
+    /**
+     * 执行 require Available Dataset 相关处理。
+     */
     private BiDataset requireAvailableDataset(Long tenantId, String datasetKey) {
         BiDataset dataset = datasetRepository.findAvailableDatasetByKeyWithTenantFallback(
                 tenantId,
@@ -2105,7 +2538,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return dataset;
     }
-
+    /**
+     * 执行 dataset Snapshot 相关处理。
+     */
     private Map<String, Object> datasetSnapshot(BiDataset dataset) {
         return orderedMap(
                 "workspaceId", dataset.workspaceId(),
@@ -2117,7 +2552,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 "tenantColumn", dataset.tenantColumn(),
                 "status", dataset.status().name());
     }
-
+    /**
+     * 执行 ordered Map 相关处理。
+     */
     private Map<String, Object> orderedMap(Object... pairs) {
         Map<String, Object> map = new LinkedHashMap<>();
         for (int index = 0; index < pairs.length; index += 2) {
@@ -2125,7 +2562,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return map;
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDatasetField toField(BiDatasetFieldCommand command) {
         return new BiDatasetField(
                 BiResourceKey.of(command.fieldKey(), "fieldKey"),
@@ -2137,7 +2576,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 command.visible() == null || command.visible(),
                 command.sortOrder() == null ? 0 : command.sortOrder());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiMetric toMetric(BiMetricCommand command) {
         return new BiMetric(
                 BiResourceKey.of(command.metricKey(), "metricKey"),
@@ -2147,7 +2588,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 command.dataType(),
                 command.unit());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiWorkspaceView toWorkspaceView(BiWorkspace workspace) {
         return new BiWorkspaceView(
                 workspace.id(),
@@ -2160,7 +2603,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 workspace.createdAt(),
                 workspace.updatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDatasetView toDatasetView(BiDataset dataset) {
         return new BiDatasetView(
                 dataset.id(),
@@ -2180,7 +2625,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 dataset.createdAt(),
                 dataset.updatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDatasetFieldView toFieldView(BiDatasetField field) {
         return new BiDatasetFieldView(
                 field.fieldKey().value(),
@@ -2192,7 +2639,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 field.visible(),
                 field.sortOrder());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiMetricView toMetricView(BiMetric metric) {
         return new BiMetricView(
                 metric.metricKey().value(),
@@ -2202,7 +2651,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 metric.dataType(),
                 metric.unit());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiQueryDatasetView toQueryDatasetView(BiQueryDatasetCatalog.BiQueryDataset dataset) {
         return new BiQueryDatasetView(
                 dataset.datasetKey(),
@@ -2213,7 +2664,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                         .map(metric -> new BiQueryMetricView(metric.metricKey(), metric.dataType()))
                         .toList());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDashboardPresetView toDashboardPresetView(BiDashboardPresetCatalog.BiDashboardPreset preset) {
         return new BiDashboardPresetView(
                 preset.dashboardKey(),
@@ -2226,7 +2679,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 preset.subscriptionChannels(),
                 preset.embedScopes());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDashboardPresetWidgetView toDashboardPresetWidgetView(
             BiDashboardPresetCatalog.BiDashboardWidget widget) {
         return new BiDashboardPresetWidgetView(
@@ -2241,7 +2696,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 widget.gridH(),
                 widget.stylePreset());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDashboardPresetFilterView toDashboardPresetFilterView(
             BiDashboardPresetCatalog.BiDashboardFilter filter) {
         BiDashboardPresetCatalog.BiDashboardFilterCascade cascade = filter.cascade();
@@ -2260,7 +2717,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 filter.optionFieldKey(),
                 filter.hidden());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDashboardPresetInteractionView toDashboardPresetInteractionView(
             BiDashboardPresetCatalog.BiDashboardInteraction interaction) {
         return new BiDashboardPresetInteractionView(
@@ -2271,7 +2730,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 interaction.fieldKey(),
                 interaction.target());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiChartView toChartView(BiChart chart) {
         return new BiChartView(
                 chart.id(),
@@ -2290,7 +2751,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 chart.createdAt(),
                 chart.updatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDashboardView toDashboardView(BiDashboard dashboard) {
         return new BiDashboardView(
                 dashboard.id(),
@@ -2308,7 +2771,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 dashboard.createdAt(),
                 dashboard.updatedAt());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDashboardReadinessView toReadinessView(BiDashboardReadinessReport report) {
         return new BiDashboardReadinessView(
                 report.status(),
@@ -2318,7 +2783,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 report.blockers().stream().map(this::toReadinessIssueView).toList(),
                 report.warnings().stream().map(this::toReadinessIssueView).toList());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiDashboardReadinessIssueView toReadinessIssueView(BiDashboardReadinessIssue issue) {
         return new BiDashboardReadinessIssueView(
                 issue.severity(),
@@ -2327,7 +2794,9 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 issue.itemKey(),
                 issue.message());
     }
-
+    /**
+     * 转换为目标数据结构。
+     */
     private BiPermissionGrantView toPermissionGrantView(BiPermissionGrant grant) {
         return new BiPermissionGrantView(
                 grant.id(),
@@ -2342,24 +2811,34 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
                 grant.createdBy(),
                 grant.createdAt());
     }
-
+    /**
+     * 执行 safe Tenant Id 相关处理。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }
-
+    /**
+     * 执行 text 相关处理。
+     */
     private static String text(Object value, String fallback) {
         return value == null ? fallback : value.toString();
     }
-
+    /**
+     * 执行 long Value 相关处理。
+     */
     private static Long longValue(Object value, Long fallback) {
         return value instanceof Number number ? number.longValue() : fallback;
     }
-
+    /**
+     * 执行 map 相关处理。
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> map(Object value) {
         return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
     }
-
+    /**
+     * 执行 string List 相关处理。
+     */
     @SuppressWarnings("unchecked")
     private static List<String> stringList(Object value) {
         if (value instanceof List<?> list) {
@@ -2367,18 +2846,24 @@ public class BiCatalogApplicationService implements BiCatalogFacade {
         }
         return List.of();
     }
-
+    /**
+     * 执行 required Id 相关处理。
+     */
     private static Long requiredId(Long value, String field) {
         if (value == null || value <= 0) {
             throw new IllegalArgumentException(field + " is required");
         }
         return value;
     }
-
+    /**
+     * 生成默认值。
+     */
     private static String defaultActor(String actor) {
         return actor == null || actor.isBlank() ? "system" : actor.trim();
     }
-
+    /**
+     * 生成默认值。
+     */
     private static String defaultRole(String role) {
         return role == null || role.isBlank() ? "ANALYST" : role.trim().toUpperCase(java.util.Locale.ROOT);
     }
