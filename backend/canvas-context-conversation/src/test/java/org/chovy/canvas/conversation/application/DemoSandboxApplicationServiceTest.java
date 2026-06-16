@@ -12,12 +12,21 @@ import java.util.Map;
 import org.chovy.canvas.conversation.api.DemoSandboxFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证演示沙箱应用服务的单元测试。
+ */
 class DemoSandboxApplicationServiceTest {
 
+    /**
+     * 固定演示沙箱测试时钟。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T05:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证沙箱安装、重置和过期查询按租户隔离。
+     */
     @Test
     void installsResetsAndFindsExpiredSandboxesByTenant() {
         DemoSandboxFacade service = new DemoSandboxApplicationService(CLOCK);
@@ -40,6 +49,9 @@ class DemoSandboxApplicationServiceTest {
                 .containsExactly(8L);
     }
 
+    /**
+     * 验证演示会话回复保留沙箱渠道和原始载荷。
+     */
     @Test
     void recordsConversationRepliesWithSandboxChannelAndPayload() {
         DemoSandboxFacade service = new DemoSandboxApplicationService(CLOCK);
@@ -58,6 +70,9 @@ class DemoSandboxApplicationServiceTest {
         assertThat(reply.attributes()).containsEntry("locale", "en-US");
     }
 
+    /**
+     * 验证沙箱默认值和参数校验保持兼容行为。
+     */
     @Test
     void validationAndDefaultsFollowLegacyCompatibility() {
         DemoSandboxFacade service = new DemoSandboxApplicationService(CLOCK);

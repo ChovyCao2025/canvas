@@ -8,10 +8,19 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证会话工单路由策略的单元测试。
+ */
 class ConversationRoutingPolicyTest {
 
+    /**
+     * 固定路由决策时间。
+     */
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 6, 6, 11, 0);
 
+    /**
+     * 验证策略选择满足技能要求且负载最低的坐席。
+     */
     @Test
     void choosesLowestLoadAvailableAgentWithAllRequiredSkills() {
         ConversationRoutingPolicy policy = new ConversationRoutingPolicy();
@@ -33,6 +42,9 @@ class ConversationRoutingPolicyTest {
         assertThat(decision.reason()).contains("matched rule vip-sales");
     }
 
+    /**
+     * 验证没有坐席容量时返回未路由决策。
+     */
     @Test
     void returnsMissWhenNoAgentHasCapacity() {
         ConversationRoutingPolicy policy = new ConversationRoutingPolicy();
@@ -49,6 +61,12 @@ class ConversationRoutingPolicyTest {
         assertThat(decision.reason()).contains("no available agent");
     }
 
+    /**
+     * 构造指定优先级的测试工单。
+     *
+     * @param priority 工单优先级
+     * @return 测试工单
+     */
     private static ConversationWorkItem workItem(String priority) {
         return new ConversationWorkItem(
                 50L, 7L, 10L, 20L, "user-1", "WEB_CHAT", "WIDGET",
@@ -58,6 +76,11 @@ class ConversationRoutingPolicyTest {
                 NOW.minusMinutes(10), NOW.minusMinutes(5));
     }
 
+    /**
+     * 构造匹配 WEB_CHAT 高优先级工单的测试规则。
+     *
+     * @return 测试路由规则
+     */
     private static ConversationRoutingRule rule() {
         return new ConversationRoutingRule(
                 70L, 7L, "vip-sales", "WEB_CHAT", "HIGH",
@@ -65,6 +88,16 @@ class ConversationRoutingPolicyTest {
                 "manager", NOW.minusDays(1), NOW.minusDays(1));
     }
 
+    /**
+     * 构造测试路由坐席。
+     *
+     * @param key 坐席业务键
+     * @param status 坐席状态
+     * @param maxCapacity 最大容量
+     * @param currentLoad 当前负载
+     * @param skills 技能列表
+     * @return 测试坐席
+     */
     private static ConversationRoutingAgent agent(String key,
                                                   String status,
                                                   int maxCapacity,
