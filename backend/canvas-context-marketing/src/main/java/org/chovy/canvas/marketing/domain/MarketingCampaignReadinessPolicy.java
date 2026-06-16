@@ -5,8 +5,14 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 提供MarketingCampaignReadinessPolicy的业务能力。
+ */
 public class MarketingCampaignReadinessPolicy {
 
+    /**
+     * 执行evaluate业务操作。
+     */
     public MarketingCampaignReadinessReport evaluate(MarketingCampaign campaign,
                                                      List<MarketingCampaignLink> links,
                                                      Clock clock) {
@@ -15,6 +21,7 @@ public class MarketingCampaignReadinessPolicy {
         List<MarketingCampaignReadinessIssue> blockers = new ArrayList<>();
         List<MarketingCampaignReadinessIssue> warnings = new ArrayList<>();
 
+        // 生产上线必须先确认活动本身可投放，避免后续资源检查掩盖主状态问题。
         if (campaign.status() != CampaignStatus.ACTIVE) {
             blockers.add(finding(
                     "BLOCKER",
@@ -89,6 +96,7 @@ public class MarketingCampaignReadinessPolicy {
                         "linkStatus=" + link.linkStatus().name(),
                         link.resourceRoute())));
 
+        // 阻断项决定是否可上线，警告项只降低准备度状态，保持旧版兼容的三态输出。
         String status = blockers.isEmpty() ? (warnings.isEmpty() ? "READY" : "DEGRADED") : "BLOCKED";
         return new MarketingCampaignReadinessReport(
                 campaign.tenantId(),
@@ -107,6 +115,9 @@ public class MarketingCampaignReadinessPolicy {
                 safeLinks);
     }
 
+    /**
+     * 查找ing业务对象。
+     */
     private static MarketingCampaignReadinessIssue finding(String severity,
                                                            String itemType,
                                                            String itemKey,

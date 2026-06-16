@@ -8,8 +8,14 @@ import java.time.LocalDateTime;
 import org.chovy.canvas.marketing.api.MarketingPolicyFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证MarketingPolicyApplicationService的关键兼容行为。
+ */
 class MarketingPolicyApplicationServiceTest {
 
+    /**
+     * 验证 upserts consent suppression and channel into tenant scoped policy state 场景的兼容行为。
+     */
     @Test
     void upsertsConsentSuppressionAndChannelIntoTenantScopedPolicyState() {
         MarketingPolicyFacade service = new MarketingPolicyApplicationService();
@@ -40,6 +46,9 @@ class MarketingPolicyApplicationServiceTest {
         assertThat(state.customerChannel()).isEqualTo(channel);
     }
 
+    /**
+     * 验证 upserts rows by tenant user channel and reason without cross tenant leakage 场景的兼容行为。
+     */
     @Test
     void upsertsRowsByTenantUserChannelAndReasonWithoutCrossTenantLeakage() {
         MarketingPolicyFacade service = new MarketingPolicyApplicationService();
@@ -69,6 +78,9 @@ class MarketingPolicyApplicationServiceTest {
         assertThat(service.policyState(8L, "user-1", "sms").consent().source()).isEqualTo("other");
     }
 
+    /**
+     * 验证 validation and defaults follow legacy compatibility 场景的兼容行为。
+     */
     @Test
     void validationAndDefaultsFollowLegacyCompatibility() {
         MarketingPolicyFacade service = new MarketingPolicyApplicationService();

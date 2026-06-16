@@ -16,10 +16,16 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证MarketingCampaignPersistenceConverter的关键兼容行为。
+ */
 class MarketingCampaignPersistenceConverterTest {
 
     private final MarketingCampaignPersistenceConverter converter = new MarketingCampaignPersistenceConverter();
 
+    /**
+     * 验证 campaign do preserves table and column mapping shape 场景的兼容行为。
+     */
     @Test
     void campaignDoPreservesTableAndColumnMappingShape() {
         assertThat(MarketingCampaignMasterDO.class.getAnnotation(TableName.class).value())
@@ -56,6 +62,9 @@ class MarketingCampaignPersistenceConverterTest {
         assertThat(mapped.brief()).containsEntry("northStar", "signup");
     }
 
+    /**
+     * 验证 link do preserves table mapper and launch flag mapping 场景的兼容行为。
+     */
     @Test
     void linkDoPreservesTableMapperAndLaunchFlagMapping() {
         assertThat(MarketingCampaignLinkDO.class.getAnnotation(TableName.class).value())
@@ -93,6 +102,9 @@ class MarketingCampaignPersistenceConverterTest {
         assertThat(mapped.metadata()).containsEntry("stage", "launch");
     }
 
+    /**
+     * 验证 json mapping preserves nested lists and null values 场景的兼容行为。
+     */
     @Test
     void jsonMappingPreservesNestedListsAndNullValues() {
         Map<String, Object> brief = new LinkedHashMap<>();

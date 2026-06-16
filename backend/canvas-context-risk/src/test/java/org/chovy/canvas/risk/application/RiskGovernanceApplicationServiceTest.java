@@ -7,8 +7,14 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+/**
+ * 定义 RiskGovernanceApplicationServiceTest 的风控模块职责和数据契约。
+ */
 class RiskGovernanceApplicationServiceTest {
 
+    /**
+     * 执行 managesListsStrategiesDecisionTracesAndLabSimulationsPerTenant 相关的风控处理逻辑。
+     */
     @Test
     void managesListsStrategiesDecisionTracesAndLabSimulationsPerTenant() {
         RiskGovernanceApplicationService service = new RiskGovernanceApplicationService();
@@ -78,6 +84,9 @@ class RiskGovernanceApplicationServiceTest {
                 .isEqualTo("MARKETING_BENEFIT_ISSUE");
     }
 
+    /**
+     * 执行 validatesRequiredKeysAndDefaultsActor 相关的风控处理逻辑。
+     */
     @Test
     void validatesRequiredKeysAndDefaultsActor() {
         RiskGovernanceApplicationService service = new RiskGovernanceApplicationService();

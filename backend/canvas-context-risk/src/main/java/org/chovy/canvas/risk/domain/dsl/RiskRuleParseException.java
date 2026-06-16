@@ -5,8 +5,16 @@ package org.chovy.canvas.risk.domain.dsl;
  */
 public final class RiskRuleParseException extends RuntimeException {
 
+    /**
+     * 保存 code 对应的风控状态或配置。
+     */
     private final RiskValidationErrorCode code;
+
+    /**
+     * 保存 path 对应的风控状态或配置。
+     */
     private final String path;
+
 
     /**
      * 创建解析异常。

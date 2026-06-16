@@ -8,11 +8,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 维护MarketingForm相关的内存业务目录。
+ */
 public class MarketingFormCatalog {
 
     private final List<Map<String, Object>> forms = new ArrayList<>();
     private final List<Map<String, Object>> submissions = new ArrayList<>();
 
+    /**
+     * 创建MarketingFormCatalog实例。
+     */
     public MarketingFormCatalog() {
         forms.add(form(5001L, 7L, "lead-capture", "Lead Capture", "Capture newsletter leads",
                 "[{\"name\":\"email\",\"type\":\"email\"}]", "{\"type\":\"tag\"}", "Thanks", true, "operator-1"));
@@ -27,6 +33,9 @@ public class MarketingFormCatalog {
         submissions.add(submission(9101L, 8L, 5001L, "tenant-8", Map.of("email", "tenant8@example.com")));
     }
 
+    /**
+     * 查询forms列表。
+     */
     public synchronized List<Map<String, Object>> listForms(Long tenantId) {
         return forms.stream()
                 .filter(row -> Objects.equals(row.get("tenantId"), tenantId))
@@ -35,10 +44,16 @@ public class MarketingFormCatalog {
                 .toList();
     }
 
+    /**
+     * 返回form字段值。
+     */
     public synchronized Map<String, Object> getForm(Long tenantId, Long id) {
         return copy(requireForm(tenantId, id));
     }
 
+    /**
+     * 创建form业务对象。
+     */
     public synchronized Map<String, Object> createForm(Long tenantId, Map<String, Object> payload, String actor) {
         String name = string(payload, "name", null);
         if (name == null) {
@@ -60,6 +75,9 @@ public class MarketingFormCatalog {
         return copy(form);
     }
 
+    /**
+     * 更新form业务对象。
+     */
     public synchronized Map<String, Object> updateForm(Long tenantId, Long id, Map<String, Object> payload,
                                                        String actor) {
         Map<String, Object> form = requireForm(tenantId, id);
@@ -88,6 +106,9 @@ public class MarketingFormCatalog {
         return copy(form);
     }
 
+    /**
+     * 设置status字段值。
+     */
     public synchronized Map<String, Object> setStatus(Long tenantId, Long id, Map<String, Object> payload,
                                                       String actor) {
         Map<String, Object> form = requireForm(tenantId, id);
@@ -99,6 +120,9 @@ public class MarketingFormCatalog {
         return copy(form);
     }
 
+    /**
+     * 执行submissions业务操作。
+     */
     public synchronized List<Map<String, Object>> submissions(Long tenantId, Long formId, int limit) {
         return submissions.stream()
                 .filter(row -> Objects.equals(row.get("tenantId"), tenantId))
@@ -109,6 +133,9 @@ public class MarketingFormCatalog {
                 .toList();
     }
 
+    /**
+     * 校验并返回form必填值。
+     */
     private Map<String, Object> requireForm(Long tenantId, Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("form id is required");
@@ -120,6 +147,9 @@ public class MarketingFormCatalog {
                 .orElseThrow(() -> new IllegalArgumentException("marketing form not found: " + id));
     }
 
+    /**
+     * 执行nextId业务操作。
+     */
     private Long nextId(Long tenantId) {
         return forms.stream()
                 .filter(row -> Objects.equals(row.get("tenantId"), tenantId))
@@ -128,6 +158,9 @@ public class MarketingFormCatalog {
                 .orElse(5000L) + 1L;
     }
 
+    /**
+     * 执行form业务操作。
+     */
     private static Map<String, Object> form(Long id, Long tenantId, String publicKey, String name, String description,
                                             String fieldSchemaJson, String submitActionJson, String successMessage,
                                             boolean active, String createdBy) {
@@ -146,6 +179,9 @@ public class MarketingFormCatalog {
                 "createdAt", Instant.EPOCH.toString());
     }
 
+    /**
+     * 执行submission业务操作。
+     */
     private static Map<String, Object> submission(Long id, Long tenantId, Long formId, String anonymousId,
                                                   Map<String, Object> response) {
         return ordered(
@@ -157,12 +193,18 @@ public class MarketingFormCatalog {
                 "submittedAt", Instant.EPOCH.toString());
     }
 
+    /**
+     * 执行putIfPresent业务操作。
+     */
     private static void putIfPresent(Map<String, Object> target, Map<String, Object> payload, String key) {
         if (payload.containsKey(key)) {
             target.put(key, payload.get(key));
         }
     }
 
+    /**
+     * 执行string业务操作。
+     */
     private static String string(Map<String, Object> payload, String key, String fallback) {
         Object value = payload.get(key);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -171,6 +213,9 @@ public class MarketingFormCatalog {
         return String.valueOf(value).trim();
     }
 
+    /**
+     * 执行booleanValue业务操作。
+     */
     private static boolean booleanValue(Object value, boolean fallback) {
         if (value == null) {
             return fallback;
@@ -181,6 +226,9 @@ public class MarketingFormCatalog {
         return Boolean.parseBoolean(String.valueOf(value));
     }
 
+    /**
+     * 执行validateJson业务操作。
+     */
     private static void validateJson(String field, String value) {
         if (value == null) {
             return;
@@ -192,10 +240,16 @@ public class MarketingFormCatalog {
         }
     }
 
+    /**
+     * 执行copy业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }
 
+    /**
+     * 执行ordered业务操作。
+     */
     private static Map<String, Object> ordered(Object... pairs) {
         Map<String, Object> result = new LinkedHashMap<>();
         for (int i = 0; i < pairs.length; i += 2) {

@@ -5,7 +5,13 @@ package org.chovy.canvas.risk.domain.dsl;
  */
 public interface RiskRuleJsonCodec {
 
+    /**
+     * 执行 readTree 相关的风控处理逻辑。
+     */
     RiskRuleJsonNode readTree(String json);
 
+    /**
+     * 执行 writeCanonical 相关的风控处理逻辑。
+     */
     String writeCanonical(Object value);
 }

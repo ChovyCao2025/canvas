@@ -9,7 +9,11 @@ import java.util.Objects;
  */
 public class RiskRuleParser {
 
+    /**
+     * 保存 jsonCodec 对应的风控状态或配置。
+     */
     private final RiskRuleJsonCodec jsonCodec;
+
 
     /**
      * 使用指定 JSON 边界构造解析器。

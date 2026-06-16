@@ -20,50 +20,62 @@ public class RiskRuleHitDO {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+
     /**
      * 规则命中所属租户。
      */
     private Long tenantId;
+
     /**
      * 产生该命中的风控决策执行记录 ID。
      */
     private Long decisionRunId;
+
     /**
      * 命中时使用的策略键。
      */
     private String strategyKey;
+
     /**
      * 命中时使用的策略版本号。
      */
     private Integer strategyVersion;
+
     /**
      * 命中规则所在的规则组键。
      */
     private String groupKey;
+
     /**
      * 规则组内的规则键。
      */
     private String ruleKey;
+
     /**
      * 规则评估时的运行模式。
      */
     private String mode;
+
     /**
      * 命中规则贡献的决策动作。
      */
     private String action;
+
     /**
      * 命中规则贡献的风险分增量。
      */
     private Integer scoreDelta;
+
     /**
      * 命中规则输出的原因码。
      */
     private String reasonCode;
+
     /**
      * 序列化后的命中证据，用于追踪和调查页面。
      */
     private String evidenceJson;
+
     /**
      * 规则命中记录创建时间。
      */

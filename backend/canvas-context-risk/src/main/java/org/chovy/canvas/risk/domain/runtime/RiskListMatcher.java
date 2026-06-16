@@ -9,9 +9,21 @@ import java.util.Objects;
  */
 public class RiskListMatcher {
 
+    /**
+     * 保存 repository 对应的风控状态或配置。
+     */
     private final RiskListEntryRepository repository;
+
+    /**
+     * 保存 hasher 对应的风控状态或配置。
+     */
     private final RiskSubjectHasher hasher;
+
+    /**
+     * 保存 clock 对应的风控状态或配置。
+     */
     private final Clock clock;
+
 
     /**
      * 创建名单匹配器，时钟为空时使用 UTC 系统时钟。

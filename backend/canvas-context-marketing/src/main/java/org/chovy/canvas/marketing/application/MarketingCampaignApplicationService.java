@@ -28,13 +28,30 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * 编排MarketingCampaign相关的应用层用例。
+ */
 @Service
 public class MarketingCampaignApplicationService implements MarketingCampaignFacade {
 
+    /**
+     * 用于读写营销活动聚合的仓储。
+     */
     private final MarketingCampaignRepository repository;
+
+    /**
+     * 用于评估活动上线准备度的领域策略。
+     */
     private final MarketingCampaignReadinessPolicy readinessPolicy;
+
+    /**
+     * 用于生成确定性业务时间的时钟。
+     */
     private final Clock clock;
 
+    /**
+     * 创建MarketingCampaignApplicationService实例。
+     */
     public MarketingCampaignApplicationService(MarketingCampaignRepository repository) {
         this(repository, Clock.systemDefaultZone());
     }
@@ -45,6 +62,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
     }
 
+    /**
+     * 执行upsertCampaign业务操作。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MarketingCampaignView upsertCampaign(Long tenantId, MarketingCampaignCommand command, String actor) {
@@ -73,6 +93,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return toCampaignView(repository.save(campaign));
     }
 
+    /**
+     * 查询campaigns列表。
+     */
     @Override
     public List<MarketingCampaignView> listCampaigns(Long tenantId, String status, Integer limit) {
         Long scopedTenantId = safeTenantId(tenantId);
@@ -82,6 +105,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
                 .toList();
     }
 
+    /**
+     * 执行linkResource业务操作。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MarketingCampaignLinkView linkResource(Long tenantId, MarketingCampaignLinkCommand command, String actor) {
@@ -117,6 +143,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return toLinkView(repository.saveLink(link));
     }
 
+    /**
+     * 查询links列表。
+     */
     @Override
     public List<MarketingCampaignLinkView> listLinks(Long tenantId, Long campaignId) {
         Long scopedTenantId = safeTenantId(tenantId);
@@ -126,6 +155,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
                 .toList();
     }
 
+    /**
+     * 执行readiness业务操作。
+     */
     @Override
     public MarketingCampaignReadinessView readiness(Long tenantId, Long campaignId) {
         Long scopedTenantId = safeTenantId(tenantId);
@@ -137,6 +169,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return toReadinessView(report);
     }
 
+    /**
+     * 执行unlinkResource业务操作。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void unlinkResource(Long tenantId, Long linkId) {
@@ -149,6 +184,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         repository.deleteLink(scopedTenantId, requiredLinkId);
     }
 
+    /**
+     * 执行campaign业务操作。
+     */
     private MarketingCampaign campaign(Long tenantId, Long campaignId) {
         MarketingCampaign campaign = repository.findById(tenantId, requiredId(campaignId, "campaignId"));
         if (campaign == null) {
@@ -157,6 +195,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return campaign;
     }
 
+    /**
+     * 转换为campaignView对象。
+     */
     private MarketingCampaignView toCampaignView(MarketingCampaign campaign) {
         return new MarketingCampaignView(
                 campaign.id(),
@@ -178,6 +219,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
                 campaign.updatedAt());
     }
 
+    /**
+     * 转换为linkView对象。
+     */
     private MarketingCampaignLinkView toLinkView(MarketingCampaignLink link) {
         return new MarketingCampaignLinkView(
                 link.id(),
@@ -198,6 +242,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
                 link.updatedAt());
     }
 
+    /**
+     * 转换为readinessView对象。
+     */
     private MarketingCampaignReadinessView toReadinessView(MarketingCampaignReadinessReport report) {
         return new MarketingCampaignReadinessView(
                 report.tenantId(),
@@ -216,6 +263,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
                 report.links().stream().map(this::toLinkView).toList());
     }
 
+    /**
+     * 转换为finding对象。
+     */
     private MarketingCampaignReadinessFinding toFinding(MarketingCampaignReadinessIssue issue) {
         return new MarketingCampaignReadinessFinding(
                 issue.severity(),
@@ -226,10 +276,16 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
                 issue.route());
     }
 
+    /**
+     * 执行safeTenantId业务操作。
+     */
     private static Long safeTenantId(Long tenantId) {
         return tenantId == null || tenantId < 0 ? 0L : tenantId;
     }
 
+    /**
+     * 校验并返回dId必填值。
+     */
     private static Long requiredId(Long value, String field) {
         if (value == null || value <= 0) {
             throw new IllegalArgumentException(field + " is required");
@@ -237,6 +293,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return value;
     }
 
+    /**
+     * 校验并返回d必填值。
+     */
     private static String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -244,21 +303,33 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return value.trim();
     }
 
+    /**
+     * 规范化upper输入值。
+     */
     private static String normalizeUpper(String value, String fallback) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? fallback : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化optionalUpper输入值。
+     */
     private static String normalizeOptionalUpper(String value) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? null : trimmed.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 执行defaultString业务操作。
+     */
     private static String defaultString(String value, String fallback) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.isBlank() ? fallback : trimmed;
     }
 
+    /**
+     * 执行trimToLimit业务操作。
+     */
     private static String trimToLimit(String value, int limit) {
         if (value == null) {
             return null;
@@ -270,6 +341,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return trimmed.length() <= limit ? trimmed : trimmed.substring(0, limit);
     }
 
+    /**
+     * 规范化dLimit输入值。
+     */
     private static int normalizedLimit(Integer limit) {
         if (limit == null) {
             return 50;
@@ -277,6 +351,9 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
         return Math.max(1, Math.min(limit, 200));
     }
 
+    /**
+     * 执行safeMap业务操作。
+     */
     private static Map<String, Object> safeMap(Map<String, Object> value) {
         if (value == null || value.isEmpty()) {
             return Map.of();

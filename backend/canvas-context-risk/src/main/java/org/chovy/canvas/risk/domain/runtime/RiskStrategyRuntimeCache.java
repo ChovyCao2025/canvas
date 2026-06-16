@@ -8,8 +8,12 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class RiskStrategyRuntimeCache {
 
+    /**
+     * 保存 compiler 对应的风控状态或配置。
+     */
     private final RiskStrategyCompiler compiler;
     private final ConcurrentMap<String, RiskCompiledStrategy> cache = new ConcurrentHashMap<>();
+
 
     /**
      * 创建运行时缓存。

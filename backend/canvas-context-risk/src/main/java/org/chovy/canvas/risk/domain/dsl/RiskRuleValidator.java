@@ -10,11 +10,27 @@ import java.util.Optional;
  */
 public class RiskRuleValidator {
 
+    /**
+     * 保存 MAX_DEPTH 对应的风控状态或配置。
+     */
     private static final int MAX_DEPTH = 5;
+
+    /**
+     * 保存 MAX_CONDITIONS 对应的风控状态或配置。
+     */
     private static final int MAX_CONDITIONS = 100;
 
+
+    /**
+     * 保存 factorCatalog 对应的风控状态或配置。
+     */
     private final RiskFactorCatalog factorCatalog;
+
+    /**
+     * 保存 listCatalog 对应的风控状态或配置。
+     */
     private final RiskListCatalog listCatalog;
+
 
     /**
      * 构造规则校验器，缺失目录时使用空目录以便返回明确的未知特征/名单错误。
@@ -216,6 +232,9 @@ public class RiskRuleValidator {
      * Counter 承载对应领域的业务规则、流程编排和结果转换。
      */
     private static final class Counter {
+        /**
+         * 保存 conditions 对应的风控状态或配置。
+         */
         private int conditions;
     }
 }

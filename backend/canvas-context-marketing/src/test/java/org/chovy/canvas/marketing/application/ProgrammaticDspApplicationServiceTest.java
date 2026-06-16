@@ -14,12 +14,18 @@ import java.util.Map;
 import org.chovy.canvas.marketing.api.ProgrammaticDspFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 验证ProgrammaticDspApplicationService的关键兼容行为。
+ */
 class ProgrammaticDspApplicationServiceTest {
 
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-14T03:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证 manages programmatic dsp catalog and summary within tenant 场景的兼容行为。
+     */
     @Test
     void managesProgrammaticDspCatalogAndSummaryWithinTenant() {
         ProgrammaticDspFacade service = new ProgrammaticDspApplicationService(CLOCK);
@@ -77,6 +83,9 @@ class ProgrammaticDspApplicationServiceTest {
         assertThat(service.summary(8L, Map.of())).containsEntry("seatCount", 0);
     }
 
+    /**
+     * 验证 mutation lifecycle is deterministic and scoped 场景的兼容行为。
+     */
     @Test
     void mutationLifecycleIsDeterministicAndScoped() {
         ProgrammaticDspFacade service = new ProgrammaticDspApplicationService(CLOCK);
@@ -113,6 +122,9 @@ class ProgrammaticDspApplicationServiceTest {
         assertThat(service.listMutations(8L, Map.of("limit", 10))).isEmpty();
     }
 
+    /**
+     * 验证 defaults validation and query normalization follow compatibility rules 场景的兼容行为。
+     */
     @Test
     void defaultsValidationAndQueryNormalizationFollowCompatibilityRules() {
         ProgrammaticDspFacade service = new ProgrammaticDspApplicationService(CLOCK);

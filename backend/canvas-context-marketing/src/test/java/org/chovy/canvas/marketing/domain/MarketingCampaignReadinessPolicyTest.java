@@ -12,6 +12,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 验证MarketingCampaignReadinessPolicy的关键兼容行为。
+ */
 class MarketingCampaignReadinessPolicyTest {
 
     private static final Clock CLOCK = Clock.fixed(
@@ -20,6 +23,9 @@ class MarketingCampaignReadinessPolicyTest {
 
     private final MarketingCampaignReadinessPolicy policy = new MarketingCampaignReadinessPolicy();
 
+    /**
+     * 验证 blocks inactive campaign with no launch dependencies 场景的兼容行为。
+     */
     @Test
     void blocksInactiveCampaignWithNoLaunchDependencies() {
         MarketingCampaignReadinessReport report = policy.evaluate(campaign(CampaignStatus.DRAFT), List.of(), CLOCK);
@@ -37,6 +43,9 @@ class MarketingCampaignReadinessPolicyTest {
                         "measurement-dependency");
     }
 
+    /**
+     * 验证 blocks required resources that are not active 场景的兼容行为。
+     */
     @Test
     void blocksRequiredResourcesThatAreNotActive() {
         MarketingCampaignReadinessReport report = policy.evaluate(campaign(CampaignStatus.ACTIVE), List.of(
@@ -54,6 +63,9 @@ class MarketingCampaignReadinessPolicyTest {
                 });
     }
 
+    /**
+     * 验证 reports ready when primary and measurement dependencies are active 场景的兼容行为。
+     */
     @Test
     void reportsReadyWhenPrimaryAndMeasurementDependenciesAreActive() {
         MarketingCampaignReadinessReport report = policy.evaluate(campaign(CampaignStatus.ACTIVE), List.of(
@@ -66,6 +78,9 @@ class MarketingCampaignReadinessPolicyTest {
         assertThat(report.warningCount()).isZero();
     }
 
+    /**
+     * 验证 reports degraded when only optional links need triage 场景的兼容行为。
+     */
     @Test
     void reportsDegradedWhenOnlyOptionalLinksNeedTriage() {
         MarketingCampaignReadinessReport report = policy.evaluate(campaign(CampaignStatus.ACTIVE), List.of(
@@ -80,6 +95,9 @@ class MarketingCampaignReadinessPolicyTest {
                 .satisfies(finding -> assertThat(finding.itemType()).isEqualTo("OPTIONAL_RESOURCE_LINK"));
     }
 
+    /**
+     * 执行campaign业务操作。
+     */
     private static MarketingCampaign campaign(CampaignStatus status) {
         return new MarketingCampaign(
                 10L,
@@ -99,6 +117,9 @@ class MarketingCampaignReadinessPolicyTest {
                 LocalDateTime.parse("2026-06-01T00:00:00"));
     }
 
+    /**
+     * 执行link业务操作。
+     */
     private static MarketingCampaignLink link(Long id,
                                               String type,
                                               String key,

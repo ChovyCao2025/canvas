@@ -34,8 +34,14 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 定义 RiskDecisionApplicationServiceTest 的风控模块职责和数据契约。
+ */
 class RiskDecisionApplicationServiceTest {
 
+    /**
+     * 执行 evaluateMapsCommandToDomainDecisionView 相关的风控处理逻辑。
+     */
     @Test
     void evaluateMapsCommandToDomainDecisionView() {
         RiskDecisionApplicationService service = new RiskDecisionApplicationService(domainService());
@@ -57,6 +63,9 @@ class RiskDecisionApplicationServiceTest {
         assertThat(view.matchedRules()).containsExactly("velocity:score-high");
     }
 
+    /**
+     * 执行 domainService 相关的风控处理逻辑。
+     */
     private RiskDecisionService domainService() {
         RiskCompiledStrategy strategy = new RiskCompiledStrategy(
                 "MARKETING_BENEFIT_ISSUE",
@@ -85,6 +94,9 @@ class RiskDecisionApplicationServiceTest {
                 Clock.fixed(Instant.parse("2026-06-08T10:00:00Z"), ZoneOffset.UTC));
     }
 
+    /**
+     * 执行 map 相关的风控处理逻辑。
+     */
     private static Map<String, Object> map(Object... pairs) {
         Map<String, Object> result = new LinkedHashMap<>();
         for (int index = 0; index < pairs.length; index += 2) {
@@ -93,9 +105,16 @@ class RiskDecisionApplicationServiceTest {
         return result;
     }
 
+    /**
+     * 定义 FakeLedger 的风控模块职责和数据契约。
+     */
     private static final class FakeLedger implements RiskDecisionLedger {
         private final List<RiskDecisionRunRecord> savedRuns = new ArrayList<>();
 
+
+        /**
+         * 执行 findByRequest 相关的风控处理逻辑。
+         */
         @Override
         public Optional<RiskDecisionRunRecord> findByRequest(Long tenantId, String requestId) {
             return savedRuns.stream()
@@ -103,6 +122,9 @@ class RiskDecisionApplicationServiceTest {
                     .findFirst();
         }
 
+        /**
+         * 执行 saveRun 相关的风控处理逻辑。
+         */
         @Override
         public RiskDecisionRunRecord saveRun(RiskDecisionRunRecord run) {
             RiskDecisionRunRecord saved = run.withDecisionRunId("rd-" + (savedRuns.size() + 1));
@@ -110,6 +132,9 @@ class RiskDecisionApplicationServiceTest {
             return saved;
         }
 
+        /**
+         * 执行 saveRuleHits 相关的风控处理逻辑。
+         */
         @Override
         public void saveRuleHits(String decisionRunId, List<RiskDecisionRuleHit> hits) {
         }

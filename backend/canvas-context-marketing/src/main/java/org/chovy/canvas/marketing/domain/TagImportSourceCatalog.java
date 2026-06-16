@@ -8,19 +8,35 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 维护TagImportSource相关的内存业务目录。
+ */
 public class TagImportSourceCatalog {
 
+    /**
+     * 保存SOURCE_TYPE字段值。
+     */
     private static final String SOURCE_TYPE = "API_PULL";
 
     private final List<SourceState> sources = new ArrayList<>();
+
+    /**
+     * 下一个可分配的内存标识。
+     */
     private long nextId = 1L;
 
+    /**
+     * 创建TagImportSourceCatalog实例。
+     */
     public TagImportSourceCatalog() {
         seed(7L, 7001L, "Default CRM Source", 1);
         seed(7L, 7002L, "Disabled CDP Source", 0);
         seed(8L, 7001L, "Tenant 8 CRM Source", 1);
     }
 
+    /**
+     * 查询sources列表。
+     */
     public synchronized Map<String, Object> listSources(Long tenantId, Integer enabled) {
         List<Map<String, Object>> rows = sources.stream()
                 .filter(source -> Objects.equals(source.tenantId, tenantId))
@@ -31,12 +47,18 @@ public class TagImportSourceCatalog {
         return Map.of("total", (long) rows.size(), "list", rows);
     }
 
+    /**
+     * 创建source业务对象。
+     */
     public synchronized Map<String, Object> createSource(Long tenantId, Map<String, Object> payload, String actor) {
         SourceState source = SourceState.from(tenantId, nextAvailableId(), requirePayload(payload), actor);
         sources.add(source);
         return source.toMap();
     }
 
+    /**
+     * 更新source业务对象。
+     */
     public synchronized Map<String, Object> updateSource(Long tenantId, Long id, Map<String, Object> payload,
                                                          String actor) {
         SourceState source = findRequired(tenantId, id);
@@ -44,11 +66,17 @@ public class TagImportSourceCatalog {
         return source.toMap();
     }
 
+    /**
+     * 删除或停用source业务对象。
+     */
     public synchronized void deleteSource(Long tenantId, Long id) {
         SourceState source = findRequired(tenantId, id);
         sources.remove(source);
     }
 
+    /**
+     * 执行runSource业务操作。
+     */
     public synchronized Map<String, Object> runSource(Long tenantId, Long id) {
         SourceState source = findRequired(tenantId, id);
         if (!Objects.equals(source.enabled, 1)) {
@@ -57,6 +85,9 @@ public class TagImportSourceCatalog {
         return Map.of("batchId", 1L, "status", "SUCCESS", "totalRows", 2, "successRows", 2, "failedRows", 0);
     }
 
+    /**
+     * 查找required业务对象。
+     */
     private SourceState findRequired(Long tenantId, Long id) {
         return sources.stream()
                 .filter(source -> Objects.equals(source.tenantId, tenantId))
@@ -65,6 +96,9 @@ public class TagImportSourceCatalog {
                 .orElseThrow(() -> new IllegalArgumentException("tag import source not found: " + id));
     }
 
+    /**
+     * 执行seed业务操作。
+     */
     private void seed(Long tenantId, Long id, String name, int enabled) {
         SourceState source = new SourceState(tenantId, id);
         source.name = name;
@@ -84,6 +118,9 @@ public class TagImportSourceCatalog {
         nextId = Math.max(nextId, id + 1);
     }
 
+    /**
+     * 执行nextAvailableId业务操作。
+     */
     private long nextAvailableId() {
         while (containsId(nextId)) {
             nextId++;
@@ -91,10 +128,16 @@ public class TagImportSourceCatalog {
         return nextId++;
     }
 
+    /**
+     * 执行containsId业务操作。
+     */
     private boolean containsId(Long id) {
         return sources.stream().anyMatch(source -> Objects.equals(source.id, id));
     }
 
+    /**
+     * 校验并返回payload必填值。
+     */
     private static Map<String, Object> requirePayload(Map<String, Object> payload) {
         if (payload == null) {
             throw new IllegalArgumentException("tag import source body is required");
@@ -102,6 +145,9 @@ public class TagImportSourceCatalog {
         return payload;
     }
 
+    /**
+     * 校验并返回dString必填值。
+     */
     private static String requiredString(Map<String, Object> payload, String field, String message) {
         Object value = payload.get(field);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -110,6 +156,9 @@ public class TagImportSourceCatalog {
         return String.valueOf(value).trim();
     }
 
+    /**
+     * 执行optionalString业务操作。
+     */
     private static String optionalString(Map<String, Object> payload, String field, String fallback) {
         Object value = payload.get(field);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -118,6 +167,9 @@ public class TagImportSourceCatalog {
         return String.valueOf(value).trim();
     }
 
+    /**
+     * 执行optionalInt业务操作。
+     */
     private static int optionalInt(Map<String, Object> payload, String field, int fallback) {
         Object value = payload.get(field);
         if (value == null || String.valueOf(value).isBlank()) {
@@ -129,6 +181,9 @@ public class TagImportSourceCatalog {
         return Integer.parseInt(String.valueOf(value));
     }
 
+    /**
+     * 校验并返回json必填值。
+     */
     private static void requireJson(String value) {
         String trimmed = value.trim();
         boolean objectLike = trimmed.startsWith("{") && trimmed.endsWith("}");
@@ -138,10 +193,16 @@ public class TagImportSourceCatalog {
         }
     }
 
+    /**
+     * 规范化method输入值。
+     */
     private static String normalizeMethod(String method) {
         return method.toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化recordsPath输入值。
+     */
     private static String normalizeRecordsPath(String recordsPath) {
         if ("$".equals(recordsPath) || "$.data".equals(recordsPath)) {
             return recordsPath;
@@ -149,28 +210,96 @@ public class TagImportSourceCatalog {
         throw new IllegalArgumentException("unsupported recordsPath: " + recordsPath);
     }
 
+    /**
+     * 提供SourceState的业务能力。
+     */
     private static final class SourceState {
+        /**
+         * 保存tenantId字段值。
+         */
         private final Long tenantId;
+
+        /**
+         * 保存id字段值。
+         */
         private final Long id;
+
+        /**
+         * 保存name字段值。
+         */
         private String name;
+
+        /**
+         * 保存url字段值。
+         */
         private String url;
+
+        /**
+         * 保存method字段值。
+         */
         private String method;
+
+        /**
+         * 保存headersJson字段值。
+         */
         private String headersJson;
+
+        /**
+         * 保存bodyTemplate字段值。
+         */
         private String bodyTemplate;
+
+        /**
+         * 保存pageParam字段值。
+         */
         private String pageParam;
+
+        /**
+         * 保存pageSizeParam字段值。
+         */
         private String pageSizeParam;
+
+        /**
+         * 保存pageSize字段值。
+         */
         private Integer pageSize;
+
+        /**
+         * 保存recordsPath字段值。
+         */
         private String recordsPath;
+
+        /**
+         * 保存fieldMapping字段值。
+         */
         private String fieldMapping;
+
+        /**
+         * 保存enabled字段值。
+         */
         private Integer enabled;
+
+        /**
+         * 保存createdBy字段值。
+         */
         private String createdBy;
+
+        /**
+         * 保存updatedBy字段值。
+         */
         private String updatedBy;
 
+        /**
+         * 创建SourceState实例。
+         */
         private SourceState(Long tenantId, Long id) {
             this.tenantId = tenantId;
             this.id = id;
         }
 
+        /**
+         * 根据输入创建对象。
+         */
         private static SourceState from(Long tenantId, Long id, Map<String, Object> payload, String actor) {
             SourceState source = new SourceState(tenantId, id);
             source.createdBy = actor;
@@ -178,6 +307,9 @@ public class TagImportSourceCatalog {
             return source;
         }
 
+        /**
+         * 执行apply业务操作。
+         */
         private void apply(Map<String, Object> payload, String actor) {
             name = requiredString(payload, "name", "name is required");
             url = requiredString(payload, "url", "url is required");
@@ -194,6 +326,9 @@ public class TagImportSourceCatalog {
             updatedBy = actor;
         }
 
+        /**
+         * 转换为map对象。
+         */
         private Map<String, Object> toMap() {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("tenantId", tenantId);

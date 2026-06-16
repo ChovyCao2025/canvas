@@ -8,20 +8,43 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 维护Audience相关的内存业务目录。
+ */
 public class AudienceCatalog {
 
+    /**
+     * 保存DEFAULT_SOURCE字段值。
+     */
     private static final String DEFAULT_SOURCE = "cdp_profile";
 
+    /**
+     * 用于生成确定性业务时间的时钟。
+     */
     private final Clock clock;
     private final Map<Long, Map<String, Object>> audiences = new LinkedHashMap<>();
     private final Map<Long, Map<String, Object>> stats = new LinkedHashMap<>();
+
+    /**
+     * 保存nextAudienceId字段值。
+     */
     private long nextAudienceId = 1L;
+
+    /**
+     * 保存nextTaskId字段值。
+     */
     private long nextTaskId = 1L;
 
+    /**
+     * 创建AudienceCatalog实例。
+     */
     public AudienceCatalog(Clock clock) {
         this.clock = clock;
     }
 
+    /**
+     * 查询列表。
+     */
     public synchronized Map<String, Object> list(Long tenantId, int page, int size) {
         List<Map<String, Object>> scoped = audiences.values().stream()
                 .filter(row -> tenantId.equals(row.get("tenantId")))
@@ -37,6 +60,9 @@ public class AudienceCatalog {
                 "records", new ArrayList<>(scoped.subList(from, to)));
     }
 
+    /**
+     * 执行sourceFields业务操作。
+     */
     public List<Map<String, Object>> sourceFields(String dataSourceType) {
         String source = normalizeSource(dataSourceType);
         ensureSupportedSource(source);
@@ -46,6 +72,9 @@ public class AudienceCatalog {
                 field(source, "lifetimeValue", "NUMBER", "Lifetime value"));
     }
 
+    /**
+     * 执行preview业务操作。
+     */
     public Map<String, Object> preview(Long tenantId, Map<String, Object> payload) {
         Map<String, Object> safe = safePayload(payload);
         String source = normalizeSource(text(safe.get("dataSourceType"), DEFAULT_SOURCE));
@@ -59,6 +88,9 @@ public class AudienceCatalog {
                 "sampleUserIds", userIds.stream().limit(limit).toList());
     }
 
+    /**
+     * 返回字段值。
+     */
     public synchronized Map<String, Object> get(Long tenantId, Long id) {
         Map<String, Object> audience = audiences.get(id);
         if (audience == null || !tenantId.equals(audience.get("tenantId"))) {
@@ -67,6 +99,9 @@ public class AudienceCatalog {
         return copy(audience);
     }
 
+    /**
+     * 执行ready业务操作。
+     */
     public synchronized List<Map<String, Object>> ready(Long tenantId) {
         return audiences.values().stream()
                 .filter(row -> tenantId.equals(row.get("tenantId")))
@@ -77,6 +112,9 @@ public class AudienceCatalog {
                 .toList();
     }
 
+    /**
+     * 创建业务对象。
+     */
     public synchronized Map<String, Object> create(Long tenantId, Map<String, Object> payload, String actor) {
         Map<String, Object> safe = safePayload(payload);
         String source = normalizeSource(text(safe.get("dataSourceType"), DEFAULT_SOURCE));
@@ -102,6 +140,9 @@ public class AudienceCatalog {
         return copy(audience);
     }
 
+    /**
+     * 更新业务对象。
+     */
     public synchronized Map<String, Object> update(Long tenantId, Long id, Map<String, Object> payload, String actor) {
         Map<String, Object> audience = requireAudience(tenantId, id);
         Map<String, Object> safe = safePayload(payload);
@@ -131,6 +172,9 @@ public class AudienceCatalog {
         return copy(audience);
     }
 
+    /**
+     * 删除或停用业务对象。
+     */
     public synchronized Map<String, Object> delete(Long tenantId, Long id) {
         requireAudience(tenantId, id);
         audiences.remove(id);
@@ -138,6 +182,9 @@ public class AudienceCatalog {
         return mapOf("tenantId", tenantId, "audienceId", id, "deleted", true);
     }
 
+    /**
+     * 执行compute业务操作。
+     */
     public synchronized Map<String, Object> compute(Long tenantId, Long id, Map<String, Object> payload, String actor) {
         Map<String, Object> audience = requireAudience(tenantId, id);
         if (!Boolean.TRUE.equals(audience.get("enabled"))) {
@@ -153,11 +200,17 @@ public class AudienceCatalog {
                 "payload", safePayload(payload));
     }
 
+    /**
+     * 执行stat业务操作。
+     */
     public synchronized Map<String, Object> stat(Long tenantId, Long id) {
         requireAudience(tenantId, id);
         return copy(stats.get(id));
     }
 
+    /**
+     * 校验并返回audience必填值。
+     */
     private Map<String, Object> requireAudience(Long tenantId, Long id) {
         Map<String, Object> audience = audiences.get(id);
         if (audience == null || !tenantId.equals(audience.get("tenantId"))) {
@@ -166,6 +219,9 @@ public class AudienceCatalog {
         return audience;
     }
 
+    /**
+     * 执行statRow业务操作。
+     */
     private Map<String, Object> statRow(Long tenantId, Long audienceId, String status, long memberCount) {
         return mapOf(
                 "tenantId", tenantId,
@@ -175,6 +231,9 @@ public class AudienceCatalog {
                 "computedAt", now());
     }
 
+    /**
+     * 执行resolveUserIds业务操作。
+     */
     private static List<String> resolveUserIds(String ruleJson) {
         if (ruleJson.toLowerCase().contains("vip")) {
             return List.of("vip-user-1", "vip-user-2", "vip-user-3");
@@ -182,20 +241,32 @@ public class AudienceCatalog {
         return List.of("user-1", "user-2", "user-3");
     }
 
+    /**
+     * 执行field业务操作。
+     */
     private static Map<String, Object> field(String source, String name, String type, String label) {
         return mapOf("dataSourceType", source, "name", name, "type", type, "label", label);
     }
 
+    /**
+     * 执行ensureSupportedSource业务操作。
+     */
     private static void ensureSupportedSource(String dataSourceType) {
         if (!DEFAULT_SOURCE.equals(dataSourceType) && !"cdp_event".equals(dataSourceType)) {
             throw new IllegalArgumentException("Unsupported CDP audience source: " + dataSourceType);
         }
     }
 
+    /**
+     * 规范化source输入值。
+     */
     private static String normalizeSource(String dataSourceType) {
         return text(dataSourceType, DEFAULT_SOURCE).trim().toLowerCase();
     }
 
+    /**
+     * 执行boolValue业务操作。
+     */
     private static boolean boolValue(Object value, boolean fallback) {
         if (value instanceof Boolean bool) {
             return bool;
@@ -206,6 +277,9 @@ public class AudienceCatalog {
         return fallback;
     }
 
+    /**
+     * 执行intValue业务操作。
+     */
     private static int intValue(Object value, int fallback) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -216,6 +290,9 @@ public class AudienceCatalog {
         return fallback;
     }
 
+    /**
+     * 执行text业务操作。
+     */
     private static String text(Object value, String fallback) {
         if (value == null) {
             return fallback;
@@ -224,18 +301,30 @@ public class AudienceCatalog {
         return text.isBlank() ? fallback : text;
     }
 
+    /**
+     * 执行safePayload业务操作。
+     */
     private static Map<String, Object> safePayload(Map<String, Object> payload) {
         return payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
     }
 
+    /**
+     * 执行copy业务操作。
+     */
     private static Map<String, Object> copy(Map<String, Object> source) {
         return new LinkedHashMap<>(source);
     }
 
+    /**
+     * 执行now业务操作。
+     */
     private String now() {
         return Instant.now(clock).toString();
     }
 
+    /**
+     * 执行mapOf业务操作。
+     */
     private static Map<String, Object> mapOf(Object... keysAndValues) {
         Map<String, Object> row = new LinkedHashMap<>();
         for (int i = 0; i < keysAndValues.length; i += 2) {

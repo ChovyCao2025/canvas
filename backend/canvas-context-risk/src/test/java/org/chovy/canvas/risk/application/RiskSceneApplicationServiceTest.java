@@ -25,13 +25,22 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 
+/**
+ * 定义 RiskSceneApplicationServiceTest 的风控模块职责和数据契约。
+ */
 class RiskSceneApplicationServiceTest {
 
+    /**
+     * 执行 initMyBatisPlusTableInfo 相关的风控处理逻辑。
+     */
     @BeforeAll
     static void initMyBatisPlusTableInfo() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), RiskSceneDO.class);
     }
 
+    /**
+     * 执行 listScenesSeedsDeterministicDefaultCatalogWhenRepositoryIsEmpty 相关的风控处理逻辑。
+     */
     @Test
     void listScenesSeedsDeterministicDefaultCatalogWhenRepositoryIsEmpty() {
         FakeRepository repository = new FakeRepository();
@@ -88,6 +97,9 @@ class RiskSceneApplicationServiceTest {
                 .containsExactlyElementsOf(scenes.stream().map(RiskSceneView::sceneKey).toList());
     }
 
+    /**
+     * 执行 listScenesReturnsRepositoryCatalogWithoutSeedingWhenRowsExist 相关的风控处理逻辑。
+     */
     @Test
     void listScenesReturnsRepositoryCatalogWithoutSeedingWhenRowsExist() {
         FakeRepository repository = new FakeRepository();
@@ -109,6 +121,9 @@ class RiskSceneApplicationServiceTest {
         assertThat(repository.saved).isEmpty();
     }
 
+    /**
+     * 执行 mybatisRepositorySeedsRowsWithAuditTimestampsAndIgnoresDuplicateSceneKeys 相关的风控处理逻辑。
+     */
     @Test
     void mybatisRepositorySeedsRowsWithAuditTimestampsAndIgnoresDuplicateSceneKeys() {
         RiskSceneMapper mapper = mock(RiskSceneMapper.class);
@@ -135,6 +150,9 @@ class RiskSceneApplicationServiceTest {
         assertThat(row.getUpdatedAt()).isEqualTo(row.getCreatedAt());
     }
 
+    /**
+     * 执行 mybatisRepositoryListsOnlyActiveScenesForTenant 相关的风控处理逻辑。
+     */
     @Test
     void mybatisRepositoryListsOnlyActiveScenesForTenant() {
         RiskSceneMapper mapper = mock(RiskSceneMapper.class);
@@ -151,15 +169,25 @@ class RiskSceneApplicationServiceTest {
                 .contains(42L, "ACTIVE");
     }
 
+    /**
+     * 定义 FakeRepository 的风控模块职责和数据契约。
+     */
     private static final class FakeRepository implements RiskSceneRepository {
         private List<RiskSceneView> rows = List.of();
         private final List<RiskSceneView> saved = new ArrayList<>();
 
+
+        /**
+         * 执行 listScenes 相关的风控处理逻辑。
+         */
         @Override
         public List<RiskSceneView> listScenes(Long tenantId) {
             return rows;
         }
 
+        /**
+         * 执行 saveAll 相关的风控处理逻辑。
+         */
         @Override
         public void saveAll(List<RiskSceneView> scenes) {
             saved.addAll(scenes);
@@ -167,6 +195,9 @@ class RiskSceneApplicationServiceTest {
         }
     }
 
+    /**
+     * 执行 scene 相关的风控处理逻辑。
+     */
     private static RiskSceneView scene(
             Long tenantId,
             String sceneKey,
