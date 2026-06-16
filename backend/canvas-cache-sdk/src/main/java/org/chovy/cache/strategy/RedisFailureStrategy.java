@@ -7,8 +7,12 @@ package org.chovy.cache.strategy;
  * <p>策略化处理可以避免缓存故障直接扩大为业务故障。
  */
 public enum RedisFailureStrategy {
-    /** Redis 故障时降级到后续缓存或加载链路。 */
+    /**
+     * Redis 故障时降级到后续缓存或加载链路。
+     */
     FALLTHROUGH,
-    /** Redis 故障时立即向调用方抛出异常。 */
+    /**
+     * Redis 故障时立即向调用方抛出异常。
+     */
     FAIL_FAST
 }

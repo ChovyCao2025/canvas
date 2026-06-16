@@ -23,61 +23,144 @@ import java.util.function.Function;
  * <p>build 后得到可直接注册到 TieredCacheManager 的缓存实例。
  */
 public class TieredCacheBuilder<K, V> {
-    /** 缓存实例名称。 */
+    /**
+     * 缓存实例名称。
+     */
     private String name;
-    /** 一级本地缓存最大条目数。 */
+
+    /**
+     * 一级本地缓存最大条目数。
+     */
     private int l1MaxSize = 1000;
-    /** 一级缓存写入后的刷新间隔。 */
+
+    /**
+     * 一级缓存写入后的刷新间隔。
+     */
     private Duration l1RefreshAfterWrite = Duration.ofHours(1);
-    /** 二级 Redis 缓存键前缀。 */
+
+    /**
+     * 二级 Redis 缓存键前缀。
+     */
     private String l2KeyPrefix = "cache:";
-    /** 二级 Redis 缓存默认过期时间。 */
+
+    /**
+     * 二级 Redis 缓存默认过期时间。
+     */
     private Duration l2Ttl = Duration.ofHours(24);
-    /** 二级缓存过期时间抖动比例。 */
+
+    /**
+     * 二级缓存过期时间抖动比例。
+     */
     private double l2TtlJitter = 0.1;
-    /** 缓存键结构版本号。 */
+
+    /**
+     * 缓存键结构版本号。
+     */
     private int keySchemaVersion = 1;
-    /** 空对象占位值过期时间。 */
+
+    /**
+     * 空对象占位值过期时间。
+     */
     private Duration nullValueTtl = Duration.ofMinutes(1);
-    /** 空集合或空结果占位值过期时间。 */
+
+    /**
+     * 空集合或空结果占位值过期时间。
+     */
     private Duration emptyValueTtl = Duration.ofMinutes(1);
-    /** 分布式加载锁过期时间。 */
+
+    /**
+     * 分布式加载锁过期时间。
+     */
     private Duration lockTtl = Duration.ofSeconds(30);
-    /** 缓存过期前提前刷新窗口。 */
+
+    /**
+     * 缓存过期前提前刷新窗口。
+     */
     private Duration refreshAhead = Duration.ZERO;
-    /** 旧值兜底可用时间。 */
+
+    /**
+     * 旧值兜底可用时间。
+     */
     private Duration staleTtl = Duration.ofMinutes(30);
-    /** 是否启用热点 key 保护。 */
+
+    /**
+     * 是否启用热点 key 保护。
+     */
     private boolean hotspotProtection = false;
-    /** 缓存穿透保护策略。 */
+
+    /**
+     * 缓存穿透保护策略。
+     */
     private PenetrationProtectionStrategy penetration = PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL;
-    /** 缓存击穿保护策略。 */
+
+    /**
+     * 缓存击穿保护策略。
+     */
     private BreakdownProtectionStrategy breakdown = BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT;
-    /** 缓存雪崩保护策略。 */
+
+    /**
+     * 缓存雪崩保护策略。
+     */
     private AvalancheProtectionStrategy avalanche = AvalancheProtectionStrategy.TTL_JITTER;
-    /** 缓存 key 合法性校验器。 */
+
+    /**
+     * 缓存 key 合法性校验器。
+     */
     private Predicate<K> keyValidator = key -> true;
-    /** 用于拦截不存在 key 的布隆过滤器。 */
+
+    /**
+     * 用于拦截不存在 key 的布隆过滤器。
+     */
     private CacheBloomFilter<K> bloomFilter;
-    /** 数据加载器失败时的处理策略。 */
+
+    /**
+     * 数据加载器失败时的处理策略。
+     */
     private LoaderFailureStrategy loaderFailure = LoaderFailureStrategy.THROW;
-    /** Redis 读取失败时的处理策略。 */
+
+    /**
+     * Redis 读取失败时的处理策略。
+     */
     private RedisFailureStrategy redisReadFailure = RedisFailureStrategy.FALLTHROUGH;
-    /** Redis 写入失败时的处理策略。 */
+
+    /**
+     * Redis 写入失败时的处理策略。
+     */
     private RedisFailureStrategy redisWriteFailure = RedisFailureStrategy.FALLTHROUGH;
-    /** Redis 值反序列化失败时的处理策略。 */
+
+    /**
+     * Redis 值反序列化失败时的处理策略。
+     */
     private DeserializeFailureStrategy deserializeFailure = DeserializeFailureStrategy.FALLTHROUGH_TO_L3;
-    /** L3 数据加载函数。 */
+
+    /**
+     * L3 数据加载函数。
+     */
     private Function<K, V> loader;
-    /** 缓存值的 Jackson JavaType。 */
+
+    /**
+     * 缓存值的 Jackson JavaType。
+     */
     private JavaType valueJavaType;
-    /** 调用方显式配置的缓存值类型。 */
+
+    /**
+     * 调用方显式配置的缓存值类型。
+     */
     private Type configuredValueType;
-    /** 缓存值序列化与反序列化使用的 ObjectMapper。 */
+
+    /**
+     * 缓存值序列化与反序列化使用的 ObjectMapper。
+     */
     private ObjectMapper objectMapper = new ObjectMapper();
-    /** 是否注册并上报缓存指标。 */
+
+    /**
+     * 是否注册并上报缓存指标。
+     */
     private boolean enableMetrics = true;
-    /** 缓存指标注册表。 */
+
+    /**
+     * 缓存指标注册表。
+     */
     private MeterRegistry meterRegistry;
 
     /**
@@ -222,6 +305,7 @@ public class TieredCacheBuilder<K, V> {
         }
         return this;
     }
+
     /**
      * 设置缓存穿透保护策略。
      *
