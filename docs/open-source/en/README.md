@@ -5,8 +5,7 @@ want a visual, reviewable, and extensible way to operate customer journeys.
 
 Use these English-facing docs as the public entry point while the root README is
 managed by the release coordinator. They summarize the current open-source
-surface without claiming that backend public extension or write APIs are stable
-before the G10 gate.
+surface without claiming publish or runtime marketplace readiness.
 
 ## Start Here
 
@@ -24,7 +23,7 @@ before the G10 gate.
 - Local development stack with Java 21, Spring Boot, React, Vite, MySQL, Redis,
   RocketMQ, and WireMock.
 - Template catalog documentation for ten journey scenarios.
-- Local-only Canvas DSL validation and diff examples.
+- Canvas DSL validation, diff, and G10 import/export preview examples.
 - Contract documents for plugin manifests, template packs, Canvas DSL, node
   handlers, demo profile behavior, and AI operators.
 - Community files and guardrails being prepared for a public open-source
@@ -32,7 +31,9 @@ before the G10 gate.
 
 ## Important Caveats
 
-- Backend public extension and write APIs remain gated by G10.
+- G10 import/export preview is unlocked for Canvas DSL. Publish remains gated
+  until a stable backend publish endpoint is verified by current final-module
+  tests.
 - The project is not claiming production runtime plugin marketplace readiness.
 - The final public license status must be confirmed by the coordinator before a
   release post is published.

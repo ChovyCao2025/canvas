@@ -99,6 +99,8 @@
 ### Java 注释规范
 - [java-commenting/README.md](./java-commenting/README.md) — Java 全量注释规范、goal 写法、字段/方法 Javadoc 格式和行为不变护栏
 - [java-commenting/subagent-packets.md](./java-commenting/subagent-packets.md) — 按 Maven 模块和包拆分的 Java 注释子代理执行包模板
+- [prompt/java-commenting-worktree-window-prompts.md](./prompt/java-commenting-worktree-window-prompts.md) — 基于 git worktree 的多窗口 Java 注释执行提示词和断点续跑流程
+- [prompt/java-commenting-progress-template.md](./prompt/java-commenting-progress-template.md) — 每个 worktree/window 的断点续跑进度记录模板
 
 ### 深度代码审计（13 轮）
 - [code-review/deep-code-audit-all-rounds-summary.md](./code-review/deep-code-audit-all-rounds-summary.md) — 13 轮完整汇总：覆盖 7 大维度

@@ -46,10 +46,13 @@ export interface PublicMarketingForm {
   description?: string | null
 
   /** 表单状态。 */
-  status: string
+  status?: string
 
   /** 字段 schema JSON 字符串。 */
-  fieldSchemaJson: string
+  fieldSchemaJson?: string
+
+  /** 首次运行公开目录返回的字段 schema，可为字段 key 数组或字段对象数组。 */
+  fieldSchema?: unknown
 
   /** 提交成功提示文案。 */
   successMessage?: string | null

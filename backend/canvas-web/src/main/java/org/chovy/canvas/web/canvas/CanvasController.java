@@ -7,6 +7,7 @@ import org.chovy.canvas.canvas.application.CanvasCompatibilityApplicationService
 import org.chovy.canvas.canvas.application.CanvasPublishApplicationService;
 import org.chovy.canvas.canvas.application.CanvasVersionApplicationService;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,7 @@ public class CanvasController {
         this(versionService, publishService, new CanvasCompatibilityApplicationService());
     }
 
+    @Autowired
     public CanvasController(CanvasVersionApplicationService versionService,
                             CanvasPublishApplicationService publishService,
                             CanvasCompatibilityApplicationService compatibilityService) {

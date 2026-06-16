@@ -8,14 +8,8 @@ import java.util.Map;
 import org.chovy.canvas.execution.api.ExecutionRerunFacade;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 ExecutionRerunApplicationServiceTest 的执行上下文数据结构或业务契约。
- */
 class ExecutionRerunApplicationServiceTest {
 
-    /**
-     * 执行 rerunCreatesSuccessfulAuditAndReturnsExecutionPayload 对应的业务处理。
-     */
     @Test
     void rerunCreatesSuccessfulAuditAndReturnsExecutionPayload() {
         ExecutionRerunFacade service = new ExecutionRerunApplicationService();
@@ -41,9 +35,6 @@ class ExecutionRerunApplicationServiceTest {
                 .returns("SUCCESS", ExecutionRerunFacade.AuditRow::status);
     }
 
-    /**
-     * 执行 auditsAreTenantScopedFilteredAndNewestFirst 对应的业务处理。
-     */
     @Test
     void auditsAreTenantScopedFilteredAndNewestFirst() {
         ExecutionRerunFacade service = new ExecutionRerunApplicationService();
@@ -67,9 +58,6 @@ class ExecutionRerunApplicationServiceTest {
                 .returns("SKIP_SIDE_EFFECTS", ExecutionRerunFacade.AuditRow::mode);
     }
 
-    /**
-     * 执行 validationMatchesLegacyBusinessRules 对应的业务处理。
-     */
     @Test
     void validationMatchesLegacyBusinessRules() {
         ExecutionRerunFacade service = new ExecutionRerunApplicationService();

@@ -33,7 +33,7 @@ npm run test
 npm run test:watch
 ```
 
-Use Java 21, Maven 3.9+, Node.js 18+, and Docker 24+. The Vite dev server runs on `:3000` and proxies API routes to the backend on `:8080`.
+Use Java 21, Maven 3.9+, Node.js 20.19+ or 22.12+, and Docker 24+. The Vite dev server runs on `:3000` and proxies API routes to the backend on `:8080`.
 
 ## Coding Style & Naming Conventions
 

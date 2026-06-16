@@ -2,16 +2,6 @@ package org.chovy.canvas.execution.adapter.messaging;
 
 import java.util.Map;
 
-/**
- * 定义 MqTriggerMessage 的执行上下文数据结构或业务契约。
- * @param tenantId tenantId 对应的数据字段
- * @param canvasId canvasId 对应的数据字段
- * @param versionId versionId 对应的数据字段
- * @param triggerType triggerType 对应的数据字段
- * @param matchKey matchKey 对应的数据字段
- * @param sourceMsgId sourceMsgId 对应的数据字段
- * @param payload payload 对应的数据字段
- */
 public record MqTriggerMessage(
         Long tenantId,
         Long canvasId,

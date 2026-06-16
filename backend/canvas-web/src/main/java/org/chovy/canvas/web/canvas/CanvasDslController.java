@@ -9,6 +9,7 @@ import org.chovy.canvas.canvas.application.dsl.CanvasDslMappingService;
 import org.chovy.canvas.canvas.application.dsl.CanvasDslValidationResult;
 import org.chovy.canvas.canvas.application.dsl.CanvasDslValidator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +33,7 @@ public class CanvasDslController {
     @Autowired
     public CanvasDslController(CanvasDslValidator validator,
                                CanvasDslMappingService mapper,
+                               @Qualifier("canvasQueryApplicationService")
                                PublishedCanvasDefinitionProvider publishedCanvasDefinitionProvider) {
         this.validator = validator;
         this.mapper = mapper;

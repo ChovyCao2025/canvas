@@ -24,7 +24,10 @@ async function fixture() {
   mkdirSync(path.join(root, 'frontend/src/pages/canvas-list'), { recursive: true })
   mkdirSync(path.join(root, 'tools/canvas-cli/src'), { recursive: true })
   mkdirSync(path.join(root, 'tools/canvas-cli/test/fixtures'), { recursive: true })
+  mkdirSync(path.join(root, 'tools/open-source-growth'), { recursive: true })
   mkdirSync(path.join(root, '.github'), { recursive: true })
+  mkdirSync(path.join(root, 'backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas'), { recursive: true })
+  mkdirSync(path.join(root, 'backend/canvas-web/src/test/java/org/chovy/canvas/web/compat'), { recursive: true })
   mkdirSync(path.join(root, 'backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin'), { recursive: true })
   mkdirSync(path.join(root, 'backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler'), { recursive: true })
   mkdirSync(path.join(root, 'backend/canvas-engine/src/main/java/org/chovy/canvas/engine/template'), { recursive: true })
@@ -88,6 +91,19 @@ async function fixture() {
     'implementation-guardrails.md',
     'guardrail-verifier.mjs',
   ].join('\n'))
+  mkdirSync(path.join(root, '.github/workflows'), { recursive: true })
+  for (const workflow of ['ci.yml', 'canvas-ci.yml']) {
+    writeFileSync(path.join(root, '.github/workflows', workflow), [
+      'jobs:',
+      '  open-source-growth-guardrails:',
+      '    steps:',
+      '      - run: cd tools/canvas-cli && npm test',
+      '      - run: docker compose -f docker-compose.demo.yml config',
+      '      - run: node tools/open-source-growth/playground-runtime-smoke.mjs',
+      '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+      '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+    ].join('\n'))
+  }
   writeFileSync(path.join(root, 'docs/open-source-growth/README.md'), [
     '[open-source-growth-spec.md](./open-source-growth-spec.md)',
     '[open-source-growth-plan.md](./open-source-growth-plan.md)',
@@ -196,6 +212,54 @@ async function fixture() {
   writeFileSync(path.join(root, 'backend/canvas-engine/src/main/java/org/chovy/canvas/engine/template/TemplateRenderService.java'), 'class TemplateRenderService {}')
   writeFileSync(path.join(root, 'docs/open-source/templates/new-user-welcome.md'), 'new-user-welcome')
   writeFileSync(path.join(root, 'docs/open-source/templates/coupon-approval-release.md'), 'coupon-approval-release')
+  writeFileSync(path.join(root, 'docs/open-source/playground.md'), [
+    '# Playground',
+    '',
+    'Run the offline runtime smoke:',
+    '',
+    '```bash',
+    'node tools/open-source-growth/playground-runtime-smoke.mjs',
+    '```',
+    '',
+    'Run the optional live backend API smoke only when the backend is running:',
+    '',
+    '```bash',
+    'node tools/open-source-growth/playground-live-api-smoke.mjs --api-url http://localhost:8080',
+    '```',
+    '',
+    'Local/offline runtime smoke covers checked-in fixture and WireMock catalog coherence.',
+  ].join('\n'))
+  writeFileSync(path.join(root, 'tools/open-source-growth/playground-runtime-smoke.mjs'), 'export function verifyPlaygroundRuntimeSmoke() {}\n')
+  writeFileSync(path.join(root, 'tools/open-source-growth/playground-live-api-smoke.mjs'), [
+    'const DSL_MAP_PATH = "/canvas/dsl/map"',
+    'function validateMappingResponse(errors, responseJson) {',
+    '  if (responseJson.templateKey !== "new-user-welcome") errors.push("templateKey")',
+    '  if (typeof responseJson.graphJson !== "string") errors.push("graphJson")',
+    '  if (!Array.isArray(responseJson.violations)) errors.push("violations")',
+    '}',
+    'export function verifyPlaygroundLiveApiSmoke() {}',
+  ].join('\n'))
+  writeFileSync(path.join(root, 'tools/open-source-growth/g10-public-api-stability.mjs'), 'export function verifyG10PublicApiStability() {}\n')
+  writeFileSync(path.join(root, 'backend/canvas-web/src/main/java/org/chovy/canvas/web/canvas/CanvasDslController.java'), [
+    '@RestController',
+    '@RequestMapping("/canvas/dsl")',
+    'class CanvasDslController {',
+    '  @PostMapping("/validate") void validate() {}',
+    '  @PostMapping("/map") void map() {}',
+    '  @PostMapping("/import") void importDsl() {}',
+    '  @GetMapping("/export/{canvasId}") void exportDsl() {}',
+    '  @PostMapping("/diff") void diff() {}',
+    '}',
+  ].join('\n'))
+  writeFileSync(path.join(root, 'backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/CanvasApiCompatibilityTest.java'), [
+    'class CanvasApiCompatibilityTest {',
+    '  void validateRoute() { webClient().post().uri("/canvas/dsl/validate"); }',
+    '  void mapRoute() { webClient().post().uri("/canvas/dsl/map"); }',
+    '  void importRoute() { webClient().post().uri("/canvas/dsl/import"); }',
+    '  void exportRoute() { webClient().get().uri("/canvas/dsl/export/99"); }',
+    '  void diffRoute() { webClient().post().uri("/canvas/dsl/diff"); }',
+    '}',
+  ].join('\n'))
   writeFileSync(path.join(root, 'docker-compose.demo.yml'), [
     'services:',
     '  mysql:',
@@ -213,11 +277,13 @@ async function fixture() {
             templates: [
               {
                 key: 'new-user-welcome',
+                riskLevel: 'LOW',
                 docs: 'docs/open-source/templates/new-user-welcome.md',
                 requiredPlugins: ['canvas-plugin-webhook', 'canvas-plugin-coupon', 'canvas-plugin-message'],
               },
               {
                 key: 'coupon-approval-release',
+                riskLevel: 'HIGH',
                 docs: 'docs/open-source/templates/coupon-approval-release.md',
                 requiredPlugins: ['canvas-plugin-approval', 'canvas-plugin-coupon', 'canvas-plugin-message'],
               },
@@ -254,26 +320,49 @@ async function fixture() {
     'export const officialTemplateCatalog = [',
     '  {',
     "    key: 'new-user-welcome',",
+    "    riskLevel: 'LOW',",
     "    requiredPlugins: ['canvas-plugin-webhook', 'canvas-plugin-coupon', 'canvas-plugin-message'],",
+    "    docs: 'docs/open-source/templates/new-user-welcome.md',",
+    "    canvas: journey('new-user-welcome', '新用户欢迎旅程', { type: 'webhook', event: 'user.registered' }, [",
+    '      node(\'segment\', \'condition\', \'新客判断\', { expression: \'user.lifecycleStage == "new"\' }),',
+    "      node('coupon', 'coupon.grant', '发放首单券', { couponKey: 'WELCOME_10' }),",
+    "      node('message', 'message.send', '欢迎短信', { channel: 'sms', template: 'welcome_coupon' }),",
+    '    ], [',
+    "      edge('segment', 'coupon', true),",
+    "      edge('coupon', 'message'),",
+    '    ]),',
+    "    samplePayload: { event: 'user.registered', user: { id: 'u_1001', lifecycleStage: 'new', phone: '+8613800000001' } },",
+    '  },',
+    '  {',
+    "    key: 'coupon-approval-release',",
+    "    riskLevel: 'HIGH',",
+    "    requiredPlugins: ['canvas-plugin-approval', 'canvas-plugin-coupon', 'canvas-plugin-message'],",
+    "    docs: 'docs/open-source/templates/coupon-approval-release.md',",
     '  },',
     ']',
   ].join('\n'))
   writeFileSync(path.join(root, 'tools/canvas-cli/src/index.mjs'), [
-    "const G10_GATED_MESSAGE = 'Backend API commands are gated until G10 public extension/API stability passes; use local validate and diff for now.'",
+    "const PUBLISH_GATED_MESSAGE = 'Publish is gated until a stable backend publish API is verified; import/export preview is available after G10 unlock.'",
     'const usage = `Canvas CLI',
     '',
     'Usage:',
     '  canvas-cli --help',
     '  canvas-cli validate <file>',
     '  canvas-cli diff <before> <after>',
+    '  canvas-cli import <file> --api-url <url>',
+    '  canvas-cli export <canvasId> --api-url <url> --tenant-id <tenantId>',
     '',
     'Current boundary:',
-    '  import, export, and publish are blocked until G10 public extension/API stability passes.',
-    '  validate and diff are local-only and do not call backend APIs.`',
+    '  import and export are unlocked after G10 public extension/API stability.',
+    '  publish remains blocked until a stable backend publish API is verified.`',
     '',
     'function main(command) {',
-    "  if (['import', 'export', 'publish'].includes(command)) {",
-    '    throw new Error(G10_GATED_MESSAGE)',
+    "  if (command === 'import') runImport()",
+    "  if (command === 'export') runExport()",
+    '  requestJson(apiUrl, "POST", "/canvas/dsl/import", { document })',
+    '  requestJson(apiUrl, "GET", `/canvas/dsl/export/${canvasId}`, undefined, { "x-tenant-id": tenantId })',
+    "  if (command === 'publish') {",
+    '    throw new Error(PUBLISH_GATED_MESSAGE)',
     '  }',
     '  return usage',
     '}',
@@ -293,6 +382,30 @@ async function fixture() {
         { from: 'segment', to: 'coupon' },
         { from: 'coupon', to: 'message' },
       ],
+    },
+  }, null, 2))
+  writeFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), JSON.stringify({
+    apiVersion: 'canvas/v1',
+    kind: 'Journey',
+    metadata: {
+      name: 'new-user-welcome',
+      title: '新用户欢迎旅程',
+    },
+    spec: {
+      trigger: { type: 'webhook', event: 'user.registered' },
+      nodes: [
+        { id: 'segment', type: 'condition', label: '新客判断', config: { expression: 'user.lifecycleStage == "new"' } },
+        { id: 'coupon', type: 'coupon.grant', label: '发放首单券', config: { couponKey: 'WELCOME_10' } },
+        { id: 'message', type: 'message.send', label: '欢迎短信', config: { channel: 'sms', template: 'welcome_coupon' } },
+      ],
+      edges: [
+        { from: 'segment', to: 'coupon', when: true },
+        { from: 'coupon', to: 'message' },
+      ],
+    },
+    samplePayload: {
+      event: 'user.registered',
+      user: { id: 'u_1001', lifecycleStage: 'new', phone: '+8613800000001' },
     },
   }, null, 2))
   return root
@@ -477,6 +590,20 @@ test('rejects demo templates requiring plugins that are not enabled in mock mode
   assert.match(result.errors.join('\n'), /new-user-welcome requires demo plugin canvas-plugin-coupon/)
 })
 
+test('rejects non-golden demo templates requiring disabled plugins', async () => {
+  const root = await fixture()
+  const catalog = JSON.parse(readFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), 'utf8'))
+  const pluginMapping = catalog.mappings.find(mapping => mapping.request.url === '/mock/demo/plugins')
+  const approvalPlugin = pluginMapping.response.jsonBody.plugins.find(plugin => plugin.key === 'canvas-plugin-approval')
+  approvalPlugin.enabled = false
+  writeFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), JSON.stringify(catalog, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /coupon-approval-release requires demo plugin canvas-plugin-approval/)
+})
+
 test('rejects demo catalog entries whose template docs path is missing', async () => {
   const root = await fixture()
   const catalog = JSON.parse(readFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), 'utf8'))
@@ -503,37 +630,444 @@ test('rejects demo catalog plugin drift from frontend new-user-welcome golden pa
   assert.match(result.errors.join('\n'), /new-user-welcome WireMock requiredPlugins must match frontend catalog/)
 })
 
-test('rejects CLI fixture drift from documented new-user-welcome trace path', async () => {
+test('rejects demo catalog missing a frontend official template', async () => {
   const root = await fixture()
-  const journey = JSON.parse(readFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/valid-journey.json'), 'utf8'))
-  journey.spec.nodes = journey.spec.nodes.filter(node => node.id !== 'coupon')
-  journey.spec.edges = [{ from: 'segment', to: 'message' }]
-  writeFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/valid-journey.json'), JSON.stringify(journey, null, 2))
+  const catalog = JSON.parse(readFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), 'utf8'))
+  const templateMapping = catalog.mappings.find(mapping => mapping.request.url === '/mock/demo/templates')
+  templateMapping.response.jsonBody.templates = templateMapping.response.jsonBody.templates.filter(template => template.key !== 'coupon-approval-release')
+  writeFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), JSON.stringify(catalog, null, 2))
 
   const result = verifyOpenSourceGrowthGuardrails(root)
 
   assert.equal(result.ok, false)
-  assert.match(result.errors.join('\n'), /CLI valid-journey fixture must include coupon node/)
-  assert.match(result.errors.join('\n'), /CLI valid-journey fixture must include segment -> coupon edge/)
+  assert.match(result.errors.join('\n'), /must include frontend official template coupon-approval-release/)
 })
 
-test('rejects canvas-cli backend API command or network path drift before G10', async () => {
+test('rejects demo catalog extra template outside frontend official catalog', async () => {
   const root = await fixture()
-  writeFileSync(path.join(root, 'tools/canvas-cli/src/index.mjs'), [
-    'const usage = `Canvas CLI',
-    'Usage:',
-    '  canvas-cli import <file>`',
+  const catalog = JSON.parse(readFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), 'utf8'))
+  const templateMapping = catalog.mappings.find(mapping => mapping.request.url === '/mock/demo/templates')
+  templateMapping.response.jsonBody.templates.push({
+    key: 'unlisted-demo-template',
+    riskLevel: 'LOW',
+    docs: 'docs/open-source/templates/new-user-welcome.md',
+    requiredPlugins: ['canvas-plugin-message'],
+  })
+  writeFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), JSON.stringify(catalog, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /contains non-frontend official template unlisted-demo-template/)
+})
+
+test('rejects demo catalog risk level drift from frontend official catalog', async () => {
+  const root = await fixture()
+  const catalog = JSON.parse(readFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), 'utf8'))
+  const templateMapping = catalog.mappings.find(mapping => mapping.request.url === '/mock/demo/templates')
+  templateMapping.response.jsonBody.templates.find(template => template.key === 'coupon-approval-release').riskLevel = 'LOW'
+  writeFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), JSON.stringify(catalog, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /coupon-approval-release WireMock riskLevel must match frontend catalog: HIGH/)
+})
+
+test('rejects WireMock drift when frontend catalog fields use constants and nested arrays', async () => {
+  const root = await fixture()
+  const frontendCatalogPath = path.join(root, 'frontend/src/pages/canvas-list/templateCatalog.ts')
+  writeFileSync(frontendCatalogPath, [
+    "const welcomePlugins = [",
+    "  'canvas-plugin-webhook',",
+    "  'canvas-plugin-coupon',",
+    "  'canvas-plugin-message',",
+    ']',
+    "const welcomeRiskLevel = 'LOW'",
+    "const welcomeDocs = 'docs/open-source/templates/new-user-welcome.md'",
+    "const approvalPlugins = ['canvas-plugin-approval', 'canvas-plugin-coupon', 'canvas-plugin-message']",
+    "const approvalRiskLevel = 'HIGH'",
+    "const approvalDocs = 'docs/open-source/templates/coupon-approval-release.md'",
     '',
-    'async function runImport(document) {',
-    "  return fetch('/canvas/dsl/map', { method: 'POST', body: JSON.stringify(document) })",
+    'export const officialTemplateCatalog = [',
+    '  {',
+    "    key: 'new-user-welcome',",
+    '    riskLevel: welcomeRiskLevel,',
+    '    requiredPlugins: welcomePlugins,',
+    '    docs: welcomeDocs,',
+    "    canvas: journey('new-user-welcome', '新用户欢迎旅程', { type: 'webhook', event: 'user.registered' }, [",
+    '      node(\'segment\', \'condition\', \'新客判断\', { expression: \'user.lifecycleStage == "new"\' }),',
+    "      node('coupon', 'coupon.grant', '发放首单券', { couponKey: 'WELCOME_10' }),",
+    "      node('message', 'message.send', '欢迎短信', { channel: 'sms', template: 'welcome_coupon' }),",
+    '    ], [',
+    "      edge('segment', 'coupon', true),",
+    "      edge('coupon', 'message'),",
+    '    ]),',
+    "    samplePayload: { event: 'user.registered', user: { id: 'u_1001', lifecycleStage: 'new', phone: '+8613800000001' } },",
+    '  },',
+    '  {',
+    "    key: 'coupon-approval-release',",
+    '    riskLevel: approvalRiskLevel,',
+    '    requiredPlugins: approvalPlugins,',
+    '    docs: approvalDocs,',
+    '  },',
+    ']',
+  ].join('\n'))
+  const catalog = JSON.parse(readFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), 'utf8'))
+  const templateMapping = catalog.mappings.find(mapping => mapping.request.url === '/mock/demo/templates')
+  const welcomeTemplate = templateMapping.response.jsonBody.templates.find(template => template.key === 'new-user-welcome')
+  welcomeTemplate.requiredPlugins = ['canvas-plugin-webhook', 'canvas-plugin-message']
+  welcomeTemplate.riskLevel = 'MEDIUM'
+  welcomeTemplate.docs = 'docs/open-source/templates/coupon-approval-release.md'
+  writeFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), JSON.stringify(catalog, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /new-user-welcome WireMock requiredPlugins must match frontend catalog: canvas-plugin-webhook, canvas-plugin-coupon, canvas-plugin-message/)
+  assert.match(result.errors.join('\n'), /new-user-welcome WireMock riskLevel must match frontend catalog: LOW/)
+  assert.match(result.errors.join('\n'), /new-user-welcome WireMock docs path must match frontend catalog: docs\/open-source\/templates\/new-user-welcome\.md/)
+})
+
+test('rejects missing mock plugin enablement from frontend official plugin union', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'docs/open-source/templates/scheduled-winback.md'), 'scheduled-winback')
+  const frontendCatalogPath = path.join(root, 'frontend/src/pages/canvas-list/templateCatalog.ts')
+  const frontendCatalog = readFileSync(frontendCatalogPath, 'utf8').replace(
+    /\n\]$/,
+    [
+      '  {',
+      "    key: 'scheduled-winback',",
+      "    riskLevel: 'MEDIUM',",
+      "    requiredPlugins: ['canvas-plugin-schedule', 'canvas-plugin-message'],",
+      "    docs: 'docs/open-source/templates/scheduled-winback.md',",
+      '  },',
+      ']',
+    ].join('\n'),
+  )
+  writeFileSync(frontendCatalogPath, frontendCatalog)
+  const catalog = JSON.parse(readFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), 'utf8'))
+  const templateMapping = catalog.mappings.find(mapping => mapping.request.url === '/mock/demo/templates')
+  templateMapping.response.jsonBody.templates.push({
+    key: 'scheduled-winback',
+    riskLevel: 'MEDIUM',
+    docs: 'docs/open-source/templates/scheduled-winback.md',
+    requiredPlugins: ['canvas-plugin-schedule', 'canvas-plugin-message'],
+  })
+  writeFileSync(path.join(root, 'wiremock/mappings/demo-catalog.json'), JSON.stringify(catalog, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /must enable frontend required plugin canvas-plugin-schedule/)
+})
+
+test('rejects CLI fixture drift from documented new-user-welcome trace path', async () => {
+  const root = await fixture()
+  const journey = JSON.parse(readFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), 'utf8'))
+  journey.spec.nodes = journey.spec.nodes.filter(node => node.id !== 'coupon')
+  journey.spec.edges = [{ from: 'segment', to: 'message' }]
+  writeFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), JSON.stringify(journey, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome fixture must include coupon node/)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome fixture must include segment -> coupon edge/)
+})
+
+test('rejects missing dedicated playground golden path fixture', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), '')
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /tools\/canvas-cli\/test\/fixtures\/playground-new-user-welcome\.json must be valid JSON/)
+})
+
+test('allows generic CLI fixture to diverge from playground golden path', async () => {
+  const root = await fixture()
+  const journey = JSON.parse(readFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/valid-journey.json'), 'utf8'))
+  journey.metadata.name = 'generic-cli-validation'
+  journey.spec.nodes = [{ id: 'message', type: 'message.send', config: { channel: 'email', template: 'generic' } }]
+  journey.spec.edges = []
+  writeFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/valid-journey.json'), JSON.stringify(journey, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.errors, [])
+})
+
+test('rejects playground fixture drift from frontend official new-user-welcome canvas and payload', async () => {
+  const root = await fixture()
+  const journey = JSON.parse(readFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), 'utf8'))
+  journey.apiVersion = 'canvas/v2'
+  journey.kind = 'Workflow'
+  journey.metadata.name = 'new-user-welcome-copy'
+  journey.spec.nodes.find(node => node.id === 'message').type = 'message'
+  journey.spec.edges.find(edge => edge.from === 'segment' && edge.to === 'coupon').when = 'matched'
+  journey.samplePayload.user.lifecycleStage = 'returning'
+  writeFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), JSON.stringify(journey, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome fixture apiVersion must match frontend catalog canvas apiVersion canvas\/v1/)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome fixture kind must match frontend catalog canvas kind Journey/)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome fixture metadata.name must match frontend catalog canvas metadata.name new-user-welcome/)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome message node must match frontend catalog node type message\.send/)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome segment -> coupon edge must match frontend catalog/)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome samplePayload must match frontend catalog samplePayload/)
+})
+
+test('rejects playground fixture missing frontend sample payload', async () => {
+  const root = await fixture()
+  const journey = JSON.parse(readFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), 'utf8'))
+  delete journey.samplePayload
+  writeFileSync(path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'), JSON.stringify(journey, null, 2))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /playground-new-user-welcome samplePayload must match frontend catalog samplePayload/)
+})
+
+test('rejects missing playground runtime smoke verifier and doc command', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'tools/open-source-growth/playground-runtime-smoke.mjs'), '')
+  writeFileSync(path.join(root, 'docs/open-source/playground.md'), [
+    '# Playground',
+    '',
+    'Local runtime smoke exists for checked-in artifacts.',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /tools\/open-source-growth\/playground-runtime-smoke\.mjs is required/)
+  assert.match(result.errors.join('\n'), /docs\/open-source\/playground\.md must reference node tools\/open-source-growth\/playground-runtime-smoke\.mjs/)
+})
+
+test('rejects missing optional playground live API smoke verifier and doc command', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'tools/open-source-growth/playground-live-api-smoke.mjs'), '')
+  writeFileSync(path.join(root, 'docs/open-source/playground.md'), [
+    '# Playground',
+    '',
+    'Run the offline runtime smoke:',
+    '',
+    '```bash',
+    'node tools/open-source-growth/playground-runtime-smoke.mjs',
+    '```',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /tools\/open-source-growth\/playground-live-api-smoke\.mjs is required/)
+  assert.match(result.errors.join('\n'), /docs\/open-source\/playground\.md must reference node tools\/open-source-growth\/playground-live-api-smoke\.mjs --api-url http:\/\/localhost:8080/)
+})
+
+test('rejects missing G10 public API stability verifier script', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'tools/open-source-growth/g10-public-api-stability.mjs'), '')
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /tools\/open-source-growth\/g10-public-api-stability\.mjs is required/)
+})
+
+test('rejects G10 public API stability evidence drift', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'backend/canvas-web/src/test/java/org/chovy/canvas/web/compat/CanvasApiCompatibilityTest.java'), [
+    'class CanvasApiCompatibilityTest {',
+    '  void validateRoute() { webClient().post().uri("/canvas/dsl/validate"); }',
+    '  void mapRoute() { webClient().post().uri("/canvas/dsl/map"); }',
+    '  void importRoute() { webClient().post().uri("/canvas/dsl/import"); }',
+    '  void exportRoute() { webClient().get().uri("/canvas/dsl/export/99"); }',
     '}',
   ].join('\n'))
 
   const result = verifyOpenSourceGrowthGuardrails(root)
 
   assert.equal(result.ok, false)
-  assert.match(result.errors.join('\n'), /canvas-cli must gate backend API commands until G10/)
-  assert.match(result.errors.join('\n'), /remove import command in usage/)
-  assert.match(result.errors.join('\n'), /remove network fetch call/)
+  assert.match(result.errors.join('\n'), /CanvasApiCompatibilityTest\.java must cover \/canvas\/dsl\/diff/)
+})
+
+test('rejects canvas-cli publish unlock after G10 import/export unlock', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'tools/canvas-cli/src/index.mjs'), [
+    'const usage = `Canvas CLI',
+    'Usage:',
+    '  canvas-cli import <file>',
+    '  canvas-cli export <canvasId>',
+    '  canvas-cli publish <canvasId>`',
+    '',
+    'async function runPublish(canvasId) {',
+    "  return requestJson(apiUrl, 'POST', `/canvas/publish/${canvasId}`)",
+    '}',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /canvas-cli must keep publish gated until a stable backend publish API is verified/)
+  assert.match(result.errors.join('\n'), /canvas-cli must stay within G10 import\/export unlock; remove publish command in usage/)
+  assert.match(result.errors.join('\n'), /canvas-cli must stay within G10 import\/export unlock; remove publish backend path/)
+})
+
+test('rejects canvas-cli backend API drift outside import/export after G10 unlock', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, 'tools/canvas-cli/src/backend-api.mjs'), [
+    'export function callBackend(document) {',
+    "  return requestJson(apiUrl, 'POST', '/canvas/dsl/map', document)",
+    '}',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
   assert.match(result.errors.join('\n'), /remove Canvas DSL map backend path/)
+})
+
+test('rejects CI that skips canvas-cli behavior tests before OSG guardrails', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, '.github/workflows/ci.yml'), [
+    'jobs:',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: docker compose -f docker-compose.demo.yml config',
+    '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/ci\.yml must run tools\/canvas-cli/)
+})
+
+test('rejects CI that skips demo compose config validation before OSG guardrails', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, '.github/workflows/canvas-ci.yml'), [
+    'jobs:',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: cd tools/canvas-cli && npm test',
+    '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/canvas-ci\.yml must run docker compose -f docker-compose\.demo\.yml config/)
+})
+
+test('rejects CI that omits playground runtime smoke before OSG verifier results', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, '.github/workflows/ci.yml'), [
+    'jobs:',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: cd tools/canvas-cli && npm test',
+    '      - run: docker compose -f docker-compose.demo.yml config',
+    '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+  ].join('\n'))
+  writeFileSync(path.join(root, '.github/workflows/canvas-ci.yml'), [
+    'jobs:',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: cd tools/canvas-cli && npm test',
+    '      - run: docker compose -f docker-compose.demo.yml config',
+    '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+    '      - run: node tools/open-source-growth/playground-runtime-smoke.mjs',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/ci\.yml must run node tools\/open-source-growth\/playground-runtime-smoke\.mjs before publishing OSG guardrail results/)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/canvas-ci\.yml must run node --test tools\/open-source-growth\/guardrail-verifier\.test\.mjs before publishing OSG guardrail results/)
+})
+
+test('rejects CI that runs OSG verifier before CLI and demo compose gates', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, '.github/workflows/ci.yml'), [
+    'jobs:',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+    '      - run: cd tools/canvas-cli && npm test',
+    '      - run: docker compose -f docker-compose.demo.yml config',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/ci\.yml must run node --test tools\/open-source-growth\/guardrail-verifier\.test\.mjs before publishing OSG guardrail results/)
+})
+
+test('rejects CI when OSG commands are ordered outside the OSG guardrail job', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, '.github/workflows/ci.yml'), [
+    'jobs:',
+    '  unrelated-validation:',
+    '    steps:',
+    '      - run: cd tools/canvas-cli && npm test',
+    '      - run: docker compose -f docker-compose.demo.yml config',
+    '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/ci\.yml must run tools\/canvas-cli npm test before publishing OSG guardrail results/)
+})
+
+test('rejects CI when OSG commands are only echoed inside the OSG guardrail job', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, '.github/workflows/ci.yml'), [
+    'jobs:',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: echo "cd tools/canvas-cli && npm test"',
+    '      - run: echo "docker compose -f docker-compose.demo.yml config"',
+    '      - run: echo "node --test tools/open-source-growth/guardrail-verifier.test.mjs"',
+    '      - run: echo "node tools/open-source-growth/guardrail-verifier.mjs"',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/ci\.yml must run tools\/canvas-cli npm test before publishing OSG guardrail results/)
+})
+
+test('rejects CI when canvas-cli directory and npm test are split across OSG steps', async () => {
+  const root = await fixture()
+  writeFileSync(path.join(root, '.github/workflows/ci.yml'), [
+    'jobs:',
+    '  open-source-growth-guardrails:',
+    '    steps:',
+    '      - run: npm test',
+    '      - run: echo "tools/canvas-cli"',
+    '      - run: docker compose -f docker-compose.demo.yml config',
+    '      - run: node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+    '      - run: node tools/open-source-growth/guardrail-verifier.mjs',
+  ].join('\n'))
+
+  const result = verifyOpenSourceGrowthGuardrails(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /\.github\/workflows\/ci\.yml must run tools\/canvas-cli npm test before publishing OSG guardrail results/)
 })

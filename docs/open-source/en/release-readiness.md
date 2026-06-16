@@ -11,8 +11,8 @@ for coordinator-owned gates.
   assistance, dry-run, governance, and traceability.
 - [ ] Docs avoid pushing CDP, BI, ads, data warehouse, approval center, or SCRM
   into the main public story.
-- [ ] Claims are consistent with G10: backend public extension/API write
-  operations are not stable yet.
+- [ ] Claims are consistent with G10: CLI import/export preview is unlocked,
+  while publish remains gated.
 
 ## Demo And Quickstart
 
@@ -20,8 +20,8 @@ for coordinator-owned gates.
 - [ ] Demo path does not require real SMS, email, coupon, approval, AI, or
   customer credentials.
 - [ ] Default local account and required infrastructure are documented.
-- [ ] Known limits are explicit, including RocketMQ and current local-only CLI
-  behavior.
+- [ ] Known limits are explicit, including RocketMQ, G10 import/export preview,
+  and gated publish behavior.
 
 ## Ecosystem Content
 
@@ -30,8 +30,8 @@ for coordinator-owned gates.
   sample payload, expected trace, and risk notes.
 - [ ] Plugin docs describe build-time plugins, manifests, permissions, and
   enablement governance.
-- [ ] DSL/CLI docs describe local validation and diff behavior without implying
-  backend import/publish readiness before G10.
+- [ ] DSL/CLI docs describe local validation, diff behavior, and G10
+  import/export preview without implying publish readiness.
 - [ ] AI docs describe mock-first behavior and do not require real model keys
   for the default demo path.
 

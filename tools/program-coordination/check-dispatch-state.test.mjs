@@ -101,6 +101,36 @@ test('accepts an empty active dispatch state', async () => {
   assert.deepEqual(result.errors, [])
 })
 
+test('rejects stale contradictory cutover evidence after ready evidence with empty blockers', async () => {
+  const root = await fixture(baseState({
+    readiness: {
+      level: 'R5',
+      gate: 'Cutover preflight ready with blockers empty',
+      backendTarget: 'cutoverReady true; blockers empty',
+      writeMode: 'No active dispatches',
+    },
+    lastEvent: 'Cutover preflight ready: cutoverReady true, blockers empty.',
+    lastVerifiedEvidence: [
+      {
+        command: 'node tools/program-coordination/cutover-compatibility-preflight.mjs . --json',
+        result: 'passed; next candidates route:/canvas/batch; cutoverReady=false; blockers remain',
+      },
+      {
+        command: 'node tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready --json',
+        result: 'passed: cutoverReady true, blockers []',
+      },
+    ],
+  }))
+
+  const result = checkDispatchState(root)
+
+  assert.equal(result.ok, false)
+  assert.match(result.errors.join('\n'), /stale contradictory lastVerifiedEvidence\[0\]/)
+  assert.match(result.errors.join('\n'), /cutoverReady=false/)
+  assert.match(result.errors.join('\n'), /route:\/canvas\/batch/)
+  assert.match(result.errors.join('\n'), /blockers remain/)
+})
+
 test('rejects missing parallel groups', async () => {
   const state = baseState()
   delete state.parallelGroups

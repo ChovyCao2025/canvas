@@ -3,28 +3,10 @@ package org.chovy.canvas.execution.api.template;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 定义 TemplateDryRunFacade 的执行上下文数据结构或业务契约。
- */
 public interface TemplateDryRunFacade {
 
-    /**
-     * 执行 dryRun 对应的业务处理。
-     * @param command command 参数
-     */
     TemplateDryRunResultView dryRun(TemplateDryRunCommand command);
 
-    /**
-     * 定义 TemplateDryRunCommand 的执行上下文数据结构或业务契约。
-     * @param tenantId tenantId 对应的数据字段
-     * @param templateKey templateKey 对应的数据字段
-     * @param canvasJson canvasJson 对应的数据字段
-     * @param samplePayloadJson samplePayloadJson 对应的数据字段
-     * @param requiredPluginKeys requiredPluginKeys 对应的数据字段
-     * @param pluginEnablement pluginEnablement 对应的数据字段
-     * @param expectedTrace expectedTrace 对应的数据字段
-     * @param mockMode mockMode 对应的数据字段
-     */
     record TemplateDryRunCommand(
             Long tenantId,
             String templateKey,
@@ -52,13 +34,6 @@ public interface TemplateDryRunFacade {
         }
     }
 
-    /**
-     * 定义 ExpectedTraceStep 的执行上下文数据结构或业务契约。
-     * @param nodeId nodeId 对应的数据字段
-     * @param nodeType nodeType 对应的数据字段
-     * @param outcome outcome 对应的数据字段
-     * @param summary summary 对应的数据字段
-     */
     record ExpectedTraceStep(
             String nodeId,
             String nodeType,
@@ -77,14 +52,6 @@ public interface TemplateDryRunFacade {
         }
     }
 
-    /**
-     * 定义 TemplateTraceStepView 的执行上下文数据结构或业务契约。
-     * @param nodeId nodeId 对应的数据字段
-     * @param nodeType nodeType 对应的数据字段
-     * @param outcome outcome 对应的数据字段
-     * @param summary summary 对应的数据字段
-     * @param outputData outputData 对应的数据字段
-     */
     record TemplateTraceStepView(
             String nodeId,
             String nodeType,
@@ -103,11 +70,6 @@ public interface TemplateDryRunFacade {
         }
     }
 
-    /**
-     * 定义 TemplateDryRunViolation 的执行上下文数据结构或业务契约。
-     * @param code code 对应的数据字段
-     * @param message message 对应的数据字段
-     */
     record TemplateDryRunViolation(String code, String message) {
 
         public TemplateDryRunViolation {
@@ -118,15 +80,6 @@ public interface TemplateDryRunFacade {
         }
     }
 
-    /**
-     * 定义 TemplateDryRunResultView 的执行上下文数据结构或业务契约。
-     * @param valid valid 对应的数据字段
-     * @param executionId executionId 对应的数据字段
-     * @param published published 对应的数据字段
-     * @param trace trace 对应的数据字段
-     * @param matchedNodeIds matchedNodeIds 对应的数据字段
-     * @param violations violations 对应的数据字段
-     */
     record TemplateDryRunResultView(
             boolean valid,
             String executionId,

@@ -33,7 +33,7 @@ npm install
 npm run dev
 ```
 
-Use Java 21, Maven 3.9+, Node.js 18+, and Docker 24+.
+Use Java 21, Maven 3.9+, Node.js 20.19+ or 22.12+, and Docker 24+.
 
 ## Branch And PR Workflow
 

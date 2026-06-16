@@ -9,14 +9,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 TraceEventSinkTest 的执行上下文数据结构或业务契约。
- */
 class TraceEventSinkTest {
 
-    /**
-     * 执行 mysqlTraceEventSinkPersistsTraceEventsThroughExecutionOwnedWriter 对应的业务处理。
-     */
     @Test
     void mysqlTraceEventSinkPersistsTraceEventsThroughExecutionOwnedWriter() {
         List<TraceEvent> written = new ArrayList<>();

@@ -232,11 +232,14 @@ async function fixture() {
       'Compare active dispatch registry rows with actual branches, worktrees, and changed paths',
       'Record the recovery audit',
       'fallback reason:',
-      'Current Snapshot',
-      'Active Dispatch Registry',
+      '## Current Snapshot',
+      '| Field | Value |',
+      '| --- | --- |',
+      '| Current backend target | no cutover evidence yet |',
+      '## Active Dispatch Registry',
       'Last Verified Evidence',
-      'Worker Board',
-      'Reviewer Board',
+      '## Worker Board',
+      '## Reviewer Board',
       'Recovery Audit',
       'Worker Result Recording Template',
       'Stop Conditions',
@@ -435,6 +438,82 @@ function runCheck(root) {
   })
 }
 
+function cutoverReadyDispatchState() {
+  return {
+    schemaVersion: 1,
+    updatedAt: '2026-06-15T18:53:56+08:00',
+    readiness: {
+      level: 'R5',
+      gate: 'Cutover preflight ready with frontend validation dependency gates',
+      backendTarget: 'cutoverReady true with blockers empty',
+      writeMode: 'No active dispatches',
+    },
+    activeDispatches: [],
+    workerBoard: [
+      {
+        taskId: 'DDD-E01',
+        status: 'DONE',
+        mode: 'read-only',
+        gate: 'R0',
+        writeScope: [],
+      },
+      {
+        taskId: 'OSG-W02',
+        status: 'DONE',
+        mode: 'code-writing',
+        gate: 'G0/G1',
+        writeScope: ['docker-compose.demo.yml', 'wiremock/**', 'docs/open-source/playground.md'],
+      },
+      {
+        taskId: 'OSG-W07F',
+        status: 'NOT_STARTED',
+        mode: 'code-writing',
+        gate: 'G9/G10 plus OSG-C07',
+        writeScope: ['backend/canvas-context-execution/src/main/java/org/chovy/canvas/execution/adapter/plugin/official/risk/**'],
+      },
+    ],
+    parallelGroups: [
+      {
+        groupId: 'P1-immediate-shell',
+        startCondition: 'Coordination docs accepted',
+        maxCodeWriters: 6,
+        maxReadOnlyReviewers: 4,
+        taskIds: ['DDD-E01', 'OSG-W02'],
+        notes: 'Fixture group.',
+      },
+      {
+        groupId: 'P7-plugin-burst',
+        startCondition: 'DDD-W08 integrated and OSG-C07 done',
+        maxCodeWriters: 6,
+        maxReadOnlyReviewers: 2,
+        taskIds: ['OSG-W07F'],
+        notes: 'Fixture group.',
+      },
+    ],
+    reviewerBoard: [],
+    recoveryAudit: {
+      status: 'clean',
+      activeDispatches: 0,
+      commandsToRunBeforeDispatch: ['G0', 'G0B before code-writing'],
+    },
+    lastVerifiedEvidence: [
+      {
+        command: 'node tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready --json',
+        result: 'cutoverReady true; blockers empty',
+      },
+    ],
+    lastVerifiedAt: '2026-06-15T18:53:56+08:00',
+    lastEvent: 'cutoverReady true with blockers empty',
+  }
+}
+
+function writeCutoverReadyDispatchState(root) {
+  writeFileSync(
+    path.join(root, 'docs/program-coordination/dispatch-state.json'),
+    `${JSON.stringify(cutoverReadyDispatchState(), null, 2)}\n`,
+  )
+}
+
 test('program coordination checks reject incomplete worker packet sections', async () => {
   const root = await fixture()
   const packetPath = path.join(root, 'docs/program-coordination/subagent-worker-packets.md')
@@ -488,19 +567,76 @@ test('program coordination checks reject active worker board rows when active re
   const root = await fixture()
   const ledgerPath = path.join(root, 'docs/program-coordination/progress-ledger.md')
   const ledger = readFileSync(ledgerPath, 'utf8')
-    .replace('Active Dispatch Registry', '## Active Dispatch Registry\n```text\nnone\n```')
-    .replace('Worker Board', [
+    .replace('## Active Dispatch Registry', '## Active Dispatch Registry\n```text\nnone\n```')
+    .replace('## Worker Board', [
       '## Worker Board',
       '| Task | Status | Gate |',
       '| --- | --- | --- |',
       '| OSG-W08 template content/catalog | RUNNING | G0/G1 |',
     ].join('\n'))
-    .replace('Reviewer Board', '## Reviewer Board')
+    .replace('## Reviewer Board', '## Reviewer Board')
   writeFileSync(ledgerPath, ledger)
 
   const result = runCheck(root)
   assert.notEqual(result.status, 0)
   assert.match(`${result.stdout}\n${result.stderr}`, /Active Dispatch Registry is none but Worker Board contains active worker status/)
+})
+
+test('program coordination checks reject stale current snapshot when dispatch state is cutover-ready', async () => {
+  const root = await fixture()
+  const ledgerPath = path.join(root, 'docs/program-coordination/progress-ledger.md')
+  writeFileSync(ledgerPath, readFileSync(ledgerPath, 'utf8').replace(
+    /## Current Snapshot[\s\S]*?## Active Dispatch Registry/,
+    [
+      '## Current Snapshot',
+      '',
+      '| Field | Value |',
+      '| --- | --- |',
+      '| Current backend target | DDD-C09 final cutover remains blocked by production canvas-web controller/endpoint gaps; next preflight top gap is `route:/canvas/batch` |',
+      '',
+      '## Active Dispatch Registry',
+    ].join('\n'),
+  ))
+  writeCutoverReadyDispatchState(root)
+
+  const result = runCheck(root)
+  assert.notEqual(result.status, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /Current Snapshot is stale: cutover-ready evidence exists but snapshot still says cutover is blocked/)
+  assert.match(`${result.stdout}\n${result.stderr}`, /Current Snapshot is stale: cutover-ready evidence exists but snapshot still names a next preflight route gap/)
+})
+
+test('program coordination checks reject stale latest closed dispatch when dispatch state is cutover-ready', async () => {
+  const root = await fixture()
+  const ledgerPath = path.join(root, 'docs/program-coordination/progress-ledger.md')
+  const ledger = readFileSync(ledgerPath, 'utf8')
+    .replace(
+      /## Current Snapshot[\s\S]*?## Active Dispatch Registry/,
+      [
+        '## Current Snapshot',
+        '',
+        '| Field | Value |',
+        '| --- | --- |',
+        '| Current backend target | DDD-C09 cutover preflight ready; cutoverReady true with blockers empty |',
+        '',
+        '## Active Dispatch Registry',
+      ].join('\n'),
+    )
+    .replace(
+      'Last Verified Evidence',
+      [
+        'Last Verified Evidence',
+        '',
+        'Latest closed dispatch:',
+        '- DDD-C09: global cutover remains blocked; next top gap is `route:/canvas/batch`.',
+      ].join('\n'),
+    )
+  writeFileSync(ledgerPath, ledger)
+  writeCutoverReadyDispatchState(root)
+
+  const result = runCheck(root)
+  assert.notEqual(result.status, 0)
+  assert.match(`${result.stdout}\n${result.stderr}`, /Latest closed dispatch is stale: cutover-ready evidence exists but closed dispatch still says cutover is blocked/)
+  assert.match(`${result.stdout}\n${result.stderr}`, /Latest closed dispatch is stale: cutover-ready evidence exists but closed dispatch still names a next preflight route gap/)
 })
 
 test('program coordination checks reject missing collaboration recovery protocol', async () => {

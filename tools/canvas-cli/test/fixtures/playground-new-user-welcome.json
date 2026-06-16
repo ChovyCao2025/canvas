@@ -1,0 +1,60 @@
+{
+  "apiVersion": "canvas/v1",
+  "kind": "Journey",
+  "metadata": {
+    "name": "new-user-welcome",
+    "title": "新用户欢迎旅程"
+  },
+  "spec": {
+    "trigger": {
+      "type": "webhook",
+      "event": "user.registered"
+    },
+    "nodes": [
+      {
+        "id": "segment",
+        "type": "condition",
+        "label": "新客判断",
+        "config": {
+          "expression": "user.lifecycleStage == \"new\""
+        }
+      },
+      {
+        "id": "coupon",
+        "type": "coupon.grant",
+        "label": "发放首单券",
+        "config": {
+          "couponKey": "WELCOME_10"
+        }
+      },
+      {
+        "id": "message",
+        "type": "message.send",
+        "label": "欢迎短信",
+        "config": {
+          "channel": "sms",
+          "template": "welcome_coupon"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "segment",
+        "to": "coupon",
+        "when": true
+      },
+      {
+        "from": "coupon",
+        "to": "message"
+      }
+    ]
+  },
+  "samplePayload": {
+    "event": "user.registered",
+    "user": {
+      "id": "u_1001",
+      "lifecycleStage": "new",
+      "phone": "+8613800000001"
+    }
+  }
+}

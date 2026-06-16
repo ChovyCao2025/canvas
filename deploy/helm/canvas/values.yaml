@@ -16,7 +16,7 @@ backend:
   replicaCount: 2
   image:
     repository: registry.example.com/marketing-canvas/canvas-boot
-    tag: latest
+    tag: release
     pullPolicy: IfNotPresent
   serviceAccountName: canvas-engine
   containerPort: 8080

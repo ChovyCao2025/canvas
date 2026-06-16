@@ -6,6 +6,19 @@
 import http from './api'
 import type { PageResult, R, StubOption, SystemOption } from '../types'
 
+function normalizeAdminListResponse(response: R<PageResult<SystemOption> | SystemOption[]>): R<PageResult<SystemOption>> {
+  if (Array.isArray(response.data)) {
+    return {
+      ...response,
+      data: {
+        total: response.data.length,
+        list: response.data,
+      },
+    }
+  }
+  return response as R<PageResult<SystemOption>>
+}
+
 /**
  * 前端会直接展示或批量加载的系统字典分类。
  *
@@ -72,8 +85,13 @@ export const systemOptionsApi = {
     }),
 
   /** 管理端分页查询字典项，支持分类、启用状态、租户和关键字筛选。 */
-  adminList: (params?: { category?: string; enabled?: number; keyword?: string; tenantId?: number }) =>
-    http.get<R<PageResult<SystemOption>>, R<PageResult<SystemOption>>>('/admin/system-options', { params }),
+  adminList: async (params?: { category?: string; enabled?: number; keyword?: string; tenantId?: number }) => {
+    const response = await http.get<R<PageResult<SystemOption> | SystemOption[]>, R<PageResult<SystemOption> | SystemOption[]>>(
+      '/admin/system-options',
+      { params },
+    )
+    return normalizeAdminListResponse(response)
+  },
 
   /** 更新字典项；前端以 Partial 传递仅修改的字段。 */
   update: (id: number, body: Partial<SystemOption>) =>

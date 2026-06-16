@@ -5,7 +5,9 @@ demo profile without real external providers. G10/G11 ecosystem seeds now give
 the frontend and docs a stable `new-user-welcome` golden path: template metadata,
 required plugins, sample payload, expected trace, Canvas DSL validation, and a
 mock AI risk audit. The flow remains frontend/docs guided until final DDD-C09
-and OSG-W14 live wiring evidence proves the runtime smoke end to end.
+and OSG-W14 live wiring evidence proves the live backend runtime path end to
+end. The checked-in fixture and WireMock catalog now have an offline runtime
+smoke verifier for local demo readiness.
 
 ## Start Demo Dependencies
 
@@ -89,21 +91,45 @@ The frontend catalog exposes the playground handoff from
    metadata.
 9. Run the mock AI risk audit and keep the result as preview/draft-only output.
 
-Reference commands:
+Offline runtime smoke commands:
 
 ```bash
 docker compose -f docker-compose.demo.yml config
+node tools/open-source-growth/playground-runtime-smoke.mjs
+cd tools/canvas-cli && node src/index.mjs validate test/fixtures/playground-new-user-welcome.json
+```
+
+The offline smoke verifier reads only checked-in local artifacts. It validates
+the dedicated fixture, the `segment -> coupon -> message` path, sample payload
+eligibility, WireMock golden-path/template/plugin coherence, and this document's
+runtime-smoke command reference without requiring live backend services. This is
+the default CI-safe guardrail for playground readiness.
+
+Optional live backend API smoke:
+
+```bash
+node tools/open-source-growth/playground-live-api-smoke.mjs --api-url http://localhost:8080
+```
+
+Run the live API smoke only after the backend is running. It posts the dedicated
+`new-user-welcome` DSL fixture to the live Canvas DSL map endpoint and checks
+for the stable mapping response. This live command is evidence for OSG-W14
+wiring, but it is not the default offline CI guardrail because it depends on a
+running backend. If the local backend requires bearer auth, pass `--token` or
+set `CANVAS_API_TOKEN`.
+
+Useful mock catalog and provider checks:
+
+```bash
 curl http://localhost:8099/mock/demo/golden-path
 curl http://localhost:8099/mock/demo/templates
 curl http://localhost:8099/mock/demo/plugins
-cd tools/canvas-cli && node src/index.mjs validate test/fixtures/valid-journey.json
 curl -X POST http://localhost:8099/mock/ai/audit
 ```
 
-The CLI validation command currently uses the checked-in fixture
-`tools/canvas-cli/test/fixtures/valid-journey.json`, whose `metadata.name` is
-`new-user-welcome`. A dedicated playground example can replace it only after
-that example file is reserved in a later task.
+The CLI validation command uses the dedicated checked-in playground fixture
+`tools/canvas-cli/test/fixtures/playground-new-user-welcome.json`, whose
+`metadata.name` is `new-user-welcome`.
 
 The dry-run and trace step uses the template sample payload:
 
@@ -137,8 +163,9 @@ disabled until live draft, publish, trace, and risk APIs are wired and verified.
 
 - This page documents the G10/G11-seed-aware playground flow and the
   frontend-only handoff surface.
-- Runtime smoke remains a final DDD-C09/OSG-W14 follow-up until actual live
-  wiring is verified.
+- Local/offline runtime smoke covers checked-in fixture and WireMock catalog
+  coherence; live backend runtime smoke remains gated on actual DDD-C09/OSG-W14
+  wiring verification.
 - Template import, dry-run, trace, DSL export, CLI validation, and AI audit must
   continue through public APIs when live wiring is enabled.
 - The mock AI audit must not publish, overwrite published versions, or require

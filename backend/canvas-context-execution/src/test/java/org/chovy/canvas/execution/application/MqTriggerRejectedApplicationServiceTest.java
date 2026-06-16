@@ -9,14 +9,8 @@ import java.util.Map;
 import org.chovy.canvas.execution.api.MqTriggerRejectedFacade;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 MqTriggerRejectedApplicationServiceTest 的执行上下文数据结构或业务契约。
- */
 class MqTriggerRejectedApplicationServiceTest {
 
-    /**
-     * 执行 listsWithTagReasonFiltersAndPaging 对应的业务处理。
-     */
     @Test
     void listsWithTagReasonFiltersAndPaging() {
         MqTriggerRejectedFacade service = new MqTriggerRejectedApplicationService();
@@ -39,9 +33,6 @@ class MqTriggerRejectedApplicationServiceTest {
         assertThat(normalized.total()).isEqualTo(3);
     }
 
-    /**
-     * 执行 detailReturnsRecordOrCompatibilityMissingMessage 对应的业务处理。
-     */
     @Test
     void detailReturnsRecordOrCompatibilityMissingMessage() {
         MqTriggerRejectedFacade service = new MqTriggerRejectedApplicationService();
@@ -54,9 +45,6 @@ class MqTriggerRejectedApplicationServiceTest {
                 .hasMessageContaining("rejected 消息不存在: 9999");
     }
 
-    /**
-     * 执行 replayParsesMessageRoutesByCurrentTagAndReportsDispatchFailures 对应的业务处理。
-     */
     @Test
     void replayParsesMessageRoutesByCurrentTagAndReportsDispatchFailures() {
         MqTriggerRejectedFacade service = new MqTriggerRejectedApplicationService();
@@ -69,9 +57,6 @@ class MqTriggerRejectedApplicationServiceTest {
         assertThat(replay.dispatchFailedRequestIds()).containsExactly("mq-replay-43-msg-2");
     }
 
-    /**
-     * 执行 replayRejectsMalformedOrIncompleteMessageBodies 对应的业务处理。
-     */
     @Test
     void replayRejectsMalformedOrIncompleteMessageBodies() {
         MqTriggerRejectedFacade service = new MqTriggerRejectedApplicationService();
@@ -88,9 +73,6 @@ class MqTriggerRejectedApplicationServiceTest {
                 .hasMessageContaining("缺少 userId/messageCode/payload");
     }
 
-    /**
-     * 执行 replaySkipsInvalidRoutesAndCanReturnZeroRequests 对应的业务处理。
-     */
     @Test
     void replaySkipsInvalidRoutesAndCanReturnZeroRequests() {
         MqTriggerRejectedFacade service = new MqTriggerRejectedApplicationService();

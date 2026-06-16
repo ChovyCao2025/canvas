@@ -17,14 +17,8 @@ import org.springframework.data.redis.core.ReactiveValueOperations;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-/**
- * 定义 RedisTriggerRouteAdapterTest 的执行上下文数据结构或业务契约。
- */
 class RedisTriggerRouteAdapterTest {
 
-    /**
-     * 执行 buildsStableTenantScopedRedisKeysAndRoundTripsRoutes 对应的业务处理。
-     */
     @Test
     void buildsStableTenantScopedRedisKeysAndRoundTripsRoutes() {
         RedisTriggerRouteAdapter adapter = new RedisTriggerRouteAdapter(null);
@@ -38,9 +32,6 @@ class RedisTriggerRouteAdapterTest {
         assertThat(restored).isEqualTo(route);
     }
 
-    /**
-     * 执行 routesForReturnsRouteSavedForTriggerTypeAndMatchKey 对应的业务处理。
-     */
     @Test
     void routesForReturnsRouteSavedForTriggerTypeAndMatchKey() {
         ReactiveStringRedisTemplate redisTemplate = mock(ReactiveStringRedisTemplate.class);
@@ -72,9 +63,6 @@ class RedisTriggerRouteAdapterTest {
         assertThat(adapter.routesFor("mq", "orders.created")).containsExactly(route);
     }
 
-    /**
-     * 执行 removeDeletesOnlyMatchingTenantCanvasRoutes 对应的业务处理。
-     */
     @Test
     void removeDeletesOnlyMatchingTenantCanvasRoutes() {
         ReactiveStringRedisTemplate redisTemplate = mock(ReactiveStringRedisTemplate.class);
@@ -109,9 +97,6 @@ class RedisTriggerRouteAdapterTest {
         assertThat(adapter.routesFor("MQ", "orders.updated")).containsExactly(otherCanvas);
     }
 
-    /**
-     * 执行 routesForReturnsBlankMatchRoutesAsWildcardRoutes 对应的业务处理。
-     */
     @Test
     void routesForReturnsBlankMatchRoutesAsWildcardRoutes() {
         ReactiveStringRedisTemplate redisTemplate = mock(ReactiveStringRedisTemplate.class);

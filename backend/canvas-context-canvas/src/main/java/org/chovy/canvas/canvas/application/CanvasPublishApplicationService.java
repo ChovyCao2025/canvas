@@ -7,6 +7,7 @@ import org.chovy.canvas.canvas.domain.CanvasStateTransitionPolicy;
 import org.chovy.canvas.canvas.domain.CanvasStatus;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
 import org.chovy.canvas.canvas.domain.CanvasVersionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +40,7 @@ public class CanvasPublishApplicationService {
     /**
      * 使用发布所需依赖创建画布发布应用服务。
      */
+    @Autowired
     public CanvasPublishApplicationService(CanvasRepository canvasRepository,
                                            CanvasVersionRepository versionRepository,
                                            ExecutionPublicationPort publicationPort) {

@@ -127,6 +127,18 @@ class RiskDecisionServiceTest {
      * 执行 persistsRuleHitsForEffectiveAndShadowSignals 相关的风控处理逻辑。
      */
     @Test
+    void missingActiveStrategyPersistsFallbackDecisionWithRuntimeMode() {
+        strategyReader.strategy = null;
+
+        RiskDecisionResponse response = service.evaluate(request("missing-strategy"));
+
+        assertThat(response.strategyKey()).isEqualTo("missing");
+        assertThat(response.mode()).isEqualTo(RiskRuntimeMode.ENFORCE);
+        assertThat(response.action()).isEqualTo(RiskDecisionAction.REVIEW);
+        assertThat(ledger.savedRuns.getFirst().response().mode()).isEqualTo(RiskRuntimeMode.ENFORCE);
+    }
+
+    @Test
     void persistsRuleHitsForEffectiveAndShadowSignals() {
         strategyReader.strategy = strategyWithRules(
                 rule("score-high", RiskRuleOperand.feature("risk.score"), RiskRuleOperator.GTE,

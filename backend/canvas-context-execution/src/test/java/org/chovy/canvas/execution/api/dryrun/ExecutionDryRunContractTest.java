@@ -7,14 +7,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 ExecutionDryRunContractTest 的执行上下文数据结构或业务契约。
- */
 class ExecutionDryRunContractTest {
 
-    /**
-     * 执行 dryRunReturnsTraceWithoutPublishingOrMutatingCanvas 对应的业务处理。
-     */
     @Test
     void dryRunReturnsTraceWithoutPublishingOrMutatingCanvas() {
         RecordingDryRunFacade facade = new RecordingDryRunFacade();
@@ -33,19 +27,9 @@ class ExecutionDryRunContractTest {
         assertThat(facade.publishCalls).isZero();
     }
 
-    /**
-     * 定义 RecordingDryRunFacade 的执行上下文数据结构或业务契约。
-     */
     private static final class RecordingDryRunFacade implements ExecutionDryRunFacade {
-        /**
-         * 保存 publishCalls 对应的状态或配置。
-         */
         private int publishCalls;
 
-        /**
-         * 执行 dryRun 对应的业务处理。
-         * @param command command 参数
-         */
         @Override
         public DryRunResultView dryRun(DryRunCommand command) {
             return new DryRunResultView(

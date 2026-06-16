@@ -822,7 +822,7 @@ class BiApiCompatibilityTest {
     }
 
     @Test
-    void dashboardResourceReadRoutesPreserveCompactLegacyEnvelopeWithoutWorkspaceId() {
+    void dashboardResourceReadRoutesPreserveCompactLegacyEnvelopeWithOptionalWorkspaceId() {
         TestFixture fixture = fixtureWithWorkspaceDatasetChartAndDashboard();
         WebTestClient client = webClient(fixture.facade);
         client.post()
@@ -844,6 +844,21 @@ class BiApiCompatibilityTest {
                 .jsonPath("$.traceId").doesNotExist()
                 .jsonPath("$.data.length()").isEqualTo(1)
                 .jsonPath("$.data[0].tenantId").isEqualTo(TENANT_ID.intValue())
+                .jsonPath("$.data[0].dashboardKey").isEqualTo("marketing-overview")
+                .jsonPath("$.data[0].status").isEqualTo("PUBLISHED");
+
+        client.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/canvas/bi/dashboards/resources")
+                        .queryParam("workspaceId", WORKSPACE_ID)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo(0)
+                .jsonPath("$.message").isEqualTo("success")
+                .jsonPath("$.data.length()").isEqualTo(1)
                 .jsonPath("$.data[0].dashboardKey").isEqualTo("marketing-overview")
                 .jsonPath("$.data[0].status").isEqualTo("PUBLISHED");
 
@@ -1747,6 +1762,13 @@ class BiApiCompatibilityTest {
         Mono<CompatibilityEnvelope<List<BiDashboardView>>> listDashboardResources(
                 @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
             return envelope(() -> facade.listDashboardResources(tenantIdOrDefault(tenantId)));
+        }
+
+        @GetMapping(value = "/canvas/bi/dashboards/resources", params = "workspaceId")
+        Mono<CompatibilityEnvelope<List<BiDashboardView>>> listDashboardResourcesByWorkspaceAlias(
+                @RequestParam Long workspaceId,
+                @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
+            return listDashboardResources(tenantId);
         }
 
         @GetMapping(value = "/canvas/bi/dashboards/resources/{dashboardKey}", params = "!workspaceId")

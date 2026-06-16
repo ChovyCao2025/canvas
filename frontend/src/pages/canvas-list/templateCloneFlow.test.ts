@@ -49,9 +49,28 @@ describe('template catalog helpers', () => {
       'mock-ai-risk-audit',
     ])
     expect(goldenPath.steps.find(step => step.id === 'dsl-export-cli-validate')?.command)
-      .toBe('cd tools/canvas-cli && node src/index.mjs validate test/fixtures/valid-journey.json')
+      .toBe('cd tools/canvas-cli && node src/index.mjs validate test/fixtures/playground-new-user-welcome.json')
     expect(goldenPath.steps.find(step => step.id === 'mock-ai-risk-audit')?.safety)
       .toBe('mock-provider-preview-only')
     expect(goldenPath.publishBoundary).toBe('draft-preview-only')
+  })
+
+  it('returns isolated nested playground payload and trace objects', () => {
+    const firstGoldenPath = getPlaygroundGoldenPath()
+    const mutablePayload = firstGoldenPath.template.samplePayload as {
+      user: { lifecycleStage: string }
+    }
+
+    mutablePayload.user.lifecycleStage = 'mutated'
+    firstGoldenPath.template.expectedTrace[0].summary = 'mutated trace summary'
+
+    const freshGoldenPath = getPlaygroundGoldenPath()
+    const freshPayload = freshGoldenPath.template.samplePayload as {
+      user: { lifecycleStage: string }
+    }
+
+    expect(freshPayload.user.lifecycleStage).toBe('new')
+    expect(freshGoldenPath.template.expectedTrace[0].summary)
+      .toBe('用户处于 new 生命周期阶段')
   })
 })

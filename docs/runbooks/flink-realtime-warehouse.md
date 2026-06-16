@@ -1,6 +1,6 @@
 # Flink Realtime Warehouse Runbook
 
-This runbook covers the local first slice of the realtime warehouse execution layer. It gives Marketing Canvas runnable Flink SQL jobs for MySQL CDC to Doris ODS and Doris ODS/DWD/DWS transformations, plus checkpoint evidence reporting back to `canvas-engine`.
+This runbook covers the local first slice of the realtime warehouse execution layer. It gives Marketing Canvas runnable Flink SQL jobs for MySQL CDC to Doris ODS and Doris ODS/DWD/DWS transformations, plus checkpoint evidence reporting back to the `canvas-boot` runtime.
 
 It is not a production readiness claim. Production still needs a managed Flink deployment model, real secret wiring, live Flink + Doris integration evidence, alerting, capacity sizing, and cutover policy from the direct Doris Stream Load fallback.
 
@@ -113,7 +113,7 @@ Submit the other pipeline keys the same way after the prerequisite source tables
 
 ## Inspect Evidence
 
-When `canvas-engine` is running, the job reports startup PASS/FAIL evidence to:
+When `canvas-boot` is running, the job reports startup PASS/FAIL evidence to:
 
 ```text
 POST /warehouse/realtime/pipelines/checkpoints
@@ -164,7 +164,7 @@ Passing unit tests prove the job module compiles, SQL assets render, connector p
 
 ## Live Local E2E Proof
 
-Use the opt-in live verifier only when Docker is available and `canvas-engine` is already running locally with Doris enabled:
+Use the opt-in live verifier only when Docker is available and `canvas-boot` is already running locally with Doris enabled:
 
 ```bash
 export CANVAS_DORIS_ENABLED=true
@@ -176,7 +176,7 @@ export CANVAS_LIVE_VERIFY_DERIVED_LAYERS=true
 scripts/verify-flink-realtime-warehouse-live.sh
 ```
 
-If `canvas-engine` is not already running, the script can start it for the duration of the verification:
+If `canvas-boot` is not already running, the script can start it for the duration of the verification:
 
 ```bash
 export CANVAS_LIVE_START_ENGINE=true

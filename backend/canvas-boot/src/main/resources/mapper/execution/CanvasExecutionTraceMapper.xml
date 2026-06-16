@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="org.chovy.canvas.dal.mapper.CanvasExecutionTraceMapper">
+<mapper namespace="org.chovy.canvas.execution.adapter.persistence.CanvasExecutionTraceMapper">
 
     <!-- 批量插入轨迹记录（TraceWriteBuffer 每 500ms 调用一次） -->
     <insert id="insertBatch" parameterType="java.util.List">

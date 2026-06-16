@@ -9,7 +9,7 @@ details.
 
 - Java 21
 - Maven 3.9+
-- Node.js 18+
+- Node.js 20.19+ or 22.12+
 - Docker 24+
 
 ## Local Startup Path
@@ -57,8 +57,9 @@ node tools/open-source-growth/guardrail-verifier.mjs
 - RocketMQ is part of the current backend startup path.
 - The current quickstart is a local development path, not a finalized public
   one-command demo.
-- Template docs and local DSL validation can be reviewed now.
-- Backend public extension/API write operations remain blocked until G10.
+- Template docs, local DSL validation/diff, and G10 CLI import/export preview
+  can be reviewed now.
+- Publish remains blocked until a stable backend publish endpoint is verified.
 - Use WireMock and local mock providers for external integrations during local
   testing.
 

@@ -16,24 +16,112 @@
           "templates": [
             {
               "key": "new-user-welcome",
-              "title": "New user welcome journey",
+              "title": "新用户欢迎旅程",
               "riskLevel": "LOW",
-              "requiredPlugins": ["canvas-plugin-webhook", "canvas-plugin-coupon", "canvas-plugin-message"],
+              "requiredPlugins": [
+                "canvas-plugin-webhook",
+                "canvas-plugin-coupon",
+                "canvas-plugin-message"
+              ],
               "docs": "docs/open-source/templates/new-user-welcome.md"
             },
             {
+              "key": "dormant-user-winback",
+              "title": "沉睡用户召回",
+              "riskLevel": "MEDIUM",
+              "requiredPlugins": [
+                "canvas-plugin-schedule",
+                "canvas-plugin-coupon",
+                "canvas-plugin-message",
+                "canvas-plugin-risk"
+              ],
+              "docs": "docs/open-source/templates/dormant-user-winback.md"
+            },
+            {
               "key": "coupon-approval-release",
-              "title": "Coupon approval release",
+              "title": "优惠券审批发布",
               "riskLevel": "HIGH",
-              "requiredPlugins": ["canvas-plugin-coupon", "canvas-plugin-approval", "canvas-plugin-message"],
+              "requiredPlugins": [
+                "canvas-plugin-approval",
+                "canvas-plugin-coupon",
+                "canvas-plugin-message"
+              ],
               "docs": "docs/open-source/templates/coupon-approval-release.md"
             },
             {
+              "key": "ai-copy-review-publish",
+              "title": "AI 文案生成与人工审核",
+              "riskLevel": "MEDIUM",
+              "requiredPlugins": [
+                "canvas-plugin-ai",
+                "canvas-plugin-approval",
+                "canvas-plugin-message"
+              ],
+              "docs": "docs/open-source/templates/ai-copy-review-publish.md"
+            },
+            {
+              "key": "lead-capture-assignment",
+              "title": "表单线索分配",
+              "riskLevel": "LOW",
+              "requiredPlugins": [
+                "canvas-plugin-webhook",
+                "canvas-plugin-assignment",
+                "canvas-plugin-message"
+              ],
+              "docs": "docs/open-source/templates/lead-capture-assignment.md"
+            },
+            {
+              "key": "birthday-benefit",
+              "title": "生日权益触达",
+              "riskLevel": "LOW",
+              "requiredPlugins": [
+                "canvas-plugin-schedule",
+                "canvas-plugin-coupon",
+                "canvas-plugin-message"
+              ],
+              "docs": "docs/open-source/templates/birthday-benefit.md"
+            },
+            {
+              "key": "vip-retention",
+              "title": "高价值用户维护",
+              "riskLevel": "MEDIUM",
+              "requiredPlugins": [
+                "canvas-plugin-coupon",
+                "canvas-plugin-assignment",
+                "canvas-plugin-message"
+              ],
+              "docs": "docs/open-source/templates/vip-retention.md"
+            },
+            {
+              "key": "ab-message-experiment",
+              "title": "A/B 实验触达",
+              "riskLevel": "MEDIUM",
+              "requiredPlugins": [
+                "canvas-plugin-experiment",
+                "canvas-plugin-message"
+              ],
+              "docs": "docs/open-source/templates/ab-message-experiment.md"
+            },
+            {
               "key": "risk-blocked-outreach",
-              "title": "Risk-blocked outreach",
+              "title": "风险触达拦截",
               "riskLevel": "HIGH",
-              "requiredPlugins": ["canvas-plugin-risk", "canvas-plugin-message"],
+              "requiredPlugins": [
+                "canvas-plugin-risk",
+                "canvas-plugin-message"
+              ],
               "docs": "docs/open-source/templates/risk-blocked-outreach.md"
+            },
+            {
+              "key": "private-domain-follow-up",
+              "title": "私域跟进旅程",
+              "riskLevel": "MEDIUM",
+              "requiredPlugins": [
+                "canvas-plugin-webhook",
+                "canvas-plugin-private-domain",
+                "canvas-plugin-message"
+              ],
+              "docs": "docs/open-source/templates/private-domain-follow-up.md"
             }
           ]
         }
@@ -53,12 +141,56 @@
         "jsonBody": {
           "status": "SUCCESS",
           "plugins": [
-            { "key": "canvas-plugin-webhook", "enabled": true, "mode": "mock" },
-            { "key": "canvas-plugin-message", "enabled": true, "mode": "mock" },
-            { "key": "canvas-plugin-coupon", "enabled": true, "mode": "mock" },
-            { "key": "canvas-plugin-approval", "enabled": true, "mode": "mock" },
-            { "key": "canvas-plugin-ai", "enabled": true, "mode": "mock" },
-            { "key": "canvas-plugin-risk", "enabled": true, "mode": "mock" }
+            {
+              "key": "canvas-plugin-ai",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-approval",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-assignment",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-coupon",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-experiment",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-message",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-private-domain",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-risk",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-schedule",
+              "enabled": true,
+              "mode": "mock"
+            },
+            {
+              "key": "canvas-plugin-webhook",
+              "enabled": true,
+              "mode": "mock"
+            }
           ]
         }
       }

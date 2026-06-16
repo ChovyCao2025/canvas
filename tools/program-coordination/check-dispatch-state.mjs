@@ -333,6 +333,77 @@ function validateEvidence(state, errors) {
       }
     }
   }
+  validateCutoverEvidenceFreshness(state, errors)
+}
+
+function evidenceText(evidence) {
+  if (!isObject(evidence)) {
+    return ''
+  }
+  return `${evidence.command ?? ''} ${evidence.result ?? ''}`
+}
+
+function readinessText(readiness) {
+  if (!isObject(readiness)) {
+    return ''
+  }
+  return [
+    readiness.level,
+    readiness.gate,
+    readiness.backendTarget,
+    readiness.writeMode,
+  ].filter(Boolean).join(' ')
+}
+
+function hasCutoverReadySignal(text) {
+  return /cutoverReady[:= ]+true/i.test(text)
+    || /cutover preflight.*ready/i.test(text)
+}
+
+function hasBlockersEmptySignal(text) {
+  return /blockers\s*(?:empty|\[\]|0|: \[\])/i.test(text)
+    || /no blockers/i.test(text)
+}
+
+function currentCutoverStateIsReady(state) {
+  const currentText = [
+    readinessText(state.readiness),
+    state.lastEvent ?? '',
+    ...state.lastVerifiedEvidence.slice(-3).map(evidenceText),
+  ].join(' ')
+
+  return hasCutoverReadySignal(currentText) && hasBlockersEmptySignal(currentText)
+}
+
+function staleCutoverEvidenceReasons(text) {
+  const reasons = []
+  if (/cutoverReady[:= ]+false/i.test(text)) {
+    reasons.push('cutoverReady=false')
+  }
+  if (/\broute gap candidates?\b/i.test(text)) {
+    reasons.push('route gap candidates')
+  }
+  if (/\bnext (?:preflight )?(?:top gap|clear preflight route batch|candidates?)\b/i.test(text)) {
+    reasons.push('next route gap')
+  }
+  const routeMatches = text.match(/\broute:\/[^\s,;|)]+/gi) ?? []
+  reasons.push(...routeMatches)
+  if (/\bblockers?\s+remain\b/i.test(text)) {
+    reasons.push('blockers remain')
+  }
+  return [...new Set(reasons)]
+}
+
+function validateCutoverEvidenceFreshness(state, errors) {
+  if (!currentCutoverStateIsReady(state)) {
+    return
+  }
+  for (const [index, evidence] of state.lastVerifiedEvidence.entries()) {
+    const reasons = staleCutoverEvidenceReasons(evidenceText(evidence))
+    if (reasons.length > 0) {
+      errors.push(`stale contradictory lastVerifiedEvidence[${index}] after cutover-ready evidence: ${reasons.join(', ')}`)
+    }
+  }
 }
 
 function validateBridgeDeclaration(dispatch, label, errors) {

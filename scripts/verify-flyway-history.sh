@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verifies the known Flyway history repair window without mutating the database.
 #
-# The checker compares applied V91/V92/V93/V272/V273/V354/V356 rows with the expected
+# The checker compares applied V91/V92/V93/V354/V356 rows with the expected
 # post-merge migration sequence and returns repair guidance through failures.
 set -euo pipefail
 
@@ -14,7 +14,7 @@ DB_PASSWORD="${DB_PASSWORD:-${MYSQL_PASSWORD:-}}"
 
 usage() {
   cat <<'USAGE'
-Verify Flyway history for the V91/V92/V272/V273/V354/V356 migration merge repair.
+Verify Flyway history for the V91/V92/V354/V356 migration merge repair.
 
 By default this connects to MySQL and reads flyway_schema_history.
 
@@ -82,7 +82,7 @@ history_rows() {
   fi
 
   local query
-  query="SELECT version, description, success FROM flyway_schema_history WHERE version IN ('91','92','93','272','273','354','356') ORDER BY installed_rank;"
+  query="SELECT version, description, success FROM flyway_schema_history WHERE version IN ('91','92','93','354','356') ORDER BY installed_rank;"
   MYSQL_PWD="$DB_PASSWORD" mysql \
     --batch \
     --raw \
@@ -102,8 +102,6 @@ verify_rows() {
   local seen_91=""
   local seen_92=""
   local seen_93=""
-  local seen_272=""
-  local seen_273=""
   local seen_354=""
   local seen_356=""
 
@@ -140,22 +138,6 @@ verify_rows() {
           failures+=("V93 has unexpected description: ${description:-<missing>}")
         fi
         ;;
-      272)
-        seen_272="$normalized"
-        if [[ "$normalized" == "sanitize demo datasource credentials" ]]; then
-          failures+=("V272 contains old conflicting sanitize migration")
-        elif [[ "$normalized" != "github oauth integration" ]]; then
-          failures+=("V272 has unexpected description: ${description:-<missing>}")
-        fi
-        ;;
-      273)
-        seen_273="$normalized"
-        if [[ "$normalized" == "enforce core tenant not null" ]]; then
-          failures+=("V273 contains old conflicting tenant-not-null migration")
-        elif [[ "$normalized" != "add filesystem read capability" ]]; then
-          failures+=("V273 has unexpected description: ${description:-<missing>}")
-        fi
-        ;;
       354)
         seen_354="$normalized"
         if [[ "$normalized" != "sanitize demo datasource credentials" ]]; then
@@ -175,7 +157,7 @@ verify_rows() {
   done <<< "$rows"
 
   if [[ "$seen_count" -eq 0 ]]; then
-    echo "PASS: no V91/V92/V93/V272/V273/V354/V356 Flyway history rows exist yet"
+    echo "PASS: no V91/V92/V93/V354/V356 Flyway history rows exist yet"
     return 0
   fi
 

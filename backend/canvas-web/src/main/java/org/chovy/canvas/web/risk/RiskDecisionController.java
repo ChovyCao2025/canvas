@@ -10,6 +10,7 @@ import org.chovy.canvas.risk.api.RiskDecisionCommand;
 import org.chovy.canvas.risk.api.RiskDecisionFacade;
 import org.chovy.canvas.risk.api.RiskDecisionView;
 import org.chovy.canvas.risk.domain.runtime.RiskDecisionReplayMismatchException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,7 @@ public class RiskDecisionController {
     private final RiskDecisionFacade facade;
     private final Clock clock;
 
+    @Autowired
     public RiskDecisionController(RiskDecisionFacade facade) {
         this(facade, Clock.systemUTC());
     }

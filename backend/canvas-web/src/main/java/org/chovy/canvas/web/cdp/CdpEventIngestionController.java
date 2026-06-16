@@ -9,6 +9,7 @@ import org.chovy.canvas.cdp.api.CdpEventIngestionFacade;
 import org.chovy.canvas.cdp.api.CdpIngestionResult;
 import org.chovy.canvas.cdp.api.CdpWriteKeyAuthenticationFacade;
 import org.chovy.canvas.cdp.api.CdpWriteKeyView;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,6 +34,7 @@ public class CdpEventIngestionController {
         this(null, facade);
     }
 
+    @Autowired
     public CdpEventIngestionController(CdpWriteKeyAuthenticationFacade writeKeyAuthenticationFacade,
                                        CdpEventIngestionFacade facade) {
         this.writeKeyAuthenticationFacade = writeKeyAuthenticationFacade;

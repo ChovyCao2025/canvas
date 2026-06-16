@@ -390,8 +390,8 @@ export function getPlaygroundGoldenPath(): PlaygroundGoldenPath {
       key: template.key,
       title: template.title,
       requiredPlugins: [...template.requiredPlugins],
-      samplePayload: template.samplePayload,
-      expectedTrace: [...template.expectedTrace],
+      samplePayload: cloneCatalogJson(template.samplePayload),
+      expectedTrace: cloneCatalogJson(template.expectedTrace),
       docs: template.docs,
     },
     steps: [
@@ -419,8 +419,8 @@ export function getPlaygroundGoldenPath(): PlaygroundGoldenPath {
       {
         id: 'dsl-export-cli-validate',
         title: 'Export DSL and validate with CLI',
-        command: 'cd tools/canvas-cli && node src/index.mjs validate test/fixtures/valid-journey.json',
-        expected: 'Current checked-in CLI fixture validates as a Journey with metadata.name new-user-welcome until a dedicated playground example is reserved.',
+        command: 'cd tools/canvas-cli && node src/index.mjs validate test/fixtures/playground-new-user-welcome.json',
+        expected: 'Dedicated playground CLI fixture validates as a Journey with metadata.name new-user-welcome.',
         safety: 'cli-validation-only',
       },
       {
@@ -433,6 +433,10 @@ export function getPlaygroundGoldenPath(): PlaygroundGoldenPath {
     ],
     publishBoundary: 'draft-preview-only',
   }
+}
+
+function cloneCatalogJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
 }
 
 function journey(

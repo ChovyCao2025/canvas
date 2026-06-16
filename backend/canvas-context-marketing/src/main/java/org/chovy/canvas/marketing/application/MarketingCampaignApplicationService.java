@@ -18,6 +18,7 @@ import org.chovy.canvas.marketing.domain.MarketingCampaignReadinessIssue;
 import org.chovy.canvas.marketing.domain.MarketingCampaignReadinessPolicy;
 import org.chovy.canvas.marketing.domain.MarketingCampaignReadinessReport;
 import org.chovy.canvas.marketing.domain.MarketingCampaignRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +53,7 @@ public class MarketingCampaignApplicationService implements MarketingCampaignFac
     /**
      * 创建MarketingCampaignApplicationService实例。
      */
+    @Autowired
     public MarketingCampaignApplicationService(MarketingCampaignRepository repository) {
         this(repository, Clock.systemDefaultZone());
     }

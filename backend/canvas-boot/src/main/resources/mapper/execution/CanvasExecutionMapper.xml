@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.chovy.canvas.dal.mapper.CanvasExecutionMapper">
+<mapper namespace="org.chovy.canvas.execution.adapter.persistence.CanvasExecutionMapper">
     <update id="updateContextSnapshot">
         UPDATE `canvas_execution`
         SET `context_snapshot_json` = #{contextSnapshotJson},
@@ -11,7 +11,7 @@
     </update>
 
     <select id="selectLatestPausedContextSnapshot"
-            resultType="org.chovy.canvas.dal.dataobject.CanvasExecutionDO">
+            resultType="org.chovy.canvas.execution.adapter.persistence.CanvasExecutionDO">
         SELECT
             `id`,
             `canvas_id`,

@@ -6,14 +6,8 @@ import static org.chovy.canvas.execution.adapter.persistence.PersistenceMappingA
 import com.baomidou.mybatisplus.annotation.IdType;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 CanvasExecutionDlqPersistenceMappingTest 的执行上下文数据结构或业务契约。
- */
 class CanvasExecutionDlqPersistenceMappingTest {
 
-    /**
-     * 执行 mapsCanvasExecutionDlqTable 对应的业务处理。
-     */
     @Test
     void mapsCanvasExecutionDlqTable() {
         assertTable(CanvasExecutionDlqDO.class, "canvas_execution_dlq");

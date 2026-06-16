@@ -6,18 +6,10 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-/**
- * 定义 AggregateNodeHandler 的执行上下文数据结构或业务契约。
- */
 @Component
 @NodeHandlerType("AGGREGATE")
 public class AggregateNodeHandler implements NodeHandler {
 
-    /**
-     * 执行 execute 对应的业务处理。
-     * @param context context 参数
-     * @return 处理后的结果
-     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         List<String> upstreamIds = NodeHandlerSupport.stringList(context.node().config().get("upstreamIds"));
@@ -45,13 +37,6 @@ public class AggregateNodeHandler implements NodeHandler {
         return NodeExecutionResult.routed(output, Map.of(passed ? "success" : "fail", target));
     }
 
-    /**
-     * 执行 passed 对应的业务处理。
-     * @param config config 参数
-     * @param successCount successCount 参数
-     * @param successRate successRate 参数
-     * @return 处理后的结果
-     */
     private boolean passed(Map<String, Object> config, long successCount, double successRate) {
         String mode = NodeHandlerSupport.upper(config.get("evaluateMode"), "COUNT");
         return switch (mode) {
@@ -67,11 +52,6 @@ public class AggregateNodeHandler implements NodeHandler {
         };
     }
 
-    /**
-     * 执行 upstreamStatus 对应的业务处理。
-     * @param context context 参数
-     * @param upstreamId upstreamId 参数
-     */
     private Object upstreamStatus(NodeExecutionContext context, String upstreamId) {
         Object status = fromMap(context.contextData().get("nodeStatuses"), upstreamId);
         if (status != null) {
@@ -98,11 +78,6 @@ public class AggregateNodeHandler implements NodeHandler {
         return null;
     }
 
-    /**
-     * 执行 fromMap 对应的业务处理。
-     * @param value value 参数
-     * @param key key 参数
-     */
     private Object fromMap(Object value, String key) {
         if (value instanceof Map<?, ?> map) {
             return map.get(key);
@@ -110,10 +85,6 @@ public class AggregateNodeHandler implements NodeHandler {
         return null;
     }
 
-    /**
-     * 执行 isSuccess 对应的业务处理。
-     * @param status status 参数
-     */
     private boolean isSuccess(Object status) {
         if (status instanceof Boolean value) {
             return value;

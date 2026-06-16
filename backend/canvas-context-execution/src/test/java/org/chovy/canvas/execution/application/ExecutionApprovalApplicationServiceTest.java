@@ -6,14 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.chovy.canvas.execution.api.ExecutionApprovalFacade;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 ExecutionApprovalApplicationServiceTest 的执行上下文数据结构或业务契约。
- */
 class ExecutionApprovalApplicationServiceTest {
 
-    /**
-     * 执行 approveAndRejectRecordPendingApprovalDecisionWithActorAndComment 对应的业务处理。
-     */
     @Test
     void approveAndRejectRecordPendingApprovalDecisionWithActorAndComment() {
         ExecutionApprovalFacade service = new ExecutionApprovalApplicationService();
@@ -33,9 +27,6 @@ class ExecutionApprovalApplicationServiceTest {
         assertThat(rejected.comment()).isEqualTo("risk mismatch");
     }
 
-    /**
-     * 执行 enforcesTenantAndApproverButTreatsMissingPendingApprovalAsNoop 对应的业务处理。
-     */
     @Test
     void enforcesTenantAndApproverButTreatsMissingPendingApprovalAsNoop() {
         ExecutionApprovalFacade service = new ExecutionApprovalApplicationService();

@@ -12,14 +12,8 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerRegistry;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 OfficialAiPluginTest 的执行上下文数据结构或业务契约。
- */
 class OfficialAiPluginTest {
 
-    /**
-     * 执行 registersAiGenerateCopyHandlerThroughExecutionRegistry 对应的业务处理。
-     */
     @Test
     void registersAiGenerateCopyHandlerThroughExecutionRegistry() {
         NodeHandlerRegistry registry = new NodeHandlerRegistry(List.of(new OfficialAiNodeHandler()));
@@ -29,9 +23,6 @@ class OfficialAiPluginTest {
                 .containsExactly("ai.generate-copy");
     }
 
-    /**
-     * 执行 returnsDeterministicAiGenerateCopyEnvelope 对应的业务处理。
-     */
     @Test
     void returnsDeterministicAiGenerateCopyEnvelope() {
         NodeHandler handler = new OfficialAiNodeHandler();
@@ -63,9 +54,6 @@ class OfficialAiPluginTest {
         assertThat(result.output().get("context")).isEqualTo(Map.of("tenantId", "tenant-a"));
     }
 
-    /**
-     * 执行 trimsPromptKey 对应的业务处理。
-     */
     @Test
     void trimsPromptKey() {
         NodeHandler handler = new OfficialAiNodeHandler();
@@ -88,9 +76,6 @@ class OfficialAiPluginTest {
                 .containsEntry("generatedCopy", "Generated copy for seasonal_offer");
     }
 
-    /**
-     * 执行 defaultsOperatorToAnonymousWhenUserIdIsMissing 对应的业务处理。
-     */
     @Test
     void defaultsOperatorToAnonymousWhenUserIdIsMissing() {
         NodeHandler handler = new OfficialAiNodeHandler();
@@ -107,9 +92,6 @@ class OfficialAiPluginTest {
         assertThat(result.output()).containsEntry("operator", "anonymous");
     }
 
-    /**
-     * 执行 failsWhenPromptKeyIsMissing 对应的业务处理。
-     */
     @Test
     void failsWhenPromptKeyIsMissing() {
         NodeHandler handler = new OfficialAiNodeHandler();
@@ -126,9 +108,6 @@ class OfficialAiPluginTest {
         assertThat(result.error()).contains("AI prompt key is required");
     }
 
-    /**
-     * 执行 failsWhenPromptKeyIsBlank 对应的业务处理。
-     */
     @Test
     void failsWhenPromptKeyIsBlank() {
         NodeHandler handler = new OfficialAiNodeHandler();

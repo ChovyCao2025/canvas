@@ -5,6 +5,7 @@ import org.chovy.canvas.canvas.domain.CanvasRepository;
 import org.chovy.canvas.canvas.domain.CanvasStateTransitionPolicy;
 import org.chovy.canvas.canvas.domain.CanvasVersion;
 import org.chovy.canvas.canvas.domain.CanvasVersionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class CanvasDraftApplicationService {
     /**
      * 使用画布仓储和版本仓储创建草稿应用服务。
      */
+    @Autowired
     public CanvasDraftApplicationService(CanvasRepository canvasRepository,
                                          CanvasVersionRepository versionRepository,
                                          CanvasStateTransitionPolicy transitionPolicy) {

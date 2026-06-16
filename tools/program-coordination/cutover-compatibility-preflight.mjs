@@ -41,7 +41,26 @@ const activeRuntimeRunbookFiles = [
   'docs/product-evolution/runbooks/4000-concurrency-readiness-runbook.md',
   'docs/runbooks/marketing-content-production-readiness.md',
   'docs/runbooks/risk-control-rule-engine.md',
+  'docs/runbooks/flink-realtime-warehouse.md',
+  'docs/runbooks/flink-production-deployment.md',
   'docs/runbooks/flyway-migration-history-repair-2026-06-06.md'
+]
+const serviceNameCompatibilityPolicyPath = 'docs/runbooks/backend-service-name-cutover.md'
+const helmCompatibilityValuesFiles = [
+  'deploy/helm/canvas/values.yaml',
+  'deploy/helm/canvas/values-staging.yaml',
+  'deploy/helm/canvas/values-prod.yaml'
+]
+const frontendPackagePath = 'frontend/package.json'
+const frontendPackageLockPath = 'frontend/package-lock.json'
+const requiredFrontendNodeEngine = '^20.19.0 || >=22.12.0'
+const requiredCiNodeVersion = '20.19.0'
+const requiredFrontendNodeDocText = 'Node.js 20.19+ or 22.12+'
+const frontendNodeVersionDocFiles = [
+  'AGENTS.md',
+  'CONTRIBUTING.md',
+  'docs/open-source/quickstart.md',
+  'docs/open-source/en/quickstart.md'
 ]
 
 const requiredCompatibilityTests = [
@@ -73,11 +92,12 @@ export async function buildReport(rootDirectory) {
   const bootCutover = await inspectBootCutover(root)
   const runCommandCutover = await inspectRunCommandCutover(root)
   const packagedRuntimeCutover = await inspectPackagedRuntimeCutover(root)
+  const frontendToolchain = await inspectFrontendToolchain(root, packagedRuntimeCutover)
   const productionPreflightCutover = await inspectProductionPreflightCutover(root)
   const activeRuntimeRunbookCutover = await inspectActiveRuntimeRunbookCutover(root)
   const serviceNameCompatibility = await inspectServiceNameCompatibility(root)
   const routeGapSummary = buildRouteGapSummary(oldCounts.controllers, currentCounts.controllers)
-  const blockers = buildBlockers(oldCounts, currentCounts, compatibilityTests, routeGapSummary, bootCutover, runCommandCutover, packagedRuntimeCutover, productionPreflightCutover, activeRuntimeRunbookCutover, serviceNameCompatibility)
+  const blockers = buildBlockers(oldCounts, currentCounts, compatibilityTests, routeGapSummary, bootCutover, runCommandCutover, packagedRuntimeCutover, frontendToolchain, productionPreflightCutover, activeRuntimeRunbookCutover, serviceNameCompatibility)
 
   return {
     root,
@@ -99,6 +119,7 @@ export async function buildReport(rootDirectory) {
     currentCanvasBoot: bootCutover,
     runCommandCutover,
     packagedRuntimeCutover,
+    frontendToolchain,
     productionPreflightCutover,
     activeRuntimeRunbookCutover,
     serviceNameCompatibility,
@@ -184,18 +205,24 @@ function extractControllerEndpoints(source) {
   const header = classIndex === -1 ? source : source.slice(0, classIndex)
   const body = classIndex === -1 ? source : source.slice(classIndex)
   const classPaths = extractClassPaths(header)
+  const classConditionSignature = extractClassConditionSignature(header)
   const mappings = extractMappingAnnotations(body)
   const endpoints = []
 
   for (const mapping of mappings) {
     const methodPaths = extractMappingPaths(mapping.argumentsText)
     const httpMethods = extractHttpMethods(mapping.name, mapping.argumentsText)
+    const conditionSignature = mergeMappingConditionSignatures(
+      classConditionSignature,
+      extractMappingConditionSignature(mapping.argumentsText)
+    )
     for (const classPath of classPaths) {
       for (const methodPath of methodPaths) {
         for (const httpMethod of httpMethods) {
           endpoints.push({
             httpMethod,
-            path: joinRoutePaths(classPath, methodPath)
+            path: joinRoutePaths(classPath, methodPath),
+            conditionSignature
           })
         }
       }
@@ -211,6 +238,14 @@ function extractClassPaths(header) {
     return ['']
   }
   return extractMappingPaths(mappings[mappings.length - 1].argumentsText)
+}
+
+function extractClassConditionSignature(header) {
+  const mappings = extractMappingAnnotations(header).filter((mapping) => mapping.name === 'RequestMapping')
+  if (mappings.length === 0) {
+    return ''
+  }
+  return extractMappingConditionSignature(mappings[mappings.length - 1].argumentsText)
 }
 
 function extractMappingAnnotations(source) {
@@ -296,6 +331,41 @@ function extractMappingPaths(argumentsText) {
   const pathExpression = explicitPath ?? readPositionalPathValue(trimmed)
   const paths = extractQuotedStrings(pathExpression)
   return paths.length === 0 ? [''] : paths
+}
+
+function extractMappingConditionSignature(argumentsText) {
+  const parts = []
+  for (const attribute of ['params', 'headers', 'consumes', 'produces']) {
+    const expression = readNamedAttributeValue(argumentsText, attribute)
+    if (expression == null) {
+      continue
+    }
+    const values = normalizeAnnotationConditionValues(expression)
+    parts.push(`${attribute}=${values.join('|')}`)
+  }
+  return parts.join(';')
+}
+
+function normalizeAnnotationConditionValues(expression) {
+  const quoted = extractQuotedStrings(expression)
+  if (quoted.length > 0) {
+    return quoted.sort()
+  }
+  const normalized = expression
+    .replace(/^\{\s*|\s*}$/g, '')
+    .split(',')
+    .map((value) => value.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .sort()
+  return normalized.length > 0 ? normalized : ['']
+}
+
+function mergeMappingConditionSignatures(...signatures) {
+  return signatures
+    .filter(Boolean)
+    .flatMap((signature) => signature.split(';').filter(Boolean))
+    .sort()
+    .join(';')
 }
 
 function readNamedAttributeValue(text, attributeName) {
@@ -464,9 +534,7 @@ function buildRouteGapSummary(oldControllers, currentControllers) {
 }
 
 function filterUncoveredOldControllerEndpoints(oldControllers, currentControllers) {
-  const currentEndpointKeys = new Set(currentControllers.flatMap((controller) => (
-    controller.endpoints.map(endpointRouteKey)
-  )))
+  const currentEndpoints = currentControllers.flatMap((controller) => controller.endpoints)
 
   return oldControllers
     .flatMap((controller) => {
@@ -474,7 +542,7 @@ function filterUncoveredOldControllerEndpoints(oldControllers, currentController
         return [controller]
       }
 
-      const endpoints = controller.endpoints.filter((endpoint) => !currentEndpointKeys.has(endpointRouteKey(endpoint)))
+      const endpoints = controller.endpoints.filter((endpoint) => !isEndpointCoveredByCurrent(endpoint, currentEndpoints))
       if (endpoints.length === 0) {
         return []
       }
@@ -487,8 +555,108 @@ function filterUncoveredOldControllerEndpoints(oldControllers, currentController
     })
 }
 
+function isEndpointCoveredByCurrent(oldEndpoint, currentEndpoints) {
+  const oldPath = normalizeRoutePathVariables(oldEndpoint.path)
+  const comparableEndpoints = currentEndpoints.filter((currentEndpoint) => (
+    currentEndpoint.httpMethod === oldEndpoint.httpMethod &&
+    normalizeRoutePathVariables(currentEndpoint.path) === oldPath
+  ))
+  if (comparableEndpoints.length === 0) {
+    return false
+  }
+
+  const oldConditions = parseConditionSignature(oldEndpoint.conditionSignature)
+  const matchingFixedConditionEndpoints = comparableEndpoints.filter((currentEndpoint) => {
+    const currentConditions = parseConditionSignature(currentEndpoint.conditionSignature)
+    return ['headers', 'consumes', 'produces'].every((attribute) => (
+      conditionValuesEqual(oldConditions.get(attribute), currentConditions.get(attribute))
+    ))
+  })
+
+  if (matchingFixedConditionEndpoints.some((currentEndpoint) => (
+    conditionValuesEqual(
+      oldConditions.get('params'),
+      parseConditionSignature(currentEndpoint.conditionSignature).get('params')
+    )
+  ))) {
+    return true
+  }
+
+  const oldParams = oldConditions.get('params')
+  if (oldParams && oldParams.length > 0) {
+    return false
+  }
+
+  return hasCurrentParamsPartitionCoverage(matchingFixedConditionEndpoints)
+}
+
+function hasCurrentParamsPartitionCoverage(currentEndpoints) {
+  const partitionValuesByName = new Map()
+
+  for (const currentEndpoint of currentEndpoints) {
+    const currentParams = parseConditionSignature(currentEndpoint.conditionSignature).get('params') ?? []
+    if (currentParams.length !== 1) {
+      continue
+    }
+
+    const parsed = parseSimpleParamCondition(currentParams[0])
+    if (!parsed) {
+      continue
+    }
+
+    const values = partitionValuesByName.get(parsed.name) ?? new Set()
+    values.add(parsed.negated ? 'negated' : 'present')
+    partitionValuesByName.set(parsed.name, values)
+  }
+
+  return [...partitionValuesByName.values()].some((values) => (
+    values.has('present') && values.has('negated')
+  ))
+}
+
+function parseSimpleParamCondition(paramCondition) {
+  const trimmed = paramCondition.trim()
+  const match = trimmed.match(/^(!)?([A-Za-z_$][\w$.-]*)$/u)
+  if (!match) {
+    return null
+  }
+  return {
+    negated: Boolean(match[1]),
+    name: match[2]
+  }
+}
+
+function parseConditionSignature(signature) {
+  const conditions = new Map()
+  if (!signature) {
+    return conditions
+  }
+
+  for (const part of signature.split(';').filter(Boolean)) {
+    const separatorIndex = part.indexOf('=')
+    if (separatorIndex === -1) {
+      continue
+    }
+    const attribute = part.slice(0, separatorIndex)
+    const values = part.slice(separatorIndex + 1).split('|').filter(Boolean)
+    conditions.set(attribute, [
+      ...(conditions.get(attribute) ?? []),
+      ...values
+    ].sort())
+  }
+  return conditions
+}
+
+function conditionValuesEqual(left = [], right = []) {
+  if (left.length !== right.length) {
+    return false
+  }
+  return left.every((value, index) => value === right[index])
+}
+
 function endpointRouteKey(endpoint) {
-  return `${endpoint.httpMethod} ${normalizeRoutePathVariables(endpoint.path)}`
+  const baseKey = `${endpoint.httpMethod} ${normalizeRoutePathVariables(endpoint.path)}`
+  return endpoint.conditionSignature ? `${baseKey} ${endpoint.conditionSignature}` : baseKey
 }
 
 function normalizeRoutePathVariables(routePath) {
@@ -647,34 +815,97 @@ async function inspectRunCommandCutover(root) {
 }
 
 async function inspectPackagedRuntimeCutover(root) {
+  const helmValuesPath = 'deploy/helm/canvas/values.yaml'
+  const helmValuesFile = path.join(root, helmValuesPath)
+  const helmValues = await fileExists(helmValuesFile) ? await readFile(helmValuesFile, 'utf8') : ''
+  const helmBackendImageRepository = readNestedYamlScalar(helmValues, ['backend', 'image'], 'repository')
+  const helmBackendSecretName = readSimpleYamlScalar(helmValues, 'backend', 'secretName')
   const requiredFiles = await Promise.all(requiredPackagedRuntimeFiles.map(async (file) => {
     const absolutePath = path.join(root, file)
     const present = await fileExists(absolutePath)
     const content = present ? await readFile(absolutePath, 'utf8') : ''
-    return {
-      file,
-      present,
-      usesCanvasBootArtifact: content.includes('canvas-boot'),
-      usesCanvasEngineArtifact: /canvas-engine(?:\/pom\.xml|-\*\.jar|-1\.0\.0-SNAPSHOT\.jar|\/target\/canvas-engine| -am package|\/Dockerfile)/.test(content),
-      usesLegacyCanvasEngineMavenModule: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
-        ? usesMavenModuleCommand(content, 'canvas-engine')
-        : undefined,
+    const workflow = file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
+      ? inspectWorkflowGateJobs(content, file)
+      : undefined
+	    const finalBuildJob = file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
+	      ? workflowFinalImageBuildJob(content, file)
+	      : { needs: [], canRunAfterFailedNeeds: false }
+	    const finalBuildNeeds = finalBuildJob.needs
+	    const releaseRunbookImageRepositories = file === 'docs/architecture/evidence/runbooks/release-deployment.md'
+	      ? readReleaseRunbookImageRepositories(content)
+	      : []
+		    return {
+	      file,
+	      present,
+	      usesCanvasBootArtifact: content.includes('canvas-boot'),
+	      usesCanvasEngineArtifact: /canvas-engine(?:\/pom\.xml|-\*\.jar|-1\.0\.0-SNAPSHOT\.jar|\/target\/canvas-engine| -am package|\/Dockerfile)/.test(content),
+	      ...(file === 'docs/architecture/evidence/runbooks/release-deployment.md'
+		        ? {
+		            appliesStaticCanvasEngineManifests: /^\s*(?:kubectl\s+apply[^\n]*deploy\/k8s\/canvas-engine-|envsubst\s+<\s*deploy\/k8s\/canvas-engine-)/m.test(content),
+		            usesHelmReleasePath: /helm\s+(?:upgrade|template)/.test(content) && /deploy\/helm\/canvas/.test(content),
+		            releaseRunbookImageRepositories,
+		            releaseRunbookImageRepository: releaseRunbookImageRepositories[0],
+		            mismatchedReleaseRunbookImageRepositories: releaseRunbookImageRepositories.filter((repository) => repository !== helmBackendImageRepository),
+		            matchesHelmImageRepository: releaseRunbookImageRepositories.length > 0 &&
+		              releaseRunbookImageRepositories.every((repository) => repository === helmBackendImageRepository),
+		            releaseRunbookSecretName: readKubectlCreateSecretName(content),
+		            matchesHelmRuntimeSecret: readKubectlCreateSecretName(content) === helmBackendSecretName,
+		            documentsStableServiceAccountPrerequisite: documentsStableServiceAccountPrerequisite(content)
+		          }
+		        : {}),
+	      usesLegacyCanvasEngineMavenModule: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
+	        ? usesMavenModuleCommand(content, 'canvas-engine')
+	        : undefined,
       hasBootRuntimeTestGate: file === '.github/workflows/ci.yml'
-        ? content.includes('-pl canvas-boot') && content.includes('ModularArchitectureTest') && content.includes('CanvasBootApplicationSmokeTest')
+        ? workflow.hasBootRuntimeTestGate
         : undefined,
       hasHelmRenderGate: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
-        ? content.includes('azure/setup-helm') && content.includes('scripts/release/verify-helm-render.sh')
+        ? workflow.hasHelmRenderGate
         : undefined,
       hasBootFlywayMigrationPolicyGate: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
-        ? content.includes('scripts/release/check-flyway-migration.sh') &&
-          content.includes('-pl canvas-boot') &&
-          content.includes('FlywayMigrationPolicyTest') &&
+        ? workflow.hasBootFlywayMigrationPolicyGate &&
           !content.includes('-pl canvas-engine -am -Dtest=FlywayMigrationPolicyTest')
         : undefined,
       hasProgramCoordinationGate: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
-        ? content.includes('tools/program-coordination/check-dispatch-state.mjs') &&
-          content.includes('node --test tools/program-coordination/cutover-compatibility-preflight.test.mjs') &&
-          content.includes('tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready')
+        ? workflow.hasProgramCoordinationGate
+        : undefined,
+      hasReleaseDryRunGate: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
+        ? workflow.hasReleaseDryRunGate
+        : undefined,
+      hasProductionFlinkDeploymentPreflightGate: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
+        ? workflow.hasProductionFlinkDeploymentPreflightGate
+        : undefined,
+      requiredGateJobsAllowFailure: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
+        ? workflow.requiredGateJobsAllowFailure
+        : undefined,
+      finalBuildDependsOnRequiredGates: file === '.github/workflows/ci.yml'
+        ? finalBuildNeeds.includes('open-source-growth-guardrails') &&
+          finalBuildNeeds.includes('cutover-preflight') &&
+          finalBuildNeeds.includes('helm-render') &&
+          finalBuildNeeds.includes('release-dry-run') &&
+          finalBuildNeeds.includes('migration-validation')
+        : file === '.github/workflows/canvas-ci.yml'
+          ? finalBuildNeeds.includes('open-source-growth-guardrails') &&
+            finalBuildNeeds.includes('cutover-preflight') &&
+            finalBuildNeeds.includes('deployment-config') &&
+            finalBuildNeeds.includes('flyway-migration-policy')
+        : undefined,
+      finalBuildDependsOnBackendValidationGates: file === '.github/workflows/ci.yml'
+        ? finalBuildNeeds.includes('backend-test') &&
+          finalBuildNeeds.includes('boot-runtime-test')
+        : file === '.github/workflows/canvas-ci.yml'
+          ? finalBuildNeeds.includes('backend-tests') &&
+            finalBuildNeeds.includes('backend-integration-tests') &&
+            finalBuildNeeds.includes('profile-validation')
+        : undefined,
+      finalBuildDependsOnFrontendValidationGates: file === '.github/workflows/ci.yml'
+        ? finalBuildNeeds.includes('frontend-test') &&
+          finalBuildNeeds.includes('frontend-build')
+        : file === '.github/workflows/canvas-ci.yml'
+          ? finalBuildNeeds.includes('frontend-tests')
+        : undefined,
+      finalBuildCanRunAfterFailedRequiredGates: file === '.github/workflows/ci.yml' || file === '.github/workflows/canvas-ci.yml'
+        ? finalBuildJob.canRunAfterFailedNeeds
         : undefined
     }
   }))
@@ -682,23 +913,392 @@ async function inspectPackagedRuntimeCutover(root) {
   return { requiredFiles }
 }
 
-async function inspectProductionPreflightCutover(root) {
-  const requiredFiles = await Promise.all(requiredProductionPreflightFiles.map(async (file) => {
+async function inspectFrontendToolchain(root) {
+  const packageFile = path.join(root, frontendPackagePath)
+  const lockFile = path.join(root, frontendPackageLockPath)
+  const packagePresent = await fileExists(packageFile)
+  const lockPresent = await fileExists(lockFile)
+  const packageJson = packagePresent ? JSON.parse(await readFile(packageFile, 'utf8')) : {}
+  const lockJson = lockPresent ? JSON.parse(await readFile(lockFile, 'utf8')) : {}
+  const workflowFiles = await Promise.all(
+    ['.github/workflows/ci.yml', '.github/workflows/canvas-ci.yml'].map(async (file) => {
+      const absolutePath = path.join(root, file)
+      const present = await fileExists(absolutePath)
+      const content = present ? await readFile(absolutePath, 'utf8') : ''
+      const nodeVersions = extractWorkflowNodeVersions(content)
+      const declaresNodeRuntime = /actions\/setup-node/.test(content) || nodeVersions.length > 0
+      return {
+        file,
+        present,
+        nodeVersions,
+        usesRequiredNodeVersion: !declaresNodeRuntime ||
+          (nodeVersions.length > 0 && nodeVersions.every((version) => version === requiredCiNodeVersion))
+      }
+    })
+  )
+  const documentationFiles = await Promise.all(frontendNodeVersionDocFiles.map(async (file) => {
     const absolutePath = path.join(root, file)
     const present = await fileExists(absolutePath)
     const content = present ? await readFile(absolutePath, 'utf8') : ''
     return {
       file,
       present,
+      documentsRequiredNodeVersion: content.includes(requiredFrontendNodeDocText)
+    }
+  }))
+
+  return {
+    packageJson: {
+      path: frontendPackagePath,
+      present: packagePresent,
+      nodeEngine: packageJson.engines?.node,
+      usesRequiredNodeEngine: packageJson.engines?.node === requiredFrontendNodeEngine
+    },
+    packageLock: {
+      path: frontendPackageLockPath,
+      present: lockPresent,
+      nodeEngine: lockJson.packages?.['']?.engines?.node,
+      usesRequiredNodeEngine: lockJson.packages?.['']?.engines?.node === requiredFrontendNodeEngine
+    },
+    workflowFiles,
+    documentationFiles
+  }
+}
+
+function workflowFinalImageBuildJob(content, file) {
+  const jobs = extractWorkflowJobs(content)
+  if (jobs.length === 0) {
+    return {
+      needs: extractLooseWorkflowNeeds(content),
+      canRunAfterFailedNeeds: false
+    }
+  }
+  const nonFinalImageBuildJobNames = new Set([
+    file === '.github/workflows/ci.yml' ? 'release-dry-run' : 'deployment-config'
+  ])
+  const finalBuildJob = jobs.find((job) => {
+    if (nonFinalImageBuildJobNames.has(job.name)) {
+      return false
+    }
+    return extractWorkflowRunCommands(job.body).some((command) => (
+      isCanvasBootImageBuildCommand(command, { dryRun: false })
+    ))
+  })
+
+  return {
+    needs: finalBuildJob ? extractWorkflowNeeds(finalBuildJob.body) : [],
+    canRunAfterFailedNeeds: finalBuildJob ? workflowJobHasAlwaysCondition(finalBuildJob.body) : false
+  }
+}
+
+function inspectWorkflowGateJobs(content, file) {
+  const jobs = extractWorkflowJobs(content)
+  if (jobs.length === 0) {
+    return inspectLooseWorkflowGates(content)
+  }
+  const jobByName = new Map(jobs.map((job) => [job.name, job]))
+  const requiredGateJobNames = workflowRequiredGateJobNames(file)
+  const gateJobName = file === '.github/workflows/ci.yml' ? 'release-dry-run' : 'deployment-config'
+  const flywayJobName = file === '.github/workflows/ci.yml' ? 'migration-validation' : 'flyway-migration-policy'
+  const helmJobName = file === '.github/workflows/ci.yml' ? 'helm-render' : 'deployment-config'
+
+  return {
+    hasBootRuntimeTestGate: file === '.github/workflows/ci.yml'
+      ? jobRunsCommand(jobByName.get('boot-runtime-test'), (command) => (
+        commandIncludesAll(command, ['-pl canvas-boot', 'ModularArchitectureTest', 'CanvasBootApplicationSmokeTest'])
+      ))
+      : undefined,
+    hasHelmRenderGate: jobRunsCommand(jobByName.get(helmJobName), (command) => (
+      command === 'bash scripts/release/verify-helm-render.sh'
+    )),
+    hasBootFlywayMigrationPolicyGate: jobRunsCommands(jobByName.get(flywayJobName), [
+      (command) => command === 'bash scripts/release/check-flyway-migration.sh',
+      (command) => commandIncludesAll(command, ['-pl canvas-boot', 'FlywayMigrationPolicyTest']) &&
+        !command.includes('-pl canvas-engine')
+    ]),
+    hasProgramCoordinationGate: jobRunsCommands(jobByName.get('cutover-preflight'), [
+      (command) => command === 'bash docs/program-coordination/checks/program-coordination-checks.sh .',
+      (command) => command === 'node tools/program-coordination/check-dispatch-state.mjs .',
+      (command) => command === 'node --test tools/program-coordination/*.test.mjs',
+      (command) => command === 'node tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready'
+    ]),
+    hasReleaseDryRunGate: jobRunsCommands(jobByName.get(gateJobName), [
+      (command) => command === 'bash -n scripts/release/*.sh',
+      (command) => isCanvasBootImageBuildCommand(command, { dryRun: true }),
+      (command) => command === 'bash scripts/release/pre-deploy-check.sh --dry-run',
+      (command) => command === 'bash scripts/release/post-deploy-check.sh --dry-run',
+      (command) => command === 'bash scripts/release/rollback-drill.sh --dry-run'
+    ]),
+    hasProductionFlinkDeploymentPreflightGate: jobRunsCommand(jobByName.get(gateJobName), (command) => (
+      command === 'bash scripts/verify-flink-production-deployment.sh'
+    )),
+    requiredGateJobsAllowFailure: requiredGateJobNames.filter((jobName) => (
+      workflowJobContinuesOnError(jobByName.get(jobName)?.body ?? '')
+    ))
+  }
+}
+
+function inspectLooseWorkflowGates(content) {
+  return {
+    hasBootRuntimeTestGate: content.includes('-pl canvas-boot') &&
+      content.includes('ModularArchitectureTest') &&
+      content.includes('CanvasBootApplicationSmokeTest'),
+    hasHelmRenderGate: content.includes('azure/setup-helm') &&
+      content.includes('scripts/release/verify-helm-render.sh'),
+    hasBootFlywayMigrationPolicyGate: content.includes('scripts/release/check-flyway-migration.sh') &&
+      content.includes('-pl canvas-boot') &&
+      content.includes('FlywayMigrationPolicyTest'),
+    hasProgramCoordinationGate: content.includes('bash docs/program-coordination/checks/program-coordination-checks.sh .') &&
+      content.includes('tools/program-coordination/check-dispatch-state.mjs') &&
+      content.includes('node --test tools/program-coordination/*.test.mjs') &&
+      content.includes('tools/program-coordination/cutover-compatibility-preflight.mjs . --require-ready'),
+    hasReleaseDryRunGate: content.includes('bash -n scripts/release/*.sh') &&
+      content.includes('scripts/release/build-image.sh --dry-run --image canvas-boot') &&
+      content.includes('scripts/release/pre-deploy-check.sh --dry-run') &&
+      content.includes('scripts/release/post-deploy-check.sh --dry-run') &&
+      content.includes('scripts/release/rollback-drill.sh --dry-run'),
+    hasProductionFlinkDeploymentPreflightGate: content.includes('scripts/verify-flink-production-deployment.sh'),
+    requiredGateJobsAllowFailure: []
+  }
+}
+
+function workflowRequiredGateJobNames(file) {
+  if (file === '.github/workflows/ci.yml') {
+    return [
+      'backend-test',
+      'boot-runtime-test',
+      'frontend-test',
+      'frontend-build',
+      'open-source-growth-guardrails',
+      'cutover-preflight',
+      'helm-render',
+      'release-dry-run',
+      'migration-validation'
+    ]
+  }
+  if (file === '.github/workflows/canvas-ci.yml') {
+    return [
+      'backend-tests',
+      'backend-integration-tests',
+      'frontend-tests',
+      'profile-validation',
+      'open-source-growth-guardrails',
+      'cutover-preflight',
+      'deployment-config',
+      'flyway-migration-policy'
+    ]
+  }
+  return []
+}
+
+function jobRunsCommands(job, predicates) {
+  const commands = extractWorkflowRunCommands(job?.body ?? '')
+  return predicates.every((predicate) => commands.some(predicate))
+}
+
+function jobRunsCommand(job, predicate) {
+  return jobRunsCommands(job, [predicate])
+}
+
+function extractWorkflowRunCommands(jobBody) {
+  return jobBody
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s{6,}-\s+run:\s*(.*)$/) ?? line.match(/^\s{8,}run:\s*(.*)$/))
+    .filter(Boolean)
+    .map((match) => normalizeWorkflowScalar(match[1]))
+    .filter((command) => !/^echo(?:\s|$)/.test(command))
+}
+
+function extractWorkflowNodeVersions(content) {
+  return [...content.matchAll(/^\s*node-version:\s*(.*)$/gm)]
+    .map((match) => normalizeWorkflowScalar(match[1]))
+}
+
+function normalizeWorkflowScalar(value) {
+  const trimmed = value.trim()
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+function commandIncludesAll(command, parts) {
+  return parts.every((part) => command.includes(part))
+}
+
+function isCanvasBootImageBuildCommand(command, { dryRun }) {
+  const normalized = stripShellComments(command)
+    .replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=(?:\$\{\{[^}]+}}|[^ ]+)\s+)+/, '')
+    .trim()
+  return (
+    (
+      normalized.startsWith('bash scripts/release/build-image.sh ') ||
+      normalized.startsWith('scripts/release/build-image.sh ')
+    ) &&
+    normalized.includes('--image canvas-boot') &&
+    normalized.includes('--dry-run') === dryRun
+  )
+}
+
+function stripShellComments(command) {
+  let quote = null
+  let escaped = false
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (character === '\\' && quote !== "'") {
+      escaped = true
+      continue
+    }
+    if (quote) {
+      if (character === quote) {
+        quote = null
+      }
+      continue
+    }
+    if (character === '"' || character === "'") {
+      quote = character
+      continue
+    }
+    if (character === '#') {
+      return command.slice(0, index)
+    }
+  }
+
+  return command
+}
+
+function workflowJobHasAlwaysCondition(jobBody) {
+  return jobBody
+    .split(/\r?\n/)
+    .some((line) => {
+      const condition = line.match(/^\s{4}if:\s*(.+)$/)
+      return condition && /\balways\s*\(\s*\)/.test(normalizeWorkflowScalar(condition[1]))
+    })
+}
+
+function workflowJobContinuesOnError(jobBody) {
+  return jobBody
+    .split(/\r?\n/)
+    .some((line) => {
+      const setting = line.match(/^\s{4}continue-on-error:\s*(.+)$/)
+      return setting && normalizeWorkflowScalar(setting[1]).trim() !== 'false'
+    })
+}
+
+function extractLooseWorkflowNeeds(content) {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*-\s*([A-Za-z0-9_-]+)\s*$/))
+    .filter(Boolean)
+    .map((match) => match[1])
+}
+
+function extractWorkflowJobs(content) {
+  const lines = content.split(/\r?\n/)
+  const jobs = []
+  let inJobs = false
+  let current = null
+
+  for (const line of lines) {
+    if (/^jobs:\s*$/.test(line)) {
+      inJobs = true
+      continue
+    }
+    if (!inJobs) {
+      continue
+    }
+    if (/^[^ \t#][^:]*:\s*$/.test(line)) {
+      break
+    }
+
+    const jobMatch = line.match(/^  ([A-Za-z0-9_-]+):\s*$/)
+    if (jobMatch) {
+      if (current) {
+        jobs.push(current)
+      }
+      current = { name: jobMatch[1], body: '' }
+      continue
+    }
+    if (current) {
+      current.body += `${line}\n`
+    }
+  }
+
+  if (current) {
+    jobs.push(current)
+  }
+  return jobs
+}
+
+function extractWorkflowNeeds(jobBody) {
+  const lines = jobBody.split(/\r?\n/)
+  const needs = []
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    const inline = line.match(/^\s{4}needs:\s*\[([^\]]*)\]\s*$/)
+    if (inline) {
+      return inline[1].split(',').map((entry) => entry.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+    }
+
+    const scalar = line.match(/^\s{4}needs:\s*([A-Za-z0-9_-]+)\s*$/)
+    if (scalar) {
+      return [scalar[1]]
+    }
+
+    if (/^\s{4}needs:\s*$/.test(line)) {
+      for (let needsIndex = index + 1; needsIndex < lines.length; needsIndex += 1) {
+        const needsLine = lines[needsIndex]
+        if (/^\s{4}[A-Za-z0-9_-]+:/.test(needsLine)) {
+          break
+        }
+        const listItem = needsLine.match(/^\s{6}-\s*([A-Za-z0-9_-]+)\s*$/)
+        if (listItem) {
+          needs.push(listItem[1])
+        }
+      }
+      return needs
+    }
+  }
+
+  return needs
+}
+
+async function inspectProductionPreflightCutover(root) {
+  const requiredFiles = await Promise.all(requiredProductionPreflightFiles.map(async (file) => {
+    const absolutePath = path.join(root, file)
+    const present = await fileExists(absolutePath)
+    const content = present ? await readFile(absolutePath, 'utf8') : ''
+    const activeContent = activeShellScriptContent(content)
+    return {
+      file,
+      present,
       anchorsLegacyEngineSource: /backend\/canvas-engine\/src\/main\/java|canvas-engine\/src\/main\/java/.test(content),
-      checksHelmPipelineContract: content.includes('deploy/helm/canvas/values.yaml') &&
-        content.includes('deploy/k8s/canvas-flink-job-submitter.yaml') &&
-        content.includes('docs/runbooks/flink-production-deployment.md') &&
-        content.includes('--pipeline-key=${pipeline}')
+      checksHelmPipelineContract: activeContent.includes('deploy/helm/canvas/values.yaml') &&
+        activeContent.includes('deploy/k8s/canvas-flink-job-submitter.yaml') &&
+        activeContent.includes('docs/runbooks/flink-production-deployment.md') &&
+        activeContent.includes('--pipeline-key=${pipeline}')
     }
   }))
 
   return { requiredFiles }
+}
+
+function activeShellScriptContent(content) {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#') && !/^(?:echo|printf)(?:\s|$)/.test(line))
+    .join('\n')
 }
 
 async function inspectActiveRuntimeRunbookCutover(root) {
@@ -723,6 +1323,15 @@ async function inspectServiceNameCompatibility(root) {
   const helmValuesFile = path.join(root, helmValuesPath)
   const helmValuesPresent = await fileExists(helmValuesFile)
   const helmValues = helmValuesPresent ? await readFile(helmValuesFile, 'utf8') : ''
+  const helmValueFiles = await Promise.all(helmCompatibilityValuesFiles.map(async (file) => {
+    const absolutePath = path.join(root, file)
+    const present = await fileExists(absolutePath)
+    const content = present ? await readFile(absolutePath, 'utf8') : ''
+    return inspectHelmCompatibilityValuesFile(file, present, content, file === helmValuesPath)
+  }))
+  const policyFile = path.join(root, serviceNameCompatibilityPolicyPath)
+  const policyPresent = await fileExists(policyFile)
+  const policy = policyPresent ? await readFile(policyFile, 'utf8') : ''
 
   return {
     helmValues: {
@@ -730,13 +1339,46 @@ async function inspectServiceNameCompatibility(root) {
       present: helmValuesPresent,
       backendName: readSimpleYamlScalar(helmValues, 'backend', 'name'),
       imageRepository: readNestedYamlScalar(helmValues, ['backend', 'image'], 'repository'),
+      imageTag: readNestedYamlScalar(helmValues, ['backend', 'image'], 'tag'),
       serviceAccountName: readSimpleYamlScalar(helmValues, 'backend', 'serviceAccountName'),
       secretName: readSimpleYamlScalar(helmValues, 'backend', 'secretName'),
       keepsCanvasEngineBackendName: readSimpleYamlScalar(helmValues, 'backend', 'name') === 'canvas-engine',
       usesCanvasBootImageRepository: readNestedYamlScalar(helmValues, ['backend', 'image'], 'repository')?.endsWith('/canvas-boot') === true,
+      usesImmutableBackendImageTag: readNestedYamlScalar(helmValues, ['backend', 'image'], 'tag') !== 'latest',
       keepsCanvasEngineServiceAccount: readSimpleYamlScalar(helmValues, 'backend', 'serviceAccountName') === 'canvas-engine',
       keepsCanvasEngineRuntimeSecret: readSimpleYamlScalar(helmValues, 'backend', 'secretName') === 'canvas-engine-runtime'
+    },
+    helmValueFiles,
+    policy: {
+      path: serviceNameCompatibilityPolicyPath,
+      present: policyPresent,
+      documentsCanvasBootRuntimeImage: /canvas-boot/.test(policy),
+      documentsStableCanvasEngineServiceNames: /canvas-engine/.test(policy) && /canvas-engine-runtime/.test(policy),
+      requiresDnsCompatibilityBeforeRename: /DNS/.test(policy) && /compatibility/i.test(policy) && /before rename/i.test(policy),
+      rejectsMechanicalRename: /mechanical rename/i.test(policy) && /do not/i.test(policy)
     }
+  }
+}
+
+function inspectHelmCompatibilityValuesFile(file, present, content, requireBaseValues) {
+  const backendName = readSimpleYamlScalar(content, 'backend', 'name')
+  const imageRepository = readNestedYamlScalar(content, ['backend', 'image'], 'repository')
+  const imageTag = readNestedYamlScalar(content, ['backend', 'image'], 'tag')
+  const serviceAccountName = readSimpleYamlScalar(content, 'backend', 'serviceAccountName')
+  const secretName = readSimpleYamlScalar(content, 'backend', 'secretName')
+  return {
+    file,
+    present,
+    backendName,
+    imageRepository,
+    imageTag,
+    serviceAccountName,
+    secretName,
+    keepsCanvasEngineBackendName: requireBaseValues ? backendName === 'canvas-engine' : backendName === undefined || backendName === 'canvas-engine',
+    usesCanvasBootImageRepository: requireBaseValues ? imageRepository?.endsWith('/canvas-boot') === true : imageRepository === undefined || imageRepository.endsWith('/canvas-boot'),
+    usesImmutableBackendImageTag: imageTag !== 'latest',
+    keepsCanvasEngineServiceAccount: requireBaseValues ? serviceAccountName === 'canvas-engine' : serviceAccountName === undefined || serviceAccountName === 'canvas-engine',
+    keepsCanvasEngineRuntimeSecret: requireBaseValues ? secretName === 'canvas-engine-runtime' : secretName === undefined || secretName === 'canvas-engine-runtime'
   }
 }
 
@@ -755,6 +1397,22 @@ function readNestedYamlScalar(content, sectionPath, key) {
   }
   const match = section.match(new RegExp(`^${' '.repeat(indent)}${escapeRegExp(key)}:\\s*"?([^"\\n]+)"?\\s*$`, 'm'))
   return match?.[1]?.trim()
+}
+
+function readKubectlCreateSecretName(content) {
+  const match = content.match(/\bkubectl\b[^\n]*\bcreate\s+secret\s+generic\s+([A-Za-z0-9._-]+)/)
+  return match?.[1]
+}
+
+function readReleaseRunbookImageRepositories(content) {
+  return [...content.matchAll(/\bCANVAS_IMAGE_NAME=(?:"([^"\n]+)"|'([^'\n]+)'|([^\s\\\n]+))/g)]
+    .map((match) => match[1] ?? match[2] ?? match[3])
+}
+
+function documentsStableServiceAccountPrerequisite(content) {
+  return /service\s*account/i.test(content) &&
+    /\bcanvas-engine\b/.test(content) &&
+    /\bRBAC\b/i.test(content)
 }
 
 function readTopLevelYamlSection(content, sectionName) {
@@ -843,7 +1501,7 @@ async function fileExists(filePath) {
   }
 }
 
-function buildBlockers(oldCounts, currentCounts, compatibilityTests, routeGapSummary, bootCutover, runCommandCutover, packagedRuntimeCutover, productionPreflightCutover, activeRuntimeRunbookCutover, serviceNameCompatibility) {
+function buildBlockers(oldCounts, currentCounts, compatibilityTests, routeGapSummary, bootCutover, runCommandCutover, packagedRuntimeCutover, frontendToolchain, productionPreflightCutover, activeRuntimeRunbookCutover, serviceNameCompatibility) {
   const blockers = []
   if (!oldCounts.present) {
     blockers.push(`old canvas-engine web source path is missing: ${oldWebPath}`)
@@ -898,12 +1556,33 @@ function buildBlockers(oldCounts, currentCounts, compatibilityTests, routeGapSum
     if (!runtimeFile.usesCanvasBootArtifact) {
       blockers.push(`packaged runtime cutover file does not use canvas-boot artifact: ${runtimeFile.file}`)
     }
-    if (runtimeFile.usesCanvasEngineArtifact) {
-      blockers.push(`packaged runtime cutover file still uses canvas-engine artifact: ${runtimeFile.file}`)
-    }
-    if (runtimeFile.usesLegacyCanvasEngineMavenModule) {
-      blockers.push(`CI workflow still runs legacy canvas-engine Maven module: ${runtimeFile.file}`)
-    }
+	    if (runtimeFile.usesCanvasEngineArtifact) {
+	      blockers.push(`packaged runtime cutover file still uses canvas-engine artifact: ${runtimeFile.file}`)
+	    }
+	    if (runtimeFile.file === 'docs/architecture/evidence/runbooks/release-deployment.md') {
+	      if (runtimeFile.appliesStaticCanvasEngineManifests) {
+	        blockers.push('release deployment runbook applies static canvas-engine manifests instead of Helm service-name policy')
+	      }
+		      if (!runtimeFile.usesHelmReleasePath) {
+		        blockers.push('release deployment runbook does not use Helm release path for backend service-name policy')
+		      }
+		      if (!runtimeFile.releaseRunbookImageRepository) {
+		        blockers.push('release deployment runbook does not set backend image repository')
+		      } else if (!runtimeFile.matchesHelmImageRepository) {
+		        blockers.push(`release deployment runbook uses image repositories ${runtimeFile.mismatchedReleaseRunbookImageRepositories.join(', ')} but Helm expects ${serviceNameCompatibility.helmValues.imageRepository}`)
+		      }
+		      if (!runtimeFile.releaseRunbookSecretName) {
+		        blockers.push('release deployment runbook does not create backend runtime secret')
+		      } else if (!runtimeFile.matchesHelmRuntimeSecret) {
+		        blockers.push(`release deployment runbook creates secret ${runtimeFile.releaseRunbookSecretName} but Helm expects ${serviceNameCompatibility.helmValues.secretName}`)
+		      }
+		      if (!runtimeFile.documentsStableServiceAccountPrerequisite) {
+		        blockers.push('release deployment runbook does not document stable canvas-engine ServiceAccount/RBAC prerequisite')
+		      }
+		    }
+	    if (runtimeFile.usesLegacyCanvasEngineMavenModule) {
+	      blockers.push(`CI workflow still runs legacy canvas-engine Maven module: ${runtimeFile.file}`)
+	    }
     if (runtimeFile.file === '.github/workflows/ci.yml' && !runtimeFile.hasBootRuntimeTestGate) {
       blockers.push('CI workflow does not run canvas-boot runtime gate tests')
     }
@@ -915,6 +1594,54 @@ function buildBlockers(oldCounts, currentCounts, compatibilityTests, routeGapSum
     }
     if ((runtimeFile.file === '.github/workflows/ci.yml' || runtimeFile.file === '.github/workflows/canvas-ci.yml') && !runtimeFile.hasProgramCoordinationGate) {
       blockers.push(`CI workflow does not run DDD cutover preflight gate: ${runtimeFile.file}`)
+    }
+    if ((runtimeFile.file === '.github/workflows/ci.yml' || runtimeFile.file === '.github/workflows/canvas-ci.yml') && !runtimeFile.hasReleaseDryRunGate) {
+      blockers.push(`CI workflow does not run release dry-run gates: ${runtimeFile.file}`)
+    }
+    if ((runtimeFile.file === '.github/workflows/ci.yml' || runtimeFile.file === '.github/workflows/canvas-ci.yml') && !runtimeFile.hasProductionFlinkDeploymentPreflightGate) {
+      blockers.push(`CI workflow does not run production Flink deployment preflight: ${runtimeFile.file}`)
+    }
+    for (const jobName of runtimeFile.requiredGateJobsAllowFailure ?? []) {
+      blockers.push(`CI required gate job can continue after failure: ${runtimeFile.file} ${jobName}`)
+    }
+    if ((runtimeFile.file === '.github/workflows/ci.yml' || runtimeFile.file === '.github/workflows/canvas-ci.yml') && !runtimeFile.finalBuildDependsOnRequiredGates) {
+      blockers.push(`CI final image build does not depend on required guardrail gates: ${runtimeFile.file}`)
+    }
+    if ((runtimeFile.file === '.github/workflows/ci.yml' || runtimeFile.file === '.github/workflows/canvas-ci.yml') && !runtimeFile.finalBuildDependsOnBackendValidationGates) {
+      blockers.push(`CI final image build does not depend on backend validation gates: ${runtimeFile.file}`)
+    }
+    if ((runtimeFile.file === '.github/workflows/ci.yml' || runtimeFile.file === '.github/workflows/canvas-ci.yml') && !runtimeFile.finalBuildDependsOnFrontendValidationGates) {
+      blockers.push(`CI final image build does not depend on frontend validation gates: ${runtimeFile.file}`)
+    }
+    if ((runtimeFile.file === '.github/workflows/ci.yml' || runtimeFile.file === '.github/workflows/canvas-ci.yml') && runtimeFile.finalBuildCanRunAfterFailedRequiredGates) {
+      blockers.push(`CI final image build can run when required gates fail: ${runtimeFile.file}`)
+    }
+  }
+  if (!frontendToolchain.packageJson.present) {
+    blockers.push(`frontend package manifest is missing: ${frontendPackagePath}`)
+  } else if (!frontendToolchain.packageJson.usesRequiredNodeEngine) {
+    blockers.push(`frontend package.json must declare node engine ${requiredFrontendNodeEngine}`)
+  }
+  if (!frontendToolchain.packageLock.present) {
+    blockers.push(`frontend package lock is missing: ${frontendPackageLockPath}`)
+  } else if (!frontendToolchain.packageLock.usesRequiredNodeEngine) {
+    blockers.push(`frontend package-lock must declare node engine ${requiredFrontendNodeEngine}`)
+  }
+  for (const workflowFile of frontendToolchain.workflowFiles) {
+    if (!workflowFile.present) {
+      continue
+    }
+    if (!workflowFile.usesRequiredNodeVersion) {
+      blockers.push(`CI workflow must pin frontend-compatible Node ${requiredCiNodeVersion}: ${workflowFile.file}`)
+    }
+  }
+  for (const documentationFile of frontendToolchain.documentationFiles) {
+    if (!documentationFile.present) {
+      blockers.push(`frontend Node version doc is missing: ${documentationFile.file}`)
+      continue
+    }
+    if (!documentationFile.documentsRequiredNodeVersion) {
+      blockers.push(`frontend Node version doc must mention ${requiredFrontendNodeDocText}: ${documentationFile.file}`)
     }
   }
   for (const productionFile of productionPreflightCutover.requiredFiles) {
@@ -946,18 +1673,42 @@ function buildBlockers(oldCounts, currentCounts, compatibilityTests, routeGapSum
   }
   if (!serviceNameCompatibility.helmValues.present) {
     blockers.push(`service-name compatibility Helm values file is missing: ${serviceNameCompatibility.helmValues.path}`)
+  }
+  for (const helmValuesFile of serviceNameCompatibility.helmValueFiles ?? []) {
+    if (!helmValuesFile.present) {
+      blockers.push(`service-name compatibility Helm values file is missing: ${helmValuesFile.file}`)
+      continue
+    }
+    if (!helmValuesFile.usesCanvasBootImageRepository) {
+      blockers.push(`Helm backend image repository is not cut over to canvas-boot: ${helmValuesFile.file}`)
+    }
+    if (!helmValuesFile.usesImmutableBackendImageTag) {
+      blockers.push(`Helm backend image tag must not be latest: ${helmValuesFile.file}`)
+    }
+    if (!helmValuesFile.keepsCanvasEngineBackendName) {
+      blockers.push(`Helm backend.name must remain canvas-engine until service/DNS compatibility cutover: ${helmValuesFile.file}`)
+    }
+    if (!helmValuesFile.keepsCanvasEngineServiceAccount) {
+      blockers.push(`Helm serviceAccountName must remain canvas-engine until RBAC compatibility cutover: ${helmValuesFile.file}`)
+    }
+    if (!helmValuesFile.keepsCanvasEngineRuntimeSecret) {
+      blockers.push(`Helm runtime secret name must remain canvas-engine-runtime until secret compatibility cutover: ${helmValuesFile.file}`)
+    }
+  }
+  if (!serviceNameCompatibility.policy.present) {
+    blockers.push(`service-name compatibility policy runbook is missing: ${serviceNameCompatibility.policy.path}`)
   } else {
-    if (!serviceNameCompatibility.helmValues.usesCanvasBootImageRepository) {
-      blockers.push('Helm backend image repository is not cut over to canvas-boot')
+    if (!serviceNameCompatibility.policy.documentsCanvasBootRuntimeImage) {
+      blockers.push(`service-name compatibility policy does not document canvas-boot runtime image: ${serviceNameCompatibility.policy.path}`)
     }
-    if (!serviceNameCompatibility.helmValues.keepsCanvasEngineBackendName) {
-      blockers.push('Helm backend.name must remain canvas-engine until service/DNS compatibility cutover')
+    if (!serviceNameCompatibility.policy.documentsStableCanvasEngineServiceNames) {
+      blockers.push(`service-name compatibility policy does not document stable canvas-engine service/secret names: ${serviceNameCompatibility.policy.path}`)
     }
-    if (!serviceNameCompatibility.helmValues.keepsCanvasEngineServiceAccount) {
-      blockers.push('Helm serviceAccountName must remain canvas-engine until RBAC compatibility cutover')
+    if (!serviceNameCompatibility.policy.requiresDnsCompatibilityBeforeRename) {
+      blockers.push(`service-name compatibility policy does not require DNS compatibility before rename: ${serviceNameCompatibility.policy.path}`)
     }
-    if (!serviceNameCompatibility.helmValues.keepsCanvasEngineRuntimeSecret) {
-      blockers.push('Helm runtime secret name must remain canvas-engine-runtime until secret compatibility cutover')
+    if (!serviceNameCompatibility.policy.rejectsMechanicalRename) {
+      blockers.push(`service-name compatibility policy does not reject mechanical service-name renames: ${serviceNameCompatibility.policy.path}`)
     }
   }
 

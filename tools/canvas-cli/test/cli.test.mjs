@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:http'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as joinPath } from 'node:path'
 import test from 'node:test'
@@ -89,19 +89,18 @@ async function withApiServer(handler, run) {
   }
 }
 
-test('help exposes only local commands before G10 backend API stability', () => {
+test('help exposes G10-unlocked import and export while publish stays gated', () => {
   const result = runCli(['--help'])
 
   assert.equal(result.status, 0)
   assert.match(result.stdout, /validate <file>/)
   assert.match(result.stdout, /diff <before> <after>/)
-  assert.match(result.stdout, /import, export, and publish are blocked until G10/)
-  assert.match(result.stdout, /local-only and do not call backend APIs/)
-  assert.doesNotMatch(result.stdout, /import <file>/)
-  assert.doesNotMatch(result.stdout, /export <canvasId>/)
+  assert.match(result.stdout, /import <file>/)
+  assert.match(result.stdout, /export <canvasId>/)
+  assert.match(result.stdout, /--api-url <url>/)
+  assert.match(result.stdout, /CANVAS_API_URL/)
+  assert.match(result.stdout, /publish remains blocked until a stable backend publish API is verified/)
   assert.doesNotMatch(result.stdout, /publish <canvasId>/)
-  assert.doesNotMatch(result.stdout, /--api-url <url>/)
-  assert.doesNotMatch(result.stdout, /CANVAS_API_URL/)
   assert.equal(result.stderr, '')
 })
 
@@ -113,26 +112,153 @@ test('validate accepts a valid Canvas DSL v1 journey', () => {
   assert.equal(result.stderr, '')
 })
 
-test('backend API commands are G10-gated and do not make network requests', async () => {
+test('import posts a local DSL document to the G10-unlocked backend import endpoint', async () => {
+  await withApiServer((request, response) => {
+    assert.equal(request.method, 'POST')
+    assert.equal(request.url, '/canvas/dsl/import')
+    assert.equal(request.headers['content-type'], 'application/json')
+    assert.deepEqual(JSON.parse(request.body), {
+      document: JSON.parse(readFileSync(fixture('valid-journey.json'), 'utf8'))
+    })
+
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({
+      compatible: true,
+      result: {
+        canvasId: 'canvas-123',
+        imported: true
+      }
+    }))
+  }, async (apiUrl, requests) => {
+    const result = await runCliAsync(['--api-url', apiUrl, 'import', fixture('valid-journey.json')])
+
+    assert.equal(result.status, 0)
+    assert.deepEqual(JSON.parse(result.stdout), {
+      canvasId: 'canvas-123',
+      imported: true
+    })
+    assert.equal(result.stderr, '')
+    assert.equal(requests.length, 1)
+  })
+})
+
+test('import prints a direct JSON response from the backend import endpoint', async () => {
+  await withApiServer((request, response) => {
+    assert.equal(request.method, 'POST')
+    assert.equal(request.url, '/canvas/dsl/import')
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({
+      canvasId: 'canvas-direct',
+      imported: true
+    }))
+  }, async (apiUrl) => {
+    const result = await runCliAsync(['import', fixture('valid-journey.json')], {
+      env: {
+        CANVAS_API_URL: apiUrl
+      }
+    })
+
+    assert.equal(result.status, 0)
+    assert.deepEqual(JSON.parse(result.stdout), {
+      canvasId: 'canvas-direct',
+      imported: true
+    })
+    assert.equal(result.stderr, '')
+  })
+})
+
+test('export gets the G10-unlocked backend export endpoint and prints JSON', async () => {
+  await withApiServer((request, response) => {
+    assert.equal(request.method, 'GET')
+    assert.equal(request.url, '/canvas/dsl/export/canvas-123')
+    assert.equal(request.body, '')
+    assert.equal(request.headers['x-tenant-id'], 'tenant-demo')
+
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({
+      apiVersion: 'canvas/v1',
+      kind: 'Journey',
+      metadata: {
+        name: 'exported-journey'
+      },
+      spec: {
+        trigger: {
+          type: 'webhook'
+        },
+        nodes: [
+          {
+            id: 'message',
+            type: 'message.send'
+          }
+        ]
+      }
+    }))
+  }, async (apiUrl, requests) => {
+    const result = await runCliAsync(['export', 'canvas-123', '--api-url', apiUrl, '--tenant-id', 'tenant-demo'])
+
+    assert.equal(result.status, 0)
+    assert.deepEqual(JSON.parse(result.stdout).metadata, {
+      name: 'exported-journey'
+    })
+    assert.equal(result.stderr, '')
+    assert.equal(requests.length, 1)
+  })
+})
+
+test('export accepts tenant id from CANVAS_TENANT_ID', async () => {
+  await withApiServer((request, response) => {
+    assert.equal(request.method, 'GET')
+    assert.equal(request.url, '/canvas/dsl/export/canvas-env')
+    assert.equal(request.headers['x-tenant-id'], 'tenant-env')
+
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({
+      apiVersion: 'canvas/v1',
+      kind: 'Journey',
+      metadata: {
+        name: 'env-tenant-export'
+      },
+      spec: {
+        trigger: {
+          type: 'webhook'
+        },
+        nodes: [
+          {
+            id: 'message',
+            type: 'message.send'
+          }
+        ]
+      }
+    }))
+  }, async (apiUrl) => {
+    const result = await runCliAsync(['export', 'canvas-env', '--api-url', apiUrl], {
+      env: {
+        CANVAS_TENANT_ID: 'tenant-env'
+      }
+    })
+
+    assert.equal(result.status, 0)
+    assert.deepEqual(JSON.parse(result.stdout).metadata, {
+      name: 'env-tenant-export'
+    })
+    assert.equal(result.stderr, '')
+  })
+})
+
+test('publish stays G10-gated and does not make network requests', async () => {
   await withApiServer((request, response) => {
     response.statusCode = 500
     response.end(`unexpected request: ${request.method} ${request.url}`)
   }, async (apiUrl, requests) => {
-    for (const args of [
-      ['--api-url', apiUrl, 'import', fixture('valid-journey.json')],
-      ['--api-url', apiUrl, 'export', 'canvas-123'],
-      ['--api-url', apiUrl, 'publish', 'canvas-123'],
-    ]) {
-      const result = await runCliAsync(args, {
-        env: {
-          CANVAS_API_URL: apiUrl
-        }
-      })
+    const result = await runCliAsync(['--api-url', apiUrl, 'publish', 'canvas-123'], {
+      env: {
+        CANVAS_API_URL: apiUrl
+      }
+    })
 
-      assert.notEqual(result.status, 0)
-      assert.equal(result.stdout, '')
-      assert.match(result.stderr, /Backend API commands are gated until G10 public extension\/API stability passes/)
-    }
+    assert.notEqual(result.status, 0)
+    assert.equal(result.stdout, '')
+    assert.match(result.stderr, /Publish is gated until a stable backend publish API is verified/)
     assert.equal(requests.length, 0)
   })
 })

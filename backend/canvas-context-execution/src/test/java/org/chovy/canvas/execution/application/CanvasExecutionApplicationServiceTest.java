@@ -23,14 +23,8 @@ import org.chovy.canvas.execution.domain.NodeHandlerType;
 import org.chovy.canvas.execution.domain.StartNodeHandler;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 CanvasExecutionApplicationServiceTest 的执行上下文数据结构或业务契约。
- */
 class CanvasExecutionApplicationServiceTest {
 
-    /**
-     * 执行 triggerExecutesPublishedDefinitionAndExposesTraceThroughFacade 对应的业务处理。
-     */
     @Test
     void triggerExecutesPublishedDefinitionAndExposesTraceThroughFacade() {
         ExecutionDefinitionRepository repository = new InMemoryExecutionDefinitionRepository();
@@ -62,9 +56,6 @@ class CanvasExecutionApplicationServiceTest {
                 .containsEntry("couponCode", "A10");
     }
 
-    /**
-     * 执行 triggerMakesNodeStatusesAndOutputsAvailableToAggregateHandlers 对应的业务处理。
-     */
     @Test
     void triggerMakesNodeStatusesAndOutputsAvailableToAggregateHandlers() {
         ExecutionDefinitionRepository repository = new InMemoryExecutionDefinitionRepository();
@@ -110,9 +101,6 @@ class CanvasExecutionApplicationServiceTest {
                 .containsEntry("passed", true);
     }
 
-    /**
-     * 执行 aggregateWaitsForAllConfiguredUpstreamBranchesBeforeExecuting 对应的业务处理。
-     */
     @Test
     void aggregateWaitsForAllConfiguredUpstreamBranchesBeforeExecuting() {
         ExecutionDefinitionRepository repository = new InMemoryExecutionDefinitionRepository();
@@ -151,10 +139,6 @@ class CanvasExecutionApplicationServiceTest {
                 .doesNotContain("end-fail");
     }
 
-    /**
-     * 执行 definition 对应的业务处理。
-     * @return 处理后的结果
-     */
     private static PublishedCanvasDefinition definition() {
         return new PublishedCanvasDefinition(
                 9L,
@@ -173,9 +157,6 @@ class CanvasExecutionApplicationServiceTest {
                         edge("capture", "end")));
     }
 
-    /**
-     * 执行 aggregateDefinition 对应的业务处理。
-     */
     private static PublishedCanvasDefinition aggregateDefinition() {
         return new PublishedCanvasDefinition(
                 9L,
@@ -201,9 +182,6 @@ class CanvasExecutionApplicationServiceTest {
                         edge("aggregate", "end-fail")));
     }
 
-    /**
-     * 执行 unbalancedAggregateDefinition 对应的业务处理。
-     */
     private static PublishedCanvasDefinition unbalancedAggregateDefinition() {
         return new PublishedCanvasDefinition(
                 9L,
@@ -231,36 +209,16 @@ class CanvasExecutionApplicationServiceTest {
                         edge("aggregate", "end-fail")));
     }
 
-    /**
-     * 执行 node 对应的业务处理。
-     * @param nodeId nodeId 参数
-     * @param nodeType nodeType 参数
-     * @return 处理后的结果
-     */
     private static PublishedCanvasNodeDefinition node(String nodeId, String nodeType) {
         return new PublishedCanvasNodeDefinition(nodeId, nodeType, nodeType, "{}", Map.of(), Map.of());
     }
 
-    /**
-     * 执行 edge 对应的业务处理。
-     * @param source source 参数
-     * @param target target 参数
-     * @return 处理后的结果
-     */
     private static PublishedCanvasEdgeDefinition edge(String source, String target) {
         return new PublishedCanvasEdgeDefinition(source + "-" + target, source, target, "{}", Map.of());
     }
 
-    /**
-     * 定义 CapturePayloadHandler 的执行上下文数据结构或业务契约。
-     */
     @NodeHandlerType("CAPTURE_PAYLOAD")
     private static final class CapturePayloadHandler implements NodeHandler {
-        /**
-         * 执行 execute 对应的业务处理。
-         * @param context context 参数
-         * @return 处理后的结果
-         */
         @Override
         public NodeExecutionResult execute(NodeExecutionContext context) {
             return NodeExecutionResult.success(Map.of(
@@ -269,16 +227,8 @@ class CanvasExecutionApplicationServiceTest {
         }
     }
 
-    /**
-     * 定义 ChannelSuccessHandler 的执行上下文数据结构或业务契约。
-     */
     @NodeHandlerType("CHANNEL_SUCCESS")
     private static final class ChannelSuccessHandler implements NodeHandler {
-        /**
-         * 执行 execute 对应的业务处理。
-         * @param context context 参数
-         * @return 处理后的结果
-         */
         @Override
         public NodeExecutionResult execute(NodeExecutionContext context) {
             return NodeExecutionResult.success(Map.of(

@@ -12,28 +12,13 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerType;
 import org.springframework.stereotype.Component;
 
-/**
- * 定义 OfficialAiNodeHandler 的执行上下文数据结构或业务契约。
- */
 @Component
 @NodeHandlerType(OfficialAiNodeHandler.NODE_TYPE)
 public class OfficialAiNodeHandler implements NodeHandler {
 
-    /**
-     * 保存 PLUGIN_ID 对应的状态或配置。
-     */
     static final String PLUGIN_ID = "canvas-plugin-ai";
-
-    /**
-     * 保存 NODE_TYPE 对应的状态或配置。
-     */
     static final String NODE_TYPE = "ai.generate-copy";
 
-    /**
-     * 执行 execute 对应的业务处理。
-     * @param context context 参数
-     * @return 处理后的结果
-     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         String promptKey = stringConfig(context, "promptKey");
@@ -54,19 +39,10 @@ public class OfficialAiNodeHandler implements NodeHandler {
         return NodeExecutionResult.success(output);
     }
 
-    /**
-     * 执行 operator 对应的业务处理。
-     * @param context context 参数
-     * @return 处理后的结果
-     */
     private static String operator(NodeExecutionContext context) {
         return userOrAnonymous(context);
     }
 
-    /**
-     * 执行 generatedCopy 对应的业务处理。
-     * @param promptKey promptKey 参数
-     */
     private static String generatedCopy(String promptKey) {
         return "Generated copy for " + promptKey;
     }

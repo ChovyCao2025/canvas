@@ -49,6 +49,26 @@ function fieldInput(field: MarketingFormField) {
   return <Input type={type === 'number' ? 'number' : type === 'email' ? 'email' : 'text'} placeholder={field.placeholder} />
 }
 
+function fieldsFromPublicSchema(schema: unknown): MarketingFormField[] {
+  if (!Array.isArray(schema)) return []
+  if (schema.every(item => typeof item === 'string')) {
+    return schema
+      .map(item => item.trim())
+      .filter(Boolean)
+      .map(key => ({
+        key,
+        label: key,
+        type: key === 'email' ? 'email' : key === 'message' ? 'textarea' : 'text',
+      }))
+  }
+  return parseFormFields(JSON.stringify(schema))
+}
+
+function publicFormFields(definition: PublicMarketingForm | null): MarketingFormField[] {
+  const fields = parseFormFields(definition?.fieldSchemaJson)
+  return fields.length > 0 ? fields : fieldsFromPublicSchema(definition?.fieldSchema)
+}
+
 export default function PublicMarketingFormPage() {
   const { publicKey = '' } = useParams()
   const location = useLocation()
@@ -58,7 +78,7 @@ export default function PublicMarketingFormPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  const fields = useMemo(() => parseFormFields(definition?.fieldSchemaJson), [definition?.fieldSchemaJson])
+  const fields = useMemo(() => publicFormFields(definition), [definition])
 
   useEffect(() => {
     setLoading(true)

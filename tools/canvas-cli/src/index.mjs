@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'node:fs'
+import http from 'node:http'
+import https from 'node:https'
 import { basename } from 'node:path'
 
-const G10_GATED_MESSAGE = 'Backend API commands are gated until G10 public extension/API stability passes; use local validate and diff for now.'
+const PUBLISH_GATED_MESSAGE = 'Publish is gated until a stable backend publish API is verified; import/export preview is available after G10 unlock.'
 
 const usage = `Canvas CLI
 
@@ -11,13 +13,22 @@ Usage:
   canvas-cli --help
   canvas-cli validate <file>
   canvas-cli diff <before> <after>
+  canvas-cli import <file> --api-url <url>
+  canvas-cli export <canvasId> --api-url <url> --tenant-id <tenantId>
 
 Commands:
   validate <file>        Validate a local Canvas DSL v1 JSON Journey document.
   diff <before> <after>  Summarize added, removed, and changed node ids locally.
+  import <file>          POST a local Canvas DSL document to /canvas/dsl/import.
+  export <canvasId>      GET a Canvas DSL document from /canvas/dsl/export/{canvasId}.
+
+Options:
+  --api-url <url>        Backend base URL. Defaults to CANVAS_API_URL.
+  --tenant-id <id>       Tenant id for export. Defaults to CANVAS_TENANT_ID.
 
 Current boundary:
-  import, export, and publish are blocked until G10 public extension/API stability passes.
+  import and export are unlocked after G10 public extension/API stability.
+  publish remains blocked until a stable backend publish API is verified.
   validate and diff are local-only and do not call backend APIs.`
 
 function readJson(file) {
@@ -118,6 +129,10 @@ function formatList(ids) {
 
 function parseGlobalOptions(args) {
   const commandArgs = []
+  const options = {
+    apiUrl: process.env.CANVAS_API_URL,
+    tenantId: process.env.CANVAS_TENANT_ID
+  }
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
@@ -127,6 +142,7 @@ function parseGlobalOptions(args) {
       if (!value) {
         throw new Error('--api-url requires a value')
       }
+      options.apiUrl = value
       index += 1
       continue
     }
@@ -136,6 +152,26 @@ function parseGlobalOptions(args) {
       if (!value) {
         throw new Error('--api-url requires a value')
       }
+      options.apiUrl = value
+      continue
+    }
+
+    if (arg === '--tenant-id') {
+      const value = args[index + 1]
+      if (!value) {
+        throw new Error('--tenant-id requires a value')
+      }
+      options.tenantId = value
+      index += 1
+      continue
+    }
+
+    if (arg.startsWith('--tenant-id=')) {
+      const value = arg.slice('--tenant-id='.length)
+      if (!value) {
+        throw new Error('--tenant-id requires a value')
+      }
+      options.tenantId = value
       continue
     }
 
@@ -143,8 +179,79 @@ function parseGlobalOptions(args) {
   }
 
   return {
-    commandArgs
+    commandArgs,
+    options
   }
+}
+
+function requireApiUrl(options) {
+  if (!isNonEmptyString(options.apiUrl)) {
+    throw new Error('--api-url or CANVAS_API_URL is required')
+  }
+  return options.apiUrl
+}
+
+function requireTenantId(options) {
+  if (!isNonEmptyString(options.tenantId)) {
+    throw new Error('--tenant-id or CANVAS_TENANT_ID is required for export')
+  }
+  return options.tenantId
+}
+
+function requestJson(apiUrl, method, pathname, body, headers = {}) {
+  const base = new URL(apiUrl)
+  const target = new URL(pathname, base)
+  const transport = target.protocol === 'https:' ? https : http
+  const payload = body === undefined ? undefined : JSON.stringify(body)
+
+  return new Promise((resolve, reject) => {
+    const request = transport.request(target, {
+      method,
+      headers: {
+        accept: 'application/json',
+        ...(payload === undefined ? {} : {
+          'content-type': 'application/json',
+          'content-length': Buffer.byteLength(payload)
+        }),
+        ...headers
+      }
+    }, (response) => {
+      const chunks = []
+      response.on('data', (chunk) => {
+        chunks.push(chunk)
+      })
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8')
+        let parsed = null
+        if (text.trim()) {
+          try {
+            parsed = JSON.parse(text)
+          } catch (error) {
+            reject(new Error(`backend returned invalid JSON: ${error.message}`))
+            return
+          }
+        }
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          reject(new Error(`backend request failed with ${response.statusCode}: ${text}`))
+          return
+        }
+        resolve(parsed)
+      })
+    })
+
+    request.on('error', reject)
+    if (payload !== undefined) {
+      request.write(payload)
+    }
+    request.end()
+  })
+}
+
+function unwrapCompatibilityEnvelope(response) {
+  if (isObject(response) && Object.hasOwn(response, 'result')) {
+    return response.result
+  }
+  return response
 }
 
 function runValidate(file) {
@@ -178,9 +285,35 @@ function runDiff(beforeFile, afterFile) {
   return 0
 }
 
+async function runImport(file, options) {
+  const document = readJson(file)
+  const response = await requestJson(requireApiUrl(options), 'POST', '/canvas/dsl/import', {
+    document
+  })
+  console.log(JSON.stringify(unwrapCompatibilityEnvelope(response), null, 2))
+  return 0
+}
+
+async function runExport(canvasId, options) {
+  if (!isNonEmptyString(canvasId)) {
+    throw new Error('export requires a canvas id')
+  }
+  const response = await requestJson(
+    requireApiUrl(options),
+    'GET',
+    `/canvas/dsl/export/${encodeURIComponent(canvasId)}`,
+    undefined,
+    {
+      'x-tenant-id': requireTenantId(options)
+    }
+  )
+  console.log(JSON.stringify(unwrapCompatibilityEnvelope(response), null, 2))
+  return 0
+}
+
 async function main(args) {
   try {
-    const { commandArgs } = parseGlobalOptions(args)
+    const { commandArgs, options } = parseGlobalOptions(args)
     const [command, ...rest] = commandArgs
 
     if (!command || command === '--help' || command === '-h') {
@@ -193,8 +326,14 @@ async function main(args) {
     if (command === 'diff' && rest.length === 2) {
       return runDiff(rest[0], rest[1])
     }
-    if (['import', 'export', 'publish'].includes(command)) {
-      console.error(G10_GATED_MESSAGE)
+    if (command === 'import' && rest.length === 1) {
+      return await runImport(rest[0], options)
+    }
+    if (command === 'export' && rest.length === 1) {
+      return await runExport(rest[0], options)
+    }
+    if (command === 'publish') {
+      console.error(PUBLISH_GATED_MESSAGE)
       return 1
     }
 

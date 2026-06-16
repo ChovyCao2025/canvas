@@ -9,6 +9,7 @@ import org.chovy.canvas.canvas.api.UserInputFacade;
 import org.chovy.canvas.canvas.domain.UserInputForm;
 import org.chovy.canvas.canvas.domain.UserInputResponse;
 import org.chovy.canvas.canvas.domain.UserInputStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,7 @@ public class UserInputApplicationService implements UserInputFacade {
     /**
      * 使用用户输入仓储和恢复端口创建应用服务。
      */
+    @Autowired
     public UserInputApplicationService(UserInputFormRepository formRepository,
                                        UserInputResponseRepository responseRepository,
                                        ObjectProvider<UserInputResumePort> resumePort) {

@@ -2,6 +2,37 @@
 
 These scripts are smoke checks for review items that need a running stack. Run them against a local or staging deployment after automated tests pass.
 
+## Canvas Boot Startup And Flyway
+
+Use Flyway disabled only to isolate Spring wiring failures from local database migration-history drift:
+
+```bash
+cd backend
+JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+CANVAS_JWT_SECRET=0123456789abcdef0123456789abcdef \
+perl -e 'alarm shift; exec @ARGV' 45 \
+mvn -pl canvas-boot spring-boot:run \
+  -Dspring-boot.run.arguments='--server.port=18080 --spring.flyway.enabled=false'
+```
+
+Expected: the bounded run reaches `Started CanvasBootApplication` and `Netty started`.
+
+For a normal Flyway-enabled startup, capture the log and classify validation failures before changing database history:
+
+```bash
+cd backend
+JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+CANVAS_JWT_SECRET=0123456789abcdef0123456789abcdef \
+perl -e 'alarm shift; exec @ARGV' 45 \
+mvn -pl canvas-boot spring-boot:run \
+  -Dspring-boot.run.arguments='--server.port=18081' \
+  > /tmp/canvas-boot-flyway.log 2>&1 || true
+
+../scripts/classify-flyway-validate-failure.sh --input-file /tmp/canvas-boot-flyway.log
+```
+
+Expected: checksum mismatches are classified as local `flyway_schema_history` drift. Do not run `flyway repair` automatically; use a disposable database for boot wiring checks, or repair only with operator approval after comparing applied SQL and taking a backup.
+
 ## CORS
 
 Run:

@@ -12,14 +12,8 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerRegistry;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 OfficialRiskPluginTest 的执行上下文数据结构或业务契约。
- */
 class OfficialRiskPluginTest {
 
-    /**
-     * 执行 registersRiskCheckHandlerThroughExecutionRegistry 对应的业务处理。
-     */
     @Test
     void registersRiskCheckHandlerThroughExecutionRegistry() {
         NodeHandlerRegistry registry = new NodeHandlerRegistry(List.of(new OfficialRiskNodeHandler()));
@@ -29,9 +23,6 @@ class OfficialRiskPluginTest {
                 .containsExactly("risk.check");
     }
 
-    /**
-     * 执行 returnsAllowedRiskCheckEnvelope 对应的业务处理。
-     */
     @Test
     void returnsAllowedRiskCheckEnvelope() {
         NodeHandler handler = new OfficialRiskNodeHandler();
@@ -64,9 +55,6 @@ class OfficialRiskPluginTest {
         assertThat(result.output().get("context")).isEqualTo(Map.of("tenantId", "tenant-a"));
     }
 
-    /**
-     * 执行 returnsBlockedRiskCheckEnvelopeWhenPolicyRequiresComplianceBlock 对应的业务处理。
-     */
     @Test
     void returnsBlockedRiskCheckEnvelopeWhenPolicyRequiresComplianceBlock() {
         NodeHandler handler = new OfficialRiskNodeHandler();
@@ -91,9 +79,6 @@ class OfficialRiskPluginTest {
                 .containsEntry("status", "BLOCKED");
     }
 
-    /**
-     * 执行 trimsPolicyBeforeReturningDecisionEnvelope 对应的业务处理。
-     */
     @Test
     void trimsPolicyBeforeReturningDecisionEnvelope() {
         NodeHandler handler = new OfficialRiskNodeHandler();
@@ -118,9 +103,6 @@ class OfficialRiskPluginTest {
                 .containsEntry("status", "MATCHED");
     }
 
-    /**
-     * 执行 defaultsSubjectToAnonymousWhenUserIdIsMissing 对应的业务处理。
-     */
     @Test
     void defaultsSubjectToAnonymousWhenUserIdIsMissing() {
         NodeHandler handler = new OfficialRiskNodeHandler();
@@ -137,9 +119,6 @@ class OfficialRiskPluginTest {
         assertThat(result.output()).containsEntry("subject", "anonymous");
     }
 
-    /**
-     * 执行 failsWhenPolicyIsMissing 对应的业务处理。
-     */
     @Test
     void failsWhenPolicyIsMissing() {
         NodeHandler handler = new OfficialRiskNodeHandler();
@@ -156,9 +135,6 @@ class OfficialRiskPluginTest {
         assertThat(result.error()).contains("risk policy is required");
     }
 
-    /**
-     * 执行 failsWhenPolicyIsBlank 对应的业务处理。
-     */
     @Test
     void failsWhenPolicyIsBlank() {
         NodeHandler handler = new OfficialRiskNodeHandler();

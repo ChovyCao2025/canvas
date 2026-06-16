@@ -6,14 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.chovy.canvas.execution.domain.PluginRegistryCatalog.Plugin;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 PluginRegistryApplicationServiceTest 的执行上下文数据结构或业务契约。
- */
 class PluginRegistryApplicationServiceTest {
 
-    /**
-     * 执行 groupsCatalogByExtensionPointWithPluginKeyOrdering 对应的业务处理。
-     */
     @Test
     void groupsCatalogByExtensionPointWithPluginKeyOrdering() {
         PluginRegistryApplicationService service = new PluginRegistryApplicationService();
@@ -31,9 +25,6 @@ class PluginRegistryApplicationServiceTest {
                         .containsEntry("minCanvasVersion", "1.0.0"));
     }
 
-    /**
-     * 执行 setEnabledNormalizesKeyAndEnforcesVersionCompatibility 对应的业务处理。
-     */
     @Test
     void setEnabledNormalizesKeyAndEnforcesVersionCompatibility() {
         PluginRegistryApplicationService service = new PluginRegistryApplicationService();

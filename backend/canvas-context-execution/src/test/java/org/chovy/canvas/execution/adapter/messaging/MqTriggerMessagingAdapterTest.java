@@ -10,14 +10,8 @@ import org.chovy.canvas.execution.api.CanvasExecutionFacade;
 import org.chovy.canvas.execution.api.trace.ExecutionTraceView;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 MqTriggerMessagingAdapterTest 的执行上下文数据结构或业务契约。
- */
 class MqTriggerMessagingAdapterTest {
 
-    /**
-     * 执行 consumerMapsMessageEnvelopeToExecutionCommand 对应的业务处理。
-     */
     @Test
     void consumerMapsMessageEnvelopeToExecutionCommand() {
         RecordingExecutionFacade facade = new RecordingExecutionFacade(false);
@@ -43,9 +37,6 @@ class MqTriggerMessagingAdapterTest {
         assertThat(rejected).isEmpty();
     }
 
-    /**
-     * 执行 failedConsumerHandoffRoutesRejection 对应的业务处理。
-     */
     @Test
     void failedConsumerHandoffRoutesRejection() {
         RecordingExecutionFacade facade = new RecordingExecutionFacade(true);
@@ -70,9 +61,6 @@ class MqTriggerMessagingAdapterTest {
                 message));
     }
 
-    /**
-     * 执行 publisherBuildsRocketMqDestinationFromTopicAndTag 对应的业务处理。
-     */
     @Test
     void publisherBuildsRocketMqDestinationFromTopicAndTag() {
         RocketMqTriggerPublisher publisher = new RocketMqTriggerPublisher(null);
@@ -81,29 +69,14 @@ class MqTriggerMessagingAdapterTest {
                 .isEqualTo("canvas-trigger:orders.created");
     }
 
-    /**
-     * 定义 RecordingExecutionFacade 的执行上下文数据结构或业务契约。
-     */
     private static final class RecordingExecutionFacade implements CanvasExecutionFacade {
-        /**
-         * 保存 fail 对应的状态或配置。
-         */
         private final boolean fail;
         private final List<ExecutionRequestCommand> commands = new ArrayList<>();
 
-        /**
-         * 执行 RecordingExecutionFacade 对应的业务处理。
-         * @param fail fail 参数
-         */
         private RecordingExecutionFacade(boolean fail) {
             this.fail = fail;
         }
 
-        /**
-         * 执行 trigger 对应的业务处理。
-         * @param command command 参数
-         * @return 处理后的结果
-         */
         @Override
         public ExecutionResultView trigger(ExecutionRequestCommand command) {
             commands.add(command);
@@ -113,12 +86,6 @@ class MqTriggerMessagingAdapterTest {
             return new ExecutionResultView("exec-1", "STARTED");
         }
 
-        /**
-         * 执行 trace 对应的业务处理。
-         * @param tenantId tenantId 参数
-         * @param executionId executionId 参数
-         * @return 处理后的结果
-         */
         @Override
         public ExecutionTraceView trace(Long tenantId, String executionId) {
             throw new UnsupportedOperationException();

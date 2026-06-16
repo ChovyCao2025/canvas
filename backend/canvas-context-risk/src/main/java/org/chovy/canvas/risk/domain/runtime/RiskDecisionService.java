@@ -118,10 +118,12 @@ public class RiskDecisionService {
      */
     private RiskDecisionResponse evaluateNew(RiskDecisionRequest request, String requestHash, Instant startedAt) {
         RiskCompiledStrategy strategy = strategyReader.findActiveStrategy(request.tenantId(), request.sceneKey());
+        boolean missingStrategy = false;
         if (strategy == null) {
             // 场景未配置策略时仍记录一次可追踪决策，并按 FAIL_REVIEW 返回人工复核。
             strategy = new RiskCompiledStrategy(request.sceneKey(), "missing", 0,
                     null, RiskFailPolicy.FAIL_REVIEW, List.of(), List.of());
+            missingStrategy = true;
         }
         try {
             if (request.deadlineMs() <= 0) {
@@ -132,6 +134,10 @@ public class RiskDecisionService {
             List<RiskDecisionRuleHit> hits = new ArrayList<>();
             List<String> matchedRules = new ArrayList<>();
             List<String> missingFeatures = new ArrayList<>();
+            if (missingStrategy) {
+                signals.add(RiskDecisionSignal.effective("strategy:missing", "MISSING_STRATEGY",
+                        RiskDecisionAction.REVIEW, 0));
+            }
             for (RiskCompiledRule rule : strategy.rules()) {
                 RiskRuleEvaluationResult result = evaluator.evaluate(rule.rule(),
                         operand -> resolveOperand(request, operand, requiredFeatureValues));
@@ -228,13 +234,14 @@ public class RiskDecisionService {
         int latencyMs = Math.max(0, (int) Duration.between(startedAt, clock.instant()).toMillis());
         // 运行模式只改变对外强制结果，候选策略证据仍通过 labels 保留下来。
         ProjectedDecision projected = projectByMode(request, strategy, merged);
+        RiskRuntimeMode responseMode = strategy.mode() == null ? RiskRuntimeMode.ENFORCE : strategy.mode();
         RiskDecisionResponse response = new RiskDecisionResponse(
                 request.requestId(),
                 null,
                 request.sceneKey(),
                 strategy.strategyKey(),
                 strategy.version(),
-                strategy.mode(),
+                responseMode,
                 projected.action(),
                 projected.score(),
                 projected.riskBand(),

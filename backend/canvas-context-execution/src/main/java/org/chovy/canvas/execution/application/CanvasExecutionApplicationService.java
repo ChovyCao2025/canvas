@@ -21,30 +21,12 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerRegistry;
 import org.springframework.stereotype.Service;
 
-/**
- * 定义 CanvasExecutionApplicationService 的执行上下文数据结构或业务契约。
- */
 @Service
 public class CanvasExecutionApplicationService implements CanvasExecutionFacade {
 
-    /**
-     * 保存 dagRuntimeService 对应的状态或配置。
-     */
     private final DagRuntimeService dagRuntimeService;
-
-    /**
-     * 保存 handlerRegistry 对应的状态或配置。
-     */
     private final NodeHandlerRegistry handlerRegistry;
-
-    /**
-     * 保存 traceService 对应的状态或配置。
-     */
     private final ExecutionTraceService traceService;
-
-    /**
-     * 保存 definitionRepository 对应的状态或配置。
-     */
     private final ExecutionDefinitionRepository definitionRepository;
 
     public CanvasExecutionApplicationService(
@@ -58,11 +40,6 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
         this.definitionRepository = definitionRepository;
     }
 
-    /**
-     * 执行 trigger 对应的业务处理。
-     * @param command command 参数
-     * @return 处理后的结果
-     */
     @Override
     public ExecutionResultView trigger(ExecutionRequestCommand command) {
         PublishedCanvasDefinition definition = definitionRepository.getPublished(command.tenantId(), command.canvasId());
@@ -78,7 +55,6 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
         try {
             while (!queue.isEmpty()) {
                 String nodeId = queue.remove();
-                // 同一执行轮次内只运行一次节点，避免分支汇聚时重复触发副作用。
                 if (!executed.add(nodeId)) {
                     continue;
                 }
@@ -92,7 +68,6 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
                         contextData));
                 contextData.putAll(result.output());
                 if (!result.success()) {
-                    // 失败节点会立即终止整次执行，并把失败原因写入主执行轨迹。
                     rememberNodeResult(contextData, nodeId, "FAILED", result.output());
                     traceService.recordNode(command.tenantId(), executionId, nodeId, node.nodeType(),
                             "FAILED", result.error(), result.output());
@@ -100,7 +75,6 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
                     return new ExecutionResultView(executionId, "FAILED");
                 }
                 if (result.pending()) {
-                    // WAIT 类节点暂停后续调度，等待外部事件恢复同一个执行上下文。
                     rememberNodeResult(contextData, nodeId, "WAITING", result.output());
                     traceService.recordNode(command.tenantId(), executionId, nodeId, node.nodeType(),
                             "WAITING", "", result.output());
@@ -121,12 +95,6 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
         }
     }
 
-    /**
-     * 执行 trace 对应的业务处理。
-     * @param tenantId tenantId 参数
-     * @param executionId executionId 参数
-     * @return 处理后的结果
-     */
     @Override
     public ExecutionTraceView trace(Long tenantId, String executionId) {
         return traceService.trace(tenantId, executionId);
@@ -139,7 +107,6 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
             NodeExecutionResult result,
             Set<String> completed) {
         if (!result.routes().isEmpty()) {
-            // 条件节点显式给出路由时，只调度被命中的目标节点。
             result.routes().values().stream()
                     .filter(target -> target != null && !target.isBlank())
                     .filter(target -> readyToRun(graph, target, completed))
@@ -151,18 +118,11 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
                 .forEach(queue::add);
     }
 
-    /**
-     * 执行 readyToRun 对应的业务处理。
-     * @param graph graph 参数
-     * @param nodeId nodeId 参数
-     * @param completed completed 参数
-     */
     private boolean readyToRun(DagGraph graph, String nodeId, Set<String> completed) {
         DagNode node = graph.node(nodeId);
         if (node == null || !"AGGREGATE".equals(node.nodeType())) {
             return true;
         }
-        // 聚合节点必须等待配置的上游集合全部完成后才能入队。
         Set<String> requiredUpstream = new LinkedHashSet<>(stringList(node.config().get("upstreamIds")));
         if (requiredUpstream.isEmpty()) {
             requiredUpstream.addAll(graph.upstream(nodeId));
@@ -170,11 +130,6 @@ public class CanvasExecutionApplicationService implements CanvasExecutionFacade 
         return completed.containsAll(requiredUpstream);
     }
 
-    /**
-     * 执行 stringList 对应的业务处理。
-     * @param value value 参数
-     * @return 处理后的结果
-     */
     private List<String> stringList(Object value) {
         if (!(value instanceof List<?> rawList)) {
             return List.of();

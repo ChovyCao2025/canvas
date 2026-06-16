@@ -2,7 +2,7 @@
 
 This runbook covers the production deployment assets for the Marketing Canvas realtime warehouse Flink layer.
 
-This is not a production readiness claim without live evidence. Production readiness still requires a real cluster deployment, successful job submissions, fresh checkpoint evidence in `canvas-engine`, Doris row-level validation, monitoring targets scraped by Prometheus, and an approved cutover policy from the direct Doris Stream Load fallback.
+This is not a production readiness claim without live evidence. Production readiness still requires a real cluster deployment, successful job submissions, fresh checkpoint evidence from the `canvas-boot` runtime behind the stable `canvas-engine` service name, Doris row-level validation, monitoring targets scraped by Prometheus, and an approved cutover policy from the direct Doris Stream Load fallback.
 
 ## Artifacts
 
@@ -33,7 +33,7 @@ Required keys:
 - `canvas-flink-checkpoint-endpoint`
 - `canvas-flink-internal-api-token`
 
-`canvas-flink-internal-api-token` must match `CANVAS_INTERNAL_API_TOKEN` on `canvas-engine`. The checkpoint endpoint is intentionally routed through the internal API token filter, not through operator JWT auth.
+`canvas-flink-internal-api-token` must match `CANVAS_INTERNAL_API_TOKEN` on the `canvas-boot` runtime behind the stable `canvas-engine` service name. The checkpoint endpoint is intentionally routed through the internal API token filter, not through operator JWT auth.
 
 ## Build And Publish Job Image
 

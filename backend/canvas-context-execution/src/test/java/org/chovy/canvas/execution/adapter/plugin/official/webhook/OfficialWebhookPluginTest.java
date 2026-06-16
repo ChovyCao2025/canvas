@@ -11,14 +11,8 @@ import org.chovy.canvas.execution.domain.NodeExecutionResult;
 import org.chovy.canvas.execution.domain.NodeHandlerRegistry;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 OfficialWebhookPluginTest 的执行上下文数据结构或业务契约。
- */
 class OfficialWebhookPluginTest {
 
-    /**
-     * 执行 registersWebhookHandlerThroughExecutionRegistry 对应的业务处理。
-     */
     @Test
     void registersWebhookHandlerThroughExecutionRegistry() {
         NodeHandlerRegistry registry = new NodeHandlerRegistry(List.of(new OfficialWebhookNodeHandler()));
@@ -28,9 +22,6 @@ class OfficialWebhookPluginTest {
                 .containsExactly("webhook");
     }
 
-    /**
-     * 执行 returnsNormalizedWebhookTriggerEnvelope 对应的业务处理。
-     */
     @Test
     void returnsNormalizedWebhookTriggerEnvelope() {
         OfficialWebhookNodeHandler handler = new OfficialWebhookNodeHandler();
@@ -62,9 +53,6 @@ class OfficialWebhookPluginTest {
         assertThat(result.output().get("context")).isEqualTo(Map.of("tenantId", "tenant-a"));
     }
 
-    /**
-     * 执行 defaultsSourceAndTrimsEventConfig 对应的业务处理。
-     */
     @Test
     void defaultsSourceAndTrimsEventConfig() {
         OfficialWebhookNodeHandler handler = new OfficialWebhookNodeHandler();
@@ -84,9 +72,6 @@ class OfficialWebhookPluginTest {
                 .containsEntry("source", "webhook");
     }
 
-    /**
-     * 执行 failsWhenWebhookEventIsMissing 对应的业务处理。
-     */
     @Test
     void failsWhenWebhookEventIsMissing() {
         OfficialWebhookNodeHandler handler = new OfficialWebhookNodeHandler();

@@ -12,14 +12,8 @@ import org.chovy.canvas.execution.api.MessageDeliveryFacade.ReplayResultView;
 import org.chovy.canvas.execution.domain.MessageDeliveryCatalog;
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 MessageDeliveryApplicationServiceTest 的执行上下文数据结构或业务契约。
- */
 class MessageDeliveryApplicationServiceTest {
 
-    /**
-     * 执行 searchesWithLegacyFiltersAndOneBasedPaging 对应的业务处理。
-     */
     @Test
     void searchesWithLegacyFiltersAndOneBasedPaging() {
         MessageDeliveryApplicationService service = new MessageDeliveryApplicationService();
@@ -58,9 +52,6 @@ class MessageDeliveryApplicationServiceTest {
                 .containsExactly(1001L);
     }
 
-    /**
-     * 执行 exposesDetailReceiptReplayAndReconcileSemantics 对应的业务处理。
-     */
     @Test
     void exposesDetailReceiptReplayAndReconcileSemantics() {
         MessageDeliveryApplicationService service = new MessageDeliveryApplicationService();

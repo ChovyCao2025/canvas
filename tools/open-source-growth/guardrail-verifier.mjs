@@ -1,5 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import vm from 'node:vm'
+
+import { verifyG10PublicApiStability } from './g10-public-api-stability.mjs'
+import { verifyPlaygroundRuntimeSmoke } from './playground-runtime-smoke.mjs'
 
 const REQUIRED_DOCS = [
   'README.md',
@@ -88,15 +92,29 @@ const CODEOWNERS_REFERENCES = [
   '/tools/open-source-growth/',
 ]
 
-const CLI_G10_GATED_MESSAGE = 'Backend API commands are gated until G10 public extension/API stability passes'
-const FORBIDDEN_CLI_BACKEND_API_SURFACES = [
+const CI_WORKFLOW_FILES = [
+  '.github/workflows/ci.yml',
+  '.github/workflows/canvas-ci.yml',
+]
+const PLAYGROUND_RUNTIME_SMOKE = 'tools/open-source-growth/playground-runtime-smoke.mjs'
+const PLAYGROUND_RUNTIME_SMOKE_COMMAND = `node ${PLAYGROUND_RUNTIME_SMOKE}`
+const PLAYGROUND_LIVE_API_SMOKE = 'tools/open-source-growth/playground-live-api-smoke.mjs'
+const PLAYGROUND_LIVE_API_SMOKE_COMMAND = `node ${PLAYGROUND_LIVE_API_SMOKE} --api-url http://localhost:8080`
+const G10_PUBLIC_API_STABILITY = 'tools/open-source-growth/g10-public-api-stability.mjs'
+
+const CLI_PUBLISH_GATED_MESSAGE = 'Publish is gated until a stable backend publish API is verified'
+const REQUIRED_CLI_IMPORT_EXPORT_SURFACES = [
   { text: 'canvas-cli import <file>', label: 'import command in usage' },
   { text: 'canvas-cli export <canvasId>', label: 'export command in usage' },
+  { text: '/canvas/dsl/import', label: 'Canvas DSL import backend path' },
+  { text: '/canvas/dsl/export/', label: 'Canvas DSL export backend path' },
+]
+const FORBIDDEN_CLI_BACKEND_API_SURFACES = [
   { text: 'canvas-cli publish <canvasId>', label: 'publish command in usage' },
   { text: 'fetch(', label: 'network fetch call' },
-  { text: 'requestJson', label: 'backend request helper' },
+  { text: '/canvas/dsl/validate', label: 'Canvas DSL validate backend path' },
   { text: '/canvas/dsl/map', label: 'Canvas DSL map backend path' },
-  { text: '/canvas/dsl/export/', label: 'Canvas DSL export backend path' },
+  { text: '/canvas/dsl/diff', label: 'Canvas DSL diff backend path' },
   { text: '/publish', label: 'publish backend path' },
 ]
 
@@ -317,61 +335,472 @@ function extractQuotedStrings(content) {
   return values
 }
 
-function extractFrontendNewUserWelcomePlugins(root) {
+function extractFrontendTemplateCatalog(root) {
   const catalog = readIfExists(path.join(root, 'frontend/src/pages/canvas-list/templateCatalog.ts'))
-  const match = /key:\s*['"]new-user-welcome['"][\s\S]*?requiredPlugins:\s*\[([^\]]+)\]/.exec(catalog)
-  return match ? extractQuotedStrings(match[1]) : []
+  const errors = []
+  const entries = new Map()
+  const evaluated = evaluateFrontendTemplateCatalog(catalog)
+  errors.push(...evaluated.errors)
+  const evaluatedEntries = evaluated.entries
+  for (const template of evaluatedEntries) {
+    if (!template?.key) {
+      continue
+    }
+    entries.set(template.key, {
+      key: template.key,
+      riskLevel: template.riskLevel,
+      requiredPlugins: Array.isArray(template.requiredPlugins) ? template.requiredPlugins : [],
+      docs: template.docs,
+      canvas: template.canvas,
+      samplePayload: template.samplePayload,
+    })
+  }
+  if (catalog && evaluated.foundCatalog && entries.size === 0) {
+    errors.push('frontend template catalog could not be evaluated into official template entries')
+  }
+  return { entries, errors }
 }
 
 function arraysEqual(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index])
 }
 
-function requireCliGoldenPathFixture(errors, root) {
-  const fixture = readJsonIfExists(
-    errors,
-    'tools/canvas-cli/test/fixtures/valid-journey.json',
-    path.join(root, 'tools/canvas-cli/test/fixtures/valid-journey.json'),
-  )
-  if (!fixture) {
-    return
+function evaluateFrontendTemplateCatalog(catalog) {
+  const catalogExpression = extractOfficialCatalogExpression(catalog)
+  if (!catalogExpression.foundCatalog) {
+    return { entries: [], errors: [], foundCatalog: false }
   }
-  const nodes = Array.isArray(fixture?.spec?.nodes) ? fixture.spec.nodes : []
-  const edges = Array.isArray(fixture?.spec?.edges) ? fixture.spec.edges : []
-  const nodeIds = nodes.map(node => node?.id)
-  if (fixture?.metadata?.name !== 'new-user-welcome') {
-    errors.push('CLI valid-journey fixture must use metadata.name new-user-welcome')
-  }
-  for (const nodeId of ['segment', 'coupon', 'message']) {
-    if (!nodeIds.includes(nodeId)) {
-      errors.push(`CLI valid-journey fixture must include ${nodeId} node`)
+  if (catalogExpression.error) {
+    return {
+      entries: [],
+      errors: [`frontend template catalog could not be parsed: ${catalogExpression.error}`],
+      foundCatalog: true,
     }
   }
-  if (!nodes.some(node => node?.id === 'segment' && String(node?.config?.expression ?? '').includes('user.lifecycleStage') && String(node?.config?.expression ?? '').includes('new'))) {
-    errors.push('CLI valid-journey segment node must match user.lifecycleStage == new')
-  }
-  for (const [from, to] of [['segment', 'coupon'], ['coupon', 'message']]) {
-    if (!edges.some(edge => edge?.from === from && edge?.to === to)) {
-      errors.push(`CLI valid-journey fixture must include ${from} -> ${to} edge`)
+  const declarations = collectCatalogConstDeclarations(catalog, catalogExpression.start)
+  try {
+    const entries = vm.runInNewContext(`
+      function journey(key, title, trigger, nodes, edges) {
+        return {
+          apiVersion: 'canvas/v1',
+          kind: 'Journey',
+          metadata: { name: key, title },
+          spec: { trigger, nodes, edges },
+        }
+      }
+      function node(id, type, label, config) {
+        return { id, type, label, config }
+      }
+      function edge(from, to, when) {
+        return { from, to, when }
+      }
+      function trace(nodeId, nodeType, outcome, summary) {
+        return { nodeId, nodeType, outcome, summary }
+      }
+      ${declarations.join('\n')}
+      const officialTemplateCatalog = ${catalogExpression.expression}
+      officialTemplateCatalog
+    `, {}, { timeout: 1000 })
+    if (!Array.isArray(entries)) {
+      return {
+        entries: [],
+        errors: ['frontend template catalog evaluation did not return an array'],
+        foundCatalog: true,
+      }
+    }
+    return { entries, errors: [], foundCatalog: true }
+  } catch (error) {
+    return {
+      entries: [],
+      errors: [`frontend template catalog evaluation failed: ${error.message}`],
+      foundCatalog: true,
     }
   }
 }
 
-function requireCliLocalOnlyUntilG10(errors, root) {
+function extractOfficialCatalogExpression(catalog) {
+  const catalogMatch = /\bofficialTemplateCatalog\b/.exec(catalog)
+  if (!catalogMatch) {
+    return { foundCatalog: false, start: -1, expression: '', error: '' }
+  }
+  const assignmentIndex = catalog.indexOf('=', catalogMatch.index)
+  if (assignmentIndex === -1) {
+    return {
+      foundCatalog: true,
+      start: catalogMatch.index,
+      expression: '',
+      error: 'officialTemplateCatalog assignment is missing',
+    }
+  }
+  const start = skipWhitespace(catalog, assignmentIndex + 1)
+  if (catalog[start] !== '[') {
+    return {
+      foundCatalog: true,
+      start,
+      expression: '',
+      error: 'officialTemplateCatalog assignment must be an array literal',
+    }
+  }
+  const end = findBalancedExpressionEnd(catalog, start)
+  if (end === -1) {
+    return {
+      foundCatalog: true,
+      start,
+      expression: '',
+      error: 'officialTemplateCatalog array literal is not balanced',
+    }
+  }
+  return {
+    foundCatalog: true,
+    start: catalogMatch.index,
+    expression: catalog.slice(start, end + 1),
+    error: '',
+  }
+}
+
+function collectCatalogConstDeclarations(catalog, beforeIndex) {
+  const declarations = []
+  const declarationPattern = /\b(?:export\s+)?const\s+([A-Za-z_$][\w$]*)/g
+  let match
+  while ((match = declarationPattern.exec(catalog)) !== null && match.index < beforeIndex) {
+    const name = match[1]
+    if (name === 'officialTemplateCatalog') {
+      continue
+    }
+    let cursor = skipWhitespace(catalog, declarationPattern.lastIndex)
+    if (catalog[cursor] === ':') {
+      cursor = catalog.indexOf('=', cursor)
+    }
+    if (cursor === -1 || catalog[cursor] !== '=') {
+      continue
+    }
+    const expressionStart = skipWhitespace(catalog, cursor + 1)
+    const expressionEnd = findConstExpressionEnd(catalog, expressionStart)
+    if (expressionEnd === -1) {
+      continue
+    }
+    declarations.push(`const ${name} = ${catalog.slice(expressionStart, expressionEnd + 1)}`)
+    declarationPattern.lastIndex = expressionEnd + 1
+  }
+  return declarations
+}
+
+function skipWhitespace(content, index) {
+  let cursor = index
+  while (cursor < content.length && /\s/.test(content[cursor])) {
+    cursor += 1
+  }
+  return cursor
+}
+
+function findConstExpressionEnd(content, start) {
+  const first = content[start]
+  if (['[', '{', '('].includes(first)) {
+    return findBalancedExpressionEnd(content, start)
+  }
+  if (first === '"' || first === "'" || first === '`') {
+    return skipStringLiteral(content, start) - 1
+  }
+  let cursor = start
+  while (cursor < content.length && content[cursor] !== '\n' && content[cursor] !== ';') {
+    cursor += 1
+  }
+  return cursor > start ? cursor - 1 : -1
+}
+
+function findBalancedExpressionEnd(content, start) {
+  const pairs = new Map([
+    ['[', ']'],
+    ['{', '}'],
+    ['(', ')'],
+  ])
+  const opening = content[start]
+  if (!pairs.has(opening)) {
+    return -1
+  }
+  const stack = [pairs.get(opening)]
+  let cursor = start + 1
+  while (cursor < content.length) {
+    const char = content[cursor]
+    const next = content[cursor + 1]
+    if (char === '"' || char === "'" || char === '`') {
+      cursor = skipStringLiteral(content, cursor)
+      continue
+    }
+    if (char === '/' && next === '/') {
+      cursor = skipLineComment(content, cursor + 2)
+      continue
+    }
+    if (char === '/' && next === '*') {
+      cursor = skipBlockComment(content, cursor + 2)
+      continue
+    }
+    if (pairs.has(char)) {
+      stack.push(pairs.get(char))
+      cursor += 1
+      continue
+    }
+    if (char === stack[stack.length - 1]) {
+      stack.pop()
+      if (stack.length === 0) {
+        return cursor
+      }
+    }
+    cursor += 1
+  }
+  return -1
+}
+
+function skipStringLiteral(content, start) {
+  const quote = content[start]
+  let cursor = start + 1
+  while (cursor < content.length) {
+    if (content[cursor] === '\\') {
+      cursor += 2
+      continue
+    }
+    if (content[cursor] === quote) {
+      return cursor + 1
+    }
+    cursor += 1
+  }
+  return content.length
+}
+
+function skipLineComment(content, start) {
+  const end = content.indexOf('\n', start)
+  return end === -1 ? content.length : end + 1
+}
+
+function skipBlockComment(content, start) {
+  const end = content.indexOf('*/', start)
+  return end === -1 ? content.length : end + 2
+}
+
+function jsonEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function requirePlaygroundGoldenPathFixture(errors, root, frontendTemplates) {
+  const expectedTemplate = frontendTemplates.get('new-user-welcome')
+  if (!expectedTemplate?.canvas) {
+    errors.push('frontend template catalog must define new-user-welcome canvas')
+    return
+  }
+  const fixture = readJsonIfExists(
+    errors,
+    'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json',
+    path.join(root, 'tools/canvas-cli/test/fixtures/playground-new-user-welcome.json'),
+  )
+  if (!fixture) {
+    return
+  }
+  const expectedCanvas = expectedTemplate.canvas
+  const expectedNodes = Array.isArray(expectedCanvas?.spec?.nodes) ? expectedCanvas.spec.nodes : []
+  const expectedEdges = Array.isArray(expectedCanvas?.spec?.edges) ? expectedCanvas.spec.edges : []
+  const nodes = Array.isArray(fixture?.spec?.nodes) ? fixture.spec.nodes : []
+  const edges = Array.isArray(fixture?.spec?.edges) ? fixture.spec.edges : []
+  const nodeIds = nodes.map(node => node?.id)
+  if (fixture?.apiVersion !== expectedCanvas?.apiVersion) {
+    errors.push(`playground-new-user-welcome fixture apiVersion must match frontend catalog canvas apiVersion ${expectedCanvas?.apiVersion}`)
+  }
+  if (fixture?.kind !== expectedCanvas?.kind) {
+    errors.push(`playground-new-user-welcome fixture kind must match frontend catalog canvas kind ${expectedCanvas?.kind}`)
+  }
+  if (fixture?.metadata?.name !== expectedCanvas?.metadata?.name) {
+    errors.push(`playground-new-user-welcome fixture metadata.name must match frontend catalog canvas metadata.name ${expectedCanvas?.metadata?.name}`)
+  }
+  if (!jsonEqual(fixture?.metadata, expectedCanvas?.metadata)) {
+    errors.push('playground-new-user-welcome fixture metadata must match frontend catalog canvas metadata')
+  }
+  if (!jsonEqual(fixture?.spec?.trigger, expectedCanvas?.spec?.trigger)) {
+    errors.push('playground-new-user-welcome fixture trigger must match frontend catalog canvas trigger')
+  }
+  for (const nodeId of ['segment', 'coupon', 'message']) {
+    if (!nodeIds.includes(nodeId)) {
+      errors.push(`playground-new-user-welcome fixture must include ${nodeId} node`)
+    }
+  }
+  for (const expectedNode of expectedNodes) {
+    const actualNode = nodes.find(node => node?.id === expectedNode.id)
+    if (!actualNode) {
+      continue
+    }
+    if (!jsonEqual(actualNode, expectedNode)) {
+      errors.push(`playground-new-user-welcome ${expectedNode.id} node must match frontend catalog node type ${expectedNode.type}`)
+    }
+  }
+  for (const [from, to] of [['segment', 'coupon'], ['coupon', 'message']]) {
+    if (!edges.some(edge => edge?.from === from && edge?.to === to)) {
+      errors.push(`playground-new-user-welcome fixture must include ${from} -> ${to} edge`)
+    }
+  }
+  for (const expectedEdge of expectedEdges) {
+    if (!edges.some(edge => jsonEqual(edge, expectedEdge))) {
+      errors.push(`playground-new-user-welcome ${expectedEdge.from} -> ${expectedEdge.to} edge must match frontend catalog`)
+    }
+  }
+  if (expectedTemplate.samplePayload && !jsonEqual(fixture?.samplePayload, expectedTemplate.samplePayload)) {
+    errors.push('playground-new-user-welcome samplePayload must match frontend catalog samplePayload')
+  }
+}
+
+function requireCliImportExportUnlockWithPublishGate(errors, root) {
+  const cliSourceDir = path.join(root, 'tools/canvas-cli/src')
   const cliSourcePath = path.join(root, 'tools/canvas-cli/src/index.mjs')
   const cliSource = readIfExists(cliSourcePath)
   if (!cliSource) {
-    errors.push('tools/canvas-cli/src/index.mjs is required for local-only CLI gate')
+    errors.push('tools/canvas-cli/src/index.mjs is required for G10 CLI import/export unlock gate')
     return
   }
-  if (!cliSource.includes(CLI_G10_GATED_MESSAGE)) {
-    errors.push('canvas-cli must gate backend API commands until G10 public extension/API stability passes')
+  const cliSources = listFiles(cliSourceDir)
+    .filter(file => file.endsWith('.mjs') || file.endsWith('.js'))
+    .map(file => readFileSync(file, 'utf8'))
+    .join('\n')
+  if (!cliSource.includes(CLI_PUBLISH_GATED_MESSAGE)) {
+    errors.push('canvas-cli must gate publish until a stable backend publish API is verified')
   }
-  for (const surface of FORBIDDEN_CLI_BACKEND_API_SURFACES) {
-    if (cliSource.includes(surface.text)) {
-      errors.push(`canvas-cli must remain local-only before G10; remove ${surface.label}`)
+  for (const surface of REQUIRED_CLI_IMPORT_EXPORT_SURFACES) {
+    if (!cliSources.includes(surface.text)) {
+      errors.push(`canvas-cli must include ${surface.label} after G10 import/export unlock`)
     }
   }
+  for (const surface of FORBIDDEN_CLI_BACKEND_API_SURFACES) {
+    if (cliSources.includes(surface.text)) {
+      errors.push(`canvas-cli must stay within G10 import/export unlock; remove ${surface.label}`)
+    }
+  }
+}
+
+function workflowCommandLabel(command) {
+  return typeof command === 'string' ? command : command.label
+}
+
+function normalizeWorkflowScalar(value) {
+  const trimmed = value.trim()
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+function extractWorkflowSteps(jobBody) {
+  const steps = []
+  let current = null
+  for (const line of jobBody.split(/\r?\n/)) {
+    const itemMatch = line.match(/^      -\s+(.*)$/)
+    if (itemMatch) {
+      current = { run: '', workingDirectory: '' }
+      steps.push(current)
+      const runMatch = itemMatch[1].match(/^run:\s*(.*)$/)
+      if (runMatch) {
+        current.run = normalizeWorkflowScalar(runMatch[1])
+      }
+      continue
+    }
+    if (!current) {
+      continue
+    }
+    const runMatch = line.match(/^        run:\s*(.*)$/)
+    if (runMatch) {
+      current.run = normalizeWorkflowScalar(runMatch[1])
+      continue
+    }
+    const workingDirectoryMatch = line.match(/^        working-directory:\s*(.*)$/)
+    if (workingDirectoryMatch) {
+      current.workingDirectory = normalizeWorkflowScalar(workingDirectoryMatch[1])
+    }
+  }
+  return steps
+}
+
+function workflowStepMatchesCommand(step, command) {
+  if (typeof command === 'string') {
+    return step.run === command
+  }
+  if (command.kind === 'canvas-cli-test') {
+    return (
+      step.run === 'cd tools/canvas-cli && npm test' ||
+      (step.run === 'npm test' && step.workingDirectory === 'tools/canvas-cli')
+    )
+  }
+  return false
+}
+
+function requireOrderedWorkflowCommands(errors, file, steps, commands) {
+  let cursor = -1
+  for (const command of commands) {
+    const index = steps.findIndex((step, stepIndex) => (
+      stepIndex > cursor && workflowStepMatchesCommand(step, command)
+    ))
+    if (index === -1) {
+      errors.push(`${file} must run ${workflowCommandLabel(command)} before publishing OSG guardrail results`)
+      continue
+    }
+    cursor = index
+  }
+}
+
+function requireCanvasCliCiGate(errors, root) {
+  for (const file of CI_WORKFLOW_FILES) {
+    const content = readIfExists(path.join(root, file))
+    if (!content) {
+      errors.push(`${file} is required for Open Source Growth CI gates`)
+      continue
+    }
+    const guardrailJob = extractWorkflowJobBody(content, 'open-source-growth-guardrails')
+    if (!guardrailJob) {
+      errors.push(`${file} must define open-source-growth-guardrails job`)
+      continue
+    }
+    requireOrderedWorkflowCommands(errors, file, extractWorkflowSteps(guardrailJob), [
+      {
+        label: 'tools/canvas-cli npm test',
+        kind: 'canvas-cli-test',
+      },
+      'docker compose -f docker-compose.demo.yml config',
+      PLAYGROUND_RUNTIME_SMOKE_COMMAND,
+      'node --test tools/open-source-growth/guardrail-verifier.test.mjs',
+      'node tools/open-source-growth/guardrail-verifier.mjs',
+    ])
+  }
+}
+
+function extractWorkflowJobBody(content, jobName) {
+  const lines = content.split(/\r?\n/)
+  let inJobs = false
+  let inJob = false
+  const body = []
+
+  for (const line of lines) {
+    if (/^jobs:\s*$/.test(line)) {
+      inJobs = true
+      continue
+    }
+    if (!inJobs) {
+      continue
+    }
+    if (/^[^ \t#][^:]*:\s*$/.test(line)) {
+      break
+    }
+
+    const jobMatch = line.match(/^  ([A-Za-z0-9_-]+):\s*$/)
+    if (jobMatch) {
+      if (inJob) {
+        break
+      }
+      inJob = jobMatch[1] === jobName
+      continue
+    }
+    if (inJob) {
+      body.push(line)
+    }
+  }
+
+  return body.length > 0 ? body.join('\n') : ''
 }
 
 function requireDemoReadinessGate(errors, root) {
@@ -421,18 +850,48 @@ function requireDemoReadinessGate(errors, root) {
       .filter(plugin => plugin?.enabled === true && plugin?.mode === 'mock')
       .map(plugin => plugin.key),
   )
+  const frontendCatalog = extractFrontendTemplateCatalog(root)
+  errors.push(...frontendCatalog.errors)
+  const frontendTemplates = frontendCatalog.entries
   if (!templates.some(template => template?.key === 'new-user-welcome')) {
     errors.push('/mock/demo/templates must include new-user-welcome')
   }
-  const newUserWelcomeTemplate = templates.find(template => template?.key === 'new-user-welcome')
-  const frontendPlugins = extractFrontendNewUserWelcomePlugins(root)
-  if (frontendPlugins.length === 0) {
-    errors.push('frontend template catalog must define new-user-welcome requiredPlugins')
-  } else if (newUserWelcomeTemplate && !arraysEqual(newUserWelcomeTemplate.requiredPlugins || [], frontendPlugins)) {
-    errors.push(`new-user-welcome WireMock requiredPlugins must match frontend catalog: ${frontendPlugins.join(', ')}`)
+  if (frontendTemplates.size === 0) {
+    errors.push('frontend template catalog must define official templates')
   }
-  requireCliGoldenPathFixture(errors, root)
-  requireCliLocalOnlyUntilG10(errors, root)
+  const wireMockTemplatesByKey = new Map(templates.filter(template => template?.key).map(template => [template.key, template]))
+  const frontendTemplateKeys = new Set(frontendTemplates.keys())
+  for (const template of templates) {
+    if (template?.key && frontendTemplates.size > 0 && !frontendTemplateKeys.has(template.key)) {
+      errors.push(`/mock/demo/templates contains non-frontend official template ${template.key}`)
+    }
+  }
+  for (const frontendTemplate of frontendTemplates.values()) {
+    const wireMockTemplate = wireMockTemplatesByKey.get(frontendTemplate.key)
+    if (!wireMockTemplate) {
+      errors.push(`/mock/demo/templates must include frontend official template ${frontendTemplate.key}`)
+      continue
+    }
+    if (!arraysEqual(wireMockTemplate.requiredPlugins || [], frontendTemplate.requiredPlugins)) {
+      errors.push(`${frontendTemplate.key} WireMock requiredPlugins must match frontend catalog: ${frontendTemplate.requiredPlugins.join(', ')}`)
+    }
+    if (frontendTemplate.riskLevel && wireMockTemplate.riskLevel !== frontendTemplate.riskLevel) {
+      errors.push(`${frontendTemplate.key} WireMock riskLevel must match frontend catalog: ${frontendTemplate.riskLevel}`)
+    }
+    if (frontendTemplate.docs && wireMockTemplate.docs !== frontendTemplate.docs) {
+      errors.push(`${frontendTemplate.key} WireMock docs path must match frontend catalog: ${frontendTemplate.docs}`)
+    }
+  }
+  const frontendRequiredPlugins = new Set([...frontendTemplates.values()].flatMap(template => template.requiredPlugins))
+  for (const plugin of frontendRequiredPlugins) {
+    if (!enabledPlugins.has(plugin)) {
+      errors.push(`/mock/demo/plugins must enable frontend required plugin ${plugin} in mock mode`)
+    }
+  }
+  requirePlaygroundGoldenPathFixture(errors, root, frontendTemplates)
+  requirePlaygroundRuntimeSmokeGate(errors, root)
+  requireCliImportExportUnlockWithPublishGate(errors, root)
+  requireCanvasCliCiGate(errors, root)
   for (const template of templates) {
     if (!template?.key) {
       errors.push('/mock/demo/templates entries must include key')
@@ -446,6 +905,37 @@ function requireDemoReadinessGate(errors, root) {
         errors.push(`${template.key} requires demo plugin ${plugin}, but /mock/demo/plugins does not enable it in mock mode`)
       }
     }
+  }
+}
+
+function requirePlaygroundRuntimeSmokeGate(errors, root) {
+  const smokeScript = readIfExists(path.join(root, PLAYGROUND_RUNTIME_SMOKE))
+  if (!smokeScript) {
+    errors.push(`${PLAYGROUND_RUNTIME_SMOKE} is required`)
+  }
+  const liveSmokeScript = readIfExists(path.join(root, PLAYGROUND_LIVE_API_SMOKE))
+  if (!liveSmokeScript) {
+    errors.push(`${PLAYGROUND_LIVE_API_SMOKE} is required`)
+  }
+  const smokeResult = verifyPlaygroundRuntimeSmoke(root)
+  for (const error of smokeResult.errors) {
+    if (!errors.includes(error)) {
+      errors.push(error)
+    }
+  }
+  const playgroundDoc = readIfExists(path.join(root, 'docs/open-source/playground.md'))
+  if (!playgroundDoc) {
+    errors.push('docs/open-source/playground.md is required')
+    return
+  }
+  if (!playgroundDoc.includes(PLAYGROUND_RUNTIME_SMOKE_COMMAND)) {
+    errors.push(`docs/open-source/playground.md must reference ${PLAYGROUND_RUNTIME_SMOKE_COMMAND}`)
+  }
+  if (!playgroundDoc.includes(PLAYGROUND_LIVE_API_SMOKE_COMMAND)) {
+    errors.push(`docs/open-source/playground.md must reference ${PLAYGROUND_LIVE_API_SMOKE_COMMAND}`)
+  }
+  if (/runtime smoke remains (?:a )?(?:final )?.*follow-up/i.test(playgroundDoc) || /runtime smoke remains a future task/i.test(playgroundDoc)) {
+    errors.push('docs/open-source/playground.md must not frame local runtime smoke as only a future task')
   }
 }
 
@@ -537,6 +1027,12 @@ export function verifyOpenSourceGrowthGuardrails(rootDir = process.cwd()) {
     requireContains(errors, 'implementation-guardrails.md', guardrails, reference)
   }
   requireDemoReadinessGate(errors, root)
+
+  const g10Verifier = readIfExists(path.join(root, G10_PUBLIC_API_STABILITY))
+  if (!g10Verifier.trim()) {
+    errors.push(`${G10_PUBLIC_API_STABILITY} is required`)
+  }
+  errors.push(...verifyG10PublicApiStability(root).errors)
 
   const traceability = readIfExists(path.join(osgDir, 'traceability-matrix.md'))
   for (const id of TRACEABILITY_IDS) {

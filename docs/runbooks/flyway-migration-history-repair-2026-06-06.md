@@ -9,10 +9,10 @@ The integration history introduced duplicate Flyway numeric versions:
 - `V92__execution_context_cold_backup.sql`
 - `V92__enforce_core_tenant_not_null.sql`
 
-Flyway versioned migrations are ordered by version, and a production migration directory must not contain two different `V<version>__*.sql` files with the same version. The resolved migration directory therefore keeps the security/cold-backup migrations at `V91` and `V92`, and moves the conflicting snapshot migrations forward:
+Flyway versioned migrations are ordered by version, and a production migration directory must not contain two different `V<version>__*.sql` files with the same version. The resolved runtime migration directory keeps the security/cold-backup migrations at `V91` and `V92`. The conflicting snapshot migrations are now owned by later runtime versions:
 
-- `V91__sanitize_demo_datasource_credentials.sql` -> `V272__sanitize_demo_datasource_credentials.sql`
-- `V92__enforce_core_tenant_not_null.sql` -> `V273__enforce_core_tenant_not_null.sql`
+- `V91__sanitize_demo_datasource_credentials.sql` -> `V354__sanitize_demo_datasource_credentials.sql`
+- `V92__enforce_core_tenant_not_null.sql` -> `V356__enforce_core_tenant_not_null.sql`
 
 `V93__tenant_scope_datasources_and_execution_requests.sql` is intentionally idempotent for `data_source_config.tenant_id` and `idx_data_source_tenant_type_enabled`, because `V91__data_security_and_tenant_isolation.sql` already owns that tenant-scope hardening in the merged sequence.
 
@@ -42,20 +42,19 @@ The manual SQL behind the verifier is:
 ```sql
 SELECT version, description, checksum, success
 FROM flyway_schema_history
-WHERE version IN ('91', '92', '93', '272', '273')
+WHERE version IN ('91', '92', '93', '354', '356')
 ORDER BY installed_rank;
 ```
 
 Allowed clean state:
 
-- No records for versions `91`, `92`, `93`, `272`, or `273`.
-- Or records for `91=data security and tenant isolation`, `92=execution context cold backup`, and `93=tenant scope datasources and execution requests`.
+- No records for versions `91`, `92`, `93`, `354`, or `356`.
+- Or records for `91=data security and tenant isolation`, `92=execution context cold backup`, `93=tenant scope datasources and execution requests`, `354=sanitize demo datasource credentials`, and `356=enforce core tenant not null`.
 
 Stop and do not deploy automatically if schema history contains either old conflicting description:
 
 - `sanitize demo datasource credentials` at version `91`
 - `enforce core tenant not null` at version `92`
-
 Those environments need an operator-led Flyway repair plan after proving the applied SQL is equivalent to the new forward versions. Do not silently change checksums on a live database.
 
 ## Verification
@@ -72,8 +71,8 @@ mvn -pl canvas-boot -am test -Dtest=FlywayMigrationPolicyTest,DataSecurityMigrat
 Expected:
 
 - No duplicate numeric migration versions.
-- `V272__sanitize_demo_datasource_credentials.sql` exists.
-- `V273__enforce_core_tenant_not_null.sql` exists.
+- `V354__sanitize_demo_datasource_credentials.sql` exists.
+- `V356__enforce_core_tenant_not_null.sql` exists.
 - The old conflicting `V91__sanitize...` and `V92__enforce...` files are absent from the runtime migration directory.
 - `V93__tenant_scope_datasources_and_execution_requests.sql` keeps idempotent guards for `data_source_config` tenant scope.
 - `scripts/verify-flyway-history.sh` rejects old conflicting Flyway history before automatic deployment.

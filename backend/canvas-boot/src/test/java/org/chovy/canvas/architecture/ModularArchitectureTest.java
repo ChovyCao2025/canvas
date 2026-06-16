@@ -2,21 +2,20 @@ package org.chovy.canvas.architecture;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.session.Configuration;
+import org.springframework.stereotype.Service;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * 校验模块化重构后的 Maven 模块、包标记和运行时资源边界。
- */
 class ModularArchitectureTest {
 
-    /**
-     * 新上下文模块必须持续存在的模块清单。
-     */
     private static final List<String> CONTEXT_MODULES = List.of(
             "canvas-context-canvas",
             "canvas-context-execution",
@@ -27,9 +26,6 @@ class ModularArchitectureTest {
             "canvas-context-conversation",
             "canvas-platform");
 
-    /**
-     * 每个上下文模块应显式声明的 DDD 分层包路径。
-     */
     private static final List<String> CONTEXT_PACKAGES = List.of(
             "api",
             "application",
@@ -39,9 +35,6 @@ class ModularArchitectureTest {
             "adapter/external",
             "config");
 
-    /**
-     * 验证新模块和包级 {@code package-info.java} 标记完整存在。
-     */
     @Test
     void dddFoundationModulesExistWithPackageMarkers() {
         Path backendRoot = backendRoot();
@@ -66,11 +59,6 @@ class ModularArchitectureTest {
         }
     }
 
-    /**
-     * 验证新模块不会反向依赖遗留 {@code canvas-engine}。
-     *
-     * @throws Exception 读取模块 POM 失败时抛出
-     */
     @Test
     void newModulePomsDoNotDependOnLegacyEngine() throws Exception {
         Path backendRoot = backendRoot();
@@ -84,11 +72,6 @@ class ModularArchitectureTest {
         }
     }
 
-    /**
-     * 验证 Boot 运行时资源在引擎移除前与遗留引擎保持镜像一致。
-     *
-     * @throws Exception 遍历资源目录失败时抛出
-     */
     @Test
     void bootRuntimeResourcesMirrorLegacyEngineUntilEngineRemoval() throws Exception {
         Path backendRoot = backendRoot();
@@ -109,11 +92,63 @@ class ModularArchitectureTest {
                 .containsExactlyElementsOf(engineResourceFiles);
     }
 
-    /**
-     * 返回模块化重构后不应依赖遗留引擎的新模块列表。
-     *
-     * @return 新模块名称列表
-     */
+    @Test
+    void bootExecutionMapperResourcesBindFinalExecutionAdapters() throws Exception {
+        Path executionMappers = backendRoot().resolve("canvas-boot/src/main/resources/mapper/execution");
+
+        assertMapperResourceTargetsFinalAdapter(executionMappers, "CanvasExecutionMapper.xml");
+        assertMapperResourceTargetsFinalAdapter(executionMappers, "CanvasExecutionTraceMapper.xml");
+        assertMapperResourceTargetsFinalAdapter(executionMappers, "CanvasExecutionStatsMapper.xml");
+        assertMapperResourceTargetsFinalAdapter(executionMappers, "CanvasExecutionDlqMapper.xml");
+        assertMapperResourceTargetsFinalAdapter(executionMappers, "CanvasExecutionRequestMapper.xml");
+        assertMapperResourceTargetsFinalAdapter(executionMappers, "CanvasMqTriggerRejectedMapper.xml");
+        assertMapperResourceTargetsFinalAdapter(executionMappers, "CanvasWaitSubscriptionMapper.xml");
+
+        assertThat(Files.readString(executionMappers.resolve("CanvasExecutionMapper.xml")))
+                .contains("resultType=\"org.chovy.canvas.execution.adapter.persistence.CanvasExecutionDO\"")
+                .doesNotContain("org.chovy.canvas.dal.dataobject.CanvasExecutionDO");
+    }
+
+    @Test
+    void bootExecutionMapperXmlParsesWithoutLegacyResultTypes() throws Exception {
+        Path executionMappers = backendRoot().resolve("canvas-boot/src/main/resources/mapper/execution");
+        Configuration configuration = new Configuration();
+
+        for (String fileName : List.of(
+                "CanvasExecutionMapper.xml",
+                "CanvasExecutionTraceMapper.xml",
+                "CanvasExecutionStatsMapper.xml",
+                "CanvasExecutionDlqMapper.xml",
+                "CanvasExecutionRequestMapper.xml",
+                "CanvasMqTriggerRejectedMapper.xml",
+                "CanvasWaitSubscriptionMapper.xml")) {
+            Path mapperFile = executionMappers.resolve(fileName);
+            try (InputStream input = Files.newInputStream(mapperFile)) {
+                new XMLMapperBuilder(input, configuration, mapperFile.toString(), configuration.getSqlFragments()).parse();
+            }
+        }
+    }
+
+    @Test
+    void crossContextTriggerServicesUseDistinctSpringBeanNames() {
+        Service executionTriggerService = org.chovy.canvas.execution.application.CanvasTriggerApplicationService.class
+                .getAnnotation(Service.class);
+        Service canvasTriggerService = org.chovy.canvas.canvas.application.CanvasTriggerApplicationService.class
+                .getAnnotation(Service.class);
+
+        assertThat(executionTriggerService).isNotNull();
+        assertThat(executionTriggerService.value()).isEqualTo("executionCanvasTriggerApplicationService");
+        assertThat(canvasTriggerService).isNotNull();
+        assertThat(canvasTriggerService.value()).isEmpty();
+    }
+
+    private static void assertMapperResourceTargetsFinalAdapter(Path executionMappers, String fileName) throws Exception {
+        String mapperName = fileName.replace(".xml", "");
+        assertThat(Files.readString(executionMappers.resolve(fileName)))
+                .contains("namespace=\"org.chovy.canvas.execution.adapter.persistence." + mapperName + "\"")
+                .doesNotContain("namespace=\"org.chovy.canvas.dal.mapper." + mapperName + "\"");
+    }
+
     private static List<String> allNewModules() {
         return List.of(
                 "canvas-common",
@@ -129,12 +164,6 @@ class ModularArchitectureTest {
                 "canvas-boot");
     }
 
-    /**
-     * 解析上下文模块对应的 Java 包根目录。
-     *
-     * @param module Maven 模块名
-     * @return 模块内源代码包根路径
-     */
     private static String packageRootFor(String module) {
         if ("canvas-platform".equals(module)) {
             return "org/chovy/canvas/platform";
@@ -142,11 +171,6 @@ class ModularArchitectureTest {
         return "org/chovy/canvas/" + module.substring("canvas-context-".length());
     }
 
-    /**
-     * 根据测试启动目录定位后端根目录。
-     *
-     * @return 后端 Maven 聚合项目根目录
-     */
     private static Path backendRoot() {
         Path userDir = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         if (userDir.endsWith("canvas-boot")) {
@@ -158,13 +182,6 @@ class ModularArchitectureTest {
         return userDir.resolve("backend");
     }
 
-    /**
-     * 列出指定资源目录下的全部相对文件路径。
-     *
-     * @param root 待遍历的资源目录
-     * @return 统一为正斜杠并排序后的相对路径列表
-     * @throws Exception 遍历资源目录失败时抛出
-     */
     private static List<String> listRelativeFiles(Path root) throws Exception {
         try (Stream<Path> files = Files.walk(root)) {
             return files

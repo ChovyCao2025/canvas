@@ -12,28 +12,13 @@ import org.chovy.canvas.execution.domain.NodeHandler;
 import org.chovy.canvas.execution.domain.NodeHandlerType;
 import org.springframework.stereotype.Component;
 
-/**
- * 定义 OfficialMessageNodeHandler 的执行上下文数据结构或业务契约。
- */
 @Component
 @NodeHandlerType(OfficialMessageNodeHandler.NODE_TYPE)
 public class OfficialMessageNodeHandler implements NodeHandler {
 
-    /**
-     * 保存 PLUGIN_ID 对应的状态或配置。
-     */
     static final String PLUGIN_ID = "canvas-plugin-message";
-
-    /**
-     * 保存 NODE_TYPE 对应的状态或配置。
-     */
     static final String NODE_TYPE = "message.send";
 
-    /**
-     * 执行 execute 对应的业务处理。
-     * @param context context 参数
-     * @return 处理后的结果
-     */
     @Override
     public NodeExecutionResult execute(NodeExecutionContext context) {
         String template = stringConfig(context, "template");
@@ -54,21 +39,11 @@ public class OfficialMessageNodeHandler implements NodeHandler {
         return NodeExecutionResult.success(output);
     }
 
-    /**
-     * 执行 channel 对应的业务处理。
-     * @param context context 参数
-     * @return 处理后的结果
-     */
     private static String channel(NodeExecutionContext context) {
         String configured = stringConfig(context, "channel");
         return configured.isBlank() ? "sms" : configured;
     }
 
-    /**
-     * 执行 recipient 对应的业务处理。
-     * @param context context 参数
-     * @return 处理后的结果
-     */
     private static String recipient(NodeExecutionContext context) {
         String configured = stringConfig(context, "recipient");
         if (configured.isBlank()) {
@@ -87,12 +62,6 @@ public class OfficialMessageNodeHandler implements NodeHandler {
         return configured;
     }
 
-    /**
-     * 执行 resolve 对应的业务处理。
-     * @param context context 参数
-     * @param key key 参数
-     * @return 处理后的结果
-     */
     private static Object resolve(NodeExecutionContext context, String key) {
         String normalized = normalizeTemplate(key);
         if (normalized == null) {
@@ -114,10 +83,6 @@ public class OfficialMessageNodeHandler implements NodeHandler {
         return contextValue == null ? nestedValue(context.payload(), normalized) : contextValue;
     }
 
-    /**
-     * 执行 normalizeTemplate 对应的业务处理。
-     * @param value value 参数
-     */
     private static String normalizeTemplate(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -129,10 +94,6 @@ public class OfficialMessageNodeHandler implements NodeHandler {
         return text;
     }
 
-    /**
-     * 执行 isReference 对应的业务处理。
-     * @param value value 参数
-     */
     private static boolean isReference(String value) {
         String text = value == null ? "" : value.trim();
         return (text.startsWith("${") && text.endsWith("}") && text.length() > 3)
@@ -140,11 +101,6 @@ public class OfficialMessageNodeHandler implements NodeHandler {
                 || text.startsWith("context.");
     }
 
-    /**
-     * 执行 nestedValue 对应的业务处理。
-     * @param source source 参数
-     * @param path path 参数
-     */
     private static Object nestedValue(Map<String, Object> source, String path) {
         if (source == null || path == null || path.isBlank()) {
             return null;

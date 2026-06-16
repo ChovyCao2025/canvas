@@ -4,17 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 定义 ExecutionTraceView 的执行上下文数据结构或业务契约。
- * @param tenantId tenantId 对应的数据字段
- * @param executionId executionId 对应的数据字段
- * @param canvasId canvasId 对应的数据字段
- * @param status status 对应的数据字段
- * @param startedAt startedAt 对应的数据字段
- * @param finishedAt finishedAt 对应的数据字段
- * @param nodeResults nodeResults 对应的数据字段
- * @param failureReason failureReason 对应的数据字段
- */
 public record ExecutionTraceView(
         Long tenantId,
         String executionId,

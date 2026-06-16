@@ -28,9 +28,11 @@ render_variant() {
 
   grep -Eq 'image: "registry\.example\.com/marketing-canvas/canvas-boot:[^"]+"' "$output_file" \
     || fail "$name render does not use the canvas-boot backend image"
+  ! grep -Eq 'image: "registry\.example\.com/marketing-canvas/canvas-boot:latest"' "$output_file" \
+    || fail "$name render uses mutable latest tag for the canvas-boot backend image"
   grep -Eq '^  name: canvas-engine$' "$output_file" \
     || fail "$name render does not preserve the stable canvas-engine backend resource name"
-  grep -Eq '^  name: canvas-engine-runtime$' "$output_file" \
+  grep -Eq '^[[:space:]]+name: canvas-engine-runtime$' "$output_file" \
     || fail "$name render does not preserve the stable canvas-engine-runtime Secret reference"
 
   echo "rendered $name: $output_file"

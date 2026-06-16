@@ -7,7 +7,7 @@ dependencies, the Spring Boot backend, and the Vite frontend.
 
 - Java 21
 - Maven 3.9+
-- Node.js 18+
+- Node.js 20.19+ or 22.12+
 - Docker 24+
 
 ## 1. Start Local Infrastructure

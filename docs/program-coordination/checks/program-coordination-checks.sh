@@ -152,6 +152,88 @@ validate_progress_ledger_runtime_consistency() {
   fi
 }
 
+validate_progress_ledger_current_snapshot_freshness() {
+  local file="docs/program-coordination/progress-ledger.md"
+  local state_file="docs/program-coordination/dispatch-state.json"
+  if [ ! -f "$file" ]; then
+    fail "$file is required before checking current snapshot freshness"
+    return
+  fi
+  if [ ! -f "$state_file" ]; then
+    fail "$state_file is required before checking current snapshot freshness"
+    return
+  fi
+
+  local current_snapshot
+  current_snapshot="$(awk '
+    /^## Current Snapshot$/ { in_section = 1; next }
+    /^## Active Dispatch Registry$/ { exit }
+    in_section { print }
+  ' "$file")"
+
+  if [ -z "$current_snapshot" ]; then
+    fail "progress-ledger.md must contain a non-empty Current Snapshot section"
+    return
+  fi
+
+  local preflight_ready="false"
+  if [ -f "tools/program-coordination/cutover-compatibility-preflight.mjs" ]; then
+    local preflight_json
+    if preflight_json="$(node tools/program-coordination/cutover-compatibility-preflight.mjs . --json 2>/dev/null)"; then
+      if node -e '
+        const chunks = []
+        process.stdin.on("data", chunk => chunks.push(chunk))
+        process.stdin.on("end", () => {
+          const report = JSON.parse(Buffer.concat(chunks).toString("utf8"))
+          process.exit(report.cutoverReady === true && Array.isArray(report.blockers) && report.blockers.length === 0 ? 0 : 1)
+        })
+      ' <<<"$preflight_json"; then
+        preflight_ready="true"
+      fi
+    fi
+  fi
+
+  local state_ready="false"
+  if node -e '
+    const fs = require("fs")
+    const state = JSON.parse(fs.readFileSync("docs/program-coordination/dispatch-state.json", "utf8"))
+    const text = [
+      state.readiness && state.readiness.gate,
+      state.readiness && state.readiness.backendTarget,
+      state.lastEvent,
+      ...(state.lastVerifiedEvidence || []).map(entry => `${entry.command || ""} ${entry.result || ""}`)
+    ].filter(Boolean).join("\n")
+    process.exit(/cutoverReady[:= ]+true|cutover preflight.*ready/i.test(text) && /blockers (empty|\\[\\]|0)|no blockers/i.test(text) ? 0 : 1)
+  '; then
+    state_ready="true"
+  fi
+
+  if [ "$preflight_ready" = "true" ] || [ "$state_ready" = "true" ]; then
+    if grep -Eiq 'cutover remains blocked|final cutover remains blocked|global cutover remains blocked|route parity.*blocked|G12 blockers' <<<"$current_snapshot"; then
+      fail "Current Snapshot is stale: cutover-ready evidence exists but snapshot still says cutover is blocked"
+    fi
+    if grep -Eiq 'next preflight top gap|next top gap|next clear preflight route batch|route:/[^`| ]+' <<<"$current_snapshot"; then
+      fail "Current Snapshot is stale: cutover-ready evidence exists but snapshot still names a next preflight route gap"
+    fi
+
+    local latest_closed_dispatch
+    latest_closed_dispatch="$(awk '
+      /^Latest closed dispatch:$/ { in_section = 1 }
+      in_section && (/^Previous closed dispatch:$/ || /^## /) { exit }
+      in_section { print }
+    ' "$file")"
+
+    if [ -n "$latest_closed_dispatch" ]; then
+      if grep -Eiq 'cutover remains blocked|final cutover remains blocked|global cutover remains blocked|route parity.*blocked|G12 blockers' <<<"$latest_closed_dispatch"; then
+        fail "Latest closed dispatch is stale: cutover-ready evidence exists but closed dispatch still says cutover is blocked"
+      fi
+      if grep -Eiq 'next preflight top gap|next top gap|next clear preflight route batch|route:/[^`| ]+' <<<"$latest_closed_dispatch"; then
+        fail "Latest closed dispatch is stale: cutover-ready evidence exists but closed dispatch still names a next preflight route gap"
+      fi
+    fi
+  fi
+}
+
 for file in \
   docs/program-coordination/README.md \
   docs/program-coordination/progress-ledger.md \
@@ -345,6 +427,7 @@ require_contains docs/program-coordination/evidence/README.md "worker-return.txt
 require_contains docs/program-coordination/evidence/README.md "reviewer-return.txt"
 require_contains docs/program-coordination/evidence/README.md "rollback.txt"
 validate_progress_ledger_runtime_consistency
+validate_progress_ledger_current_snapshot_freshness
 
 if ! node tools/program-coordination/check-dispatch-state.mjs .; then
   fail "dispatch-state.json failed machine validation"

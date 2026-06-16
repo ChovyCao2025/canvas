@@ -2,18 +2,6 @@ package org.chovy.canvas.execution.api.node;
 
 import java.util.List;
 
-/**
- * 定义 NodeMetadataView 的执行上下文数据结构或业务契约。
- * @param nodeType nodeType 对应的数据字段
- * @param displayName displayName 对应的数据字段
- * @param category category 对应的数据字段
- * @param configSchemaJson configSchemaJson 对应的数据字段
- * @param inputPorts inputPorts 对应的数据字段
- * @param outputPorts outputPorts 对应的数据字段
- * @param requiredPluginId requiredPluginId 对应的数据字段
- * @param enabled enabled 对应的数据字段
- * @param disabledReason disabledReason 对应的数据字段
- */
 public record NodeMetadataView(
         String nodeType,
         String displayName,

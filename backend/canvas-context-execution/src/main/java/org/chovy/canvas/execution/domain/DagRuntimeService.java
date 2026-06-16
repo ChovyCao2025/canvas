@@ -13,37 +13,19 @@ import org.chovy.canvas.canvas.api.PublishedCanvasEdgeDefinition;
 import org.chovy.canvas.canvas.api.PublishedCanvasNodeDefinition;
 import org.springframework.stereotype.Service;
 
-/**
- * 定义 DagRuntimeService 的执行上下文数据结构或业务契约。
- */
 @Service
 public class DagRuntimeService {
 
-    /**
-     * 保存 configParser 对应的状态或配置。
-     */
     private final NodeConfigParser configParser;
 
-    /**
-     * 执行 DagRuntimeService 对应的业务处理。
-     */
     public DagRuntimeService() {
         this(NodeConfigParser.empty());
     }
 
-    /**
-     * 执行 DagRuntimeService 对应的业务处理。
-     * @param configParser configParser 参数
-     */
     public DagRuntimeService(NodeConfigParser configParser) {
         this.configParser = Objects.requireNonNull(configParser, "configParser is required");
     }
 
-    /**
-     * 执行 validate 对应的业务处理。
-     * @param definition definition 参数
-     * @return 处理后的结果
-     */
     public DagGraph validate(PublishedCanvasDefinition definition) {
         Objects.requireNonNull(definition, "definition is required");
         Map<String, DagNode> nodes = new LinkedHashMap<>();
@@ -81,7 +63,6 @@ public class DagRuntimeService {
             inDegree.merge(edge.targetNodeId(), 1, Integer::sum);
         }
 
-        // 使用入度拓扑遍历校验环路，避免运行期调度进入无法完成的图。
         validateNoCycle(nodes, forward, inDegree);
         return new DagGraph(nodes, forward, reverse, inDegree);
     }
@@ -103,7 +84,6 @@ public class DagRuntimeService {
             String current = queue.remove();
             processed++;
             for (String next : forward.getOrDefault(current, List.of())) {
-                // 每消费一条入边就降低目标节点入度，入度清零代表可进入拓扑队列。
                 int nextDegree = degree.merge(next, -1, Integer::sum);
                 if (nextDegree == 0) {
                     queue.add(next);

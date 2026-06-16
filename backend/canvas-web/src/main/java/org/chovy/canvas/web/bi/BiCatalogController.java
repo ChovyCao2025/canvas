@@ -779,6 +779,13 @@ public class BiCatalogController {
         return envelope(() -> facade.listDashboardResources(tenantIdOrDefault(tenantId)));
     }
 
+    @GetMapping(value = "/dashboards/resources", params = "workspaceId")
+    public Mono<CompatibilityEnvelope<List<BiDashboardView>>> listDashboardResourcesByWorkspaceAlias(
+            @RequestParam Long workspaceId,
+            @RequestHeader(value = "X-Tenant-Id", required = false) Long tenantId) {
+        return listDashboardResources(tenantId);
+    }
+
     @GetMapping(value = "/dashboards/resources/{dashboardKey}", params = "!workspaceId")
     public Mono<CompatibilityEnvelope<BiDashboardView>> getDashboardResource(
             @PathVariable String dashboardKey,

@@ -5,17 +5,8 @@ import java.util.Map;
 
 import org.chovy.canvas.execution.domain.NodeConfigParser;
 
-/**
- * 定义 SimpleNodeConfigParser 的执行上下文数据结构或业务契约。
- */
 public class SimpleNodeConfigParser implements NodeConfigParser {
 
-    /**
-     * 执行 parse 对应的业务处理。
-     * @param configJson configJson 参数
-     * @param nodeId nodeId 参数
-     * @return 处理后的结果
-     */
     @Override
     public Map<String, Object> parse(String configJson, String nodeId) {
         if (configJson == null || configJson.isBlank() || "{}".equals(configJson.trim())) {
@@ -40,11 +31,6 @@ public class SimpleNodeConfigParser implements NodeConfigParser {
         return Map.copyOf(result);
     }
 
-    /**
-     * 执行 scalar 对应的业务处理。
-     * @param raw raw 参数
-     * @return 处理后的结果
-     */
     private Object scalar(String raw) {
         if ("true".equals(raw)) {
             return true;
@@ -58,11 +44,6 @@ public class SimpleNodeConfigParser implements NodeConfigParser {
         return unquote(raw);
     }
 
-    /**
-     * 执行 unquote 对应的业务处理。
-     * @param raw raw 参数
-     * @return 处理后的结果
-     */
     private String unquote(String raw) {
         if (raw.length() >= 2 && raw.startsWith("\"") && raw.endsWith("\"")) {
             return raw.substring(1, raw.length() - 1);

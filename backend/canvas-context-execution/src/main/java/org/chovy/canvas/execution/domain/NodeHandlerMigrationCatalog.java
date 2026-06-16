@@ -4,9 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * 定义 NodeHandlerMigrationCatalog 的执行上下文数据结构或业务契约。
- */
 public final class NodeHandlerMigrationCatalog {
 
     private static final Set<String> MIGRATED_CONTROL_TYPES = Set.of(
@@ -39,33 +36,17 @@ public final class NodeHandlerMigrationCatalog {
                             "org.chovy.canvas.cdp.api.CustomerProfileLookupPort",
                             "org.chovy.canvas.cdp.api.CdpCustomerProfileView")));
 
-    /**
-     * 执行 NodeHandlerMigrationCatalog 对应的业务处理。
-     */
     private NodeHandlerMigrationCatalog() {
     }
 
-    /**
-     * 执行 migratedControlTypes 对应的业务处理。
-     * @return 处理后的结果
-     */
     public static Set<String> migratedControlTypes() {
         return MIGRATED_CONTROL_TYPES;
     }
 
-    /**
-     * 执行 dependencyGatedTypes 对应的业务处理。
-     * @return 处理后的结果
-     */
     public static Map<String, DependencyGate> dependencyGatedTypes() {
         return DEPENDENCY_GATED_TYPES;
     }
 
-    /**
-     * 定义 DependencyGate 的执行上下文数据结构或业务契约。
-     * @param moduleArtifactId moduleArtifactId 对应的数据字段
-     * @param apiTypes apiTypes 对应的数据字段
-     */
     public record DependencyGate(String moduleArtifactId, List<String> apiTypes) {
         public DependencyGate {
             if (moduleArtifactId == null || moduleArtifactId.isBlank()) {

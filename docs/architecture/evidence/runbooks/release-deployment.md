@@ -33,7 +33,7 @@ The script validates production-like profiles, Flyway migration policy, immutabl
 Dry run:
 
 ```bash
-CANVAS_IMAGE_NAME="registry.example.com/canvas-boot" \
+CANVAS_IMAGE_NAME="registry.example.com/marketing-canvas/canvas-boot" \
 CANVAS_IMAGE_TAG="<git-sha>" \
 bash scripts/release/build-image.sh --dry-run
 ```
@@ -41,28 +41,40 @@ bash scripts/release/build-image.sh --dry-run
 Actual build:
 
 ```bash
-CANVAS_IMAGE_NAME="registry.example.com/canvas-boot" \
+CANVAS_IMAGE_NAME="registry.example.com/marketing-canvas/canvas-boot" \
 CANVAS_IMAGE_TAG="<git-sha>" \
 bash scripts/release/build-image.sh --push
 ```
 
 ## Deploy
 
-Render or substitute the image placeholder before applying Kubernetes templates:
+Render the Helm release before applying it. The backend runtime image is `canvas-boot`, while service-name resources intentionally keep the stable `canvas-engine` compatibility names documented in `docs/runbooks/backend-service-name-cutover.md`.
 
 ```bash
-export CANVAS_IMAGE="registry.example.com/canvas-boot:<git-sha>"
-envsubst < deploy/k8s/canvas-engine-deployment.yaml | kubectl apply -f -
-kubectl apply -f deploy/k8s/canvas-engine-service.yaml
-kubectl apply -f deploy/k8s/canvas-engine-hpa.yaml
-kubectl apply -f deploy/k8s/canvas-engine-network-policy.yaml
+export CANVAS_IMAGE_NAME="registry.example.com/marketing-canvas/canvas-boot"
+export CANVAS_IMAGE_TAG="<git-sha>"
+
+helm template canvas deploy/helm/canvas \
+  --namespace canvas \
+  --set backend.image.repository="$CANVAS_IMAGE_NAME" \
+  --set backend.image.tag="$CANVAS_IMAGE_TAG" \
+  > docs/architecture/evidence/release-<timestamp>/canvas-rendered.yaml
+
+helm upgrade --install canvas deploy/helm/canvas \
+  --namespace canvas \
+  --create-namespace \
+  --set backend.image.repository="$CANVAS_IMAGE_NAME" \
+  --set backend.image.tag="$CANVAS_IMAGE_TAG"
+
 kubectl -n canvas rollout status deployment/canvas-engine
 ```
+
+Do not deploy backend static manifests with `kubectl apply -f deploy/k8s/canvas-engine-*` for this cutover path; that bypasses the Helm service-name compatibility policy.
 
 Secrets must be created outside the deployment YAML:
 
 ```bash
-kubectl -n canvas create secret generic canvas-engine-prod \
+kubectl -n canvas create secret generic canvas-engine-runtime \
   --from-literal=spring-datasource-url="$SPRING_DATASOURCE_URL" \
   --from-literal=spring-datasource-username="$SPRING_DATASOURCE_USERNAME" \
   --from-literal=spring-datasource-password="$SPRING_DATASOURCE_PASSWORD" \
@@ -72,6 +84,13 @@ kubectl -n canvas create secret generic canvas-engine-prod \
   --from-literal=canvas-public-trigger-secret="$CANVAS_PUBLIC_TRIGGER_SECRET" \
   --from-literal=canvas-jwt-secret="$CANVAS_JWT_SECRET" \
   --from-literal=canvas-secret-cipher-key="$CANVAS_SECRET_CIPHER_KEY"
+```
+
+The stable `canvas-engine` ServiceAccount and its RBAC bindings must exist before the Helm upgrade in a fresh namespace, because the chart intentionally preserves `backend.serviceAccountName: canvas-engine` for compatibility:
+
+```bash
+kubectl -n canvas get serviceaccount canvas-engine
+kubectl auth can-i get pods --as=system:serviceaccount:canvas:canvas-engine -n canvas
 ```
 
 ## Post-deploy

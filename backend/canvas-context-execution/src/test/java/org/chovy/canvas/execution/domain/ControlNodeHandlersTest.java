@@ -7,14 +7,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 ControlNodeHandlersTest 的执行上下文数据结构或业务契约。
- */
 class ControlNodeHandlersTest {
 
-    /**
-     * 执行 ifConditionRoutesToSuccessWhenAllRulesMatchContext 对应的业务处理。
-     */
     @Test
     void ifConditionRoutesToSuccessWhenAllRulesMatchContext() {
         NodeExecutionResult result = new IfConditionNodeHandler().execute(context(
@@ -33,9 +27,6 @@ class ControlNodeHandlersTest {
         assertThat(result.output()).containsEntry("passed", true);
     }
 
-    /**
-     * 执行 ifConditionRoutesToFailureWhenRuleDoesNotMatchContext 对应的业务处理。
-     */
     @Test
     void ifConditionRoutesToFailureWhenRuleDoesNotMatchContext() {
         NodeExecutionResult result = new IfConditionNodeHandler().execute(context(
@@ -54,9 +45,6 @@ class ControlNodeHandlersTest {
         assertThat(result.output()).containsEntry("passed", false);
     }
 
-    /**
-     * 执行 waitSuspendsFirstEntryWithResumePayloadShape 对应的业务处理。
-     */
     @Test
     void waitSuspendsFirstEntryWithResumePayloadShape() {
         NodeExecutionResult result = new WaitNodeHandler().execute(context(
@@ -77,9 +65,6 @@ class ControlNodeHandlersTest {
                 .containsEntry("timeoutNodeId", "wait-timeout");
     }
 
-    /**
-     * 执行 waitRoutesTimeoutResumeToTimeoutBranch 对应的业务处理。
-     */
     @Test
     void waitRoutesTimeoutResumeToTimeoutBranch() {
         NodeExecutionResult result = new WaitNodeHandler().execute(context(
@@ -95,9 +80,6 @@ class ControlNodeHandlersTest {
         assertThat(result.output()).containsEntry("waitStatus", "TIMEOUT");
     }
 
-    /**
-     * 执行 userInputSuspendsWithFormSchemaAndCompletionBranches 对应的业务处理。
-     */
     @Test
     void userInputSuspendsWithFormSchemaAndCompletionBranches() {
         NodeExecutionResult result = new UserInputNodeHandler().execute(context(
@@ -116,9 +98,6 @@ class ControlNodeHandlersTest {
                 .containsEntry("timeoutNodeId", "expired");
     }
 
-    /**
-     * 执行 userInputRoutesCompletedResumeWithResponseOutput 对应的业务处理。
-     */
     @Test
     void userInputRoutesCompletedResumeWithResponseOutput() {
         NodeExecutionResult result = new UserInputNodeHandler().execute(context(
@@ -139,9 +118,6 @@ class ControlNodeHandlersTest {
                 .containsEntry("inputResponse", Map.of("reason", "approved"));
     }
 
-    /**
-     * 执行 directCallValidatesRequiredInputAndRoutesConfiguredBranches 对应的业务处理。
-     */
     @Test
     void directCallValidatesRequiredInputAndRoutesConfiguredBranches() {
         NodeExecutionResult result = new DirectCallNodeHandler().execute(context(
@@ -160,9 +136,6 @@ class ControlNodeHandlersTest {
         assertThat(result.output()).containsEntry("directCallAccepted", true);
     }
 
-    /**
-     * 执行 directCallFailsWhenRequiredInputIsMissing 对应的业务处理。
-     */
     @Test
     void directCallFailsWhenRequiredInputIsMissing() {
         NodeExecutionResult result = new DirectCallNodeHandler().execute(context(
@@ -176,9 +149,6 @@ class ControlNodeHandlersTest {
         assertThat(result.error()).contains("orderId");
     }
 
-    /**
-     * 执行 directReturnBuildsTerminalResponseFromContextAndLiterals 对应的业务处理。
-     */
     @Test
     void directReturnBuildsTerminalResponseFromContextAndLiterals() {
         NodeExecutionResult result = new DirectReturnNodeHandler().execute(context(
@@ -197,9 +167,6 @@ class ControlNodeHandlersTest {
                 .containsEntry("coupon", "A10");
     }
 
-    /**
-     * 执行 splitRoutesSelectedBranchAndFallsBackToFirstConfiguredBranch 对应的业务处理。
-     */
     @Test
     void splitRoutesSelectedBranchAndFallsBackToFirstConfiguredBranch() {
         NodeExecutionResult result = new SplitNodeHandler().execute(context(
@@ -214,9 +181,6 @@ class ControlNodeHandlersTest {
         assertThat(result.output()).containsEntry("splitBranch", "treatment");
     }
 
-    /**
-     * 执行 aggregateCountsUpstreamSuccessesAndRoutesByThreshold 对应的业务处理。
-     */
     @Test
     void aggregateCountsUpstreamSuccessesAndRoutesByThreshold() {
         NodeExecutionResult result = new AggregateNodeHandler().execute(context(
@@ -252,13 +216,6 @@ class ControlNodeHandlersTest {
         return new NodeExecutionContext("exec-1", node, "user-1", payload, contextData);
     }
 
-    /**
-     * 执行 node 对应的业务处理。
-     * @param nodeId nodeId 参数
-     * @param nodeType nodeType 参数
-     * @param config config 参数
-     * @return 处理后的结果
-     */
     private static DagNode node(String nodeId, String nodeType, Map<String, Object> config) {
         return new DagNode(nodeId, nodeType, nodeType, config, Map.of());
     }

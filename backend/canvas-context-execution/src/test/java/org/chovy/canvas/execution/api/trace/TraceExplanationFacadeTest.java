@@ -9,14 +9,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * 定义 TraceExplanationFacadeTest 的执行上下文数据结构或业务契约。
- */
 class TraceExplanationFacadeTest {
 
-    /**
-     * 执行 explainsFailedTraceThroughExecutionTraceReaderWithoutPersistenceAccess 对应的业务处理。
-     */
     @Test
     void explainsFailedTraceThroughExecutionTraceReaderWithoutPersistenceAccess() {
         RecordingTraceReader reader = new RecordingTraceReader(new ExecutionTraceView(
@@ -46,9 +40,6 @@ class TraceExplanationFacadeTest {
                 .contains("Check provider latency, retry policy, and timeout configuration.");
     }
 
-    /**
-     * 执行 explainsUnknownFailureWhenTraceHasNoFailedNode 对应的业务处理。
-     */
     @Test
     void explainsUnknownFailureWhenTraceHasNoFailedNode() {
         TraceExplanationFacade facade = new TraceExplanationFacade(command -> new ExecutionTraceView(
@@ -79,29 +70,14 @@ class TraceExplanationFacadeTest {
         return new ExecutionTraceView.NodeResultView(nodeId, nodeType, status, error, outputData);
     }
 
-    /**
-     * 定义 RecordingTraceReader 的执行上下文数据结构或业务契约。
-     */
     private static final class RecordingTraceReader implements TraceExplanationFacade.TraceReader {
-        /**
-         * 保存 trace 对应的状态或配置。
-         */
         private final ExecutionTraceView trace;
         private final List<TraceExplanationFacade.TraceLookupRequest> requests = new ArrayList<>();
 
-        /**
-         * 执行 RecordingTraceReader 对应的业务处理。
-         * @param trace trace 参数
-         */
         private RecordingTraceReader(ExecutionTraceView trace) {
             this.trace = trace;
         }
 
-        /**
-         * 执行 trace 对应的业务处理。
-         * @param request request 参数
-         * @return 处理后的结果
-         */
         @Override
         public ExecutionTraceView trace(TraceExplanationFacade.TraceLookupRequest request) {
             this.requests.add(request);

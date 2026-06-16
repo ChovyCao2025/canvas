@@ -29,6 +29,7 @@ run_fail() {
 empty="$TMP_DIR/empty.tsv"
 resolved="$TMP_DIR/resolved.tsv"
 old_conflict="$TMP_DIR/old-conflict.tsv"
+stale_forward_attempt="$TMP_DIR/stale-forward-attempt.tsv"
 failed_row="$TMP_DIR/failed-row.tsv"
 
 : > "$empty"
@@ -36,14 +37,18 @@ cat > "$resolved" <<'EOF'
 91	data security and tenant isolation	1
 92	execution context cold backup	1
 93	tenant scope datasources and execution requests	1
-272	github oauth integration	1
-273	add filesystem read capability	1
 354	sanitize demo datasource credentials	1
-355	enforce core tenant not null	1
+356	enforce core tenant not null	1
 EOF
 cat > "$old_conflict" <<'EOF'
 91	sanitize demo datasource credentials	1
 92	enforce core tenant not null	1
+EOF
+cat > "$stale_forward_attempt" <<'EOF'
+91	data security and tenant isolation	1
+92	execution context cold backup	1
+272	github oauth integration	1
+273	add filesystem read capability	1
 EOF
 cat > "$failed_row" <<'EOF'
 91	data security and tenant isolation	1
@@ -53,6 +58,7 @@ EOF
 run_ok "empty" "$empty"
 run_ok "resolved" "$resolved"
 run_fail "old-conflict" "$old_conflict"
+run_fail "stale-forward-attempt" "$stale_forward_attempt"
 run_fail "failed-row" "$failed_row"
 
 echo "verify-flyway-history tests passed"
