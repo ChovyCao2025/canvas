@@ -9,12 +9,21 @@ import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 覆盖营销平台控制面汇总、集成契约证据和就绪门禁。
+ */
 class MarketingPlatformControlPlaneServiceTest {
 
+    /**
+     * 测试用固定时钟，保证生成时间稳定。
+     */
     private static final Clock CLOCK = Clock.fixed(
             Instant.parse("2026-06-06T02:00:00Z"),
             ZoneId.of("Asia/Shanghai"));
 
+    /**
+     * 验证空证据下控制面能力齐全且整体被配置缺口阻塞。
+     */
     @Test
     void summaryExposesCoreControlPlaneCapabilitiesAndBlocksEmptyEvidence() {
         MarketingPlatformControlPlaneService service =
@@ -43,6 +52,9 @@ class MarketingPlatformControlPlaneServiceTest {
                 .contains("integration-contract-registry");
     }
 
+    /**
+     * 验证生产集成契约只有在具备新近通过探针时才被提升为可用。
+     */
     @Test
     void summaryPromotesIntegrationContractsOnlyWithFreshProductionEvidence() {
         MarketingPlatformControlPlaneEvidenceProvider evidenceProvider = tenantId ->
@@ -64,6 +76,9 @@ class MarketingPlatformControlPlaneServiceTest {
                 .contains("search-marketing-governance");
     }
 
+    /**
+     * 验证新近失败探针会阻塞集成契约就绪。
+     */
     @Test
     void readinessBlocksIntegrationContractsWhenFreshProductionProbesFail() {
         MarketingPlatformControlPlaneEvidenceProvider evidenceProvider = tenantId ->
@@ -85,6 +100,13 @@ class MarketingPlatformControlPlaneServiceTest {
                 .contains("resolve failing production integration probes");
     }
 
+    /**
+     * 按能力键从汇总中查找能力卡片。
+     *
+     * @param summary 控制面汇总
+     * @param capabilityKey 能力稳定键
+     * @return 匹配的能力卡片
+     */
     private static MarketingPlatformControlPlaneService.CapabilityCard capability(
             MarketingPlatformControlPlaneService.ControlPlaneSummary summary,
             String capabilityKey) {

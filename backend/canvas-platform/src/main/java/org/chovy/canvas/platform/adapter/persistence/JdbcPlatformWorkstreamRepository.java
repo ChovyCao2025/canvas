@@ -8,15 +8,31 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 使用 JDBC 读取平台工作流定义。
+ */
 @Repository
 public class JdbcPlatformWorkstreamRepository implements PlatformWorkstreamRepository {
 
+    /**
+     * 执行平台工作流 SQL 的 JDBC 模板。
+     */
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * 使用 JDBC 模板创建仓储。
+     *
+     * @param jdbcTemplate 执行 SQL 的 JDBC 模板
+     */
     public JdbcPlatformWorkstreamRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /**
+     * 按优先级和稳定键查询全部工作流。
+     *
+     * @return 平台工作流列表
+     */
     @Override
     public List<PlatformWorkstream> list() {
         return jdbcTemplate.query("""
@@ -32,6 +48,12 @@ public class JdbcPlatformWorkstreamRepository implements PlatformWorkstreamRepos
                 rs.getString("summary")));
     }
 
+    /**
+     * 按稳定键查询工作流。
+     *
+     * @param workstreamKey 工作流稳定键
+     * @return 匹配的工作流；没有记录时返回 null
+     */
     @Override
     public PlatformWorkstream get(String workstreamKey) {
         try {
@@ -47,6 +69,7 @@ public class JdbcPlatformWorkstreamRepository implements PlatformWorkstreamRepos
                     rs.getString("child_spec_path"),
                     rs.getString("summary")), workstreamKey);
         } catch (EmptyResultDataAccessException ignored) {
+            // 仓储接口以 null 表示未找到，应用层负责转换为业务异常。
             return null;
         }
     }

@@ -6,8 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.chovy.canvas.platform.api.AuthFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖认证应用服务的登录、锁定、登出和令牌查询行为。
+ */
 class AuthApplicationServiceTest {
 
+    /**
+     * 验证登录返回令牌并清理此前失败次数。
+     */
     @Test
     void loginReturnsTokenAndClearsPriorFailures() {
         AuthFacade service = new AuthApplicationService();
@@ -28,6 +34,9 @@ class AuthApplicationServiceTest {
         assertThat(service.failedAttempts("admin")).isZero();
     }
 
+    /**
+     * 验证连续错误密码会锁定账号并拒绝后续登录。
+     */
     @Test
     void repeatedBadPasswordLocksAccountAndRejectsLaterLogin() {
         AuthFacade service = new AuthApplicationService();
@@ -45,6 +54,9 @@ class AuthApplicationServiceTest {
                 .hasMessageContaining("账号已锁定");
     }
 
+    /**
+     * 验证登出会撤销 Bearer 令牌且当前用户查询拒绝已撤销令牌。
+     */
     @Test
     void logoutRevokesBearerTokenAndMeRejectsRevokedToken() {
         AuthFacade service = new AuthApplicationService();
@@ -61,6 +73,9 @@ class AuthApplicationServiceTest {
                 .hasMessageContaining("token has been revoked");
     }
 
+    /**
+     * 验证格式错误的登出无副作用，但当前用户查询必须提供有效令牌。
+     */
     @Test
     void malformedLogoutIsNoOpButMeRequiresKnownBearerToken() {
         AuthFacade service = new AuthApplicationService();

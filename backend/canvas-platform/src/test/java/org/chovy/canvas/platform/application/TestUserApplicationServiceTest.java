@@ -8,8 +8,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.api.TestUserFacade;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖测试用户应用服务的集合、用户、详情和预览。
+ */
 class TestUserApplicationServiceTest {
 
+    /**
+     * 验证集合和用户按租户过滤，并保留旧字段名。
+     */
     @Test
     void listsSetsAndUsersByTenantWithLegacyDoFieldNames() {
         TestUserFacade service = new TestUserApplicationService();
@@ -37,6 +43,9 @@ class TestUserApplicationServiceTest {
         assertThat(service.listUsers(7L, 100L)).isEmpty();
     }
 
+    /**
+     * 验证创建集合和用户时使用租户上下文并保留 JSON 字符串形态。
+     */
     @Test
     void createSetAndUserUseTenantAndPreserveJsonStringResponseShape() {
         TestUserFacade service = new TestUserApplicationService();
@@ -62,6 +71,9 @@ class TestUserApplicationServiceTest {
                 .containsEntry("inputParams", "{\"coupon\":\"QA10\"}");
     }
 
+    /**
+     * 验证详情和预览按租户隔离且预览会解析 Map。
+     */
     @Test
     void detailAndPreviewAreTenantScopedAndPreviewParsesMaps() {
         TestUserFacade service = new TestUserApplicationService();
@@ -90,6 +102,9 @@ class TestUserApplicationServiceTest {
                 .hasMessageContaining("test user not found");
     }
 
+    /**
+     * 验证创建集合和用户时必须提供有效名称与用户标识。
+     */
     @Test
     void createRequiresMeaningfulNameAndUserId() {
         TestUserFacade service = new TestUserApplicationService();

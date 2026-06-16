@@ -14,8 +14,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * 覆盖技术迁移候选项服务的证据登记和迁移准入。
+ */
 class TechnicalMigrationCandidateApplicationServiceTest {
 
+    /**
+     * 验证登记证据会写入租户、操作者和待复核决策。
+     */
     @Test
     void registerEvidenceStoresBlockedDecisionWithTenantAndActor() {
         TechnicalMigrationCandidateEvidenceRepository repository =
@@ -37,6 +43,9 @@ class TechnicalMigrationCandidateApplicationServiceTest {
                         && record.submittedBy().equals("operator-1")));
     }
 
+    /**
+     * 验证缺失租户、候选项、证明、基线或回滚命令时拒绝登记。
+     */
     @Test
     void registerEvidenceRejectsMissingTenantCandidateProofBaselineOrRollback() {
         TechnicalMigrationCandidateApplicationService service =
@@ -61,6 +70,9 @@ class TechnicalMigrationCandidateApplicationServiceTest {
                 .hasMessageContaining("rollback command is required");
     }
 
+    /**
+     * 验证只有同租户已评审通过的证据允许开始迁移。
+     */
     @Test
     void releaseGateOnlyAllowsReviewedEvidenceWithinSameTenant() {
         TechnicalMigrationCandidateEvidenceRepository repository =
@@ -94,6 +106,15 @@ class TechnicalMigrationCandidateApplicationServiceTest {
                 .isTrue();
     }
 
+    /**
+     * 构造迁移证据请求。
+     *
+     * @param candidateKey 迁移候选项键
+     * @param proofCommand 证明命令
+     * @param baselineResultJson 基线结果 JSON
+     * @param rollbackCommand 回滚命令
+     * @return 迁移证据请求
+     */
     private static TechnicalMigrationEvidenceRequest request(
             String candidateKey,
             String proofCommand,

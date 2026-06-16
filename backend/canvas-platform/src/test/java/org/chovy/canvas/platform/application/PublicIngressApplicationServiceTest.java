@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.domain.PublicIngressCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖公开入口应用服务的营销表单和 webhook 兼容行为。
+ */
 class PublicIngressApplicationServiceTest {
 
+    /**
+     * 验证公开营销、会话、素材和监控入口输出确定性数据。
+     */
     @Test
     void exposesDeterministicPublicMarketingConversationAssetAndMonitoringIngress() {
         PublicIngressApplicationService service = new PublicIngressApplicationService(new PublicIngressCatalog());
@@ -56,6 +62,9 @@ class PublicIngressApplicationServiceTest {
                 .containsEntry("accepted", true);
     }
 
+    /**
+     * 验证公开入口错误请求会被兼容性校验拒绝。
+     */
     @Test
     void validatesPublicIngressInputsForCompatibilityBadRequests() {
         PublicIngressApplicationService service = new PublicIngressApplicationService(new PublicIngressCatalog());

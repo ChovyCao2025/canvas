@@ -9,8 +9,14 @@ import java.util.Map;
 import org.chovy.canvas.platform.domain.AdminPlatformCatalog;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 覆盖管理后台应用服务的租户隔离和基础管理操作。
+ */
 class AdminPlatformApplicationServiceTest {
 
+    /**
+     * 验证用户列表按租户隔离且创建、更新、禁用流程保持可变状态。
+     */
     @Test
     void usersAreTenantScopedMutableAndOrdered() {
         AdminPlatformApplicationService service = new AdminPlatformApplicationService(new AdminPlatformCatalog());
@@ -42,6 +48,9 @@ class AdminPlatformApplicationServiceTest {
         assertThat(service.users(8L)).extracting(item -> item.get("tenantId")).containsExactly(8L);
     }
 
+    /**
+     * 验证项目、成员、画布分页和统计都使用租户内状态。
+     */
     @Test
     void projectsMembersCanvasesAndStatsUseTenantScopedState() {
         AdminPlatformApplicationService service = new AdminPlatformApplicationService(new AdminPlatformCatalog());
@@ -94,6 +103,9 @@ class AdminPlatformApplicationServiceTest {
                 .hasMessage("project not found");
     }
 
+    /**
+     * 验证系统选项、租户列表和用量统计具备确定性结果。
+     */
     @Test
     void systemOptionsTenantsAndUsageAreDeterministic() {
         AdminPlatformApplicationService service = new AdminPlatformApplicationService(new AdminPlatformCatalog());
@@ -131,6 +143,9 @@ class AdminPlatformApplicationServiceTest {
                 .containsEntry("canvasCount", 1L);
     }
 
+    /**
+     * 验证创建用户、项目、租户时拒绝空白必填名称。
+     */
     @Test
     void requiredNamesRejectBlankInput() {
         AdminPlatformApplicationService service = new AdminPlatformApplicationService(new AdminPlatformCatalog());
