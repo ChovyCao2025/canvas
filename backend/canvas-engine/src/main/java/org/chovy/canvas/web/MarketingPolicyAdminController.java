@@ -32,49 +32,574 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class MarketingPolicyAdminController {
 
+    /**
+     * default租户标识常量，用于保持控制器内部规则一致。
+     */
     private static final Long DEFAULT_TENANT_ID = 0L;
+    /**
+     * allchannels常量，用于保持控制器内部规则一致。
+     */
     private static final String ALL_CHANNELS = "ALL";
 
+    /**
+     * consent数据访问组件，用于访问和持久化对应数据。
+     */
     private final MarketingConsentMapper consentMapper;
+    /**
+     * suppression数据访问组件，用于访问和持久化对应数据。
+     */
     private final MarketingSuppressionMapper suppressionMapper;
+    /**
+     * 渠道数据访问组件，用于访问和持久化对应数据。
+     */
     private final CustomerChannelMapper channelMapper;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
      * ConsentReq 数据记录。
      */
-    public record ConsentReq(String userId, String channel, String consentStatus, String source) {
+    public static final class ConsentReq {
+
+        /**
+         * 用户标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("userId")
+        private final String userId;
+
+        /**
+         * 渠道。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("channel")
+        private final String channel;
+
+        /**
+         * consentStatus 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("consentStatus")
+        private final String consentStatus;
+
+        /**
+         * source 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("source")
+        private final String source;
+
+        /**
+         * 创建 ConsentReq 实例。
+         *
+         * @param userId 用户标识
+         * @param channel 渠道
+         * @param consentStatus consentStatus 字段值
+         * @param source source 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ConsentReq(@com.fasterxml.jackson.annotation.JsonProperty("userId") String userId, @com.fasterxml.jackson.annotation.JsonProperty("channel") String channel, @com.fasterxml.jackson.annotation.JsonProperty("consentStatus") String consentStatus, @com.fasterxml.jackson.annotation.JsonProperty("source") String source) {
+            this.userId = userId;
+            this.channel = channel;
+            this.consentStatus = consentStatus;
+            this.source = source;
+        }
+
+        /**
+         * 返回用户标识。
+         *
+         * @return 用户标识
+         */
+        public String userId() {
+            return userId;
+        }
+
+        /**
+         * 返回渠道。
+         *
+         * @return 渠道
+         */
+        public String channel() {
+            return channel;
+        }
+
+        /**
+         * 返回consentStatus 字段值。
+         *
+         * @return consentStatus 字段值
+         */
+        public String consentStatus() {
+            return consentStatus;
+        }
+
+        /**
+         * 返回source 字段值。
+         *
+         * @return source 字段值
+         */
+        public String source() {
+            return source;
+        }
+
+        /**
+         * 判断两个 ConsentReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ConsentReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(userId, that.userId) && java.util.Objects.equals(channel, that.channel) && java.util.Objects.equals(consentStatus, that.consentStatus) && java.util.Objects.equals(source, that.source);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(userId, channel, consentStatus, source);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ConsentReq[" + "userId=" + userId + ", " + "channel=" + channel + ", " + "consentStatus=" + consentStatus + ", " + "source=" + source + "]";
+        }
     }
 
     /**
      * SuppressionReq 数据记录。
      */
-    public record SuppressionReq(String userId,
-                                 String channel,
-                                 String reason,
-                                 Boolean active,
-                                 LocalDateTime expiresAt) {
+    public static final class SuppressionReq {
+
+        /**
+         * 用户标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("userId")
+        private final String userId;
+
+        /**
+         * 渠道。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("channel")
+        private final String channel;
+
+        /**
+         * 原因。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("reason")
+        private final String reason;
+
+        /**
+         * 启用状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("active")
+        private final Boolean active;
+
+        /**
+         * expiresAt 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("expiresAt")
+        private final LocalDateTime expiresAt;
+
+        /**
+         * 创建 SuppressionReq 实例。
+         *
+         * @param userId 用户标识
+         * @param channel 渠道
+         * @param reason 原因
+         * @param active 启用状态
+         * @param expiresAt expiresAt 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public SuppressionReq(@com.fasterxml.jackson.annotation.JsonProperty("userId") String userId, @com.fasterxml.jackson.annotation.JsonProperty("channel") String channel, @com.fasterxml.jackson.annotation.JsonProperty("reason") String reason, @com.fasterxml.jackson.annotation.JsonProperty("active") Boolean active, @com.fasterxml.jackson.annotation.JsonProperty("expiresAt") LocalDateTime expiresAt) {
+            this.userId = userId;
+            this.channel = channel;
+            this.reason = reason;
+            this.active = active;
+            this.expiresAt = expiresAt;
+        }
+
+        /**
+         * 返回用户标识。
+         *
+         * @return 用户标识
+         */
+        public String userId() {
+            return userId;
+        }
+
+        /**
+         * 返回渠道。
+         *
+         * @return 渠道
+         */
+        public String channel() {
+            return channel;
+        }
+
+        /**
+         * 返回原因。
+         *
+         * @return 原因
+         */
+        public String reason() {
+            return reason;
+        }
+
+        /**
+         * 返回启用状态。
+         *
+         * @return 启用状态
+         */
+        public Boolean active() {
+            return active;
+        }
+
+        /**
+         * 返回expiresAt 字段值。
+         *
+         * @return expiresAt 字段值
+         */
+        public LocalDateTime expiresAt() {
+            return expiresAt;
+        }
+
+        /**
+         * 判断两个 SuppressionReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof SuppressionReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(userId, that.userId) && java.util.Objects.equals(channel, that.channel) && java.util.Objects.equals(reason, that.reason) && java.util.Objects.equals(active, that.active) && java.util.Objects.equals(expiresAt, that.expiresAt);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(userId, channel, reason, active, expiresAt);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "SuppressionReq[" + "userId=" + userId + ", " + "channel=" + channel + ", " + "reason=" + reason + ", " + "active=" + active + ", " + "expiresAt=" + expiresAt + "]";
+        }
     }
 
     /**
      * ChannelReq 数据记录。
      */
-    public record ChannelReq(String userId,
-                             String channel,
-                             String address,
-                             Integer enabled,
-                             Integer verified,
-                             String metadata) {
+    public static final class ChannelReq {
+
+        /**
+         * 用户标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("userId")
+        private final String userId;
+
+        /**
+         * 渠道。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("channel")
+        private final String channel;
+
+        /**
+         * address 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("address")
+        private final String address;
+
+        /**
+         * 启用状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("enabled")
+        private final Integer enabled;
+
+        /**
+         * verified 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("verified")
+        private final Integer verified;
+
+        /**
+         * metadata 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("metadata")
+        private final String metadata;
+
+        /**
+         * 创建 ChannelReq 实例。
+         *
+         * @param userId 用户标识
+         * @param channel 渠道
+         * @param address address 字段值
+         * @param enabled 启用状态
+         * @param verified verified 字段值
+         * @param metadata metadata 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ChannelReq(@com.fasterxml.jackson.annotation.JsonProperty("userId") String userId, @com.fasterxml.jackson.annotation.JsonProperty("channel") String channel, @com.fasterxml.jackson.annotation.JsonProperty("address") String address, @com.fasterxml.jackson.annotation.JsonProperty("enabled") Integer enabled, @com.fasterxml.jackson.annotation.JsonProperty("verified") Integer verified, @com.fasterxml.jackson.annotation.JsonProperty("metadata") String metadata) {
+            this.userId = userId;
+            this.channel = channel;
+            this.address = address;
+            this.enabled = enabled;
+            this.verified = verified;
+            this.metadata = metadata;
+        }
+
+        /**
+         * 返回用户标识。
+         *
+         * @return 用户标识
+         */
+        public String userId() {
+            return userId;
+        }
+
+        /**
+         * 返回渠道。
+         *
+         * @return 渠道
+         */
+        public String channel() {
+            return channel;
+        }
+
+        /**
+         * 返回address 字段值。
+         *
+         * @return address 字段值
+         */
+        public String address() {
+            return address;
+        }
+
+        /**
+         * 返回启用状态。
+         *
+         * @return 启用状态
+         */
+        public Integer enabled() {
+            return enabled;
+        }
+
+        /**
+         * 返回verified 字段值。
+         *
+         * @return verified 字段值
+         */
+        public Integer verified() {
+            return verified;
+        }
+
+        /**
+         * 返回metadata 字段值。
+         *
+         * @return metadata 字段值
+         */
+        public String metadata() {
+            return metadata;
+        }
+
+        /**
+         * 判断两个 ChannelReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ChannelReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(userId, that.userId) && java.util.Objects.equals(channel, that.channel) && java.util.Objects.equals(address, that.address) && java.util.Objects.equals(enabled, that.enabled) && java.util.Objects.equals(verified, that.verified) && java.util.Objects.equals(metadata, that.metadata);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(userId, channel, address, enabled, verified, metadata);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ChannelReq[" + "userId=" + userId + ", " + "channel=" + channel + ", " + "address=" + address + ", " + "enabled=" + enabled + ", " + "verified=" + verified + ", " + "metadata=" + metadata + "]";
+        }
     }
 
     /**
      * PolicyState 数据记录。
      */
-    public record PolicyState(String userId,
-                              String channel,
-                              MarketingConsentDO consent,
-                              List<MarketingSuppressionDO> suppressions,
-                              CustomerChannelDO customerChannel) {
+    public static final class PolicyState {
+
+        /**
+         * 用户标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("userId")
+        private final String userId;
+
+        /**
+         * 渠道。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("channel")
+        private final String channel;
+
+        /**
+         * consent 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("consent")
+        private final MarketingConsentDO consent;
+
+        /**
+         * suppressions 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("suppressions")
+        private final List<MarketingSuppressionDO> suppressions;
+
+        /**
+         * customerChannel 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("customerChannel")
+        private final CustomerChannelDO customerChannel;
+
+        /**
+         * 创建 PolicyState 实例。
+         *
+         * @param userId 用户标识
+         * @param channel 渠道
+         * @param consent consent 字段值
+         * @param suppressions suppressions 字段值
+         * @param customerChannel customerChannel 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public PolicyState(@com.fasterxml.jackson.annotation.JsonProperty("userId") String userId, @com.fasterxml.jackson.annotation.JsonProperty("channel") String channel, @com.fasterxml.jackson.annotation.JsonProperty("consent") MarketingConsentDO consent, @com.fasterxml.jackson.annotation.JsonProperty("suppressions") List<MarketingSuppressionDO> suppressions, @com.fasterxml.jackson.annotation.JsonProperty("customerChannel") CustomerChannelDO customerChannel) {
+            this.userId = userId;
+            this.channel = channel;
+            this.consent = consent;
+            this.suppressions = suppressions;
+            this.customerChannel = customerChannel;
+        }
+
+        /**
+         * 返回用户标识。
+         *
+         * @return 用户标识
+         */
+        public String userId() {
+            return userId;
+        }
+
+        /**
+         * 返回渠道。
+         *
+         * @return 渠道
+         */
+        public String channel() {
+            return channel;
+        }
+
+        /**
+         * 返回consent 字段值。
+         *
+         * @return consent 字段值
+         */
+        public MarketingConsentDO consent() {
+            return consent;
+        }
+
+        /**
+         * 返回suppressions 字段值。
+         *
+         * @return suppressions 字段值
+         */
+        public List<MarketingSuppressionDO> suppressions() {
+            return suppressions;
+        }
+
+        /**
+         * 返回customerChannel 字段值。
+         *
+         * @return customerChannel 字段值
+         */
+        public CustomerChannelDO customerChannel() {
+            return customerChannel;
+        }
+
+        /**
+         * 判断两个 PolicyState 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof PolicyState that)) {
+                return false;
+            }
+            return java.util.Objects.equals(userId, that.userId) && java.util.Objects.equals(channel, that.channel) && java.util.Objects.equals(consent, that.consent) && java.util.Objects.equals(suppressions, that.suppressions) && java.util.Objects.equals(customerChannel, that.customerChannel);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(userId, channel, consent, suppressions, customerChannel);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "PolicyState[" + "userId=" + userId + ", " + "channel=" + channel + ", " + "consent=" + consent + ", " + "suppressions=" + suppressions + ", " + "customerChannel=" + customerChannel + "]";
+        }
     }
 
     /**
@@ -129,6 +654,12 @@ public class MarketingPolicyAdminController {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (req == null) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param required" required"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("consent request is required");
             }
             Long tenantId = tenantId(context);
@@ -170,6 +701,12 @@ public class MarketingPolicyAdminController {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (req == null) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param required" required"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("suppression request is required");
             }
             Long tenantId = tenantId(context);
@@ -214,6 +751,12 @@ public class MarketingPolicyAdminController {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (req == null) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param required" required"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("channel request is required");
             }
             Long tenantId = tenantId(context);
@@ -294,6 +837,12 @@ public class MarketingPolicyAdminController {
      */
     private String required(String value, String field) {
         if (value == null || value.isBlank()) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException(field + " is required");
         }
         return value.trim();

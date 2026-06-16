@@ -293,6 +293,10 @@ public class CdpWarehouseTableGovernanceController {
         /** 期望表属性 JSON，用于巡检实际建表属性是否漂移。 */
         private String expectedPropertiesJson;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseTableGovernanceService.TableContractCommand toCommand() {
             // 汇总前面计算出的状态和明细，返回给调用方。
             return new CdpWarehouseTableGovernanceService.TableContractCommand(

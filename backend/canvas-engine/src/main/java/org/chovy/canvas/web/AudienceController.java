@@ -205,6 +205,12 @@ public class AudienceController {
                     boolean updated = computeService.update(body);
                     // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                     if (!updated) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param id 标识，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("Audience not found: " + id);
                     }
                     AudienceDefinitionDO saved = requireAudience(id, context);
@@ -251,6 +257,12 @@ public class AudienceController {
                 Mono.fromCallable(() -> {
                     AudienceDefinitionDO definition = requireAudience(id, tuple.getT2());
                     if (definition.getEnabled() == null || definition.getEnabled() == 0) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param id 标识，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("Audience disabled: " + id);
                     }
                     // 汇总前面计算出的状态和明细，返回给调用方。
@@ -326,11 +338,6 @@ public class AudienceController {
         String title = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus()) ? "人群计算完成" : "人群计算失败";
         String detail = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus())
                 ? "任务已完成"
-                /**
-                 * 按默认值规则处理输入值。
-                 *
-                 * @return 返回 defaultIfBlank 流程生成的业务结果。
-                 */
                 : defaultIfBlank(task.getErrorMsg(), "计算失败");
         try {
             notificationService.createForTask(
@@ -373,6 +380,12 @@ public class AudienceController {
                 .eq(AudienceDefinitionDO::getId, id)
                 .last("LIMIT 1"));
         if (definition == null) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param id 标识，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("Audience not found: " + id);
         }
         return definition;

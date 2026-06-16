@@ -36,8 +36,17 @@ import java.util.List;
 @RequestMapping("/canvas/bi/permissions")
 public class BiPermissionController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * 权限admin服务，用于承接对应业务能力和领域编排。
+     */
     private final BiPermissionAdminService permissionAdminService;
+    /**
+     * 权限请求服务，用于承接对应业务能力和领域编排。
+     */
     private final BiPermissionRequestService permissionRequestService;
 
     /**

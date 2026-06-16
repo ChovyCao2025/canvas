@@ -46,11 +46,29 @@ import java.util.List;
 @RequestMapping("/canvas/bi/datasources")
 public class BiDatasourceController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * onboarding服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasourceOnboardingService onboardingService;
+    /**
+     * 运行态服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasourceRuntimeService runtimeService;
+    /**
+     * data来源config服务，用于承接对应业务能力和领域编排。
+     */
     private final DataSourceConfigService dataSourceConfigService;
+    /**
+     * fileupload服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasourceFileUploadService fileUploadService;
+    /**
+     * filematerialization服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasourceFileMaterializationService fileMaterializationService;
 
     /**
@@ -471,6 +489,12 @@ public class BiDatasourceController {
      */
     private BiDatasourceRuntimeService requireRuntimeService() {
         if (runtimeService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI datasource runtime service is not configured");
         }
         return runtimeService;
@@ -483,6 +507,12 @@ public class BiDatasourceController {
      */
     private DataSourceConfigService requireDataSourceConfigService() {
         if (dataSourceConfigService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("data source config service is not configured");
         }
         return dataSourceConfigService;
@@ -495,6 +525,12 @@ public class BiDatasourceController {
      */
     private BiDatasourceFileUploadService requireFileUploadService() {
         if (fileUploadService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI datasource file upload service is not configured");
         }
         return fileUploadService;
@@ -507,6 +543,12 @@ public class BiDatasourceController {
      */
     private BiDatasourceFileMaterializationService requireFileMaterializationService() {
         if (fileMaterializationService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI datasource file materialization service is not configured");
         }
         return fileMaterializationService;

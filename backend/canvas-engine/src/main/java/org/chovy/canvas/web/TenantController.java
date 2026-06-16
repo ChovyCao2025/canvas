@@ -199,10 +199,10 @@ public class TenantController {
     }
 
     /**
-     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+     * 根据租户创建请求组装审计元数据。
      *
-     * @param req 请求对象，承载本次操作的输入参数。
-     * @return 返回 metadata 流程生成的业务结果。
+     * @param req 租户创建请求
+     * @return 审计事件使用的元数据映射
      */
     private Map<String, Object> metadata(TenantCreateReq req) {
         Map<String, Object> metadata = new LinkedHashMap<>();

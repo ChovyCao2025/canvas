@@ -20,6 +20,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MauticInspiredInsightController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final MauticInspiredInsightService service;
     /**
      * 处理 Mautic Inspired Insight 请求接口，对应 GET /audience-membership。

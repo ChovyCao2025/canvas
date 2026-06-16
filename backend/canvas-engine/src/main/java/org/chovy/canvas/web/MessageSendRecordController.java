@@ -26,6 +26,9 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class MessageSendRecordController {
 
+    /**
+     * 数据访问组件，用于访问和持久化对应数据。
+     */
     private final MessageSendRecordMapper mapper;
     /**
      * 查询消息 Send Record列表接口，对应 GET 请求。

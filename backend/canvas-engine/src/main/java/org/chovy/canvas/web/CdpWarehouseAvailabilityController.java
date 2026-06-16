@@ -26,8 +26,17 @@ import java.util.List;
 @RequestMapping("/warehouse/availability")
 public class CdpWarehouseAvailabilityController {
 
+    /**
+     * availability服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehouseAvailabilityService availabilityService;
+    /**
+     * consumeravailability服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehouseConsumerAvailabilityService consumerAvailabilityService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -187,6 +196,12 @@ public class CdpWarehouseAvailabilityController {
      */
     private CdpWarehouseConsumerAvailabilityService consumerService() {
         if (consumerAvailabilityService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("warehouse consumer availability service is not configured");
         }
         return consumerAvailabilityService;

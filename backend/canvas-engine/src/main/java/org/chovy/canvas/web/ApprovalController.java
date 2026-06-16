@@ -29,7 +29,13 @@ import java.util.List;
 @RequestMapping("/approvals")
 public class ApprovalController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * workflow服务，用于承接对应业务能力和领域编排。
+     */
     private final ApprovalWorkflowService workflowService;
 
     /**
@@ -208,12 +214,80 @@ public class ApprovalController {
                 || RoleNames.SUPER_ADMIN.equalsIgnoreCase(role)) {
             return;
         }
+        /**
+         * 执行 accessdeniedexception 对应的内部处理流程。
+         *
+         * @param role" role"，由调用方提供
+         * @return 返回内部处理结果
+         */
         throw new AccessDeniedException("Lark approval sync requires admin role");
     }
 
     /**
      * ApprovalExternalSyncResponse 数据记录。
      */
-    public record ApprovalExternalSyncResponse(int synced) {
+    public static final class ApprovalExternalSyncResponse {
+
+        /**
+         * synced 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("synced")
+        private final int synced;
+
+        /**
+         * 创建 ApprovalExternalSyncResponse 实例。
+         *
+         * @param synced synced 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ApprovalExternalSyncResponse(@com.fasterxml.jackson.annotation.JsonProperty("synced") int synced) {
+            this.synced = synced;
+        }
+
+        /**
+         * 返回synced 字段值。
+         *
+         * @return synced 字段值
+         */
+        public int synced() {
+            return synced;
+        }
+
+        /**
+         * 判断两个 ApprovalExternalSyncResponse 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ApprovalExternalSyncResponse that)) {
+                return false;
+            }
+            return java.util.Objects.equals(synced, that.synced);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(synced);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ApprovalExternalSyncResponse[" + "synced=" + synced + "]";
+        }
     }
 }

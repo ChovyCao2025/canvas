@@ -46,19 +46,55 @@ import java.util.UUID;
 @RequestMapping("/cdp/webhooks")
 @RequiredArgsConstructor
 public class WebhookSubscriptionController {
+    /**
+     * secretbytes常量，用于保持控制器内部规则一致。
+     */
     private static final int SECRET_BYTES = 24;
+    /**
+     * secretprefixlength常量，用于保持控制器内部规则一致。
+     */
     private static final int SECRET_PREFIX_LENGTH = 12;
+    /**
+     * random常量，用于保持控制器内部规则一致。
+     */
     private static final SecureRandom RANDOM = new SecureRandom();
+    /**
+     * stringlist常量，用于保持控制器内部规则一致。
+     */
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {
     };
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * subscription数据访问组件，用于访问和持久化对应数据。
+     */
     private final WebhookSubscriptionMapper subscriptionMapper;
+    /**
+     * deliverylog数据访问组件，用于访问和持久化对应数据。
+     */
     private final WebhookDeliveryLogMapper deliveryLogMapper;
+    /**
+     * 校验器，用于保存请求处理过程中需要的业务数据。
+     */
     private final WebhookSubscriptionValidator validator;
+    /**
+     * 分发器，用于承接对应业务能力和领域编排。
+     */
     private final WebhookDispatcherService dispatcher;
+    /**
+     * 对象数据访问组件，用于访问和持久化对应数据。
+     */
     private final ObjectMapper objectMapper;
+    /**
+     * 密码编码器，用于保存请求处理过程中需要的业务数据。
+     */
     private final BCryptPasswordEncoder passwordEncoder;
+    /**
+     * secret加解密组件，用于保存请求处理过程中需要的业务数据。
+     */
     private final SecretCipher secretCipher;
     /**
      * 查询当前租户的 Webhook 订阅配置。
@@ -269,6 +305,12 @@ public class WebhookSubscriptionController {
         WebhookSubscriptionDO row = subscriptionMapper.selectById(id);
         Long normalizedTenantId = tenantId(ctx);
         if (row == null || !normalizedTenantId.equals(row.getTenantId())) {
+            /**
+             * 执行 响应状态exception 对应的内部处理流程。
+             *
+             * @param found" found"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Webhook subscription not found");
         }
         return row;
@@ -349,6 +391,12 @@ public class WebhookSubscriptionController {
             return objectMapper.writeValueAsString(eventTypes);
         // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param serializable" serializable"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("eventTypes is not JSON serializable", e);
         }
     }
@@ -405,6 +453,12 @@ public class WebhookSubscriptionController {
      */
     private String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param blank" blank"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException(fieldName + " cannot be blank");
         }
         return value.trim();

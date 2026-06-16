@@ -203,6 +203,10 @@ public class CdpWarehouseRealtimePipelineController {
         /** 扩展配置 JSON，承载引擎、链路或探针的非标准参数。 */
         private String configJson;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseRealtimePipelineService.PipelineContractCommand toCommand() {
             return new CdpWarehouseRealtimePipelineService.PipelineContractCommand(
                     pipelineKey,
@@ -258,6 +262,12 @@ public class CdpWarehouseRealtimePipelineController {
         /** 目标 Schema 版本，用于追踪实时链路输出结构。 */
         private String sinkSchemaVersion;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         *
+         * @param operator operator，由调用方提供
+         * @return 返回内部处理结果
+         */
         CdpWarehouseRealtimePipelineService.CheckpointCommand toCommand(String operator) {
             return new CdpWarehouseRealtimePipelineService.CheckpointCommand(
                     pipelineKey,
@@ -298,6 +308,12 @@ public class CdpWarehouseRealtimePipelineController {
                             .toLocalDateTime();
                 // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                 } catch (DateTimeParseException offsetFailure) {
+                    /**
+                     * 执行 illegalargumentexception 对应的内部处理流程。
+                     *
+                     * @param datetime" datetime"，由调用方提供
+                     * @return 返回内部处理结果
+                     */
                     throw new IllegalArgumentException(fieldName + " must be ISO-8601 datetime", offsetFailure);
                 }
             }

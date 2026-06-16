@@ -24,7 +24,13 @@ import java.util.List;
 @RequestMapping("/analytics")
 public class AnalyticsController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final AnalyticsQueryService service;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -155,6 +161,12 @@ public class AnalyticsController {
     }
 
     @GetMapping("/exports/{id}")
+    /**
+     * 执行 exportStatus 对应的接口或辅助流程。
+     *
+     * @param id 标识，由调用方或当前请求上下文提供
+     * @return 返回处理后的业务结果
+     */
     public Mono<R<AnalyticsQueryService.ExportJobView>> exportStatus(@PathVariable Long id) {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(
                         () -> R.ok(service.exportStatus(tenantId, id)))

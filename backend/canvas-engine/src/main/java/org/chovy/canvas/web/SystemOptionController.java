@@ -34,6 +34,9 @@ public class SystemOptionController {
 
     /** 系统选项服务，用于管理全局配置项。 */
     private final SystemOptionService service;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
     /**
      * 查询系统选项列表接口，对应 GET 请求。

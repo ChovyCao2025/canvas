@@ -33,15 +33,42 @@ import java.util.Objects;
  */
 public class CanvasBatchOperationController {
 
+    /**
+     * defaultfilter限制常量，用于保持控制器内部规则一致。
+     */
     private static final int DEFAULT_FILTER_LIMIT = 100;
+    /**
+     * maxbatchsize常量，用于保持控制器内部规则一致。
+     */
     private static final int MAX_BATCH_SIZE = 200;
+    /**
+     * success常量，用于保持控制器内部规则一致。
+     */
     private static final String SUCCESS = "SUCCESS";
+    /**
+     * skipped常量，用于保持控制器内部规则一致。
+     */
     private static final String SKIPPED = "SKIPPED";
+    /**
+     * failed常量，用于保持控制器内部规则一致。
+     */
     private static final String FAILED = "FAILED";
 
+    /**
+     * 画布服务，用于承接对应业务能力和领域编排。
+     */
     private final CanvasService canvasService;
+    /**
+     * ops服务，用于承接对应业务能力和领域编排。
+     */
     private final CanvasOpsService opsService;
+    /**
+     * 画布数据访问组件，用于访问和持久化对应数据。
+     */
     private final CanvasMapper canvasMapper;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -276,9 +303,21 @@ public class CanvasBatchOperationController {
             });
         }
         if (ids.isEmpty()) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param canvas" canvas"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("canvasIds or filters must resolve at least one canvas");
         }
         if (ids.size() > MAX_BATCH_SIZE) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param MAX_BATCH_SIZE maxbatchsize，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("batch size exceeds " + MAX_BATCH_SIZE);
         }
         return new ArrayList<>(ids);
@@ -305,10 +344,22 @@ public class CanvasBatchOperationController {
      */
     private String normalizeOperation(String operation) {
         if (!hasText(operation)) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("operation is required");
         }
         String normalized = operation.trim().toUpperCase(Locale.ROOT);
         if (!List.of("PAUSE", "RESUME", "ARCHIVE", "CLONE").contains(normalized)) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param operation operation，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("unsupported batch operation: " + operation);
         }
         return normalized;
@@ -321,6 +372,12 @@ public class CanvasBatchOperationController {
      */
     private void requireAdmin(TenantContext context) {
         if (context == null || (!context.isSuperAdmin() && !context.isTenantAdmin())) {
+            /**
+             * 执行 accessdeniedexception 对应的内部处理流程。
+             *
+             * @param role" role"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new AccessDeniedException("batch canvas operations require admin role");
         }
     }
@@ -367,40 +424,528 @@ public class CanvasBatchOperationController {
     /**
      * BatchOperationRequest 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record BatchOperationRequest(List<Long> canvasIds,
-                                        BatchCanvasFilters filters,
-                                        Map<String, String> replacements,
-                                        String reason) {
+    public static final class BatchOperationRequest {
+
+        /**
+         * canvasIds 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("canvasIds")
+        private final List<Long> canvasIds;
+
+        /**
+         * filters 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("filters")
+        private final BatchCanvasFilters filters;
+
+        /**
+         * replacements 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("replacements")
+        private final Map<String, String> replacements;
+
+        /**
+         * 原因。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("reason")
+        private final String reason;
+
+        /**
+         * 创建 BatchOperationRequest 实例。
+         *
+         * @param canvasIds canvasIds 字段值
+         * @param filters filters 字段值
+         * @param replacements replacements 字段值
+         * @param reason 原因
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public BatchOperationRequest(@com.fasterxml.jackson.annotation.JsonProperty("canvasIds") List<Long> canvasIds, @com.fasterxml.jackson.annotation.JsonProperty("filters") BatchCanvasFilters filters, @com.fasterxml.jackson.annotation.JsonProperty("replacements") Map<String, String> replacements, @com.fasterxml.jackson.annotation.JsonProperty("reason") String reason) {
+            this.canvasIds = canvasIds;
+            this.filters = filters;
+            this.replacements = replacements;
+            this.reason = reason;
+        }
+
+        /**
+         * 返回canvasIds 字段值。
+         *
+         * @return canvasIds 字段值
+         */
+        public List<Long> canvasIds() {
+            return canvasIds;
+        }
+
+        /**
+         * 返回filters 字段值。
+         *
+         * @return filters 字段值
+         */
+        public BatchCanvasFilters filters() {
+            return filters;
+        }
+
+        /**
+         * 返回replacements 字段值。
+         *
+         * @return replacements 字段值
+         */
+        public Map<String, String> replacements() {
+            return replacements;
+        }
+
+        /**
+         * 返回原因。
+         *
+         * @return 原因
+         */
+        public String reason() {
+            return reason;
+        }
+
+        /**
+         * 判断两个 BatchOperationRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof BatchOperationRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(canvasIds, that.canvasIds) && java.util.Objects.equals(filters, that.filters) && java.util.Objects.equals(replacements, that.replacements) && java.util.Objects.equals(reason, that.reason);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(canvasIds, filters, replacements, reason);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "BatchOperationRequest[" + "canvasIds=" + canvasIds + ", " + "filters=" + filters + ", " + "replacements=" + replacements + ", " + "reason=" + reason + "]";
+        }
     }
 
     /**
      * BatchCanvasFilters 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record BatchCanvasFilters(Integer status,
-                                     String name,
-                                     String triggerType,
-                                     Integer limit) {
+    public static final class BatchCanvasFilters {
+
+        /**
+         * 状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("status")
+        private final Integer status;
+
+        /**
+         * 名称。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("name")
+        private final String name;
+
+        /**
+         * triggerType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("triggerType")
+        private final String triggerType;
+
+        /**
+         * 数量限制。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("limit")
+        private final Integer limit;
+
+        /**
+         * 创建 BatchCanvasFilters 实例。
+         *
+         * @param status 状态
+         * @param name 名称
+         * @param triggerType triggerType 字段值
+         * @param limit 数量限制
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public BatchCanvasFilters(@com.fasterxml.jackson.annotation.JsonProperty("status") Integer status, @com.fasterxml.jackson.annotation.JsonProperty("name") String name, @com.fasterxml.jackson.annotation.JsonProperty("triggerType") String triggerType, @com.fasterxml.jackson.annotation.JsonProperty("limit") Integer limit) {
+            this.status = status;
+            this.name = name;
+            this.triggerType = triggerType;
+            this.limit = limit;
+        }
+
+        /**
+         * 返回状态。
+         *
+         * @return 状态
+         */
+        public Integer status() {
+            return status;
+        }
+
+        /**
+         * 返回名称。
+         *
+         * @return 名称
+         */
+        public String name() {
+            return name;
+        }
+
+        /**
+         * 返回triggerType 字段值。
+         *
+         * @return triggerType 字段值
+         */
+        public String triggerType() {
+            return triggerType;
+        }
+
+        /**
+         * 返回数量限制。
+         *
+         * @return 数量限制
+         */
+        public Integer limit() {
+            return limit;
+        }
+
+        /**
+         * 判断两个 BatchCanvasFilters 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof BatchCanvasFilters that)) {
+                return false;
+            }
+            return java.util.Objects.equals(status, that.status) && java.util.Objects.equals(name, that.name) && java.util.Objects.equals(triggerType, that.triggerType) && java.util.Objects.equals(limit, that.limit);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(status, name, triggerType, limit);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "BatchCanvasFilters[" + "status=" + status + ", " + "name=" + name + ", " + "triggerType=" + triggerType + ", " + "limit=" + limit + "]";
+        }
     }
 
     /**
      * BatchOperationItem 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record BatchOperationItem(Long canvasId,
-                                     Long targetCanvasId,
-                                     String status,
-                                     String message) {
+    public static final class BatchOperationItem {
+
+        /**
+         * 画布标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("canvasId")
+        private final Long canvasId;
+
+        /**
+         * targetCanvasId 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("targetCanvasId")
+        private final Long targetCanvasId;
+
+        /**
+         * 状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("status")
+        private final String status;
+
+        /**
+         * 消息。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("message")
+        private final String message;
+
+        /**
+         * 创建 BatchOperationItem 实例。
+         *
+         * @param canvasId 画布标识
+         * @param targetCanvasId targetCanvasId 字段值
+         * @param status 状态
+         * @param message 消息
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public BatchOperationItem(@com.fasterxml.jackson.annotation.JsonProperty("canvasId") Long canvasId, @com.fasterxml.jackson.annotation.JsonProperty("targetCanvasId") Long targetCanvasId, @com.fasterxml.jackson.annotation.JsonProperty("status") String status, @com.fasterxml.jackson.annotation.JsonProperty("message") String message) {
+            this.canvasId = canvasId;
+            this.targetCanvasId = targetCanvasId;
+            this.status = status;
+            this.message = message;
+        }
+
+        /**
+         * 返回画布标识。
+         *
+         * @return 画布标识
+         */
+        public Long canvasId() {
+            return canvasId;
+        }
+
+        /**
+         * 返回targetCanvasId 字段值。
+         *
+         * @return targetCanvasId 字段值
+         */
+        public Long targetCanvasId() {
+            return targetCanvasId;
+        }
+
+        /**
+         * 返回状态。
+         *
+         * @return 状态
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 返回消息。
+         *
+         * @return 消息
+         */
+        public String message() {
+            return message;
+        }
+
+        /**
+         * 判断两个 BatchOperationItem 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof BatchOperationItem that)) {
+                return false;
+            }
+            return java.util.Objects.equals(canvasId, that.canvasId) && java.util.Objects.equals(targetCanvasId, that.targetCanvasId) && java.util.Objects.equals(status, that.status) && java.util.Objects.equals(message, that.message);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(canvasId, targetCanvasId, status, message);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "BatchOperationItem[" + "canvasId=" + canvasId + ", " + "targetCanvasId=" + targetCanvasId + ", " + "status=" + status + ", " + "message=" + message + "]";
+        }
     }
 
     /**
      * BatchOperationResult 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record BatchOperationResult(String operation,
-                                       int totalCount,
-                                       int successCount,
-                                       int skippedCount,
-                                       int failedCount,
-                                       List<BatchOperationItem> items,
-                                       Map<String, Integer> countsByStatus) {
+    public static final class BatchOperationResult {
+
+        /**
+         * operation 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("operation")
+        private final String operation;
+
+        /**
+         * totalCount 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("totalCount")
+        private final int totalCount;
+
+        /**
+         * successCount 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("successCount")
+        private final int successCount;
+
+        /**
+         * skippedCount 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("skippedCount")
+        private final int skippedCount;
+
+        /**
+         * failedCount 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("failedCount")
+        private final int failedCount;
+
+        /**
+         * items 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("items")
+        private final List<BatchOperationItem> items;
+
+        /**
+         * countsByStatus 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("countsByStatus")
+        private final Map<String, Integer> countsByStatus;
+
+        /**
+         * 创建 BatchOperationResult 实例。
+         *
+         * @param operation operation 字段值
+         * @param totalCount totalCount 字段值
+         * @param successCount successCount 字段值
+         * @param skippedCount skippedCount 字段值
+         * @param failedCount failedCount 字段值
+         * @param items items 字段值
+         * @param countsByStatus countsByStatus 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public BatchOperationResult(@com.fasterxml.jackson.annotation.JsonProperty("operation") String operation, @com.fasterxml.jackson.annotation.JsonProperty("totalCount") int totalCount, @com.fasterxml.jackson.annotation.JsonProperty("successCount") int successCount, @com.fasterxml.jackson.annotation.JsonProperty("skippedCount") int skippedCount, @com.fasterxml.jackson.annotation.JsonProperty("failedCount") int failedCount, @com.fasterxml.jackson.annotation.JsonProperty("items") List<BatchOperationItem> items, @com.fasterxml.jackson.annotation.JsonProperty("countsByStatus") Map<String, Integer> countsByStatus) {
+            this.operation = operation;
+            this.totalCount = totalCount;
+            this.successCount = successCount;
+            this.skippedCount = skippedCount;
+            this.failedCount = failedCount;
+            this.items = items;
+            this.countsByStatus = countsByStatus;
+        }
+
+        /**
+         * 返回operation 字段值。
+         *
+         * @return operation 字段值
+         */
+        public String operation() {
+            return operation;
+        }
+
+        /**
+         * 返回totalCount 字段值。
+         *
+         * @return totalCount 字段值
+         */
+        public int totalCount() {
+            return totalCount;
+        }
+
+        /**
+         * 返回successCount 字段值。
+         *
+         * @return successCount 字段值
+         */
+        public int successCount() {
+            return successCount;
+        }
+
+        /**
+         * 返回skippedCount 字段值。
+         *
+         * @return skippedCount 字段值
+         */
+        public int skippedCount() {
+            return skippedCount;
+        }
+
+        /**
+         * 返回failedCount 字段值。
+         *
+         * @return failedCount 字段值
+         */
+        public int failedCount() {
+            return failedCount;
+        }
+
+        /**
+         * 返回items 字段值。
+         *
+         * @return items 字段值
+         */
+        public List<BatchOperationItem> items() {
+            return items;
+        }
+
+        /**
+         * 返回countsByStatus 字段值。
+         *
+         * @return countsByStatus 字段值
+         */
+        public Map<String, Integer> countsByStatus() {
+            return countsByStatus;
+        }
+
+        /**
+         * 判断两个 BatchOperationResult 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof BatchOperationResult that)) {
+                return false;
+            }
+            return java.util.Objects.equals(operation, that.operation) && java.util.Objects.equals(totalCount, that.totalCount) && java.util.Objects.equals(successCount, that.successCount) && java.util.Objects.equals(skippedCount, that.skippedCount) && java.util.Objects.equals(failedCount, that.failedCount) && java.util.Objects.equals(items, that.items) && java.util.Objects.equals(countsByStatus, that.countsByStatus);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(operation, totalCount, successCount, skippedCount, failedCount, items, countsByStatus);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "BatchOperationResult[" + "operation=" + operation + ", " + "totalCount=" + totalCount + ", " + "successCount=" + successCount + ", " + "skippedCount=" + skippedCount + ", " + "failedCount=" + failedCount + ", " + "items=" + items + ", " + "countsByStatus=" + countsByStatus + "]";
+        }
 
         /**
          * 组装输出结构或完成对象转换。
@@ -427,5 +972,6 @@ public class CanvasBatchOperationController {
                     counts
             );
         }
+
     }
 }

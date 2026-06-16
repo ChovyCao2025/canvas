@@ -190,6 +190,10 @@ public class CdpWarehouseMetricChangeReviewController {
         /** 发起变更、控制或回滚的原因，用于审批和审计追溯。 */
         private String reason;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseMetricChangeReviewService.MetricChangeCommand toCommand() {
             return new CdpWarehouseMetricChangeReviewService.MetricChangeCommand(
                     datasetKey,

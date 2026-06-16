@@ -92,6 +92,12 @@ public class CanvasMqTriggerRejectedController {
         return Mono.fromCallable(() -> {
             CanvasMqTriggerRejectedDO rejected = mapper.selectById(id);
             if (rejected == null) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param id 标识，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("rejected 消息不存在: " + id);
             }
             return R.ok(rejected);
@@ -111,6 +117,12 @@ public class CanvasMqTriggerRejectedController {
         return Mono.fromCallable(() -> {
             CanvasMqTriggerRejectedDO rejected = mapper.selectById(id);
             if (rejected == null) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param id 标识，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("rejected 消息不存在: " + id);
             }
             // 先恢复原始 MQ 触发消息，再基于当前路由表重新生成执行请求。
@@ -163,6 +175,12 @@ public class CanvasMqTriggerRejectedController {
             return objectMapper.readValue(rejected.getBody(), MqTriggerMessage.class);
         // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param JSON" json"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("无法重放 rejected 消息，消息体不是合法 MQ 触发 JSON", e);
         }
     }
@@ -178,6 +196,12 @@ public class CanvasMqTriggerRejectedController {
         if (message.getUserId() == null || message.getUserId().isBlank()
                 || message.getMessageCode() == null || message.getMessageCode().isBlank()
                 || message.getPayload() == null) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param userId/messageCode/payload" userid/messagecode/payload"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("无法重放 rejected 消息，缺少 userId/messageCode/payload");
         }
     }

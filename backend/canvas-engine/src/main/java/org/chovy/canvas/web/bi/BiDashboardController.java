@@ -42,8 +42,17 @@ import java.util.List;
 @RequestMapping("/canvas/bi/dashboards/resources")
 public class BiDashboardController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * 仪表盘资源服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDashboardResourceService dashboardResourceService;
+    /**
+     * 运行态状态服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDashboardRuntimeStateService runtimeStateService;
 
     /**
@@ -119,6 +128,12 @@ public class BiDashboardController {
                                                   @RequestBody BiDashboardPreset preset) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (!dashboardKey.equals(preset.dashboardKey())) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param path" path"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("dashboard key does not match request path");
                     }
                     return R.ok(dashboardResourceService.saveDraft(
@@ -402,6 +417,12 @@ public class BiDashboardController {
      */
     private BiDashboardRuntimeStateService requireRuntimeStateService() {
         if (runtimeStateService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI dashboard runtime state service is required");
         }
         return runtimeStateService;

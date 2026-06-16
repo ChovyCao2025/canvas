@@ -17,6 +17,9 @@ import reactor.core.scheduler.Schedulers;
 @RequestMapping("/canvas/ab-experiments/{experimentId}/governance")
 public class AbExperimentGovernanceController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final AbExperimentGovernanceService service;
 
     /**

@@ -23,14 +23,38 @@ import java.time.format.DateTimeParseException;
 @RequiredArgsConstructor
 public class ContactabilityController {
 
+    /**
+     * defaultquietstart常量，用于保持控制器内部规则一致。
+     */
     private static final String DEFAULT_QUIET_START = "22:00";
+    /**
+     * defaultquietend常量，用于保持控制器内部规则一致。
+     */
     private static final String DEFAULT_QUIET_END = "08:00";
+    /**
+     * defaultquiettimezone常量，用于保持控制器内部规则一致。
+     */
     private static final String DEFAULT_QUIET_TIMEZONE = "USER_LOCAL";
+    /**
+     * defaultnode标识常量，用于保持控制器内部规则一致。
+     */
     private static final String DEFAULT_NODE_ID = "preflight";
+    /**
+     * defaultfrequencyscope常量，用于保持控制器内部规则一致。
+     */
     private static final String DEFAULT_FREQUENCY_SCOPE = "JOURNEY";
+    /**
+     * defaultfrequencymax常量，用于保持控制器内部规则一致。
+     */
     private static final int DEFAULT_FREQUENCY_MAX = 1;
+    /**
+     * defaultfrequencywindowseconds常量，用于保持控制器内部规则一致。
+     */
     private static final long DEFAULT_FREQUENCY_WINDOW_SECONDS = 86_400L;
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final ContactabilityExplainerService service;
     /**
      * 处理 Contactability 请求接口，对应 GET /explain。

@@ -189,6 +189,12 @@ public class CanvasExecutionManagementController {
         // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (approval.getTenantId() != null) {
             if (!approval.getTenantId().equals(requestTenantId)) {
+                /**
+                 * 执行 响应状态exception 对应的内部处理流程。
+                 *
+                 * @param approval" approval"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current tenant cannot access approval");
             }
             // 汇总前面计算出的状态和明细，返回给调用方。
@@ -200,6 +206,12 @@ public class CanvasExecutionManagementController {
                 || ctx.getTenantId() == null
                 || !ctx.getTenantId().equals(requestTenantId)
                 || !approval.getExecutionId().equals(ctx.getExecutionId())) {
+            /**
+             * 执行 响应状态exception 对应的内部处理流程。
+             *
+             * @param approval" approval"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "current tenant cannot access approval");
         }
     }
@@ -253,6 +265,102 @@ public class CanvasExecutionManagementController {
     /**
      * RuntimeActor 数据记录。
      */
-    private record RuntimeActor(Long tenantId, String role, String username) {
+    private static final class RuntimeActor {
+
+        /**
+         * 租户标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("tenantId")
+        private final Long tenantId;
+
+        /**
+         * role 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("role")
+        private final String role;
+
+        /**
+         * username 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("username")
+        private final String username;
+
+        /**
+         * 创建 RuntimeActor 实例。
+         *
+         * @param tenantId 租户标识
+         * @param role role 字段值
+         * @param username username 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        private RuntimeActor(@com.fasterxml.jackson.annotation.JsonProperty("tenantId") Long tenantId, @com.fasterxml.jackson.annotation.JsonProperty("role") String role, @com.fasterxml.jackson.annotation.JsonProperty("username") String username) {
+            this.tenantId = tenantId;
+            this.role = role;
+            this.username = username;
+        }
+
+        /**
+         * 返回租户标识。
+         *
+         * @return 租户标识
+         */
+        public Long tenantId() {
+            return tenantId;
+        }
+
+        /**
+         * 返回role 字段值。
+         *
+         * @return role 字段值
+         */
+        public String role() {
+            return role;
+        }
+
+        /**
+         * 返回username 字段值。
+         *
+         * @return username 字段值
+         */
+        public String username() {
+            return username;
+        }
+
+        /**
+         * 判断两个 RuntimeActor 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof RuntimeActor that)) {
+                return false;
+            }
+            return java.util.Objects.equals(tenantId, that.tenantId) && java.util.Objects.equals(role, that.role) && java.util.Objects.equals(username, that.username);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(tenantId, role, username);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "RuntimeActor[" + "tenantId=" + tenantId + ", " + "role=" + role + ", " + "username=" + username + "]";
+        }
     }
 }

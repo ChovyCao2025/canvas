@@ -490,11 +490,120 @@ public class OpsController {
      * @param username 操作人标识，用于审计和权限判断。
      * @return 返回 RuntimeStatus 流程生成的业务结果。
      */
-    public record RuntimeStatus(
-            String status,
-            String role,
-            Long tenantId,
-            String username) {
+    public static final class RuntimeStatus {
+
+        /**
+         * 状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("status")
+        private final String status;
+
+        /**
+         * role 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("role")
+        private final String role;
+
+        /**
+         * 租户标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("tenantId")
+        private final Long tenantId;
+
+        /**
+         * username 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("username")
+        private final String username;
+
+        /**
+         * 创建 RuntimeStatus 实例。
+         *
+         * @param status 状态
+         * @param role role 字段值
+         * @param tenantId 租户标识
+         * @param username username 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public RuntimeStatus(@com.fasterxml.jackson.annotation.JsonProperty("status") String status, @com.fasterxml.jackson.annotation.JsonProperty("role") String role, @com.fasterxml.jackson.annotation.JsonProperty("tenantId") Long tenantId, @com.fasterxml.jackson.annotation.JsonProperty("username") String username) {
+            this.status = status;
+            this.role = role;
+            this.tenantId = tenantId;
+            this.username = username;
+        }
+
+        /**
+         * 返回状态。
+         *
+         * @return 状态
+         */
+        public String status() {
+            return status;
+        }
+
+        /**
+         * 返回role 字段值。
+         *
+         * @return role 字段值
+         */
+        public String role() {
+            return role;
+        }
+
+        /**
+         * 返回租户标识。
+         *
+         * @return 租户标识
+         */
+        public Long tenantId() {
+            return tenantId;
+        }
+
+        /**
+         * 返回username 字段值。
+         *
+         * @return username 字段值
+         */
+        public String username() {
+            return username;
+        }
+
+        /**
+         * 判断两个 RuntimeStatus 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof RuntimeStatus that)) {
+                return false;
+            }
+            return java.util.Objects.equals(status, that.status) && java.util.Objects.equals(role, that.role) && java.util.Objects.equals(tenantId, that.tenantId) && java.util.Objects.equals(username, that.username);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(status, role, tenantId, username);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "RuntimeStatus[" + "status=" + status + ", " + "role=" + role + ", " + "tenantId=" + tenantId + ", " + "username=" + username + "]";
+        }
     }
 
     /**
@@ -574,6 +683,10 @@ public class OpsController {
      */
     private void requireEmergencyPermission(TenantContext context) {
         if (context == null || (!context.isSuperAdmin() && !context.isTenantAdmin())) {
+            /**
+             * 执行 accessdeniedexception 对应的内部处理流程。
+             * @return 返回内部处理结果
+             */
             throw new AccessDeniedException("无权限执行运维应急动作");
         }
     }
@@ -587,6 +700,12 @@ public class OpsController {
     private String requireReason(EmergencyActionReq req) {
         String reason = req == null ? null : req.getReason();
         if (reason == null || reason.isBlank()) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("reason is required");
         }
         return reason.trim();
@@ -622,6 +741,12 @@ public class OpsController {
      */
     private CanvasService requiredCanvasService() {
         if (canvasService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("canvasService is not configured");
         }
         return canvasService;
@@ -634,6 +759,12 @@ public class OpsController {
      */
     private CanvasOpsService requiredCanvasOpsService() {
         if (canvasOpsService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("canvasOpsService is not configured");
         }
         return canvasOpsService;
@@ -646,6 +777,12 @@ public class OpsController {
      */
     private OpsAuditEventService requiredAuditService() {
         if (opsAuditEventService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("opsAuditEventService is not configured");
         }
         return opsAuditEventService;

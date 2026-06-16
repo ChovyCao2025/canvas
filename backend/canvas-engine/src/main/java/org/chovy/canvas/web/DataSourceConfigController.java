@@ -255,6 +255,12 @@ public class DataSourceConfigController {
      */
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param field field，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("Missing data source field: " + field);
         }
     }
@@ -281,6 +287,12 @@ public class DataSourceConfigController {
     private List<DataSourceTableMeta> readJdbcTables(Long id, TenantContext context) throws Exception {
         DataSourceConfigDO config = requireDataSourceAccess(id, context);
         if (config.getEnabled() == null || config.getEnabled() == 0) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param id 标识，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("Data source disabled: " + id);
         }
         if (!"JDBC".equals(config.getType())) {
@@ -392,12 +404,22 @@ public class DataSourceConfigController {
     private DataSourceConfigDO requireDataSourceAccess(Long id, TenantContext context) {
         DataSourceConfigDO config = dataSourceConfigMapper.selectById(id);
         if (config == null) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param id 标识，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("Data source not found: " + id);
         }
         if (!isSuperAdmin(context)
                 && context != null
                 && context.tenantId() != null
                 && !Objects.equals(config.getTenantId(), context.tenantId())) {
+            /**
+             * 执行 accessdeniedexception 对应的内部处理流程。
+             * @return 返回内部处理结果
+             */
             throw new AccessDeniedException("跨租户数据源访问被拒绝");
         }
         return config;

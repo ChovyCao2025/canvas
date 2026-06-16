@@ -27,28 +27,272 @@ import java.util.List;
  * CdpComputedTagController 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
  */
 public class CdpComputedTagController {
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * tag服务，用于承接对应业务能力和领域编排。
+     */
     private final ComputedTagService tagService;
+    /**
+     * lineage服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpLineageService lineageService;
 
     /**
      * ComputedTagRequest 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record ComputedTagRequest(
-            String tagCode,
-            String displayName,
-            String valueType,
-            String computeType,
-            String expressionJson,
-            String refreshMode,
-            List<String> dependencies
-    ) {
+    public static final class ComputedTagRequest {
+
+        /**
+         * tagCode 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("tagCode")
+        private final String tagCode;
+
+        /**
+         * displayName 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("displayName")
+        private final String displayName;
+
+        /**
+         * valueType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("valueType")
+        private final String valueType;
+
+        /**
+         * computeType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("computeType")
+        private final String computeType;
+
+        /**
+         * expressionJson 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("expressionJson")
+        private final String expressionJson;
+
+        /**
+         * refreshMode 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("refreshMode")
+        private final String refreshMode;
+
+        /**
+         * dependencies 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("dependencies")
+        private final List<String> dependencies;
+
+        /**
+         * 创建 ComputedTagRequest 实例。
+         *
+         * @param tagCode tagCode 字段值
+         * @param displayName displayName 字段值
+         * @param valueType valueType 字段值
+         * @param computeType computeType 字段值
+         * @param expressionJson expressionJson 字段值
+         * @param refreshMode refreshMode 字段值
+         * @param dependencies dependencies 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ComputedTagRequest(@com.fasterxml.jackson.annotation.JsonProperty("tagCode") String tagCode, @com.fasterxml.jackson.annotation.JsonProperty("displayName") String displayName, @com.fasterxml.jackson.annotation.JsonProperty("valueType") String valueType, @com.fasterxml.jackson.annotation.JsonProperty("computeType") String computeType, @com.fasterxml.jackson.annotation.JsonProperty("expressionJson") String expressionJson, @com.fasterxml.jackson.annotation.JsonProperty("refreshMode") String refreshMode, @com.fasterxml.jackson.annotation.JsonProperty("dependencies") List<String> dependencies) {
+            this.tagCode = tagCode;
+            this.displayName = displayName;
+            this.valueType = valueType;
+            this.computeType = computeType;
+            this.expressionJson = expressionJson;
+            this.refreshMode = refreshMode;
+            this.dependencies = dependencies;
+        }
+
+        /**
+         * 返回tagCode 字段值。
+         *
+         * @return tagCode 字段值
+         */
+        public String tagCode() {
+            return tagCode;
+        }
+
+        /**
+         * 返回displayName 字段值。
+         *
+         * @return displayName 字段值
+         */
+        public String displayName() {
+            return displayName;
+        }
+
+        /**
+         * 返回valueType 字段值。
+         *
+         * @return valueType 字段值
+         */
+        public String valueType() {
+            return valueType;
+        }
+
+        /**
+         * 返回computeType 字段值。
+         *
+         * @return computeType 字段值
+         */
+        public String computeType() {
+            return computeType;
+        }
+
+        /**
+         * 返回expressionJson 字段值。
+         *
+         * @return expressionJson 字段值
+         */
+        public String expressionJson() {
+            return expressionJson;
+        }
+
+        /**
+         * 返回refreshMode 字段值。
+         *
+         * @return refreshMode 字段值
+         */
+        public String refreshMode() {
+            return refreshMode;
+        }
+
+        /**
+         * 返回dependencies 字段值。
+         *
+         * @return dependencies 字段值
+         */
+        public List<String> dependencies() {
+            return dependencies;
+        }
+
+        /**
+         * 判断两个 ComputedTagRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ComputedTagRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(tagCode, that.tagCode) && java.util.Objects.equals(displayName, that.displayName) && java.util.Objects.equals(valueType, that.valueType) && java.util.Objects.equals(computeType, that.computeType) && java.util.Objects.equals(expressionJson, that.expressionJson) && java.util.Objects.equals(refreshMode, that.refreshMode) && java.util.Objects.equals(dependencies, that.dependencies);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(tagCode, displayName, valueType, computeType, expressionJson, refreshMode, dependencies);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ComputedTagRequest[" + "tagCode=" + tagCode + ", " + "displayName=" + displayName + ", " + "valueType=" + valueType + ", " + "computeType=" + computeType + ", " + "expressionJson=" + expressionJson + ", " + "refreshMode=" + refreshMode + ", " + "dependencies=" + dependencies + "]";
+        }
     }
 
     /**
      * ImpactCheckRequest 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record ImpactCheckRequest(String oldValueType, String newValueType) {
+    public static final class ImpactCheckRequest {
+
+        /**
+         * oldValueType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("oldValueType")
+        private final String oldValueType;
+
+        /**
+         * newValueType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("newValueType")
+        private final String newValueType;
+
+        /**
+         * 创建 ImpactCheckRequest 实例。
+         *
+         * @param oldValueType oldValueType 字段值
+         * @param newValueType newValueType 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ImpactCheckRequest(@com.fasterxml.jackson.annotation.JsonProperty("oldValueType") String oldValueType, @com.fasterxml.jackson.annotation.JsonProperty("newValueType") String newValueType) {
+            this.oldValueType = oldValueType;
+            this.newValueType = newValueType;
+        }
+
+        /**
+         * 返回oldValueType 字段值。
+         *
+         * @return oldValueType 字段值
+         */
+        public String oldValueType() {
+            return oldValueType;
+        }
+
+        /**
+         * 返回newValueType 字段值。
+         *
+         * @return newValueType 字段值
+         */
+        public String newValueType() {
+            return newValueType;
+        }
+
+        /**
+         * 判断两个 ImpactCheckRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ImpactCheckRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(oldValueType, that.oldValueType) && java.util.Objects.equals(newValueType, that.newValueType);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(oldValueType, newValueType);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ImpactCheckRequest[" + "oldValueType=" + oldValueType + ", " + "newValueType=" + newValueType + "]";
+        }
     }
 
     @GetMapping

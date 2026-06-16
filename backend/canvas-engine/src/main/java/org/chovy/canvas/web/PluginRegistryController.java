@@ -24,6 +24,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PluginRegistryController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final PluginRegistryService service;
     /**
      * 查询插件注册表目录接口，对应 GET 请求。
@@ -63,5 +66,68 @@ public class PluginRegistryController {
     /**
      * EnableRequest 数据记录。
      */
-    public record EnableRequest(boolean enabled) {}
+    public static final class EnableRequest {
+
+        /**
+         * 启用状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("enabled")
+        private final boolean enabled;
+
+        /**
+         * 创建 EnableRequest 实例。
+         *
+         * @param enabled 启用状态
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public EnableRequest(@com.fasterxml.jackson.annotation.JsonProperty("enabled") boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * 返回启用状态。
+         *
+         * @return 启用状态
+         */
+        public boolean enabled() {
+            return enabled;
+        }
+
+        /**
+         * 判断两个 EnableRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof EnableRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(enabled, that.enabled);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(enabled);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "EnableRequest[" + "enabled=" + enabled + "]";
+        }
+    }
 }

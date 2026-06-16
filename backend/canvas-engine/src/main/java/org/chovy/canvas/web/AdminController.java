@@ -31,6 +31,9 @@ public class AdminController {
 
     /** 用户服务：封装查询、创建、更新、禁用逻辑。 */
     private final SysUserService userService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /** 查询全部用户。 */

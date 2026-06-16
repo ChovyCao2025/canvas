@@ -17,9 +17,18 @@ import java.time.Clock;
 @Component
 public class EventReportAuthService {
 
+    /**
+     * timestampheader常量，用于保持控制器内部规则一致。
+     */
     public static final String TIMESTAMP_HEADER = CanvasHmacVerifier.TIMESTAMP_HEADER;
+    /**
+     * signatureheader常量，用于保持控制器内部规则一致。
+     */
     public static final String SIGNATURE_HEADER = CanvasHmacVerifier.SIGNATURE_HEADER;
 
+    /**
+     * verifier，用于保存请求处理过程中需要的业务数据。
+     */
     private final CanvasHmacVerifier verifier;
 
     /**
@@ -31,12 +40,6 @@ public class EventReportAuthService {
         this(secret, Clock.systemUTC());
     }
 
-    /**
-     * 执行 EventReportAuthService 流程，围绕 event report auth service 完成校验、计算或结果组装。
-     *
-     * @param secret secret 参数，用于 EventReportAuthService 流程中的校验、计算或对象转换。
-     * @param clock 时间参数，用于计算窗口、过期或审计时间。
-     */
     EventReportAuthService(String secret, Clock clock) {
         this.verifier = new CanvasHmacVerifier(secret, clock);
     }

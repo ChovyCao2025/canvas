@@ -190,6 +190,10 @@ public class CdpWarehouseCatalogController {
         /** Schema 结构 JSON，用于注册实时数据格式或目录数据集字段。 */
         private String schemaJson;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseCatalogService.DatasetCommand toCommand() {
             return new CdpWarehouseCatalogService.DatasetCommand(
                     datasetKey,
@@ -227,6 +231,10 @@ public class CdpWarehouseCatalogController {
         /** 是否作为当前有效配置参与目录、血缘或 Schema 治理。 */
         private Boolean active;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseCatalogService.LineageCommand toCommand() {
             return new CdpWarehouseCatalogService.LineageCommand(
                     upstreamDatasetKey,

@@ -34,13 +34,34 @@ import java.util.Map;
 @RequestMapping("/canvas/risk/decisions")
 public class RiskDecisionController {
 
+    /**
+     * defaultdeadlinems常量，用于保持控制器内部规则一致。
+     */
     private static final int DEFAULT_DEADLINE_MS = 50;
 
+    /**
+     * 决策服务，用于承接对应业务能力和领域编排。
+     */
     private final RiskDecisionService decisionService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * 审计sink，用于保存请求处理过程中需要的业务数据。
+     */
     private final RiskDecisionAuditSink auditSink;
+    /**
+     * budget提供方，用于保存请求处理过程中需要的业务数据。
+     */
     private final RiskSceneBudgetProvider budgetProvider;
+    /**
+     * clock，用于保存请求处理过程中需要的业务数据。
+     */
     private final Clock clock;
+    /**
+     * trace读取器，用于保存请求处理过程中需要的业务数据。
+     */
     private final RiskDecisionTraceReader traceReader;
 
     /**
@@ -143,21 +164,51 @@ public class RiskDecisionController {
      */
     private void validate(TenantContext context, RiskDecisionEvaluateRequest request) {
         if (isBlank(request.requestId())) {
+            /**
+             * 执行 bad请求 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw badRequest("requestId is required");
         }
         if (isBlank(request.sceneKey())) {
+            /**
+             * 执行 bad请求 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw badRequest("sceneKey is required");
         }
         if (!hasSubjectIdentifier(request.subject())) {
+            /**
+             * 执行 bad请求 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw badRequest("subject identifier is required");
         }
         Instant eventTime = parseEventTime(request.eventTime());
         if (eventTime.isAfter(clock.instant().plusSeconds(24 * 60 * 60))) {
+            /**
+             * 执行 bad请求 对应的内部处理流程。
+             *
+             * @param future" future"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw badRequest("eventTime must not be more than 24 hours in the future");
         }
         int deadlineMs = deadlineMs(request);
         int sceneBudget = budgetProvider.latencyBudgetMs(context.tenantId(), request.sceneKey());
         if (deadlineMs > sceneBudget) {
+            /**
+             * 执行 bad请求 对应的内部处理流程。
+             *
+             * @param budget" budget"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw badRequest("deadline must not exceed scene latency budget");
         }
         if (request.tenantId() != null && !request.tenantId().equals(context.tenantId())) {
@@ -221,12 +272,24 @@ public class RiskDecisionController {
      */
     private Instant parseEventTime(String eventTime) {
         if (isBlank(eventTime)) {
+            /**
+             * 执行 bad请求 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw badRequest("eventTime is required");
         }
         try {
             return Instant.parse(eventTime);
         // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (DateTimeParseException error) {
+            /**
+             * 执行 bad请求 对应的内部处理流程。
+             *
+             * @param ISO-8601" iso-8601"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw badRequest("eventTime must be ISO-8601");
         }
     }
@@ -236,33 +299,9 @@ public class RiskDecisionController {
      */
     private boolean hasSubjectIdentifier(Map<String, Object> subject) {
         return hasText(subject, "userId")
-                /**
-                 * 判断业务条件是否成立。
-                 *
-                 * @param subject 待处理业务值，用于规则计算、转换或外部调用。
-                 * @return 返回布尔判断结果。
-                 */
                 || hasText(subject, "deviceId")
-                /**
-                 * 判断业务条件是否成立。
-                 *
-                 * @param subject 待处理业务值，用于规则计算、转换或外部调用。
-                 * @return 返回布尔判断结果。
-                 */
                 || hasText(subject, "ip")
-                /**
-                 * 判断业务条件是否成立。
-                 *
-                 * @param subject 待处理业务值，用于规则计算、转换或外部调用。
-                 * @return 返回布尔判断结果。
-                 */
                 || hasText(subject, "email")
-                /**
-                 * 判断业务条件是否成立。
-                 *
-                 * @param subject 待处理业务值，用于规则计算、转换或外部调用。
-                 * @return 返回布尔判断结果。
-                 */
                 || hasText(subject, "phone");
     }
 

@@ -66,12 +66,33 @@ import java.util.List;
 @RequestMapping("/canvas/marketing-monitoring")
 public class MarketingMonitoringController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingMonitoringService service;
+    /**
+     * alertfanout服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingMonitorAlertFanoutService alertFanoutService;
+    /**
+     * polling服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingMonitorPollingService pollingService;
+    /**
+     * inference服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingMonitorInferenceService inferenceService;
+    /**
+     * 提供方credential服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingMonitorProviderCredentialService providerCredentialService;
+    /**
+     * 提供方oauthauthorization服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingMonitorProviderOAuthAuthorizationService providerOAuthAuthorizationService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -498,11 +519,6 @@ public class MarketingMonitoringController {
         // 对批量任务的 limit 做统一上限保护，避免一次刷新过多外部凭证。
         MarketingMonitorProviderCredentialDueRefreshCommand effectiveCommand = command == null
                 ? new MarketingMonitorProviderCredentialDueRefreshCommand(null, null)
-                /**
-                 * 执行 MarketingMonitorProviderCredentialDueRefreshCommand 流程，围绕 marketing monitor provider credential due refresh command 完成校验、计算或结果组装。
-                 *
-                 * @return 返回 MarketingMonitorProviderCredentialDueRefreshCommand 流程生成的业务结果。
-                 */
                 : new MarketingMonitorProviderCredentialDueRefreshCommand(
                         command.windowMinutes(),
                         boundedLimit(command.limit() == null ? 50 : command.limit()));
@@ -714,6 +730,12 @@ public class MarketingMonitoringController {
      */
     private MarketingMonitorPollingService requiredPollingService() {
         if (pollingService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("marketing monitoring polling service is not configured");
         }
         return pollingService;
@@ -726,6 +748,12 @@ public class MarketingMonitoringController {
      */
     private MarketingMonitorInferenceService requiredInferenceService() {
         if (inferenceService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("marketing monitoring inference service is not configured");
         }
         return inferenceService;
@@ -738,6 +766,12 @@ public class MarketingMonitoringController {
      */
     private MarketingMonitorProviderCredentialService requiredProviderCredentialService() {
         if (providerCredentialService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("marketing monitoring provider credential service is not configured");
         }
         return providerCredentialService;
@@ -750,6 +784,12 @@ public class MarketingMonitoringController {
      */
     private MarketingMonitorProviderOAuthAuthorizationService requiredProviderOAuthAuthorizationService() {
         if (providerOAuthAuthorizationService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("marketing monitoring provider OAuth authorization service is not configured");
         }
         return providerOAuthAuthorizationService;

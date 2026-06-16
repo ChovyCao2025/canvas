@@ -46,13 +46,37 @@ import java.util.List;
  */
 public class GrowthActivityController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final GrowthActivityService service;
+    /**
+     * readiness服务，用于承接对应业务能力和领域编排。
+     */
     private final GrowthActivityReadinessService readinessService;
+    /**
+     * report服务，用于承接对应业务能力和领域编排。
+     */
     private final GrowthActivityReportService reportService;
+    /**
+     * rewardpool服务，用于承接对应业务能力和领域编排。
+     */
     private final GrowthRewardPoolService rewardPoolService;
+    /**
+     * rewardgrant服务，用于承接对应业务能力和领域编排。
+     */
     private final GrowthRewardGrantService rewardGrantService;
+    /**
+     * referral服务，用于承接对应业务能力和领域编排。
+     */
     private final GrowthReferralService referralService;
+    /**
+     * task服务，用于承接对应业务能力和领域编排。
+     */
     private final GrowthTaskService taskService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -579,6 +603,12 @@ public class GrowthActivityController {
      */
     private GrowthRewardPoolService requireRewardPoolService() {
         if (rewardPoolService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("growth reward pool service is not configured");
         }
         return rewardPoolService;
@@ -591,6 +621,12 @@ public class GrowthActivityController {
      */
     private GrowthReferralService requireReferralService() {
         if (referralService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("growth referral service is not configured");
         }
         return referralService;
@@ -603,6 +639,12 @@ public class GrowthActivityController {
      */
     private GrowthRewardGrantService requireRewardGrantService() {
         if (rewardGrantService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("growth reward grant service is not configured");
         }
         return rewardGrantService;
@@ -615,6 +657,12 @@ public class GrowthActivityController {
      */
     private GrowthTaskService requireTaskService() {
         if (taskService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("growth task service is not configured");
         }
         return taskService;
@@ -623,12 +671,153 @@ public class GrowthActivityController {
     /**
      * ReferralCodeRequest 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record ReferralCodeRequest(Long participantId) {
+    public static final class ReferralCodeRequest {
+
+        /**
+         * participantId 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("participantId")
+        private final Long participantId;
+
+        /**
+         * 创建 ReferralCodeRequest 实例。
+         *
+         * @param participantId participantId 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ReferralCodeRequest(@com.fasterxml.jackson.annotation.JsonProperty("participantId") Long participantId) {
+            this.participantId = participantId;
+        }
+
+        /**
+         * 返回participantId 字段值。
+         *
+         * @return participantId 字段值
+         */
+        public Long participantId() {
+            return participantId;
+        }
+
+        /**
+         * 判断两个 ReferralCodeRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ReferralCodeRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(participantId, that.participantId);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(participantId);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ReferralCodeRequest[" + "participantId=" + participantId + "]";
+        }
     }
 
     /**
      * GrantReconcileRequest 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record GrantReconcileRequest(String providerStatus, java.util.Map<String, Object> providerResponse) {
+    public static final class GrantReconcileRequest {
+
+        /**
+         * providerStatus 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("providerStatus")
+        private final String providerStatus;
+
+        /**
+         * providerResponse 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("providerResponse")
+        private final java.util.Map<String, Object> providerResponse;
+
+        /**
+         * 创建 GrantReconcileRequest 实例。
+         *
+         * @param providerStatus providerStatus 字段值
+         * @param providerResponse providerResponse 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public GrantReconcileRequest(@com.fasterxml.jackson.annotation.JsonProperty("providerStatus") String providerStatus, @com.fasterxml.jackson.annotation.JsonProperty("providerResponse") java.util.Map<String, Object> providerResponse) {
+            this.providerStatus = providerStatus;
+            this.providerResponse = providerResponse;
+        }
+
+        /**
+         * 返回providerStatus 字段值。
+         *
+         * @return providerStatus 字段值
+         */
+        public String providerStatus() {
+            return providerStatus;
+        }
+
+        /**
+         * 返回providerResponse 字段值。
+         *
+         * @return providerResponse 字段值
+         */
+        public java.util.Map<String, Object> providerResponse() {
+            return providerResponse;
+        }
+
+        /**
+         * 判断两个 GrantReconcileRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof GrantReconcileRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(providerStatus, that.providerStatus) && java.util.Objects.equals(providerResponse, that.providerResponse);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(providerStatus, providerResponse);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "GrantReconcileRequest[" + "providerStatus=" + providerStatus + ", " + "providerResponse=" + providerResponse + "]";
+        }
     }
 }

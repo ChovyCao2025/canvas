@@ -24,8 +24,17 @@ import java.util.List;
 @RequestMapping("/warehouse/enterprise-olap/evidence")
 public class CdpWarehouseEnterpriseOlapEvidenceController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehouseEnterpriseOlapEvidenceService service;
+    /**
+     * collection服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehouseEnterpriseOlapEvidenceCollectionService collectionService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -144,6 +153,12 @@ public class CdpWarehouseEnterpriseOlapEvidenceController {
      */
     private CdpWarehouseEnterpriseOlapEvidenceCollectionService collectionService() {
         if (collectionService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("enterprise OLAP evidence collection service is not configured");
         }
         return collectionService;

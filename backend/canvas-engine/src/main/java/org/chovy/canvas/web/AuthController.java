@@ -66,10 +66,18 @@ public class AuthController {
             SysUserDO user = userService.findByUsernameForAuth(username);
             if (user == null || user.getEnabled() == 0) {
                 recordFailedAttempt(username);
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("用户名或密码错误");
             }
             if (!userService.checkPassword(user, req.getPassword())) {
                 recordFailedAttempt(username);
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("用户名或密码错误");
             }
 

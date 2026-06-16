@@ -19,6 +19,9 @@ import reactor.core.scheduler.Schedulers;
 @RequestMapping("/user-input")
 public class UserInputController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final UserInputService service;
 
     /**

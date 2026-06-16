@@ -164,11 +164,6 @@ public class CanvasController {
                             requireCanvasAction(id, context, CanvasProjectAction.EDIT);
                             canvasService.updateDraft(id, req);
                             recordCanvasAudit(context, context.username(), "canvas update",
-                                    /**
-                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
-                                     *
-                                     * @return 返回 metadata 流程生成的业务结果。
-                                     */
                                     id, metadata("name", req.getName()));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -420,11 +415,6 @@ public class CanvasController {
                             requireTenantAccess(id, context);
                             canvasService.revertToVersion(id, versionId);
                             recordCanvasAudit(context, context.username(), "canvas revert",
-                                    /**
-                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
-                                     *
-                                     * @return 返回 metadata 流程生成的业务结果。
-                                     */
                                     id, metadata("toVersion", versionId));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -449,11 +439,6 @@ public class CanvasController {
                             notifyCanvasChange("CANVAS_CANARY_STARTED", id, "画布灰度已启动",
                                     "operator=" + operator + " percent=" + percent, "INFO", operator);
                             recordCanvasAudit(context, operator, "canvas canary start",
-                                    /**
-                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
-                                     *
-                                     * @return 返回 metadata 流程生成的业务结果。
-                                     */
                                     id, metadata("percent", percent));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -584,11 +569,6 @@ public class CanvasController {
                                     id, req.getName(), req.getDescription(),
                                     req.getGraphJson(), req.getEditVersion(), operator);
                             recordCanvasAudit(context, operator, "canvas safe update",
-                                    /**
-                                     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
-                                     *
-                                     * @return 返回 metadata 流程生成的业务结果。
-                                     */
                                     id, metadata("editVersion", req.getEditVersion()));
                         })
                         .subscribeOn(Schedulers.boundedElastic())
@@ -863,6 +843,12 @@ public class CanvasController {
      */
     private CanvasPublishApprovalService requiredCanvasPublishApprovalService() {
         if (canvasPublishApprovalService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("Canvas publish approval service is not configured");
         }
         return canvasPublishApprovalService;
@@ -951,10 +937,10 @@ public class CanvasController {
     }
 
     /**
-     * 执行 metadata 流程，围绕 metadata 完成校验、计算或结果组装。
+     * 将键值序列整理为审计元数据。
      *
-     * @param keyValues key values 参数，用于 metadata 流程中的校验、计算或对象转换。
-     * @return 返回 metadata 流程生成的业务结果。
+     * @param keyValues 按键和值交替传入的元数据片段
+     * @return 审计事件使用的元数据映射
      */
     private Map<String, Object> metadata(Object... keyValues) {
         Map<String, Object> metadata = new LinkedHashMap<>();

@@ -65,8 +65,17 @@ public class MetaController {
     private final SystemOptionService systemOptionService;
     /** AB 实验分组服务，用于查询实验分组选项。 */
     private final AbExperimentGroupService abExperimentGroupService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * ai提供方modelregistry服务，用于承接对应业务能力和领域编排。
+     */
     private final AiProviderModelRegistryService aiProviderModelRegistryService;
+    /**
+     * aiprompt模板服务，用于承接对应业务能力和领域编排。
+     */
     private final AiPromptTemplateService aiPromptTemplateService;
     /** 统一 HTTP 客户端构建器，继承全局超时、连接池和响应大小限制。 */
     private final WebClient.Builder webClientBuilder;

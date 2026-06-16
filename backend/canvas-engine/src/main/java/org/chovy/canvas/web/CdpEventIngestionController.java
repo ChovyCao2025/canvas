@@ -23,7 +23,13 @@ import java.util.List;
 @RequestMapping("/cdp/events")
 @RequiredArgsConstructor
 public class CdpEventIngestionController {
+    /**
+     * write键auth服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWriteKeyAuthService writeKeyAuthService;
+    /**
+     * ingestion服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpEventIngestionService ingestionService;
     /**
      * 处理 CDP 事件采集 请求接口，对应 POST /track。

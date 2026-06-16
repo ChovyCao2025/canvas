@@ -23,7 +23,13 @@ import java.util.List;
 @RequestMapping("/canvas/event-attributes")
 @RequiredArgsConstructor
 public class EventAttributeDiscoveryController {
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * discovery服务，用于承接对应业务能力和领域编排。
+     */
     private final EventAttributeDiscoveryService discoveryService;
     /**
      * 查询Event Attribute Discovery列表接口，对应 GET /discovered。

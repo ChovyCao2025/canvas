@@ -43,11 +43,29 @@ import java.util.List;
 @RequestMapping("/canvas/bi/datasets/resources")
 public class BiDatasetController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * 数据集资源服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasetResourceService datasetResourceService;
+    /**
+     * datasource服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasetFromDatasourceService datasourceService;
+    /**
+     * acceleration服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasetAccelerationService accelerationService;
+    /**
+     * accelerationscheduler服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDatasetAccelerationSchedulerService accelerationSchedulerService;
+    /**
+     * sql数据集preview服务，用于承接对应业务能力和领域编排。
+     */
     private final BiSqlDatasetPreviewService sqlDatasetPreviewService;
 
     /**
@@ -175,6 +193,12 @@ public class BiDatasetController {
                                                 @RequestBody BiDatasetResource resource) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (!datasetKey.equals(resource.datasetKey())) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param path" path"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("dataset key does not match request path");
                     }
                     return R.ok(datasetResourceService.saveDraft(
@@ -463,6 +487,12 @@ public class BiDatasetController {
     public Mono<R<BiDatasetResource>> createFromDatasourceSchema(@RequestBody BiDatasetFromDatasourceCommand command) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (datasourceService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("BI datasource dataset service is required");
                     }
                     return R.ok(datasourceService.createTableDataset(
@@ -488,6 +518,12 @@ public class BiDatasetController {
             @RequestBody BiDatasetFromDatasourceMultiTableCommand command) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (datasourceService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("BI datasource dataset service is required");
                     }
                     return R.ok(datasourceService.createMultiTableDataset(
@@ -517,6 +553,12 @@ public class BiDatasetController {
      */
     private void requireAccelerationService() {
         if (accelerationService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI dataset acceleration service is required");
         }
     }
@@ -526,6 +568,12 @@ public class BiDatasetController {
      */
     private void requireAccelerationSchedulerService() {
         if (accelerationSchedulerService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI dataset acceleration scheduler service is required");
         }
     }
@@ -535,6 +583,12 @@ public class BiDatasetController {
      */
     private void requireSqlDatasetPreviewService() {
         if (sqlDatasetPreviewService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI SQL dataset preview service is required");
         }
     }

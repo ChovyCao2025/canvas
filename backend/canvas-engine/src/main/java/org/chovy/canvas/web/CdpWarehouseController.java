@@ -227,6 +227,12 @@ public class CdpWarehouseController {
      */
     private CdpWarehouseRetentionService requireRetentionService() {
         if (retentionService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("warehouse retention service is not configured");
         }
         return retentionService;

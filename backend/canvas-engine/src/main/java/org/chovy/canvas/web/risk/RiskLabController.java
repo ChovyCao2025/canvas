@@ -29,9 +29,18 @@ import java.util.List;
 @RequestMapping("/canvas/risk/lab")
 public class RiskLabController {
 
+    /**
+     * defaultsample限制常量，用于保持控制器内部规则一致。
+     */
     private static final int DEFAULT_SAMPLE_LIMIT = 1000;
 
+    /**
+     * simulation服务，用于承接对应业务能力和领域编排。
+     */
     private final RiskSimulationService simulationService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -73,11 +82,6 @@ public class RiskLabController {
                 ? new RiskSimulationStartRequest(null, null, null, null, null, null)
                 : body;
         int candidateVersion = request.candidateVersion() == null
-                /**
-                 * 执行 version 流程，围绕 version 完成校验、计算或结果组装。
-                 *
-                 * @return 返回 version 流程生成的业务结果。
-                 */
                 ? version(request.version())
                 : request.candidateVersion();
         // 仅传入一个版本时，默认与前一个版本作为基线对比。

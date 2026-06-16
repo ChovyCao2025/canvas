@@ -23,7 +23,13 @@ import java.time.LocalDateTime;
  */
 public class MarketingPreferenceCenterController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingPreferenceCenterService service;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -155,18 +161,323 @@ public class MarketingPreferenceCenterController {
     /**
      * ConsentUpdateReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record ConsentUpdateReq(String consentStatus, String source) {
+    public static final class ConsentUpdateReq {
+
+        /**
+         * consentStatus 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("consentStatus")
+        private final String consentStatus;
+
+        /**
+         * source 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("source")
+        private final String source;
+
+        /**
+         * 创建 ConsentUpdateReq 实例。
+         *
+         * @param consentStatus consentStatus 字段值
+         * @param source source 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ConsentUpdateReq(@com.fasterxml.jackson.annotation.JsonProperty("consentStatus") String consentStatus, @com.fasterxml.jackson.annotation.JsonProperty("source") String source) {
+            this.consentStatus = consentStatus;
+            this.source = source;
+        }
+
+        /**
+         * 返回consentStatus 字段值。
+         *
+         * @return consentStatus 字段值
+         */
+        public String consentStatus() {
+            return consentStatus;
+        }
+
+        /**
+         * 返回source 字段值。
+         *
+         * @return source 字段值
+         */
+        public String source() {
+            return source;
+        }
+
+        /**
+         * 判断两个 ConsentUpdateReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ConsentUpdateReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(consentStatus, that.consentStatus) && java.util.Objects.equals(source, that.source);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(consentStatus, source);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ConsentUpdateReq[" + "consentStatus=" + consentStatus + ", " + "source=" + source + "]";
+        }
     }
 
     /**
      * ChannelUpdateReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record ChannelUpdateReq(String address, Boolean enabled, Boolean verified, String metadata) {
+    public static final class ChannelUpdateReq {
+
+        /**
+         * address 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("address")
+        private final String address;
+
+        /**
+         * 启用状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("enabled")
+        private final Boolean enabled;
+
+        /**
+         * verified 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("verified")
+        private final Boolean verified;
+
+        /**
+         * metadata 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("metadata")
+        private final String metadata;
+
+        /**
+         * 创建 ChannelUpdateReq 实例。
+         *
+         * @param address address 字段值
+         * @param enabled 启用状态
+         * @param verified verified 字段值
+         * @param metadata metadata 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ChannelUpdateReq(@com.fasterxml.jackson.annotation.JsonProperty("address") String address, @com.fasterxml.jackson.annotation.JsonProperty("enabled") Boolean enabled, @com.fasterxml.jackson.annotation.JsonProperty("verified") Boolean verified, @com.fasterxml.jackson.annotation.JsonProperty("metadata") String metadata) {
+            this.address = address;
+            this.enabled = enabled;
+            this.verified = verified;
+            this.metadata = metadata;
+        }
+
+        /**
+         * 返回address 字段值。
+         *
+         * @return address 字段值
+         */
+        public String address() {
+            return address;
+        }
+
+        /**
+         * 返回启用状态。
+         *
+         * @return 启用状态
+         */
+        public Boolean enabled() {
+            return enabled;
+        }
+
+        /**
+         * 返回verified 字段值。
+         *
+         * @return verified 字段值
+         */
+        public Boolean verified() {
+            return verified;
+        }
+
+        /**
+         * 返回metadata 字段值。
+         *
+         * @return metadata 字段值
+         */
+        public String metadata() {
+            return metadata;
+        }
+
+        /**
+         * 判断两个 ChannelUpdateReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ChannelUpdateReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(address, that.address) && java.util.Objects.equals(enabled, that.enabled) && java.util.Objects.equals(verified, that.verified) && java.util.Objects.equals(metadata, that.metadata);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(address, enabled, verified, metadata);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ChannelUpdateReq[" + "address=" + address + ", " + "enabled=" + enabled + ", " + "verified=" + verified + ", " + "metadata=" + metadata + "]";
+        }
     }
 
     /**
      * SuppressionCreateReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record SuppressionCreateReq(String channel, String reason, Boolean active, LocalDateTime expiresAt) {
+    public static final class SuppressionCreateReq {
+
+        /**
+         * 渠道。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("channel")
+        private final String channel;
+
+        /**
+         * 原因。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("reason")
+        private final String reason;
+
+        /**
+         * 启用状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("active")
+        private final Boolean active;
+
+        /**
+         * expiresAt 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("expiresAt")
+        private final LocalDateTime expiresAt;
+
+        /**
+         * 创建 SuppressionCreateReq 实例。
+         *
+         * @param channel 渠道
+         * @param reason 原因
+         * @param active 启用状态
+         * @param expiresAt expiresAt 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public SuppressionCreateReq(@com.fasterxml.jackson.annotation.JsonProperty("channel") String channel, @com.fasterxml.jackson.annotation.JsonProperty("reason") String reason, @com.fasterxml.jackson.annotation.JsonProperty("active") Boolean active, @com.fasterxml.jackson.annotation.JsonProperty("expiresAt") LocalDateTime expiresAt) {
+            this.channel = channel;
+            this.reason = reason;
+            this.active = active;
+            this.expiresAt = expiresAt;
+        }
+
+        /**
+         * 返回渠道。
+         *
+         * @return 渠道
+         */
+        public String channel() {
+            return channel;
+        }
+
+        /**
+         * 返回原因。
+         *
+         * @return 原因
+         */
+        public String reason() {
+            return reason;
+        }
+
+        /**
+         * 返回启用状态。
+         *
+         * @return 启用状态
+         */
+        public Boolean active() {
+            return active;
+        }
+
+        /**
+         * 返回expiresAt 字段值。
+         *
+         * @return expiresAt 字段值
+         */
+        public LocalDateTime expiresAt() {
+            return expiresAt;
+        }
+
+        /**
+         * 判断两个 SuppressionCreateReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof SuppressionCreateReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(channel, that.channel) && java.util.Objects.equals(reason, that.reason) && java.util.Objects.equals(active, that.active) && java.util.Objects.equals(expiresAt, that.expiresAt);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(channel, reason, active, expiresAt);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "SuppressionCreateReq[" + "channel=" + channel + ", " + "reason=" + reason + ", " + "active=" + active + ", " + "expiresAt=" + expiresAt + "]";
+        }
     }
 }

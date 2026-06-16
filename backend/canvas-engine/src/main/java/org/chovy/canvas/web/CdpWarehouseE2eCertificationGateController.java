@@ -20,7 +20,13 @@ import java.util.List;
 @RequestMapping("/warehouse/e2e-certification/gate")
 public class CdpWarehouseE2eCertificationGateController {
 
+    /**
+     * gate服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehouseE2eCertificationGateService gateService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**

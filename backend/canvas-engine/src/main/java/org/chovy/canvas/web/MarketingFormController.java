@@ -28,7 +28,13 @@ import java.util.Map;
  */
 public class MarketingFormController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingFormService service;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -215,6 +221,12 @@ public class MarketingFormController {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param unavailable" unavailable"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("SHA-256 digest is unavailable", e);
         }
     }
@@ -240,32 +252,408 @@ public class MarketingFormController {
     /**
      * FormDefinitionReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record FormDefinitionReq(
-            String publicKey,
-            String name,
-            String description,
-            String fieldSchemaJson,
-            String submitActionJson,
-            String successMessage,
-            Boolean active,
-            String createdBy) {
+    public static final class FormDefinitionReq {
+
+        /**
+         * publicKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("publicKey")
+        private final String publicKey;
+
+        /**
+         * 名称。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("name")
+        private final String name;
+
+        /**
+         * description 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("description")
+        private final String description;
+
+        /**
+         * fieldSchemaJson 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("fieldSchemaJson")
+        private final String fieldSchemaJson;
+
+        /**
+         * submitActionJson 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("submitActionJson")
+        private final String submitActionJson;
+
+        /**
+         * successMessage 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("successMessage")
+        private final String successMessage;
+
+        /**
+         * 启用状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("active")
+        private final Boolean active;
+
+        /**
+         * createdBy 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("createdBy")
+        private final String createdBy;
+
+        /**
+         * 创建 FormDefinitionReq 实例。
+         *
+         * @param publicKey publicKey 字段值
+         * @param name 名称
+         * @param description description 字段值
+         * @param fieldSchemaJson fieldSchemaJson 字段值
+         * @param submitActionJson submitActionJson 字段值
+         * @param successMessage successMessage 字段值
+         * @param active 启用状态
+         * @param createdBy createdBy 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public FormDefinitionReq(@com.fasterxml.jackson.annotation.JsonProperty("publicKey") String publicKey, @com.fasterxml.jackson.annotation.JsonProperty("name") String name, @com.fasterxml.jackson.annotation.JsonProperty("description") String description, @com.fasterxml.jackson.annotation.JsonProperty("fieldSchemaJson") String fieldSchemaJson, @com.fasterxml.jackson.annotation.JsonProperty("submitActionJson") String submitActionJson, @com.fasterxml.jackson.annotation.JsonProperty("successMessage") String successMessage, @com.fasterxml.jackson.annotation.JsonProperty("active") Boolean active, @com.fasterxml.jackson.annotation.JsonProperty("createdBy") String createdBy) {
+            this.publicKey = publicKey;
+            this.name = name;
+            this.description = description;
+            this.fieldSchemaJson = fieldSchemaJson;
+            this.submitActionJson = submitActionJson;
+            this.successMessage = successMessage;
+            this.active = active;
+            this.createdBy = createdBy;
+        }
+
+        /**
+         * 返回publicKey 字段值。
+         *
+         * @return publicKey 字段值
+         */
+        public String publicKey() {
+            return publicKey;
+        }
+
+        /**
+         * 返回名称。
+         *
+         * @return 名称
+         */
+        public String name() {
+            return name;
+        }
+
+        /**
+         * 返回description 字段值。
+         *
+         * @return description 字段值
+         */
+        public String description() {
+            return description;
+        }
+
+        /**
+         * 返回fieldSchemaJson 字段值。
+         *
+         * @return fieldSchemaJson 字段值
+         */
+        public String fieldSchemaJson() {
+            return fieldSchemaJson;
+        }
+
+        /**
+         * 返回submitActionJson 字段值。
+         *
+         * @return submitActionJson 字段值
+         */
+        public String submitActionJson() {
+            return submitActionJson;
+        }
+
+        /**
+         * 返回successMessage 字段值。
+         *
+         * @return successMessage 字段值
+         */
+        public String successMessage() {
+            return successMessage;
+        }
+
+        /**
+         * 返回启用状态。
+         *
+         * @return 启用状态
+         */
+        public Boolean active() {
+            return active;
+        }
+
+        /**
+         * 返回createdBy 字段值。
+         *
+         * @return createdBy 字段值
+         */
+        public String createdBy() {
+            return createdBy;
+        }
+
+        /**
+         * 判断两个 FormDefinitionReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof FormDefinitionReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(publicKey, that.publicKey) && java.util.Objects.equals(name, that.name) && java.util.Objects.equals(description, that.description) && java.util.Objects.equals(fieldSchemaJson, that.fieldSchemaJson) && java.util.Objects.equals(submitActionJson, that.submitActionJson) && java.util.Objects.equals(successMessage, that.successMessage) && java.util.Objects.equals(active, that.active) && java.util.Objects.equals(createdBy, that.createdBy);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(publicKey, name, description, fieldSchemaJson, submitActionJson, successMessage, active, createdBy);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "FormDefinitionReq[" + "publicKey=" + publicKey + ", " + "name=" + name + ", " + "description=" + description + ", " + "fieldSchemaJson=" + fieldSchemaJson + ", " + "submitActionJson=" + submitActionJson + ", " + "successMessage=" + successMessage + ", " + "active=" + active + ", " + "createdBy=" + createdBy + "]";
+        }
     }
 
     /**
      * StatusReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record StatusReq(Boolean active) {
+    public static final class StatusReq {
+
+        /**
+         * 启用状态。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("active")
+        private final Boolean active;
+
+        /**
+         * 创建 StatusReq 实例。
+         *
+         * @param active 启用状态
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public StatusReq(@com.fasterxml.jackson.annotation.JsonProperty("active") Boolean active) {
+            this.active = active;
+        }
+
+        /**
+         * 返回启用状态。
+         *
+         * @return 启用状态
+         */
+        public Boolean active() {
+            return active;
+        }
+
+        /**
+         * 判断两个 StatusReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof StatusReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(active, that.active);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(active);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "StatusReq[" + "active=" + active + "]";
+        }
     }
 
     /**
      * PublicSubmitReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record PublicSubmitReq(
-            Map<String, Object> response,
-            Map<String, Object> utm,
-            String anonymousId,
-            String idempotencyKey,
-            String consentChannel,
-            String consentStatus) {
+    public static final class PublicSubmitReq {
+
+        /**
+         * response 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("response")
+        private final Map<String, Object> response;
+
+        /**
+         * utm 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("utm")
+        private final Map<String, Object> utm;
+
+        /**
+         * anonymousId 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("anonymousId")
+        private final String anonymousId;
+
+        /**
+         * idempotencyKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("idempotencyKey")
+        private final String idempotencyKey;
+
+        /**
+         * consentChannel 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("consentChannel")
+        private final String consentChannel;
+
+        /**
+         * consentStatus 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("consentStatus")
+        private final String consentStatus;
+
+        /**
+         * 创建 PublicSubmitReq 实例。
+         *
+         * @param response response 字段值
+         * @param utm utm 字段值
+         * @param anonymousId anonymousId 字段值
+         * @param idempotencyKey idempotencyKey 字段值
+         * @param consentChannel consentChannel 字段值
+         * @param consentStatus consentStatus 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public PublicSubmitReq(@com.fasterxml.jackson.annotation.JsonProperty("response") Map<String, Object> response, @com.fasterxml.jackson.annotation.JsonProperty("utm") Map<String, Object> utm, @com.fasterxml.jackson.annotation.JsonProperty("anonymousId") String anonymousId, @com.fasterxml.jackson.annotation.JsonProperty("idempotencyKey") String idempotencyKey, @com.fasterxml.jackson.annotation.JsonProperty("consentChannel") String consentChannel, @com.fasterxml.jackson.annotation.JsonProperty("consentStatus") String consentStatus) {
+            this.response = response;
+            this.utm = utm;
+            this.anonymousId = anonymousId;
+            this.idempotencyKey = idempotencyKey;
+            this.consentChannel = consentChannel;
+            this.consentStatus = consentStatus;
+        }
+
+        /**
+         * 返回response 字段值。
+         *
+         * @return response 字段值
+         */
+        public Map<String, Object> response() {
+            return response;
+        }
+
+        /**
+         * 返回utm 字段值。
+         *
+         * @return utm 字段值
+         */
+        public Map<String, Object> utm() {
+            return utm;
+        }
+
+        /**
+         * 返回anonymousId 字段值。
+         *
+         * @return anonymousId 字段值
+         */
+        public String anonymousId() {
+            return anonymousId;
+        }
+
+        /**
+         * 返回idempotencyKey 字段值。
+         *
+         * @return idempotencyKey 字段值
+         */
+        public String idempotencyKey() {
+            return idempotencyKey;
+        }
+
+        /**
+         * 返回consentChannel 字段值。
+         *
+         * @return consentChannel 字段值
+         */
+        public String consentChannel() {
+            return consentChannel;
+        }
+
+        /**
+         * 返回consentStatus 字段值。
+         *
+         * @return consentStatus 字段值
+         */
+        public String consentStatus() {
+            return consentStatus;
+        }
+
+        /**
+         * 判断两个 PublicSubmitReq 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof PublicSubmitReq that)) {
+                return false;
+            }
+            return java.util.Objects.equals(response, that.response) && java.util.Objects.equals(utm, that.utm) && java.util.Objects.equals(anonymousId, that.anonymousId) && java.util.Objects.equals(idempotencyKey, that.idempotencyKey) && java.util.Objects.equals(consentChannel, that.consentChannel) && java.util.Objects.equals(consentStatus, that.consentStatus);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(response, utm, anonymousId, idempotencyKey, consentChannel, consentStatus);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "PublicSubmitReq[" + "response=" + response + ", " + "utm=" + utm + ", " + "anonymousId=" + anonymousId + ", " + "idempotencyKey=" + idempotencyKey + ", " + "consentChannel=" + consentChannel + ", " + "consentStatus=" + consentStatus + "]";
+        }
     }
 }

@@ -185,6 +185,12 @@ public class CdpWarehouseAudienceMaterializationController {
         RefreshDueReq request = req == null ? new RefreshDueReq() : req;
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (scheduleService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param configured" configured"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("audience materialization schedule service is not configured");
                     }
                     return R.ok(scheduleService.refreshDue(
@@ -211,6 +217,12 @@ public class CdpWarehouseAudienceMaterializationController {
         GatedRefreshDueReq request = req == null ? new GatedRefreshDueReq() : req;
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (scheduleService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param configured" configured"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("audience materialization schedule service is not configured");
                     }
                     LocalDateTime now = request.getNow() == null ? LocalDateTime.now() : request.getNow();

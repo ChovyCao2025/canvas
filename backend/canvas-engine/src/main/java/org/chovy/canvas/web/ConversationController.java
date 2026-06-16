@@ -30,8 +30,17 @@ import java.util.Map;
 @RequestMapping("/canvas/conversations")
 public class ConversationController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final ConversationIngressService service;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * adapterharness，用于保存请求处理过程中需要的业务数据。
+     */
     private final ConversationAdapterHarness adapterHarness;
 
     /**
@@ -174,6 +183,12 @@ public class ConversationController {
      */
     private ConversationAdapterHarness requireAdapterHarness() {
         if (adapterHarness == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("conversation adapter harness is required");
         }
         return adapterHarness;

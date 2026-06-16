@@ -158,6 +158,12 @@ public class TagImportController {
             reader.setIgnoreEmptyRow(true);
             List<Map<String, Object>> maps = reader.readAll();
             if (maps.size() > MAX_EXCEL_ROWS) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param 20000" 20000"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("excel row count exceeds 20000");
             }
             // Excel 首行是表头，业务行号从第 2 行开始，便于错误明细回显给用户。

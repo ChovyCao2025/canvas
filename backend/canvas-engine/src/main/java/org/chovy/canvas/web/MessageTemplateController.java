@@ -23,7 +23,13 @@ import java.util.Map;
 @RequestMapping("/message-templates")
 public class MessageTemplateController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final MessageTemplateService service;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**

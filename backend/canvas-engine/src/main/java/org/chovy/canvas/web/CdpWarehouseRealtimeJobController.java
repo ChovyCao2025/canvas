@@ -236,6 +236,10 @@ public class CdpWarehouseRealtimeJobController {
         /** 责任人名称，用于治理归属、告警通知和问题追踪。 */
         private String ownerName;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseRealtimeJobControlService.HeartbeatCommand toCommand() {
             return new CdpWarehouseRealtimeJobControlService.HeartbeatCommand(
                     pipelineKey,
@@ -268,6 +272,10 @@ public class CdpWarehouseRealtimeJobController {
         /** 控制指令发起人，用于实时作业操作审计。 */
         private String requestedBy;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseRealtimeJobControlService.ActionRequestCommand toCommand() {
             return new CdpWarehouseRealtimeJobControlService.ActionRequestCommand(
                     pipelineKey,

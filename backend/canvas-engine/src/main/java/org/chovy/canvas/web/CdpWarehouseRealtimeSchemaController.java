@@ -168,6 +168,10 @@ public class CdpWarehouseRealtimeSchemaController {
         /** 注册实时 Schema 的人员标识，用于审计来源和责任归属。 */
         private String registeredBy;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseRealtimeSchemaService.SchemaVersionCommand toCommand() {
             return new CdpWarehouseRealtimeSchemaService.SchemaVersionCommand(
                     pipelineKey,

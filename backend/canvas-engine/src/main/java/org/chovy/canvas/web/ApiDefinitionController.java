@@ -133,6 +133,12 @@ public class ApiDefinitionController {
      */
     private static void validateRateLimit(ApiDefinitionDO body) {
         if (body.getRateLimitPerSec() != null && body.getRateLimitPerSec() <= 0) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param 0" 0"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("rateLimitPerSec 必须大于 0");
         }
     }

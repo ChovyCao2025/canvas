@@ -78,11 +78,23 @@ public class DeliveryReceiptController {
      */
     private void requireValidSecret(String candidate) {
         if (receiptSecret == null || receiptSecret.isBlank()) {
+            /**
+             * 执行 accessdeniedexception 对应的内部处理流程。
+             *
+             * @param configured" configured"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new AccessDeniedException("receipt secret is not configured");
         }
         byte[] expected = receiptSecret.getBytes(StandardCharsets.UTF_8);
         byte[] actual = (candidate == null ? "" : candidate).getBytes(StandardCharsets.UTF_8);
         if (!MessageDigest.isEqual(expected, actual)) {
+            /**
+             * 执行 accessdeniedexception 对应的内部处理流程。
+             *
+             * @param signature" signature"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new AccessDeniedException("invalid receipt signature");
         }
     }
@@ -111,12 +123,30 @@ public class DeliveryReceiptController {
         void validate() {
             // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (provider == null || provider.isBlank()) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param required" required"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("provider is required");
             }
             if (providerMessageId == null || providerMessageId.isBlank()) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param required" required"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("providerMessageId is required");
             }
             if (receiptType == null || receiptType.isBlank()) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param required" required"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("receiptType is required");
             }
         }

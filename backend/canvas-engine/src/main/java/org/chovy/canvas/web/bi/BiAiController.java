@@ -34,11 +34,29 @@ import reactor.core.scheduler.Schedulers;
 @RequestMapping("/canvas/bi/ai")
 public class BiAiController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * askdataagent服务，用于承接对应业务能力和领域编排。
+     */
     private final BiAskDataAgentService askDataAgentService;
+    /**
+     * interpretationagent服务，用于承接对应业务能力和领域编排。
+     */
     private final BiInterpretationAgentService interpretationAgentService;
+    /**
+     * reportagent服务，用于承接对应业务能力和领域编排。
+     */
     private final BiReportAgentService reportAgentService;
+    /**
+     * 仪表盘draftagent服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDashboardDraftAgentService dashboardDraftAgentService;
+    /**
+     * insightagent服务，用于承接对应业务能力和领域编排。
+     */
     private final BiInsightAgentService insightAgentService;
 
     /**

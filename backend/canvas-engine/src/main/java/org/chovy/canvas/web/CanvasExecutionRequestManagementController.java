@@ -162,6 +162,12 @@ public class CanvasExecutionRequestManagementController {
                             "执行请求单条重放过于频繁，请稍后再试");
                     CanvasExecutionRequestDO request = mapper.selectById(id);
                     if (request == null) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param id 标识，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("执行请求不存在: " + id);
                     }
                     requireTenantAccess(request, context);
@@ -173,6 +179,12 @@ public class CanvasExecutionRequestManagementController {
                             normalize(reason, "")
                     );
                     if (updated <= 0) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param id 标识，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("执行请求重放状态更新失败: " + id);
                     }
                     // 状态落库成功后再尝试立即投递；投递失败仍保留 PENDING 供后台扫描补偿。
@@ -279,6 +291,10 @@ public class CanvasExecutionRequestManagementController {
      */
     private void requireReplayRateLimit(boolean allowed, String message) {
         if (!allowed) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException(message);
         }
     }
@@ -298,6 +314,12 @@ public class CanvasExecutionRequestManagementController {
         if (status != null && !status.isBlank()) {
             String normalizedStatus = status.trim();
             if (!force && !REPLAYABLE_STATUSES.contains(normalizedStatus)) {
+                /**
+                 * 执行 illegalargumentexception 对应的内部处理流程。
+                 *
+                 * @param force=true" force=true"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new IllegalArgumentException("批量重放默认只允许 FAILED/RETRY，其他状态请使用 force=true");
             }
             // 显式 status 优先；force=false 时只允许失败态，防止误重放成功请求。
@@ -323,6 +345,12 @@ public class CanvasExecutionRequestManagementController {
             return;
         }
         if (!REPLAYABLE_STATUSES.contains(status)) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param force=true" force=true"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("只能重放 FAILED/RETRY 状态的执行请求，其他状态请使用 force=true");
         }
     }
@@ -420,6 +448,10 @@ public class CanvasExecutionRequestManagementController {
             return;
         }
         if (!Objects.equals(request.getTenantId(), context.tenantId())) {
+            /**
+             * 执行 accessdeniedexception 对应的内部处理流程。
+             * @return 返回内部处理结果
+             */
             throw new AccessDeniedException("跨租户执行请求访问被拒绝");
         }
     }

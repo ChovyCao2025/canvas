@@ -289,6 +289,12 @@ public class ExecutionController {
                                 return ApiRequestValidation.validate(objectMapper.readValue(body, bodyType));
                             // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
                             } catch (IOException e) {
+                                /**
+                                 * 执行 响应状态exception 对应的内部处理流程。
+                                 *
+                                 * @param 不合法" 不合法"，由调用方提供
+                                 * @return 返回内部处理结果
+                                 */
                                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请求体 JSON 不合法", e);
                             }
                         })
@@ -304,6 +310,12 @@ public class ExecutionController {
      */
     private String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
+            /**
+             * 执行 响应状态exception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required");
         }
         return value;
@@ -318,6 +330,12 @@ public class ExecutionController {
      */
     private <T> T requireValue(T value, String fieldName) {
         if (value == null) {
+            /**
+             * 执行 响应状态exception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required");
         }
         return value;

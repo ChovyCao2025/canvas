@@ -145,6 +145,10 @@ public class CdpWarehouseSloPolicyController {
         /** 补充说明，用于记录配置目的、血缘关系或治理背景。 */
         private String description;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseSloPolicyService.SloPolicyCommand toCommand() {
             return new CdpWarehouseSloPolicyService.SloPolicyCommand(
                     policyKey,

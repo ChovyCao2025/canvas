@@ -182,6 +182,10 @@ public class CdpWarehouseExternalRealtimeJobProbeController {
         /** 扩展配置 JSON，承载引擎、链路或探针的非标准参数。 */
         private String configJson;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseExternalRealtimeJobProbeService.TargetCommand toCommand() {
             return new CdpWarehouseExternalRealtimeJobProbeService.TargetCommand(
                     pipelineKey,

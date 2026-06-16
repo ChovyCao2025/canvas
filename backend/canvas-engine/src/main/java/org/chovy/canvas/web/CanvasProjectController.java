@@ -42,9 +42,21 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CanvasProjectController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * project服务，用于承接对应业务能力和领域编排。
+     */
     private final CanvasProjectService projectService;
+    /**
+     * 权限服务，用于承接对应业务能力和领域编排。
+     */
     private final CanvasProjectPermissionService permissionService;
+    /**
+     * 画布服务，用于承接对应业务能力和领域编排。
+     */
     private final CanvasService canvasService;
     /**
      * 查询画布项目列表接口，对应 GET 请求。
@@ -284,6 +296,12 @@ public class CanvasProjectController {
      */
     private void requireTenantAdmin(TenantContext context) {
         if (!context.isSuperAdmin() && !context.isTenantAdmin()) {
+            /**
+             * 执行 accessdeniedexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new AccessDeniedException("Tenant admin role is required");
         }
     }

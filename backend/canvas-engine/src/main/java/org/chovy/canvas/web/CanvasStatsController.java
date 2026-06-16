@@ -45,7 +45,13 @@ public class CanvasStatsController {
     private final CanvasExecutionStatsMapper statsMapper;
     /** Doris 查询服务；启用后优先承载 OLAP 明细和聚合查询。 */
     private final DorisQueryService dorisQueryService;
+    /**
+     * 消息sendrecord数据访问组件，用于访问和持久化对应数据。
+     */
     private final MessageSendRecordMapper messageSendRecordMapper;
+    /**
+     * attribution数据访问组件，用于访问和持久化对应数据。
+     */
     private final CanvasConversionAttributionMapper attributionMapper;
 
     /**
@@ -362,6 +368,12 @@ public class CanvasStatsController {
                 ? LocalDate.parse(since)
                 : untilDate.minusDays(Math.max(1, days) - 1L);
         if (sinceDate.isAfter(untilDate)) {
+            /**
+             * 执行 illegalargumentexception 对应的内部处理流程。
+             *
+             * @param until" until"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalArgumentException("since must be on or before until");
         }
         return new OverviewRange(sinceDate, untilDate);
@@ -780,6 +792,85 @@ public class CanvasStatsController {
     /**
      * OverviewRange 数据记录。
      */
-    private record OverviewRange(LocalDate sinceDate, LocalDate untilDate) {
+    private static final class OverviewRange {
+
+        /**
+         * sinceDate 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("sinceDate")
+        private final LocalDate sinceDate;
+
+        /**
+         * untilDate 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("untilDate")
+        private final LocalDate untilDate;
+
+        /**
+         * 创建 OverviewRange 实例。
+         *
+         * @param sinceDate sinceDate 字段值
+         * @param untilDate untilDate 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        private OverviewRange(@com.fasterxml.jackson.annotation.JsonProperty("sinceDate") LocalDate sinceDate, @com.fasterxml.jackson.annotation.JsonProperty("untilDate") LocalDate untilDate) {
+            this.sinceDate = sinceDate;
+            this.untilDate = untilDate;
+        }
+
+        /**
+         * 返回sinceDate 字段值。
+         *
+         * @return sinceDate 字段值
+         */
+        public LocalDate sinceDate() {
+            return sinceDate;
+        }
+
+        /**
+         * 返回untilDate 字段值。
+         *
+         * @return untilDate 字段值
+         */
+        public LocalDate untilDate() {
+            return untilDate;
+        }
+
+        /**
+         * 判断两个 OverviewRange 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof OverviewRange that)) {
+                return false;
+            }
+            return java.util.Objects.equals(sinceDate, that.sinceDate) && java.util.Objects.equals(untilDate, that.untilDate);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(sinceDate, untilDate);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "OverviewRange[" + "sinceDate=" + sinceDate + ", " + "untilDate=" + untilDate + "]";
+        }
     }
 }

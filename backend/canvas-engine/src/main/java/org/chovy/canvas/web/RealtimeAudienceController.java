@@ -24,7 +24,13 @@ import java.util.List;
  * RealtimeAudienceController 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
  */
 public class RealtimeAudienceController {
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final RealtimeAudienceService service;
 
     @PostMapping("/realtime-audiences/{id}/events")
@@ -143,11 +149,138 @@ public class RealtimeAudienceController {
     /**
      * RealtimeEventRequest 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
-    public record RealtimeEventRequest(String sourceEventId,
-                                       String userId,
-                                       java.time.Instant eventTime,
-                                       java.util.Map<String, Object> properties,
-                                       Boolean removeOnNoMatch) {
+    public static final class RealtimeEventRequest {
+
+        /**
+         * sourceEventId 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("sourceEventId")
+        private final String sourceEventId;
+
+        /**
+         * 用户标识。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("userId")
+        private final String userId;
+
+        /**
+         * eventTime 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("eventTime")
+        private final java.time.Instant eventTime;
+
+        /**
+         * properties 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("properties")
+        private final java.util.Map<String, Object> properties;
+
+        /**
+         * removeOnNoMatch 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("removeOnNoMatch")
+        private final Boolean removeOnNoMatch;
+
+        /**
+         * 创建 RealtimeEventRequest 实例。
+         *
+         * @param sourceEventId sourceEventId 字段值
+         * @param userId 用户标识
+         * @param eventTime eventTime 字段值
+         * @param properties properties 字段值
+         * @param removeOnNoMatch removeOnNoMatch 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public RealtimeEventRequest(@com.fasterxml.jackson.annotation.JsonProperty("sourceEventId") String sourceEventId, @com.fasterxml.jackson.annotation.JsonProperty("userId") String userId, @com.fasterxml.jackson.annotation.JsonProperty("eventTime") java.time.Instant eventTime, @com.fasterxml.jackson.annotation.JsonProperty("properties") java.util.Map<String, Object> properties, @com.fasterxml.jackson.annotation.JsonProperty("removeOnNoMatch") Boolean removeOnNoMatch) {
+            this.sourceEventId = sourceEventId;
+            this.userId = userId;
+            this.eventTime = eventTime;
+            this.properties = properties;
+            this.removeOnNoMatch = removeOnNoMatch;
+        }
+
+        /**
+         * 返回sourceEventId 字段值。
+         *
+         * @return sourceEventId 字段值
+         */
+        public String sourceEventId() {
+            return sourceEventId;
+        }
+
+        /**
+         * 返回用户标识。
+         *
+         * @return 用户标识
+         */
+        public String userId() {
+            return userId;
+        }
+
+        /**
+         * 返回eventTime 字段值。
+         *
+         * @return eventTime 字段值
+         */
+        public java.time.Instant eventTime() {
+            return eventTime;
+        }
+
+        /**
+         * 返回properties 字段值。
+         *
+         * @return properties 字段值
+         */
+        public java.util.Map<String, Object> properties() {
+            return properties;
+        }
+
+        /**
+         * 返回removeOnNoMatch 字段值。
+         *
+         * @return removeOnNoMatch 字段值
+         */
+        public Boolean removeOnNoMatch() {
+            return removeOnNoMatch;
+        }
+
+        /**
+         * 判断两个 RealtimeEventRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof RealtimeEventRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(sourceEventId, that.sourceEventId) && java.util.Objects.equals(userId, that.userId) && java.util.Objects.equals(eventTime, that.eventTime) && java.util.Objects.equals(properties, that.properties) && java.util.Objects.equals(removeOnNoMatch, that.removeOnNoMatch);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(sourceEventId, userId, eventTime, properties, removeOnNoMatch);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "RealtimeEventRequest[" + "sourceEventId=" + sourceEventId + ", " + "userId=" + userId + ", " + "eventTime=" + eventTime + ", " + "properties=" + properties + ", " + "removeOnNoMatch=" + removeOnNoMatch + "]";
+        }
+
         /**
          * 组装输出结构或完成对象转换。
          *
@@ -165,5 +298,6 @@ public class RealtimeAudienceController {
         boolean removeOnNoMatchOrDefault() {
             return removeOnNoMatch == null || removeOnNoMatch;
         }
+
     }
 }

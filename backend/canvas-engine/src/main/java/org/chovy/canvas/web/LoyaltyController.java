@@ -22,7 +22,13 @@ import java.util.List;
 @RequestMapping("/canvas/loyalty")
 public class LoyaltyController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * loyalty服务，用于承接对应业务能力和领域编排。
+     */
     private final LoyaltyService loyaltyService;
 
     /**

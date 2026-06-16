@@ -25,8 +25,17 @@ import reactor.core.scheduler.Schedulers;
 @RequestMapping("/public/marketing/content/assets/upload-callbacks")
 public class PublicMarketingContentUploadWebhookController {
 
+    /**
+     * upload服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingAssetUploadService uploadService;
+    /**
+     * signature服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingAssetUploadWebhookSignatureService signatureService;
+    /**
+     * 对象数据访问组件，用于访问和持久化对应数据。
+     */
     private final ObjectMapper objectMapper;
 
     /**
@@ -86,6 +95,12 @@ public class PublicMarketingContentUploadWebhookController {
                     objectMapper.readValue(rawBody, MarketingAssetUploadService.ProviderCallbackCommand.class);
             if (parsed.provider() != null && !parsed.provider().isBlank()
                     && !parsed.provider().trim().equalsIgnoreCase(provider)) {
+                /**
+                 * 执行 响应状态exception 对应的内部处理流程。
+                 *
+                 * @param route" route"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "asset upload provider does not match route");
             }
             return new MarketingAssetUploadService.ProviderCallbackCommand(
@@ -108,6 +123,12 @@ public class PublicMarketingContentUploadWebhookController {
                     parsed.metadata());
         // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException ex) {
+            /**
+             * 执行 响应状态exception 对应的内部处理流程。
+             *
+             * @param JSON" json"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "asset upload callback payload must be JSON", ex);
         }
     }

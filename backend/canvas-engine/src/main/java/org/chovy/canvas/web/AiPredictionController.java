@@ -19,16 +19,36 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/ai/predictions")
+/**
+ * AiPredictionController 提供对应业务域的 HTTP 接口入口。
+ */
 public class AiPredictionController {
 
+    /**
+     * churnprediction服务，用于承接对应业务能力和领域编排。
+     */
     private final ChurnPredictionService churnPredictionService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
+    /**
+     * 使用预测服务创建控制器，兼容未接入租户解析器的旧测试场景。
+     *
+     * @param churnPredictionService 流失预测服务
+     */
     public AiPredictionController(ChurnPredictionService churnPredictionService) {
         this(churnPredictionService, null);
     }
 
     @Autowired
+    /**
+     * 使用预测服务和租户解析器创建控制器。
+     *
+     * @param churnPredictionService 流失预测服务
+     * @param tenantContextResolver 租户上下文解析器
+     */
     public AiPredictionController(ChurnPredictionService churnPredictionService,
                                   TenantContextResolver tenantContextResolver) {
         this.churnPredictionService = churnPredictionService;
@@ -36,6 +56,10 @@ public class AiPredictionController {
     }
 
     @GetMapping("/latest-run")
+    /**
+     * 查询并返回对应资源或视图。
+     * @return 返回处理后的业务结果
+     */
     public Mono<R<ChurnPredictionService.PredictionRunView>> latestRun() {
         return currentAdmin().flatMap(context -> Mono.fromCallable(() ->
                         R.ok(churnPredictionService.latestRun(tenantId(context)).orElse(null)))
@@ -43,6 +67,10 @@ public class AiPredictionController {
     }
 
     @GetMapping("/readiness")
+    /**
+     * 查询并返回对应资源或视图。
+     * @return 返回处理后的业务结果
+     */
     public Mono<R<ChurnPredictionService.PredictionReadinessView>> readiness() {
         return currentAdmin().flatMap(context -> Mono.fromCallable(() ->
                         R.ok(churnPredictionService.readiness(tenantId(context))))
@@ -50,6 +78,10 @@ public class AiPredictionController {
     }
 
     @GetMapping("/churn-distribution")
+    /**
+     * 查询并返回对应资源或视图。
+     * @return 返回处理后的业务结果
+     */
     public Mono<R<List<ChurnPredictionService.RiskDistributionItem>>> distribution() {
         return currentAdmin().flatMap(context -> Mono.fromCallable(() ->
                         R.ok(churnPredictionService.churnDistribution(tenantId(context))))
@@ -57,6 +89,12 @@ public class AiPredictionController {
     }
 
     @GetMapping("/top-risk-users")
+    /**
+     * 查询并返回对应资源或视图。
+     *
+     * @param limit 限制，由调用方或当前请求上下文提供
+     * @return 返回处理后的业务结果
+     */
     public Mono<R<List<ChurnPredictionService.TopRiskUser>>> topRiskUsers(@RequestParam(defaultValue = "100") int limit) {
         return currentAdmin().flatMap(context -> Mono.fromCallable(() ->
                         R.ok(churnPredictionService.topRiskUsers(tenantId(context), limit)))
@@ -72,6 +110,10 @@ public class AiPredictionController {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 解析并校验当前请求上下文。
+     * @return 返回处理后的业务结果
+     */
     private Mono<TenantContext> currentAdmin() {
         if (tenantContextResolver == null) {
             return Mono.just(new TenantContext(0L, "ADMIN", "test"));
@@ -82,6 +124,12 @@ public class AiPredictionController {
                 .switchIfEmpty(Mono.error(new AccessDeniedException("AI prediction requires admin access")));
     }
 
+    /**
+     * 执行 tenantId 对应的接口或辅助流程。
+     *
+     * @param context 上下文，由调用方或当前请求上下文提供
+     * @return 返回处理后的业务结果
+     */
     private Long tenantId(TenantContext context) {
         return context == null || context.tenantId() == null ? 0L : context.tenantId();
     }

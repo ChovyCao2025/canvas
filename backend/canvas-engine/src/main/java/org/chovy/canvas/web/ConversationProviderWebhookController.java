@@ -23,8 +23,17 @@ import java.util.Map;
 @RequestMapping("/canvas/conversations/provider-webhooks")
 public class ConversationProviderWebhookController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * adapterharness，用于保存请求处理过程中需要的业务数据。
+     */
     private final ConversationAdapterHarness adapterHarness;
+    /**
+     * whatsapp数据访问组件，用于访问和持久化对应数据。
+     */
     private final WhatsAppWebhookPayloadMapper whatsAppMapper;
 
     /**

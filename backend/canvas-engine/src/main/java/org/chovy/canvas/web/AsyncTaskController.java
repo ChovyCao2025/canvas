@@ -47,6 +47,12 @@ public class AsyncTaskController {
                     // 任务查询走阻塞持久化层，外层切线程池后再做权限过滤。
                     AsyncTaskDO task = taskService.getByTaskId(taskId);
                     if (task == null || !canView(task, user)) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param taskId task标识，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("Async task not found: " + taskId);
                     }
                     return AsyncTaskDTO.from(task);
@@ -176,13 +182,89 @@ public class AsyncTaskController {
     }
 
     /**
-     * CurrentUser record.
+     * 当前用户上下文数据传输类型。
      * @param username 用户名.
      * @param role 角色编码.
      */
-    private record CurrentUser(
-        String username,
-        String role
-    ) {
+    private static final class CurrentUser {
+
+        /**
+         * username 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("username")
+        private final String username;
+
+        /**
+         * role 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("role")
+        private final String role;
+
+        /**
+         * 创建 CurrentUser 实例。
+         *
+         * @param username username 字段值
+         * @param role role 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        private CurrentUser(@com.fasterxml.jackson.annotation.JsonProperty("username") String username, @com.fasterxml.jackson.annotation.JsonProperty("role") String role) {
+            this.username = username;
+            this.role = role;
+        }
+
+        /**
+         * 返回username 字段值。
+         *
+         * @return username 字段值
+         */
+        public String username() {
+            return username;
+        }
+
+        /**
+         * 返回role 字段值。
+         *
+         * @return role 字段值
+         */
+        public String role() {
+            return role;
+        }
+
+        /**
+         * 判断两个 CurrentUser 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof CurrentUser that)) {
+                return false;
+            }
+            return java.util.Objects.equals(username, that.username) && java.util.Objects.equals(role, that.role);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(username, role);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "CurrentUser[" + "username=" + username + ", " + "role=" + role + "]";
+        }
     }
 }

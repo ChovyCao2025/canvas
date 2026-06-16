@@ -201,6 +201,12 @@ public class NotificationController {
             return null;
         }
         if (context.tenantId() == null) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param context" context"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("AUTH_003: missing tenant context");
         }
         return context.tenantId();

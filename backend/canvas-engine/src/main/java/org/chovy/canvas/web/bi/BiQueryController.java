@@ -73,18 +73,57 @@ import java.util.List;
 @RequestMapping("/canvas/bi")
 public class BiQueryController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * embedticket服务，用于承接对应业务能力和领域编排。
+     */
     private final BiEmbedTicketService embedTicketService;
+    /**
+     * 查询执行服务，用于承接对应业务能力和领域编排。
+     */
     private final BiQueryExecutionService queryExecutionService;
+    /**
+     * 查询历史读取器，用于保存请求处理过程中需要的业务数据。
+     */
     private final BiQueryHistoryReader queryHistoryReader;
+    /**
+     * datasourcehealth提供方，用于保存请求处理过程中需要的业务数据。
+     */
     private final BiDatasourceHealthProvider datasourceHealthProvider;
+    /**
+     * 数据集spec解析器，用于保存请求处理过程中需要的业务数据。
+     */
     private final BiDatasetSpecResolver datasetSpecResolver;
+    /**
+     * fieldgovernance服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehouseFieldGovernanceService fieldGovernanceService;
+    /**
+     * 权限服务，用于承接对应业务能力和领域编排。
+     */
     private final BiPermissionService permissionService;
+    /**
+     * 查询governancepolicy，用于保存请求处理过程中需要的业务数据。
+     */
     private final BiQueryGovernancePolicy queryGovernancePolicy;
+    /**
+     * 查询governancepolicy服务，用于承接对应业务能力和领域编排。
+     */
     private final BiQueryGovernancePolicyService queryGovernancePolicyService;
+    /**
+     * 查询缓存policy服务，用于承接对应业务能力和领域编排。
+     */
     private final BiQueryCachePolicyService queryCachePolicyService;
+    /**
+     * 门户运行态服务，用于承接对应业务能力和领域编排。
+     */
     private final BiPortalRuntimeService portalRuntimeService;
+    /**
+     * compiler，用于保存请求处理过程中需要的业务数据。
+     */
     private final BiQueryCompiler compiler = new BiQueryCompiler();
 
     /**
@@ -496,6 +535,12 @@ public class BiQueryController {
             @RequestBody GatedQueryRequest request) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (request == null || request.query() == null) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("query is required");
                     }
                     return R.ok(queryExecutionService.executeWithAvailabilityGate(
@@ -520,6 +565,12 @@ public class BiQueryController {
             @RequestBody ContractGatedQueryRequest request) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (request == null || request.query() == null) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("query is required");
                     }
                     return R.ok(queryExecutionService.executeWithConsumerAvailabilityContract(
@@ -581,11 +632,6 @@ public class BiQueryController {
     public Mono<R<BiQueryGovernancePolicyView>> queryGovernancePolicy() {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() ->
                         R.ok(queryGovernancePolicyService == null
-                                /**
-                                 * 转换为接口返回或领域视图。
-                                 *
-                                 * @return 返回组装或转换后的结果对象。
-                                 */
                                 ? toPolicyView(queryGovernancePolicy)
                                 : queryGovernancePolicyService.currentPolicyView(tenantId)))
                 .subscribeOn(Schedulers.boundedElastic()));
@@ -603,6 +649,12 @@ public class BiQueryController {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     requireAdmin(context);
                     if (queryGovernancePolicyService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param configured" configured"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("BI query governance policy service is not configured");
                     }
                     return R.ok(queryGovernancePolicyService.upsertPolicy(
@@ -658,6 +710,12 @@ public class BiQueryController {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     requireAdmin(context);
                     if (queryCachePolicyService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param configured" configured"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("BI query cache policy service is not configured");
                     }
                     return R.ok(queryCachePolicyService.upsertPolicy(
@@ -680,6 +738,12 @@ public class BiQueryController {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     requireAdmin(context);
                     if (queryCachePolicyService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param configured" configured"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("BI query cache policy service is not configured");
                     }
                     return R.ok(queryCachePolicyService.invalidate(command));
@@ -800,6 +864,12 @@ public class BiQueryController {
             @RequestHeader(value = "Referer", required = false) String referer) {
         return Mono.fromCallable(() -> {
                     if (request == null || request.query() == null) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("embed query is required");
                     }
                     BiEmbedTicketPayload preview = embedTicketService.verify(request.ticket());
@@ -873,10 +943,10 @@ public class BiQueryController {
     }
 
     /**
-     * 转换为接口返回或领域视图。
+     * 将治理策略领域对象转换为接口视图。
      *
-     * @param policy policy 参数，用于 toPolicyView 流程中的校验、计算或对象转换。
-     * @return 返回组装或转换后的结果对象。
+     * @param policy 查询治理策略
+     * @return 前端可消费的治理策略视图
      */
     private BiQueryGovernancePolicyView toPolicyView(BiQueryGovernancePolicy policy) {
         return new BiQueryGovernancePolicyView(
@@ -931,33 +1001,75 @@ public class BiQueryController {
     private void enforceEmbedQueryScope(BiEmbedTicketPayload payload, EmbedQueryRequest request) {
         // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (payload == null) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed ticket is required");
         }
         if ("DASHBOARD".equalsIgnoreCase(payload.resourceType())) {
             if (!equalsIgnoreCase(payload.resourceType(), request.resourceType())
                     || !payload.resourceKey().equals(request.resourceKey())) {
+                /**
+                 * 执行 securityexception 对应的内部处理流程。
+                 *
+                 * @param ticket" ticket"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new SecurityException("BI embed query resource does not match ticket");
             }
             if (request.query() == null
                     || request.query().dashboardKey() == null
                     || !payload.resourceKey().equals(request.query().dashboardKey())) {
+                /**
+                 * 执行 securityexception 对应的内部处理流程。
+                 *
+                 * @param resource" resource"，由调用方提供
+                 * @return 返回内部处理结果
+                 */
                 throw new SecurityException("BI embed query dashboard does not match ticket resource");
             }
             // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (!"PORTAL".equalsIgnoreCase(payload.resourceType())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param tickets" tickets"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed query only supports dashboard or portal tickets");
         }
         if (!"DASHBOARD".equalsIgnoreCase(request.resourceType())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param queries" queries"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI portal ticket can only execute dashboard menu queries");
         }
         if (request.query() == null
                 || request.query().dashboardKey() == null
                 || !request.resourceKey().equals(request.query().dashboardKey())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param resource" resource"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed query dashboard does not match requested resource");
         }
         if (!portalContainsDashboard(payload, request.resourceKey())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param menu" menu"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed query dashboard is not declared in portal menu");
         }
     }
@@ -982,6 +1094,12 @@ public class BiQueryController {
      */
     private boolean portalContainsDashboard(BiEmbedTicketPayload payload, String dashboardKey) {
         if (portalRuntimeService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI portal runtime service is required");
         }
         BiPortalResource portal = portalRuntimeService.getPublished(
@@ -1046,64 +1164,680 @@ public class BiQueryController {
     /**
      * DatasetView 数据记录。
      */
-    public record DatasetView(
-            String datasetKey,
-            List<FieldView> fields,
-            List<MetricView> metrics
-    ) {
+    public static final class DatasetView {
+
+        /**
+         * datasetKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("datasetKey")
+        private final String datasetKey;
+
+        /**
+         * fields 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("fields")
+        private final List<FieldView> fields;
+
+        /**
+         * metrics 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("metrics")
+        private final List<MetricView> metrics;
+
+        /**
+         * 创建 DatasetView 实例。
+         *
+         * @param datasetKey datasetKey 字段值
+         * @param fields fields 字段值
+         * @param metrics metrics 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public DatasetView(@com.fasterxml.jackson.annotation.JsonProperty("datasetKey") String datasetKey, @com.fasterxml.jackson.annotation.JsonProperty("fields") List<FieldView> fields, @com.fasterxml.jackson.annotation.JsonProperty("metrics") List<MetricView> metrics) {
+            this.datasetKey = datasetKey;
+            this.fields = fields;
+            this.metrics = metrics;
+        }
+
+        /**
+         * 返回datasetKey 字段值。
+         *
+         * @return datasetKey 字段值
+         */
+        public String datasetKey() {
+            return datasetKey;
+        }
+
+        /**
+         * 返回fields 字段值。
+         *
+         * @return fields 字段值
+         */
+        public List<FieldView> fields() {
+            return fields;
+        }
+
+        /**
+         * 返回metrics 字段值。
+         *
+         * @return metrics 字段值
+         */
+        public List<MetricView> metrics() {
+            return metrics;
+        }
+
+        /**
+         * 判断两个 DatasetView 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof DatasetView that)) {
+                return false;
+            }
+            return java.util.Objects.equals(datasetKey, that.datasetKey) && java.util.Objects.equals(fields, that.fields) && java.util.Objects.equals(metrics, that.metrics);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(datasetKey, fields, metrics);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "DatasetView[" + "datasetKey=" + datasetKey + ", " + "fields=" + fields + ", " + "metrics=" + metrics + "]";
+        }
     }
 
     /**
      * FieldView 数据记录。
      */
-    public record FieldView(
-            String fieldKey,
-            BiFieldSpec.Role role,
-            String dataType
-    ) {
+    public static final class FieldView {
+
+        /**
+         * fieldKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("fieldKey")
+        private final String fieldKey;
+
+        /**
+         * role 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("role")
+        private final BiFieldSpec.Role role;
+
+        /**
+         * dataType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("dataType")
+        private final String dataType;
+
+        /**
+         * 创建 FieldView 实例。
+         *
+         * @param fieldKey fieldKey 字段值
+         * @param role role 字段值
+         * @param dataType dataType 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public FieldView(@com.fasterxml.jackson.annotation.JsonProperty("fieldKey") String fieldKey, @com.fasterxml.jackson.annotation.JsonProperty("role") BiFieldSpec.Role role, @com.fasterxml.jackson.annotation.JsonProperty("dataType") String dataType) {
+            this.fieldKey = fieldKey;
+            this.role = role;
+            this.dataType = dataType;
+        }
+
+        /**
+         * 返回fieldKey 字段值。
+         *
+         * @return fieldKey 字段值
+         */
+        public String fieldKey() {
+            return fieldKey;
+        }
+
+        /**
+         * 返回role 字段值。
+         *
+         * @return role 字段值
+         */
+        public BiFieldSpec.Role role() {
+            return role;
+        }
+
+        /**
+         * 返回dataType 字段值。
+         *
+         * @return dataType 字段值
+         */
+        public String dataType() {
+            return dataType;
+        }
+
+        /**
+         * 判断两个 FieldView 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof FieldView that)) {
+                return false;
+            }
+            return java.util.Objects.equals(fieldKey, that.fieldKey) && java.util.Objects.equals(role, that.role) && java.util.Objects.equals(dataType, that.dataType);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(fieldKey, role, dataType);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "FieldView[" + "fieldKey=" + fieldKey + ", " + "role=" + role + ", " + "dataType=" + dataType + "]";
+        }
     }
 
     /**
      * MetricView 数据记录。
      */
-    public record MetricView(
-            String metricKey,
-            String dataType
-    ) {
+    public static final class MetricView {
+
+        /**
+         * metricKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("metricKey")
+        private final String metricKey;
+
+        /**
+         * dataType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("dataType")
+        private final String dataType;
+
+        /**
+         * 创建 MetricView 实例。
+         *
+         * @param metricKey metricKey 字段值
+         * @param dataType dataType 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public MetricView(@com.fasterxml.jackson.annotation.JsonProperty("metricKey") String metricKey, @com.fasterxml.jackson.annotation.JsonProperty("dataType") String dataType) {
+            this.metricKey = metricKey;
+            this.dataType = dataType;
+        }
+
+        /**
+         * 返回metricKey 字段值。
+         *
+         * @return metricKey 字段值
+         */
+        public String metricKey() {
+            return metricKey;
+        }
+
+        /**
+         * 返回dataType 字段值。
+         *
+         * @return dataType 字段值
+         */
+        public String dataType() {
+            return dataType;
+        }
+
+        /**
+         * 判断两个 MetricView 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof MetricView that)) {
+                return false;
+            }
+            return java.util.Objects.equals(metricKey, that.metricKey) && java.util.Objects.equals(dataType, that.dataType);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(metricKey, dataType);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "MetricView[" + "metricKey=" + metricKey + ", " + "dataType=" + dataType + "]";
+        }
     }
 
     /**
      * GatedQueryRequest 数据记录。
      */
-    public record GatedQueryRequest(
-            BiQueryRequest query,
-            LocalDateTime from,
-            LocalDateTime to,
-            String mode,
-            boolean allowWarn
-    ) {
+    public static final class GatedQueryRequest {
+
+        /**
+         * query 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("query")
+        private final BiQueryRequest query;
+
+        /**
+         * from 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("from")
+        private final LocalDateTime from;
+
+        /**
+         * to 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("to")
+        private final LocalDateTime to;
+
+        /**
+         * mode 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("mode")
+        private final String mode;
+
+        /**
+         * allowWarn 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("allowWarn")
+        private final boolean allowWarn;
+
+        /**
+         * 创建 GatedQueryRequest 实例。
+         *
+         * @param query query 字段值
+         * @param from from 字段值
+         * @param to to 字段值
+         * @param mode mode 字段值
+         * @param allowWarn allowWarn 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public GatedQueryRequest(@com.fasterxml.jackson.annotation.JsonProperty("query") BiQueryRequest query, @com.fasterxml.jackson.annotation.JsonProperty("from") LocalDateTime from, @com.fasterxml.jackson.annotation.JsonProperty("to") LocalDateTime to, @com.fasterxml.jackson.annotation.JsonProperty("mode") String mode, @com.fasterxml.jackson.annotation.JsonProperty("allowWarn") boolean allowWarn) {
+            this.query = query;
+            this.from = from;
+            this.to = to;
+            this.mode = mode;
+            this.allowWarn = allowWarn;
+        }
+
+        /**
+         * 返回query 字段值。
+         *
+         * @return query 字段值
+         */
+        public BiQueryRequest query() {
+            return query;
+        }
+
+        /**
+         * 返回from 字段值。
+         *
+         * @return from 字段值
+         */
+        public LocalDateTime from() {
+            return from;
+        }
+
+        /**
+         * 返回to 字段值。
+         *
+         * @return to 字段值
+         */
+        public LocalDateTime to() {
+            return to;
+        }
+
+        /**
+         * 返回mode 字段值。
+         *
+         * @return mode 字段值
+         */
+        public String mode() {
+            return mode;
+        }
+
+        /**
+         * 返回allowWarn 字段值。
+         *
+         * @return allowWarn 字段值
+         */
+        public boolean allowWarn() {
+            return allowWarn;
+        }
+
+        /**
+         * 判断两个 GatedQueryRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof GatedQueryRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(query, that.query) && java.util.Objects.equals(from, that.from) && java.util.Objects.equals(to, that.to) && java.util.Objects.equals(mode, that.mode) && java.util.Objects.equals(allowWarn, that.allowWarn);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(query, from, to, mode, allowWarn);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "GatedQueryRequest[" + "query=" + query + ", " + "from=" + from + ", " + "to=" + to + ", " + "mode=" + mode + ", " + "allowWarn=" + allowWarn + "]";
+        }
     }
 
     /**
      * ContractGatedQueryRequest 数据记录。
      */
-    public record ContractGatedQueryRequest(
-            BiQueryRequest query,
-            String contractKey,
-            LocalDateTime from,
-            LocalDateTime to
-    ) {
+    public static final class ContractGatedQueryRequest {
+
+        /**
+         * query 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("query")
+        private final BiQueryRequest query;
+
+        /**
+         * contractKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("contractKey")
+        private final String contractKey;
+
+        /**
+         * from 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("from")
+        private final LocalDateTime from;
+
+        /**
+         * to 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("to")
+        private final LocalDateTime to;
+
+        /**
+         * 创建 ContractGatedQueryRequest 实例。
+         *
+         * @param query query 字段值
+         * @param contractKey contractKey 字段值
+         * @param from from 字段值
+         * @param to to 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public ContractGatedQueryRequest(@com.fasterxml.jackson.annotation.JsonProperty("query") BiQueryRequest query, @com.fasterxml.jackson.annotation.JsonProperty("contractKey") String contractKey, @com.fasterxml.jackson.annotation.JsonProperty("from") LocalDateTime from, @com.fasterxml.jackson.annotation.JsonProperty("to") LocalDateTime to) {
+            this.query = query;
+            this.contractKey = contractKey;
+            this.from = from;
+            this.to = to;
+        }
+
+        /**
+         * 返回query 字段值。
+         *
+         * @return query 字段值
+         */
+        public BiQueryRequest query() {
+            return query;
+        }
+
+        /**
+         * 返回contractKey 字段值。
+         *
+         * @return contractKey 字段值
+         */
+        public String contractKey() {
+            return contractKey;
+        }
+
+        /**
+         * 返回from 字段值。
+         *
+         * @return from 字段值
+         */
+        public LocalDateTime from() {
+            return from;
+        }
+
+        /**
+         * 返回to 字段值。
+         *
+         * @return to 字段值
+         */
+        public LocalDateTime to() {
+            return to;
+        }
+
+        /**
+         * 判断两个 ContractGatedQueryRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ContractGatedQueryRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(query, that.query) && java.util.Objects.equals(contractKey, that.contractKey) && java.util.Objects.equals(from, that.from) && java.util.Objects.equals(to, that.to);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(query, contractKey, from, to);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "ContractGatedQueryRequest[" + "query=" + query + ", " + "contractKey=" + contractKey + ", " + "from=" + from + ", " + "to=" + to + "]";
+        }
     }
 
     /**
      * EmbedQueryRequest 数据记录。
      */
-    public record EmbedQueryRequest(
-            String ticket,
-            String resourceType,
-            String resourceKey,
-            String widgetKey,
-            BiQueryRequest query
-    ) {
+    public static final class EmbedQueryRequest {
+
+        /**
+         * ticket 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("ticket")
+        private final String ticket;
+
+        /**
+         * resourceType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("resourceType")
+        private final String resourceType;
+
+        /**
+         * resourceKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("resourceKey")
+        private final String resourceKey;
+
+        /**
+         * widgetKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("widgetKey")
+        private final String widgetKey;
+
+        /**
+         * query 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("query")
+        private final BiQueryRequest query;
+
+        /**
+         * 创建 EmbedQueryRequest 实例。
+         *
+         * @param ticket ticket 字段值
+         * @param resourceType resourceType 字段值
+         * @param resourceKey resourceKey 字段值
+         * @param widgetKey widgetKey 字段值
+         * @param query query 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public EmbedQueryRequest(@com.fasterxml.jackson.annotation.JsonProperty("ticket") String ticket, @com.fasterxml.jackson.annotation.JsonProperty("resourceType") String resourceType, @com.fasterxml.jackson.annotation.JsonProperty("resourceKey") String resourceKey, @com.fasterxml.jackson.annotation.JsonProperty("widgetKey") String widgetKey, @com.fasterxml.jackson.annotation.JsonProperty("query") BiQueryRequest query) {
+            this.ticket = ticket;
+            this.resourceType = resourceType;
+            this.resourceKey = resourceKey;
+            this.widgetKey = widgetKey;
+            this.query = query;
+        }
+
+        /**
+         * 返回ticket 字段值。
+         *
+         * @return ticket 字段值
+         */
+        public String ticket() {
+            return ticket;
+        }
+
+        /**
+         * 返回resourceType 字段值。
+         *
+         * @return resourceType 字段值
+         */
+        public String resourceType() {
+            return resourceType;
+        }
+
+        /**
+         * 返回resourceKey 字段值。
+         *
+         * @return resourceKey 字段值
+         */
+        public String resourceKey() {
+            return resourceKey;
+        }
+
+        /**
+         * 返回widgetKey 字段值。
+         *
+         * @return widgetKey 字段值
+         */
+        public String widgetKey() {
+            return widgetKey;
+        }
+
+        /**
+         * 返回query 字段值。
+         *
+         * @return query 字段值
+         */
+        public BiQueryRequest query() {
+            return query;
+        }
+
+        /**
+         * 判断两个 EmbedQueryRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof EmbedQueryRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(ticket, that.ticket) && java.util.Objects.equals(resourceType, that.resourceType) && java.util.Objects.equals(resourceKey, that.resourceKey) && java.util.Objects.equals(widgetKey, that.widgetKey) && java.util.Objects.equals(query, that.query);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(ticket, resourceType, resourceKey, widgetKey, query);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "EmbedQueryRequest[" + "ticket=" + ticket + ", " + "resourceType=" + resourceType + ", " + "resourceKey=" + resourceKey + ", " + "widgetKey=" + widgetKey + ", " + "query=" + query + "]";
+        }
     }
 }

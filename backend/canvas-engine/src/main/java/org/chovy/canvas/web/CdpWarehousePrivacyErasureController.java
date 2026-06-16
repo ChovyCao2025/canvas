@@ -27,11 +27,29 @@ import java.util.List;
 @RequestMapping("/warehouse/privacy/erasure")
 public class CdpWarehousePrivacyErasureController {
 
+    /**
+     * erasure服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehousePrivacyErasureService erasureService;
+    /**
+     * 执行服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehousePrivacyErasureExecutionService executionService;
+    /**
+     * rebuild服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehousePrivacyAudienceBitmapRebuildService rebuildService;
+    /**
+     * automation服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService;
+    /**
+     * automationrun服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService automationRunService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -170,6 +188,12 @@ public class CdpWarehousePrivacyErasureController {
             @RequestBody CdpWarehousePrivacyErasureExecutionService.ErasureExecutionCommand command) {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> {
                     if (executionService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param configured" configured"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("privacy erasure execution service is not configured");
                     }
                     return R.ok(executionService.execute(tenantId, id, command));
@@ -193,6 +217,12 @@ public class CdpWarehousePrivacyErasureController {
             @RequestBody CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildCommand command) {
         return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> {
                     if (rebuildService == null) {
+                        /**
+                         * 执行 illegalstateexception 对应的内部处理流程。
+                         *
+                         * @param configured" configured"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalStateException("privacy audience bitmap rebuild service is not configured");
                     }
                     return R.ok(rebuildService.rebuild(tenantId, id, command));

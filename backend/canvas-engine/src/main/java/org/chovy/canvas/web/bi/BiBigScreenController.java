@@ -26,7 +26,13 @@ import java.util.List;
 @RequestMapping("/canvas/bi/big-screens/resources")
 public class BiBigScreenController {
 
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * bigscreen资源服务，用于承接对应业务能力和领域编排。
+     */
     private final BiBigScreenResourceService bigScreenResourceService;
 
     /**
@@ -86,6 +92,12 @@ public class BiBigScreenController {
                                                   @RequestBody BiBigScreenResource resource) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     if (!screenKey.equals(resource.screenKey())) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param path" path"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("big screen key does not match request path");
                     }
                     return R.ok(bigScreenResourceService.saveDraft(

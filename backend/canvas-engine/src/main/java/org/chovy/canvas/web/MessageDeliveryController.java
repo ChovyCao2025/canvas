@@ -25,7 +25,13 @@ import java.util.Map;
 @RequestMapping("/message-deliveries")
 public class MessageDeliveryController {
 
+    /**
+     * outbox服务，用于承接对应业务能力和领域编排。
+     */
     private final DeliveryOutboxService outboxService;
+    /**
+     * reconciliationjob，用于保存请求处理过程中需要的业务数据。
+     */
     private final DeliveryReconciliationJob reconciliationJob;
 
     /**

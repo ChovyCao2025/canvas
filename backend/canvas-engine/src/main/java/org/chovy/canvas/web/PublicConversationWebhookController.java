@@ -31,13 +31,31 @@ import java.util.Map;
 @RequestMapping({"/public/conversation-webhooks", "/public/conversations/webhooks"})
 public class PublicConversationWebhookController {
 
+    /**
+     * map类型常量，用于保持控制器内部规则一致。
+     */
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
     };
 
+    /**
+     * adapterharness，用于保存请求处理过程中需要的业务数据。
+     */
     private final ConversationAdapterHarness adapterHarness;
+    /**
+     * whatsapp数据访问组件，用于访问和持久化对应数据。
+     */
     private final WhatsAppWebhookPayloadMapper whatsAppMapper;
+    /**
+     * security服务，用于承接对应业务能力和领域编排。
+     */
     private final WhatsAppWebhookSecurityService securityService;
+    /**
+     * 对象数据访问组件，用于访问和持久化对应数据。
+     */
     private final ObjectMapper objectMapper;
+    /**
+     * outbox服务，用于承接对应业务能力和领域编排。
+     */
     private final DeliveryOutboxService outboxService;
 
     /**

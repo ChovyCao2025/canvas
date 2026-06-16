@@ -28,8 +28,17 @@ import java.util.List;
  */
 public class CdpWarehouseFieldGovernanceController {
 
+    /**
+     * governance服务，用于承接对应业务能力和领域编排。
+     */
     private final CdpWarehouseFieldGovernanceService governanceService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
+    /**
+     * 数据集spec解析器，用于保存请求处理过程中需要的业务数据。
+     */
     private final BiDatasetSpecResolver datasetSpecResolver;
 
     /**
@@ -164,21 +173,67 @@ public class CdpWarehouseFieldGovernanceController {
      * FieldPolicyReq 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
      */
     public static class FieldPolicyReq {
+        /**
+         * 数据集键，用于保存请求处理过程中需要的业务数据。
+         */
         private String datasetKey;
+        /**
+         * field键，用于保存请求处理过程中需要的业务数据。
+         */
         private String fieldKey;
+        /**
+         * physical名称，用于保存请求处理过程中需要的业务数据。
+         */
         private String physicalName;
+        /**
+         * column名称，用于保存请求处理过程中需要的业务数据。
+         */
         private String columnName;
+        /**
+         * value类型，用于保存请求处理过程中需要的业务数据。
+         */
         private String valueType;
+        /**
+         * semantic类型，用于保存请求处理过程中需要的业务数据。
+         */
         private String semanticType;
+        /**
+         * piilevel，用于保存请求处理过程中需要的业务数据。
+         */
         private String piiLevel;
+        /**
+         * accesspolicy，用于保存请求处理过程中需要的业务数据。
+         */
         private String accessPolicy;
+        /**
+         * min角色，用于保存请求处理过程中需要的业务数据。
+         */
         private String minRole;
+        /**
+         * allowedusages，用于保存请求处理过程中需要的业务数据。
+         */
         private String allowedUsages;
+        /**
+         * mask策略，用于保存请求处理过程中需要的业务数据。
+         */
         private String maskStrategy;
+        /**
+         * lifecycle状态，用于保存请求处理过程中需要的业务数据。
+         */
         private String lifecycleStatus;
+        /**
+         * owner名称，用于保存请求处理过程中需要的业务数据。
+         */
         private String ownerName;
+        /**
+         * description，用于保存请求处理过程中需要的业务数据。
+         */
         private String description;
 
+        /**
+         * 执行 目标command 对应的内部处理流程。
+         * @return 返回内部处理结果
+         */
         CdpWarehouseFieldGovernanceService.FieldPolicyCommand toCommand() {
             return new CdpWarehouseFieldGovernanceService.FieldPolicyCommand(
                     datasetKey,

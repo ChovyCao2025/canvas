@@ -21,18 +21,30 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Returns BI embed resources only after a ticket has been checked against resource scope and request origin.
+ * 在嵌入票据通过资源范围和请求来源校验后返回 BI 嵌入资源。
  *
- * <p>The first verification reads ticket metadata for scope checks; the second binds actual use to the
- * Origin/Referer value before resource data is loaded.</p>
+ * <p>第一次校验读取票据元数据以确认资源范围，第二次校验绑定实际访问的 Origin/Referer，
+ * 避免未授权来源在加载资源数据前绕过票据约束。</p>
  */
 @RestController
 @RequestMapping("/canvas/bi/embed/resources")
 public class BiEmbedResourceController {
 
+    /**
+     * embedticket服务，用于承接对应业务能力和领域编排。
+     */
     private final BiEmbedTicketService embedTicketService;
+    /**
+     * 仪表盘资源服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDashboardResourceService dashboardResourceService;
+    /**
+     * 运行态状态服务，用于承接对应业务能力和领域编排。
+     */
     private final BiDashboardRuntimeStateService runtimeStateService;
+    /**
+     * 门户运行态服务，用于承接对应业务能力和领域编排。
+     */
     private final BiPortalRuntimeService portalRuntimeService;
 
     /**
@@ -93,6 +105,12 @@ public class BiEmbedResourceController {
             @RequestHeader(value = "Referer", required = false) String referer) {
         return Mono.fromCallable(() -> {
                     if (request == null) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("embed dashboard resource request is required");
                     }
                     BiEmbedTicketPayload preview = embedTicketService.verify(request.ticket());
@@ -123,6 +141,12 @@ public class BiEmbedResourceController {
             @RequestHeader(value = "Referer", required = false) String referer) {
         return Mono.fromCallable(() -> {
                     if (request == null) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("embed dashboard resource request is required");
                     }
                     BiEmbedTicketPayload preview = embedTicketService.verify(request.ticket());
@@ -155,6 +179,12 @@ public class BiEmbedResourceController {
             @RequestHeader(value = "Referer", required = false) String referer) {
         return Mono.fromCallable(() -> {
                     if (request == null) {
+                        /**
+                         * 执行 illegalargumentexception 对应的内部处理流程。
+                         *
+                         * @param required" required"，由调用方提供
+                         * @return 返回内部处理结果
+                         */
                         throw new IllegalArgumentException("embed portal resource request is required");
                     }
                     BiEmbedTicketPayload preview = embedTicketService.verify(request.ticket());
@@ -181,13 +211,31 @@ public class BiEmbedResourceController {
     private void enforceDashboardResourceScope(BiEmbedTicketPayload payload, EmbedDashboardResourceRequest request) {
         // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (payload == null) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed ticket is required");
         }
         if (!"DASHBOARD".equalsIgnoreCase(payload.resourceType())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param tickets" tickets"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed resource only supports dashboard tickets");
         }
         if (!equalsIgnoreCase(payload.resourceType(), request.resourceType())
                 || !payload.resourceKey().equals(request.resourceKey())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param ticket" ticket"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed dashboard resource does not match ticket");
         }
     }
@@ -202,6 +250,12 @@ public class BiEmbedResourceController {
                                                                     EmbedDashboardResourceRequest request) {
         // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (payload == null) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed ticket is required");
         }
         if ("DASHBOARD".equalsIgnoreCase(payload.resourceType())) {
@@ -210,12 +264,30 @@ public class BiEmbedResourceController {
             return;
         }
         if (!"PORTAL".equalsIgnoreCase(payload.resourceType())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param tickets" tickets"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed resource only supports dashboard or portal tickets");
         }
         if (!"DASHBOARD".equalsIgnoreCase(request.resourceType())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param resources" resources"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI portal ticket can only open dashboard menu resources");
         }
         if (!portalContainsDashboard(payload, request.resourceKey())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param menu" menu"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed dashboard resource is not declared in portal menu");
         }
     }
@@ -229,13 +301,31 @@ public class BiEmbedResourceController {
     private void enforcePortalResourceScope(BiEmbedTicketPayload payload, EmbedDashboardResourceRequest request) {
         // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (payload == null) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed ticket is required");
         }
         if (!"PORTAL".equalsIgnoreCase(payload.resourceType())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param tickets" tickets"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed resource only supports portal tickets");
         }
         if (!equalsIgnoreCase(payload.resourceType(), request.resourceType())
                 || !payload.resourceKey().equals(request.resourceKey())) {
+            /**
+             * 执行 securityexception 对应的内部处理流程。
+             *
+             * @param ticket" ticket"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new SecurityException("BI embed portal resource does not match ticket");
         }
     }
@@ -288,6 +378,12 @@ public class BiEmbedResourceController {
      */
     private BiDashboardRuntimeStateService requireRuntimeStateService() {
         if (runtimeStateService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI dashboard runtime state service is required");
         }
         return runtimeStateService;
@@ -300,6 +396,12 @@ public class BiEmbedResourceController {
      */
     private BiPortalRuntimeService requirePortalRuntimeService() {
         if (portalRuntimeService == null) {
+            /**
+             * 执行 illegalstateexception 对应的内部处理流程。
+             *
+             * @param required" required"，由调用方提供
+             * @return 返回内部处理结果
+             */
             throw new IllegalStateException("BI portal runtime service is required");
         }
         return portalRuntimeService;
@@ -308,10 +410,102 @@ public class BiEmbedResourceController {
     /**
      * EmbedDashboardResourceRequest 数据记录。
      */
-    public record EmbedDashboardResourceRequest(
-            String ticket,
-            String resourceType,
-            String resourceKey
-    ) {
+    public static final class EmbedDashboardResourceRequest {
+
+        /**
+         * ticket 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("ticket")
+        private final String ticket;
+
+        /**
+         * resourceType 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("resourceType")
+        private final String resourceType;
+
+        /**
+         * resourceKey 字段值。
+         */
+        @com.fasterxml.jackson.annotation.JsonProperty("resourceKey")
+        private final String resourceKey;
+
+        /**
+         * 创建 EmbedDashboardResourceRequest 实例。
+         *
+         * @param ticket ticket 字段值
+         * @param resourceType resourceType 字段值
+         * @param resourceKey resourceKey 字段值
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public EmbedDashboardResourceRequest(@com.fasterxml.jackson.annotation.JsonProperty("ticket") String ticket, @com.fasterxml.jackson.annotation.JsonProperty("resourceType") String resourceType, @com.fasterxml.jackson.annotation.JsonProperty("resourceKey") String resourceKey) {
+            this.ticket = ticket;
+            this.resourceType = resourceType;
+            this.resourceKey = resourceKey;
+        }
+
+        /**
+         * 返回ticket 字段值。
+         *
+         * @return ticket 字段值
+         */
+        public String ticket() {
+            return ticket;
+        }
+
+        /**
+         * 返回resourceType 字段值。
+         *
+         * @return resourceType 字段值
+         */
+        public String resourceType() {
+            return resourceType;
+        }
+
+        /**
+         * 返回resourceKey 字段值。
+         *
+         * @return resourceKey 字段值
+         */
+        public String resourceKey() {
+            return resourceKey;
+        }
+
+        /**
+         * 判断两个 EmbedDashboardResourceRequest 实例是否包含相同字段值。
+         *
+         * @param o 待比较对象
+         * @return 字段值全部一致时返回 true
+         */
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof EmbedDashboardResourceRequest that)) {
+                return false;
+            }
+            return java.util.Objects.equals(ticket, that.ticket) && java.util.Objects.equals(resourceType, that.resourceType) && java.util.Objects.equals(resourceKey, that.resourceKey);
+        }
+
+        /**
+         * 根据全部字段生成哈希值。
+         *
+         * @return 字段哈希值
+         */
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(ticket, resourceType, resourceKey);
+        }
+
+        /**
+         * 返回与原记录形态一致的调试字符串。
+         *
+         * @return 字段调试字符串
+         */
+        @Override
+        public String toString() {
+            return "EmbedDashboardResourceRequest[" + "ticket=" + ticket + ", " + "resourceType=" + resourceType + ", " + "resourceKey=" + resourceKey + "]";
+        }
     }
 }

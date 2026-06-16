@@ -46,9 +46,21 @@ import java.util.List;
 @RequestMapping("/canvas/conversations/workspace")
 public class ConversationWorkspaceController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final ConversationWorkspaceService service;
+    /**
+     * routing服务，用于承接对应业务能力和领域编排。
+     */
     private final ConversationRoutingService routingService;
+    /**
+     * aireply服务，用于承接对应业务能力和领域编排。
+     */
     private final ConversationAiReplyService aiReplyService;
+    /**
+     * 租户上下文解析器，用于保证接口在当前租户边界内执行。
+     */
     private final TenantContextResolver tenantContextResolver;
 
     /**
@@ -69,13 +81,6 @@ public class ConversationWorkspaceController {
         this.tenantContextResolver = tenantContextResolver;
     }
 
-    /**
-     * 执行 ConversationWorkspaceController 流程，围绕 conversation workspace controller 完成校验、计算或结果组装。
-     *
-     * @param service 依赖组件，用于完成数据访问或外部能力调用。
-     * @param routingService 依赖组件，用于完成数据访问或外部能力调用。
-     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
-     */
     ConversationWorkspaceController(ConversationWorkspaceService service,
                                     ConversationRoutingService routingService,
                                     TenantContextResolver tenantContextResolver) {

@@ -19,6 +19,9 @@ import reactor.core.scheduler.Schedulers;
 @RequestMapping("/public/marketing-monitoring/webhooks")
 public class PublicMarketingMonitoringWebhookController {
 
+    /**
+     * 服务，用于承接对应业务能力和领域编排。
+     */
     private final MarketingMonitorWebhookIngestionService service;
 
     /**
